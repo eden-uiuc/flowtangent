@@ -14,6 +14,7 @@ from typing import Callable, Iterable, Self, TypeVar, List
 # package imports
 import pandas as pd
 import chex
+from jax.experimental.sparse import value_and_grad
 
 # RCAIDE imports
 from RCAIDE.Framework import State, Settings, System
@@ -286,15 +287,18 @@ class Process:
                           self.initial_settings,
                           self.initial_system)
     
-        for index, step in enumerate(self.steps[self.initial_step:-1]):
-            framework_args = step(*framework_args)
+        for index, step in enumerate(self.steps[self.initial_step:]):
+
+            step.state = framework_args[0]
+            step.settings = framework_args[1]
+            step.system = framework_args[2]
+
+            framework_args = step()
+
             self.steps[index].last_result = framework_args
             self.details.at[index, 'Last Result'] = framework_args
-    
-        results = self.steps[-1](*framework_args)
-        self.details.at[len(self.steps)-1, 'Last Result'] = results
-    
-        return results
+
+        return framework_args
 
     def append(self, step: ProcessStep | Self):
         """
@@ -745,13 +749,6 @@ if __name__ == "__main__":
 
     import numpy as np
 
-    x = np.array([1, 2, 3, 4, 5])
-    y = np.array([2, 4, 6, 8, 10])
-
-    st = State()
-    st.x = x
-    st.y = y
-
     def lib_sq_func(x):
         return x**2
 
@@ -788,8 +785,19 @@ if __name__ == "__main__":
 
     proc = Process(
         steps=[sq_step, add_step],
-        initial_state=st
     )
 
-    st, set, sys = proc()
-    print(st.x)  # [1, 4, 9, 16, 25]
+    def sq_add_func(x, y):
+        proc.initial_state.x = x
+        proc.initial_state.y = y
+        st, set, sys = proc()
+        return st.x
+
+    from jax import value_and_grad
+
+    sq_grad = value_and_grad(sq_add_func)
+
+    results = sq_grad(3., 6.)
+
+    print(results)
+
