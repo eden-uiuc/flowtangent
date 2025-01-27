@@ -89,7 +89,8 @@ class Conditions:
         - Nested Conditions objects are expanded recursively.
 
         """
-        rows = max(1, int(rows) + self.row_size_adjustment)
+        max_rows = int(rows) + self.row_size_adjustment
+        rows = max(1, max_rows)
         self._number_of_rows = rows
 
         for k, v in vars(self).items():

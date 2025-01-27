@@ -41,5 +41,5 @@ class State(Conditions):
     unknowns:           Conditions                  = field(default_factory=lambda: Conditions(name='Unknowns'))
     residuals:          Conditions                  = field(default_factory=lambda: Conditions(name='Residuals'))
 
-    def __post_init__(self):
-        self.initials = State(name='Initial State')
+    # def __post_init__(self):
+        # self.initials = State(name='Initial State')

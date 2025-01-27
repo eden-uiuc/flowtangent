@@ -132,8 +132,8 @@ class Numerics(Conditions):
         """
         if not self.discretization_method:
             self.discretization_method = lambda: chebyshev_matrices(n=self.number_of_control_points,
-                                                                    calculate_integration=self.calculate_integration,
-                                                                    spacing=self.control_point_spacing)
+                                                                    calculate_integration=self.calculate_integration)
+                                                                    # spacing_function=self.control_point_spacing)
 
         (self.dimensionless.control_points,
          self.dimensionless.differentiate,

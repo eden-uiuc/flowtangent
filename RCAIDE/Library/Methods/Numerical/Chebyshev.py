@@ -24,6 +24,7 @@ import RCAIDE.Framework as rcf
 
 
 def chebyshev_matrices(n: int = 16,
+                       calculate_integration: bool = True,
                        spacing_function: Callable = lambda n: 0.5 * (1 - np.cos(np.pi * np.arange(n) / (n - 1)))
                        ):
     """
@@ -79,12 +80,15 @@ def chebyshev_matrices(n: int = 16,
 
     D -= np.diag(np.sum(D.T, axis=0))
 
-    # Invert D, trimming first row and column
-    I = np.linalg.inv(D[1:, 1:])
+    if calculate_integration:
+        # Invert D, trimming first row and column
+        I = np.linalg.inv(D[1:, 1:])
 
-    # Repack missing columns with zeros
-    I = np.append(np.zeros((1, n - 1)), I, axis=0)
-    I = np.append(np.zeros((n, 1)), I, axis=1)
+        # Repack missing columns with zeros
+        I = np.append(np.zeros((1, n - 1)), I, axis=0)
+        I = np.append(np.zeros((n, 1)), I, axis=1)
+    else:
+        I = None
 
     return np.atleast_2d(x), D, I
 
