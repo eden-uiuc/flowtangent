@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import dataclasses
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import Callable, Iterable, Self, TypeVar, List
 
 # package imports
@@ -191,8 +191,8 @@ class Process:
 
     name:               str                 = "Process"
 
-    steps:              List[ProcessStep | ProcessType] = field(default_factory=list)
-    details:            pd.DataFrame                    = field(default_factory=_create_details)
+    steps:              List[Callable]      = field(default_factory=list)
+    details:            pd.DataFrame        = field(default_factory=_create_details)
 
     step:               int                 = 0
     initial_step:       int                 = 0
@@ -295,10 +295,14 @@ class Process:
 
             framework_args = step()
 
-            self.steps[index].last_result = framework_args
-            self.details.at[index, 'Last Result'] = framework_args
+            self.steps[self.initial_step + index].last_result = framework_args
+            self.details.at[self.initial_step + index, 'Last Result'] = framework_args
 
         return framework_args
+
+    def run(self, *args, **kwargs):
+
+        return self(*args, **kwargs)
 
     def append(self, step: ProcessStep | Self):
         """
@@ -731,6 +735,15 @@ class Process:
         --------
         """
 
+        if any(not isinstance(s, ProcessStep) for s in self.steps):
+            if not all(isinstance(s, Callable) for s in self.steps):
+                raise ValueError("All process steps must be ProcessSteps, or callable functions/objects.")
+            else:
+                for i, step in enumerate(self.steps):
+                    if not (isinstance(step, ProcessStep) or isinstance(step, Process)):
+                        self.steps[i] = ProcessStep(function=step,
+                                                    name=step.__name__)
+
         new_details_list = [[step.name,
                              step.function.__name__,
                              step.last_result]
@@ -771,26 +784,15 @@ if __name__ == "__main__":
 
         return State, Settings, System
 
-    sq_step = ProcessStep(
-        function=fw_sq_func,
-        name="Square",
-        last_result=None
-    )
-
-    add_step = ProcessStep(
-        function=fw_add_func,
-        name="Add",
-        last_result=None
-    )
-
-    proc = Process(
-        steps=[sq_step, add_step],
+    square_and_add = Process(
+        steps=[fw_sq_func, fw_add_func],
+        initial_step=0
     )
 
     def sq_add_func(x, y):
-        proc.initial_state.x = x
-        proc.initial_state.y = y
-        st, set, sys = proc()
+        square_and_add.initial_state.x = x
+        square_and_add.initial_state.y = y
+        st, set, sys = square_and_add.run()
         return st.x
 
     from jax import value_and_grad
@@ -799,5 +801,6 @@ if __name__ == "__main__":
 
     results = sq_grad(3., 6.)
 
+    print(square_and_add.details)
     print(results)
 
