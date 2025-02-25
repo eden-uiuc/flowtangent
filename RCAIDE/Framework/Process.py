@@ -50,7 +50,6 @@ def skip(*args, **kwargs):
     return *args, kwargs
 
 
-
 @chex.dataclass(kw_only=True)
 class ProcessStep:
     """
@@ -134,16 +133,14 @@ def _create_details():
 
     return details
 
-# TypeVar for Process, used to type hint that Process objects can contain either ProcessStep or Process objects.
-ProcessType = TypeVar('ProcessType', bound='Process')
-
 
 @chex.dataclass(kw_only=True)
 class Process:
     """
     A class representing a process made up of multiple process steps.
 
-    Attributes:
+    Attributes
+    __________
     name    (str):                              The name of the process. Default is "Process".
     steps   (List[ProcessStep | ProcessType]):  A list of process steps in the process. Default is an empty list.
     details (pd.DataFrame):                     A pandas DataFrame to store process step details. Default is a DataFrame
@@ -160,7 +157,8 @@ class Process:
     settings    (Settings): The current settings during the process. Default is None.
     system      (System):   The current system during the process. Default is None.
 
-    Methods:
+    Methods
+    _______
     __getitem__(self, item):    Returns the process step at the specified index.
     __delitem__(self, key):     Deletes the process step at the specified index.
     
@@ -275,10 +273,10 @@ class Process:
     
         Notes
         -----
-        The function updates the details DataFrame before executing the process steps.
-        The state, settings, and system are passed to each process step in the order they are defined in the steps list.
-        The last result of each process step is stored in the corresponding ProcessStep object and in the details DataFrame.
-        The return value of the last process step is returned as the result of the __call__ method.
+        - The function updates the details DataFrame before executing the process steps.
+        - The state, settings, and system are passed to each process step in the order they are defined in the steps list.
+        - The last result of each process step is stored in the corresponding ProcessStep object and in the details DataFrame.
+        - The return value of the last process step is returned as the result of the __call__ method.
         """
     
         self.update_details()
