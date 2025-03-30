@@ -91,7 +91,7 @@ def airfoil_analysis(airfoil_geometry,alpha,Re_L, batch_analysis = True, airfoil
         
 
     # Solving for velocity distribution  
-    X,Y,vt,normals = hess_smith(ncases,ncpts,x_coord_3d,y_coord_3d,alpha,Re_L,npanel)  
+    X,Y,vt,normals = hess_smith(x_coord_3d,y_coord_3d,alpha,Re_L,npanel)
     
     # Reynolds number 
     RE_L_VALS = Re_L.T 
