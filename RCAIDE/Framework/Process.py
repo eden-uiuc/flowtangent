@@ -783,14 +783,14 @@ if __name__ == "__main__":
         last_result=None
     )
 
-    proc = Process(
+    square_and_add = Process(
         steps=[sq_step, add_step],
     )
 
     def sq_add_func(x, y):
         proc.initial_state.x = x
         proc.initial_state.y = y
-        st, set, sys = proc()
+        st, set, sys = square_and_add()
         return st.x
 
     from jax import value_and_grad

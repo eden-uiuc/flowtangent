@@ -3,10 +3,37 @@
 # 
 # Created: Jun 2024, RCAIDE Team
 
+from RCAIDE.Framework as rcf
+
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_ram_performance
 # ----------------------------------------------------------------------------------------------------------------------     
-def compute_ram_performance(ram,ram_conditions, freestream):
+
+def func_ram_performance(M0,
+                         P0,
+                         T0,
+                         g):
+
+    P_t = P0 * (1 + (g - 1)/2 * M0**2) ** (g / (g-1))   # Stagnation Pressure
+    T_t = T0 * (1 + (g - 1)/2 * M0**2)                  # Stagnation Temperature
+
+    return P_t, T_t
+
+def ram_performance(State: rcf.State,
+                    System: rcf.Sustem,
+                    Settings: rcf.Settings):
+
+    M0 = State.freestream.mach_number
+    P0 = State.freestream.pressure
+    T0 = State.freestream.temperature
+
+    F = System.propulsors.turbofan.ram.working_fluid
+    g = np.polyval(F.gamma_coefficients, T0)
+
+    P_t, T_t = func_ram_performance(M0, P0, T0, g)
+
+
+def compute_ram_performance(ram, ram_conditions, freestream):
     """ This computes the output values from the input values according T0
     equations from the source. The following properties are determined 
         conditions.freestream.
@@ -50,12 +77,12 @@ def compute_ram_performance(ram,ram_conditions, freestream):
  
     # Compute the working fluid properties
     R      = working_fluid.gas_specific_constant
-    gamma  = working_fluid.compute_gamma(T0,P0) 
-    Cp     = working_fluid.compute_cp(T0,P0)
+    gamma  = working_fluid.compute_gamma(T0, P0)
+    Cp     = working_fluid.compute_cp(T0, P0)
 
     # Compute the stagnation quantities from the input static quantities
-    stagnation_pressure    = P0*((1.+(gamma-1.)/2.*M0*M0 )**(gamma/(gamma-1.))) 
-    stagnation_temperature = T0*(1.+((gamma-1.)/2.*M0*M0))
+    stagnation_pressure    = P0 * ((1.+(gamma-1.)/2.*M0*M0 )**(gamma/(gamma-1.)))
+    stagnation_temperature = T0 * (1.+((gamma-1.)/2.*M0*M0))
 
     # Store values into flight conditions data structure  
     freestream.isentropic_expansion_factor          = gamma
@@ -71,4 +98,4 @@ def compute_ram_performance(ram,ram_conditions, freestream):
     ram_conditions.outputs.stagnation_temperature              = stagnation_temperature
     ram_conditions.outputs.stagnation_pressure                 = stagnation_pressure    
     
-    return 
+    return
