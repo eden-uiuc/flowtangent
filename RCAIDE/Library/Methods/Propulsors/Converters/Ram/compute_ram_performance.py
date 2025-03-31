@@ -3,34 +3,9 @@
 # 
 # Created: Jun 2024, RCAIDE Team
 
-from RCAIDE.Framework as rcf
-
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_ram_performance
-# ----------------------------------------------------------------------------------------------------------------------     
-
-def func_ram_performance(M0,
-                         P0,
-                         T0,
-                         g):
-
-    P_t = P0 * (1 + (g - 1)/2 * M0**2) ** (g / (g-1))   # Stagnation Pressure
-    T_t = T0 * (1 + (g - 1)/2 * M0**2)                  # Stagnation Temperature
-
-    return P_t, T_t
-
-def ram_performance(State: rcf.State,
-                    System: rcf.Sustem,
-                    Settings: rcf.Settings):
-
-    M0 = State.freestream.mach_number
-    P0 = State.freestream.pressure
-    T0 = State.freestream.temperature
-
-    F = System.propulsors.turbofan.ram.working_fluid
-    g = np.polyval(F.gamma_coefficients, T0)
-
-    P_t, T_t = func_ram_performance(M0, P0, T0, g)
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 def compute_ram_performance(ram, ram_conditions, freestream):

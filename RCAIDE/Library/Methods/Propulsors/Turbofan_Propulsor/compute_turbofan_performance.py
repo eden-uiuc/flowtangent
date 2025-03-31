@@ -171,8 +171,8 @@ def compute_performance(state,
     combustor_conditions.inputs.stagnation_temperature                = hpc_conditions.outputs.stagnation_temperature
     combustor_conditions.inputs.stagnation_pressure                   = hpc_conditions.outputs.stagnation_pressure
 
-    #flow through the high pressor comprresor
-    compute_combustor_performance(combustor,combustor_conditions, freestream)
+    #flow through the high pressor compressor
+    compute_combustor_performance(combustor, combustor_conditions, freestream)
 
     # link the shaft power output to the low pressure compressor
     try:
