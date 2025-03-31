@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 
 
 @dataclass
-class NetworkConditions(Conditions):
+class EnergyNetworkConditions(Conditions):
     """
     Represents the conditions of an energy network in a simulation.
 
@@ -142,6 +142,8 @@ class EnergyConverterConditions(Conditions):
     x_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     y_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     z_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    outputs:            Conditions  = field(default_factory=lambda: Conditions(name='Energy Converter Outputs'))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -285,7 +287,7 @@ class FuelConditions(EnergyStoreConditions):
 
 class TestNetworkConditions(unittest.TestCase):
     def setUp(self):
-        self.network = NetworkConditions()
+        self.network = EnergyNetworkConditions()
 
     def test_default_values(self):
         self.assertEqual(self.network.name, 'Energy Network')

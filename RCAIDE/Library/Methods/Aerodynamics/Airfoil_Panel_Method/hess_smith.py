@@ -61,4 +61,4 @@ def hess_smith(x_coord,y_coord,alpha,Re,npanel):
     # compute the tangential velocity distribution at the midpoint of panels 
     vt            = velocity_distribution(qg,x_coord,y_coord,xbar,ybar,st,ct,alpha_2d,npanel,ncases,ncpts)
     
-    return  xbar,ybar,vt,norm 
+    return xbar,ybar,vt,norm

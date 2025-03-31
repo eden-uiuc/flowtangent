@@ -18,13 +18,15 @@ from RCAIDE.Library.Methods.Propulsors.Converters.Expansion_Nozzle   import comp
 from RCAIDE.Library.Methods.Propulsors.Converters.Compression_Nozzle import compute_compression_nozzle_performance
 from RCAIDE.Library.Methods.Propulsors.Turbofan_Propulsor            import compute_thrust
 
-import  numpy as  np
+import numpy as np
 
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_performance
 # ---------------------------------------------------------------------------------------------------------------------- 
+
+
 ## @ingroup Methods-Energy-Propulsors-Turbofan_Propulsor
-def compute_turbofan_performance(fuel_line,state,center_of_gravity=[[0.0, 0.0, 0.0]]):  
+def compute_turbofan_performance(fuel_line,state,center_of_gravity=[[0.0, 0.0, 0.0]]):
     ''' Computes the perfomrance of all turbofan engines connected to a fuel tank
     
     Assumptions: 
@@ -52,22 +54,30 @@ def compute_turbofan_performance(fuel_line,state,center_of_gravity=[[0.0, 0.0, 0
     total_moment    = 0*state.ones_row(3)
     stored_results_flag  = False  
     
-    for turbofan in fuel_line.propulsors:  
+    for turbofan in fuel_line.propulsors:
         if turbofan.active == True:  
-            if fuel_line.identical_propulsors == False:
+            if fuel_line.identical_propulsors==False:
                 # run analysis  
-                total_thrust,total_moment,total_power ,stored_results_flag,stored_propulsor_tag = compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total_power,center_of_gravity)
+                total_thrust, total_moment, total_power, stored_results_flag, stored_propulsor_tag = compute_performance(state, fuel_line, turbofan, total_thrust, total_moment, total_power, center_of_gravity)
             else:             
-                if stored_results_flag == False: 
+                if stored_results_flag==False:
                     # run analysis 
-                    total_thrust,total_moment,total_power ,stored_results_flag,stored_propulsor_tag = compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total_power,center_of_gravity)
+                    total_thrust, total_moment, total_power, stored_results_flag, stored_propulsor_tag = compute_performance(state, fuel_line, turbofan, total_thrust, total_moment, total_power, center_of_gravity)
                 else:
                     # use old results 
-                    total_thrust,total_moment,total_power  = reuse_stored_data(state,fuel_line,turbofan,stored_propulsor_tag,total_thrust,total_moment,total_power,center_of_gravity)
+                    total_thrust, total_moment, total_power  = reuse_stored_data(state, fuel_line, turbofan, stored_propulsor_tag, total_thrust, total_moment, total_power, center_of_gravity)
                 
-    return total_thrust,total_moment,total_power
+    return total_thrust, total_moment, total_power
 
-def compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total_power, center_of_gravity= [[0.0, 0.0,0.0]]):  
+
+def compute_performance(state,
+                        fuel_line,
+                        turbofan,
+                        total_thrust,
+                        total_moment,
+                        total_power,
+                        center_of_gravity=[[0.0, 0.0, 0.0]]):
+
     ''' Computes the perfomrance of one turbofan
     
     Assumptions: 
@@ -92,7 +102,8 @@ def compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total
     Properties Used: 
     N.A.        
     ''' 
-    conditions                = state.conditions   
+
+    conditions                = state.conditions
     noise_conditions          = conditions.noise[fuel_line.tag][turbofan.tag] 
     turbofan_conditions       = conditions.energy[fuel_line.tag][turbofan.tag] 
     ram                       = turbofan.ram
@@ -123,24 +134,24 @@ def compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total
     #Creating the network by manually linking the different components
 
     #set the working fluid to determine the fluid properties
-    ram.working_fluid                               = turbofan.working_fluid
+    ram.working_fluid = turbofan.working_fluid
 
     #Flow through the ram , this computes the necessary flow quantities and stores it into conditions
-    compute_ram_performance(ram,ram_conditions, freestream)
+    compute_ram_performance(ram, ram_conditions, freestream)
 
     #link inlet nozzle to ram 
     inlet_nozzle_conditions.inputs.stagnation_temperature             = ram_conditions.outputs.stagnation_temperature 
     inlet_nozzle_conditions.inputs.stagnation_pressure                = ram_conditions.outputs.stagnation_pressure
 
     #Flow through the inlet nozzle
-    compute_compression_nozzle_performance(inlet_nozzle,inlet_nozzle_conditions, freestream)
+    compute_compression_nozzle_performance(inlet_nozzle, inlet_nozzle_conditions, freestream)
 
     #--link low pressure compressor to the inlet nozzle
     lpc_conditions.inputs.stagnation_temperature  = inlet_nozzle_conditions.outputs.stagnation_temperature
     lpc_conditions.inputs.stagnation_pressure     = inlet_nozzle_conditions.outputs.stagnation_pressure
 
     #Flow through the low pressure compressor
-    compute_compressor_performance(low_pressure_compressor,lpc_conditions, freestream)
+    compute_compressor_performance(low_pressure_compressor, lpc_conditions, freestream)
 
     #link the high pressure compressor to the low pressure compressor
     hpc_conditions.inputs.stagnation_temperature = lpc_conditions.outputs.stagnation_temperature
@@ -160,12 +171,12 @@ def compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total
     combustor_conditions.inputs.stagnation_temperature                = hpc_conditions.outputs.stagnation_temperature
     combustor_conditions.inputs.stagnation_pressure                   = hpc_conditions.outputs.stagnation_pressure
 
-    #flow through the high pressor comprresor
-    compute_combustor_performance(combustor,combustor_conditions, freestream)
+    #flow through the high pressor compressor
+    compute_combustor_performance(combustor, combustor_conditions, freestream)
 
     # link the shaft power output to the low pressure compressor
     try:
-        shaft_power = turbofan.Shaft_Power_Off_Take       
+        shaft_power = turbofan.Shaft_Power_Off_Take
         shaft_power.inputs.mdhc                            = turbofan.compressor_nondimensional_massflow
         shaft_power.inputs.Tref                            = turbofan.reference_temperature
         shaft_power.inputs.Pref                            = turbofan.reference_pressure
@@ -264,30 +275,28 @@ def compute_performance(state,fuel_line,turbofan,total_thrust,total_moment,total
 
     # store data
     core_nozzle_res = Data(
-                exit_static_temperature             = core_nozzle_conditions.outputs.static_temperature,
-                exit_static_pressure                = core_nozzle_conditions.outputs.static_pressure,
-                exit_stagnation_temperature         = core_nozzle_conditions.outputs.stagnation_temperature,
-                exit_stagnation_pressure            = core_nozzle_conditions.outputs.static_pressure,
-                exit_velocity                       = core_nozzle_conditions.outputs.velocity
+                exit_static_temperature     = core_nozzle_conditions.outputs.static_temperature,
+                exit_static_pressure        = core_nozzle_conditions.outputs.static_pressure,
+                exit_stagnation_temperature = core_nozzle_conditions.outputs.stagnation_temperature,
+                exit_stagnation_pressure    = core_nozzle_conditions.outputs.static_pressure,
+                exit_velocity               = core_nozzle_conditions.outputs.velocity
             )
 
     fan_nozzle_res = Data(
-                exit_static_temperature             = fan_nozzle_conditions.outputs.static_temperature,
-                exit_static_pressure                = fan_nozzle_conditions.outputs.static_pressure,
-                exit_stagnation_temperature         = fan_nozzle_conditions.outputs.stagnation_temperature,
-                exit_stagnation_pressure            = fan_nozzle_conditions.outputs.static_pressure,
-                exit_velocity                       = fan_nozzle_conditions.outputs.velocity
+                exit_static_temperature     = fan_nozzle_conditions.outputs.static_temperature,
+                exit_static_pressure        = fan_nozzle_conditions.outputs.static_pressure,
+                exit_stagnation_temperature = fan_nozzle_conditions.outputs.stagnation_temperature,
+                exit_stagnation_pressure    = fan_nozzle_conditions.outputs.static_pressure,
+                exit_velocity               = fan_nozzle_conditions.outputs.velocity
             )
 
     noise_conditions.turbofan.fan_nozzle    = fan_nozzle_res
     noise_conditions.turbofan.core_nozzle   = core_nozzle_res  
     noise_conditions.turbofan.fan           = None
-    stored_results_flag                  = True
-    stored_propulsor_tag                 = turbofan.tag 
+    stored_results_flag                     = True
+    stored_propulsor_tag                    = turbofan.tag
     
-    return total_thrust,total_moment,total_power,stored_results_flag,stored_propulsor_tag
-    
-    
+    return total_thrust, total_moment, total_power, stored_results_flag, stored_propulsor_tag
     
 def reuse_stored_data(state,fuel_line,turbofan,stored_propulsor_tag,total_thrust,total_moment,total_power,center_of_gravity):
     '''Reuses results from one turbofan for identical turbofans

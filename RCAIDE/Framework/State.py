@@ -33,7 +33,7 @@ class State(Conditions):
     freestream:         FreestreamConditions        = field(default_factory=lambda: FreestreamConditions())
 
     mass:               MassConditions              = field(default_factory=lambda: MassConditions())
-    energy:             NetworkConditions           = field(default_factory=lambda: NetworkConditions())
+    energy:             EnergyNetworkConditions           = field(default_factory=lambda: EnergyNetworkConditions())
 
     aerodynamics:       AerodynamicsConditions      = field(default_factory=lambda: AerodynamicsConditions())
     controls:           ControlsConditions          = field(default_factory=lambda: ControlsConditions())

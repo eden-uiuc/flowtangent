@@ -15,6 +15,8 @@ import numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.Library.Attributes.Atmospheres import Atmosphere
+from RCAIDE.Library.Attributes.Atmospheres.Earth import US_Standard_1976
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
@@ -77,31 +79,37 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    name:               str         = 'Freestream'
+    name:                   str         = 'Freestream'
+    atmosphere:             Atmosphere  = field(default_factory=US_Standard_1976())
 
-    speed:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    speed:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    u:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    v:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    w:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    u:                      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    v:                      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    w:                      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    altitude:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    altitude:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    gravity:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    gravity:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    speed_of_sound:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    pressure:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    temperature:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    density:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    pressure:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    temperature:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    density:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    speed_of_sound:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    dynamic_viscosity:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    dynamic_pressure:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    dynamic_viscosity:  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    dynamic_pressure:   np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    stagnation_pressure:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    stagnation_temperature: np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    mach_number:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    reynolds_number:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    mach_number:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    reynolds_number:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    delta_ISA:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    delta_ISA:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    gamma:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    Cp:                     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    R:                      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

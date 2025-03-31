@@ -5,8 +5,10 @@
 
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_ram_performance
-# ----------------------------------------------------------------------------------------------------------------------     
-def compute_ram_performance(ram,ram_conditions, freestream):
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def compute_ram_performance(ram, ram_conditions, freestream):
     """ This computes the output values from the input values according T0
     equations from the source. The following properties are determined 
         conditions.freestream.
@@ -50,12 +52,12 @@ def compute_ram_performance(ram,ram_conditions, freestream):
  
     # Compute the working fluid properties
     R      = working_fluid.gas_specific_constant
-    gamma  = working_fluid.compute_gamma(T0,P0) 
-    Cp     = working_fluid.compute_cp(T0,P0)
+    gamma  = working_fluid.compute_gamma(T0, P0)
+    Cp     = working_fluid.compute_cp(T0, P0)
 
     # Compute the stagnation quantities from the input static quantities
-    stagnation_pressure    = P0*((1.+(gamma-1.)/2.*M0*M0 )**(gamma/(gamma-1.))) 
-    stagnation_temperature = T0*(1.+((gamma-1.)/2.*M0*M0))
+    stagnation_pressure    = P0 * ((1.+(gamma-1.)/2.*M0*M0 )**(gamma/(gamma-1.)))
+    stagnation_temperature = T0 * (1.+((gamma-1.)/2.*M0*M0))
 
     # Store values into flight conditions data structure  
     freestream.isentropic_expansion_factor          = gamma
@@ -71,4 +73,4 @@ def compute_ram_performance(ram,ram_conditions, freestream):
     ram_conditions.outputs.stagnation_temperature              = stagnation_temperature
     ram_conditions.outputs.stagnation_pressure                 = stagnation_pressure    
     
-    return 
+    return
