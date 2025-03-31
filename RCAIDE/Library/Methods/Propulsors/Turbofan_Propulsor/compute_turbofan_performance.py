@@ -158,7 +158,7 @@ def compute_performance(state,
     hpc_conditions.inputs.stagnation_pressure    = lpc_conditions.outputs.stagnation_pressure
 
     #Flow through the high pressure compressor
-    compute_compressor_performance(high_pressure_compressor,hpc_conditions, freestream)
+    compute_compressor_performance(high_pressure_compressor, hpc_conditions, freestream)
 
     #Link the fan to the inlet nozzle
     fan_conditions.inputs.stagnation_temperature                      = inlet_nozzle_conditions.outputs.stagnation_temperature

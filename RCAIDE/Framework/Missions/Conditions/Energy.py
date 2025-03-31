@@ -143,6 +143,7 @@ class EnergyConverterConditions(Conditions):
     y_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     z_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
+    inputs:             Conditions  = field(default_factory=lambda: Conditions(name='Energy Converter Inputs'))
     outputs:            Conditions  = field(default_factory=lambda: Conditions(name='Energy Converter Outputs'))
 
 

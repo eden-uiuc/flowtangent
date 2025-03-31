@@ -23,6 +23,7 @@ import RCAIDE.Framework as rcf
 def func_combustor_performance(T_t_in,
                                P_t_in,
                                T_t_out,
+                               Cp,
                                PR,
                                n_b,
                                h_t_f):
@@ -36,30 +37,45 @@ def func_combustor_performance(T_t_in,
     return P_t_out, T_t_out, h_t_out, f
 
 
-def turbojet_combustor_performance(state: rcf.State,
-                                   system: rcf.System,
-                                   settings: rcf.Settings):
+def turbojet_combustor_performance(
+    state: rcf.State,
+    system: rcf.System,
+    settings: rcf.Settings
+):
 
     # Get inputs
+    comp_outputs = state.energy.converters.compressors[-1].outputs
+    T_t_in = comp_outputs.stagnation_temperature
+    P_t_in = comp_outputs.stagnation_pressure
 
-    T_t_in = state.energy.compressors[-1].outputs.stagnation_temperature
-    P_t_in = state.energy.compressors[-1].outputs.stagnation_pressure
+    T_t_out = system.energy.converters.turbine.intake_temperature
 
-    T_t_out = state.energy.converters.combustor.outputs.stagnation_temperature
+    Cp      = state.freestream.Cp
 
-    PR      = system.energy.converters.combustor.pressure_ratio
-    n_b     = system.energy.converters.combustor.efficiency
+    combustor   = system.energy.converters.combustor
+    PR          = combustor.pressure_ratio
+    n_b         = combustor.efficiency
 
-    h_t_f   = system.energy.fuel.specific_enthalpy
+    h_t_f       = system.energy.fuel.specific_enthalpy
 
     # Call the function
-    P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, PR, n_b, h_t_f)
+    P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, Cp, PR, n_b, h_t_f)
 
-    # Set outputs
+    # Set Input State
+    combustor_state = state.energy.converters.combustor
 
-    cond = state.energy.converters.combustor
-    cond.outputs.stagnation_pressure            = P_t_out
-    cond.outputs.stagnation_temperature         = T_t_out
-    cond.outputs.stagnation_enthalpy            = h_t_out
-    cond.fuel_air_ratio                         = f
+    inputs = combustor_state.inputs
+    inputs.freestream_Cp                            = Cp
+    inputs.stagnation_temperature                   = T_t_in
+    inputs.stagnation_pressure                      = P_t_in
+
+    # Set Output State
+
+    outputs = combustor_state.outputs
+    outputs.stagnation_pressure            = P_t_out
+    outputs.stagnation_temperature         = T_t_out
+    outputs.stagnation_enthalpy            = h_t_out
+    outputs.fuel_air_ratio                 = f
+
+    return state, system, settings
 

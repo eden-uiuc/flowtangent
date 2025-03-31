@@ -21,4 +21,4 @@ def energy(mission):
     for segment in mission.segments:
         for network in segment.analyses.energy.vehicle.networks:
             network.add_unknowns_and_residuals_to_segment(segment) 
-    return 
+    return
