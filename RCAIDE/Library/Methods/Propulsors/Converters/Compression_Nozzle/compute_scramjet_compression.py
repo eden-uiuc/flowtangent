@@ -77,7 +77,7 @@ def compute_scramjet_compression(compression_nozzle,conditions):
     gamma_c     = gamma
     Cp_c        = Cp
     
-    # Compute propertis 
+    # Compute properties
     Mach        = np.sqrt((2./(gamma_c-1.))*((T0/T_out)*(1.+(gamma_c-1.)/2.*M0*M0)-1.)) 
     P_out       = P0*(T_ratio/(T_ratio*(1.-eta)+eta))**(Cp_c/R) 
     T_out       = T_ratio*T0 

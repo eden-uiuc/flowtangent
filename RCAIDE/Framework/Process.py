@@ -14,7 +14,6 @@ from typing import Callable, Iterable, Self, TypeVar, List
 # package imports
 import pandas as pd
 import chex
-from jax.experimental.sparse import value_and_grad
 
 # RCAIDE imports
 from RCAIDE.Framework import State, Settings, System
