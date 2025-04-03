@@ -106,21 +106,21 @@ def turbine_performance(
     # Set Input State
     inputs = turb_state.inputs
 
-    inputs.gamma = g
-    inputs.Cp = Cp
-    inputs.fuel_air_ratio = f
-    inputs.bypass_ratio = a
-    inputs.shaft_work = w_s
-    inputs.fan_work = w_f
-    inputs.compressor_work = w_c
-    inputs.stagnation_temperature = T_t
-    inputs.stagnation_pressure = P_t
+    inputs.gamma                    = g
+    inputs.Cp                       = Cp
+    inputs.fuel_air_ratio           = f
+    inputs.bypass_ratio             = a
+    inputs.shaft_work               = w_s
+    inputs.fan_work                 = w_f
+    inputs.compressor_work          = w_c
+    inputs.stagnation_temperature   = T_t
+    inputs.stagnation_pressure      = P_t
 
     # Set Output State
     outputs = turb_state.outputs
 
-    outputs.stagnation_temperature = T_t_out
-    outputs.stagnation_pressure = P_t_out
-    outputs.stagnation_enthalpy = h_t_out
+    outputs.stagnation_temperature  = T_t_out
+    outputs.stagnation_pressure     = P_t_out
+    outputs.stagnation_enthalpy     = h_t_out
 
     return state, system, settings
