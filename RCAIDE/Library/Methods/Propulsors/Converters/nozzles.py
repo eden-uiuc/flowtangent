@@ -19,6 +19,7 @@ import RCAIDE.Framework as rcf
 #  Compression Nozzle Functional Methods
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def func_isentropic_nozzle_performance(
     T_t,
     P_t,
@@ -66,9 +67,9 @@ def func_compression_nozzle_performance(
 
     # Combine Outputs
 
-    P_t_out.at(M0 > 1.0).set(ns_P_t)
-    T_out.at(M0 > 1.0).set(ns_T)
-    M_out.at(M0 > 1.0).set(ns_M)
+    P_t_out = P_t_out.at(M0 > 1.0).set(ns_P_t)
+    T_t_out = T_out.at(M0 > 1.0).set(ns_T)
+    M_out = M_out.at(M0 > 1.0).set(ns_M)
 
     h_out   = Cp * T_out                        # Output static enthalpy
     h_t_out = Cp * T_t_out                      # Output stagnation enthalpy
@@ -279,7 +280,7 @@ def core_nozzle_performance(
 ):
     # Get Inputs
 
-    nozzle = system.energy.converters.fan_nozzle
+    nozzle = system.energy.converters.core_nozzle
     PR = nozzle.pressure_ratio
     n_p = nozzle.polytropic_efficiency
 

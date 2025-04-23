@@ -110,11 +110,11 @@ def VLM(conditions,settings,geometry):
         CL                                     [unitless], CLTOT in VORLAX
         CDi                                    [unitless], CDTOT in VORLAX
         CM                                     [unitless], CMTOT in VORLAX
-        CY                                  [unitless], Total y force coeff
+        CY                                     [unitless], Total y force coeff
         CRTOT                                  [unitless], Rolling moment coeff (unscaled)
         CL_mom                                 [unitless], Rolling moment coeff (scaled by b_ref)
         CNTOT                                  [unitless], Yawing  moment coeff (unscaled)
-        CN                                 [unitless], Yawing  moment coeff (scaled by b_ref)
+        CN                                     [unitless], Yawing  moment coeff (scaled by b_ref)
         CL_wing                                [unitless], CL  of each wing
         CDi_wing                               [unitless], CDi of each wing
         cl_y                                   [unitless], CL  of each strip
@@ -186,7 +186,7 @@ def VLM(conditions,settings,geometry):
     # STEPS 1-9: Generate Panelization and Vortex Distribution
     # ------------------ --------------------------------------------------------------------    
     # generate vortex distribution (VLM steps 1-9)
-    VD   = generate_vortex_distribution(geometry,settings)  
+    VD   = generate_vortex_distribution(geometry, settings)
     
     if not VD.is_postprocessed:
         raise ValueError('postprocess_VD has not been called since the panels have been modified')
@@ -241,7 +241,7 @@ def VLM(conditions,settings,geometry):
     delta = np.arctan((VD.ZC - VD.ZCH)/((VD.XC - VD.XCH)*ones)) # mean camber surface angle 
 
     # Build the RHS vector    
-    rhs = compute_RHS_matrix(delta,phi,conditions,settings,geometry,pwm) 
+    rhs = compute_RHS_matrix(delta, phi, conditions, settings, geometry, pwm)
     RHS     = rhs.RHS*1
     ONSET   = rhs.ONSET*1
 

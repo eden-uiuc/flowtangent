@@ -18,6 +18,7 @@ import numpy                                                     as np
 #  Vortex_Lattice
 # ----------------------------------------------------------------------------------------------------------------------
 ## @ingroup Library-Methods-Stability  
+
 def evaluate_surrogate(state,settings,geometry):
     """Evaluates surrogates forces and moments using built surrogates 
     
@@ -76,7 +77,7 @@ def evaluate_surrogate(state,settings,geometry):
     pts_r                = np.hstack((r,Mach))
     
     # Alpha 
-    results_alpha    = compute_coefficients( sub_sur.Clift_alpha,  sub_sur.Cdrag_alpha,  sub_sur.CX_alpha,  sub_sur.CY_alpha,  sub_sur.CZ_alpha,  sub_sur.CL_alpha,  sub_sur.CM_alpha,   sub_sur.CN_alpha,
+    results_alpha    = compute_coefficients(sub_sur.Clift_alpha,  sub_sur.Cdrag_alpha,  sub_sur.CX_alpha,  sub_sur.CY_alpha,  sub_sur.CZ_alpha,  sub_sur.CL_alpha,  sub_sur.CM_alpha,   sub_sur.CN_alpha,
                                            trans_sur.Clift_alpha,trans_sur.Cdrag_alpha,trans_sur.CX_alpha,trans_sur.CY_alpha,trans_sur.CZ_alpha,trans_sur.CL_alpha,trans_sur.CM_alpha, trans_sur.CN_alpha,
                                              sup_sur.Clift_alpha,  sup_sur.Cdrag_alpha,  sup_sur.CX_alpha,  sup_sur.CY_alpha,  sup_sur.CZ_alpha,  sup_sur.CL_alpha,  sup_sur.CM_alpha,   sup_sur.CN_alpha,
                                               h_sub,h_sup,Mach, pts_alpha)        
