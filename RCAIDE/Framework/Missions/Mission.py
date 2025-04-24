@@ -12,8 +12,14 @@ from dataclasses import dataclass, field
 
 # package imports
 
+import jax
+import jax.numpy as jnp
+jax.config.update("jax_enable_x64", True)
+
+from jax import jit, grad, value_and_grad
+
 import numpy as np
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, minimize
 
 # RCAIDE imports
 
@@ -78,6 +84,7 @@ class SegmentUpdate(Process):
             self.append(ProcessStep(name=name, function=function))
 
 
+
 @dataclass(kw_only=True)
 class SegmentConvergence(Process):
 
@@ -116,6 +123,38 @@ class SegmentConvergence(Process):
         results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
 
         return self.results_parser(results)
+
+
+@dataclass(kw_only=True)
+class SegmentOptimization(Process):
+
+    name: str = "Segment Optimization"
+    optimization_method: str = 'SLSQP'
+    display_optimization: bool = False
+    max_iterations: int = 1000
+    solution_tolerance: float = 1e-4
+
+    calculate_objective: Callable = None
+    calculate_gradients: Callable = None
+    bounds: List[Tuple[np.array, np.array]] = None
+
+    def __call__(self,
+                 state: rcf.State,
+                 settings: rcf.Settings,
+                 system: rcf.System) -> Tuple[rcf.State, rcf.Settings, rcf.System]:
+
+        res = minimize(
+            fun=self.calculate_objective,
+            jac=self.calculate_gradients,
+            x0=state.unknowns.pack_array(),
+            args=(state, settings, system),
+            method=self.optimization_method,
+            bounds=self.bounds,
+            options={'disp': self.display_optimization,'maxiter': self.max_iterations},
+            tol=self.solution_tolerance,
+        )
+
+        return state, settings, system
 
 
 @dataclass(kw_only=True)

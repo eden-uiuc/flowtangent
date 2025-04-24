@@ -102,6 +102,11 @@ class MassProperties:
             except (ValueError, ZeroDivisionError) as e:
                 warn("Error in calculating component density. Check mass and volume specifications.")
 
+@dataclass(kw_only=True)
+class VehicleEnvelope:
+    # Attribute                 Type        Default Value
+    ultimate_load:             float        = 0.0
+    limit_load_factor:         float        = 0.0
 
 @dataclass(kw_only=True)
 class Component:
