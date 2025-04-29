@@ -262,16 +262,16 @@ def compute_performance(state,
     compute_thrust(turbofan,turbofan_conditions,freestream)
 
     # getting the network outputs
-    moment_vector      = 0*state.ones_row(3)
-    F                  = 0*state.ones_row(3)
-    F[:,0]             =  turbofan_conditions.thrust[:,0]
-    moment_vector[:,0] =  turbofan.origin[0][0] -   center_of_gravity[0][0] 
-    moment_vector[:,1] =  turbofan.origin[0][1]  -  center_of_gravity[0][1] 
-    moment_vector[:,2] =  turbofan.origin[0][2]  -  center_of_gravity[0][2]
-    M                  =  np.cross(moment_vector, F)   
-    total_moment       += M 
-    total_power        += turbofan_conditions.power
-    total_thrust       += F
+    moment_vector       = 0 * state.ones_row(3)
+    F                   = 0 * state.ones_row(3)
+    F[:,0]              = turbofan_conditions.thrust[:,0]
+    moment_vector[:, 0] = turbofan.origin[0][0] - center_of_gravity[0][0]
+    moment_vector[:, 1] = turbofan.origin[0][1] - center_of_gravity[0][1]
+    moment_vector[:, 2] = turbofan.origin[0][2] - center_of_gravity[0][2]
+    M                   = np.cross(moment_vector, F)
+    total_moment        += M
+    total_power         += turbofan_conditions.power
+    total_thrust        += F
 
     # store data
     core_nozzle_res = Data(

@@ -24,7 +24,7 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 
 
 @dataclass(kw_only=True)
-class ComponentRatios:
+class ComponentFineness:
 
     # Attribute     Type    Default Value
     effective:      float   = 1.0
@@ -36,39 +36,38 @@ class ComponentRatios:
 class ComponentDimensions:
 
     # Attribute         Type    Default Value
-    ordinal_direction:  bool    = field(default=False)
+    ordinal_direction:  bool    = False
 
-    reference:          float   = field(default=0.0)
-    total:              float   = field(default=0.0)
-    maximum:            float   = field(default=0.0)
-    effective:          float   = field(default=0.0)
-
-    projected:          float   = field(default=0.0)
-    front_projected:    float   = field(default=0.0)
-    top_projected:      float   = field(default=0.0)
-    side_projected:     float   = field(default=0.0)
+    reference:          float   = 0.0
+    total:              float   = 0.0
+    maximum:            float   = 0.0
+    effective:          float   = 0.0
+    projected:          float   = 0.0
+    front_projected:    float   = 0.0
+    top_projected:      float   = 0.0
+    side_projected:     float   = 0.0
 
 
 @dataclass(kw_only=True)
 class ComponentAreas:
 
     # Attribute         Type    Default Value
-    reference:          float   = field(default=0.0)
-    total:              float   = field(default=0.0)
-    maximum:            float   = field(default=0.0)
-    effective:          float   = field(default=0.0)
+    reference:          float   = 0.0
+    total:              float   = 0.0
+    maximum:            float   = 0.0
+    effective:          float   = 0.0
 
-    inflow:             float   = field(default=0.0)
-    outflow:            float   = field(default=0.0)
-    exit:               float   = field(default=0.0)
+    inflow:             float   = 0.0
+    outflow:            float   = 0.0
+    exit:               float   = 0.0
 
-    projected:          float   = field(default=0.0)
-    front_projected:    float   = field(default=0.0)
-    top_projected:      float   = field(default=0.0)
-    side_projected:     float   = field(default=0.0)
+    projected:          float   = 0.0
+    front_projected:    float   = 0.0
+    top_projected:      float   = 0.0
+    side_projected:     float   = 0.0
 
-    wetted:             float   = field(default=0.0)
-    exposed:            float   = field(default=0.0)
+    wetted:             float   = 0.0
+    exposed:            float   = 0.0
 
 
 @dataclass(kw_only=True)
@@ -84,11 +83,11 @@ class MaterialProperties:
 class MassProperties:
 
     # Attribute                         Type        Default Value
-    total:                              float       = field(default=0.0)
-    subcomponent_total:                 float       = field(default=0.0)
+    total:                              float       = 0.0
+    subcomponent_total:                 float       = 0.0
 
-    volume:                             float       = field(default=1.0)
-    density:                            float       = field(default=0.0)
+    volume:                             float       = 1.0
+    density:                            float       = 0.0
 
     center_of_gravity:                  np.ndarray  = field(default_factory=lambda: np.zeros(3))
     moments_of_inertia:                 np.ndarray  = field(default_factory=lambda: np.zeros((3, 3)))

@@ -538,7 +538,7 @@ def vehicle_setup():
     turbofan.engine_length     = 2.71
 
     # This origin is overwritten by compute_component_centers_of_gravity(base,compute_propulsor_origin=True)
-    turbofan.origin            = [[13.72, 4.86,-1.9],[13.72, -4.86,-1.9]]
+    turbofan.origin            = [[13.72, 4.86,-1.9], [13.72, -4.86,-1.9]]
 
     # working fluid
     turbofan.working_fluid = SUAVE.Attributes.Gases.Air()

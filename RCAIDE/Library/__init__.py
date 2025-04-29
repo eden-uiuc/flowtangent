@@ -12,4 +12,4 @@ from . import Attributes
 from . import Components 
 from . import Methods
 
-from .Component import Component
+from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness
