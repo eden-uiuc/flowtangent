@@ -23,6 +23,7 @@ from Legacy.trunk.S.Methods.Aerodynamics.Common.Fidelity_Zero.Lift.compute_RHS_m
 #  Vortex Lattice
 # ----------------------------------------------------------------------
   
+
 def VLM(conditions,settings,geometry):
     """Uses the vortex lattice method to compute the lift, induced drag and moment coefficients.
     

@@ -39,11 +39,20 @@ class FuselageLengths(rcl.ComponentDimensions):
 
 
 @dataclass(kw_only=True)
+class FuselageSegment(rcl.Component):
+
+    percent_x_location: float = 0.0
+    percent_z_location: float = 0.0
+
+
+
+@dataclass(kw_only=True)
 class Fuselage(rcl.Component):
 
     aerodynamic_center: np.ndarray = field(default_factory=lambda: np.zeros(3))
 
-    seats_abreast: float    = 0.0
+    number_of_seats: int    = 1
+    seats_abreast: int      = 0.0
     seat_pitch: float       = 0.0
 
     heights: FuselageHeights = field(default_factory=FuselageHeights())
@@ -52,8 +61,11 @@ class Fuselage(rcl.Component):
     diameters: rcl.ComponentDimensions  = field(default_factory=rcl.ComponentDimensions())
     fineness: rcl.ComponentFineness     = field(default_factory=rcl.ComponentFineness())
 
+    def __post_init__(self):
+        self.lengths.ordinal_direction = True
 
-class Fuselage(Component):
+
+class S_Fuselage(Component):
     """Default fuselage compoment class.
     """
     

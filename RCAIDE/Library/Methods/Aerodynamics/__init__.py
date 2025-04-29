@@ -8,7 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import AVL
+# from . import AVL
 from . import AERODAS
 from . import Common
 from . import Lifting_Line

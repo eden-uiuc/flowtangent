@@ -102,16 +102,12 @@ class Wing(rcf.Component):
     twists: WingDimensions = field(default_factory=WingDimensions())
     sweeps: WingDimensions = field(default_factory=WingDimensions())
 
-
     def __post_init__(self):
+
+        self.spans.ordinal_direction = True
 
         self.chords.mean_aerodynamic = 0.0
         self.chords.mean_geometric = 0.0
-        self.chords.root = 0.0
-        self.chords.tip = 0.0
-
-        self.twists.root = 0.0
-        self.twists.tip = 0.0
 
         self.sweeps.leading_edge = None
         self.sweeps.quarter_chord = 0.0
