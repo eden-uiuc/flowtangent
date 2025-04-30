@@ -45,7 +45,6 @@ class FuselageSegment(rcl.Component):
     percent_z_location: float = 0.0
 
 
-
 @dataclass(kw_only=True)
 class Fuselage(rcl.Component):
 
