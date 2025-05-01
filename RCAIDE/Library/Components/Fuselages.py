@@ -64,6 +64,16 @@ class Fuselage(rcl.Component):
         self.lengths.ordinal_direction = True
 
 
+@dataclass(kw_only=True)
+class BWBFuselage(Fuselage):
+
+    aft_centerbody_taper: float = 0.0
+
+    def __post_init__(self):
+
+        self.areas.aft_centerbody = 0.0
+
+
 class S_Fuselage(Component):
     """Default fuselage compoment class.
     """

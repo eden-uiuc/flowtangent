@@ -59,6 +59,8 @@ class ComponentAreas:
 
     inflow:             float   = 0.0
     outflow:            float   = 0.0
+
+    inlet:              float   = 0.0
     exit:               float   = 0.0
 
     projected:          float   = 0.0
@@ -108,6 +110,7 @@ class Component:
 
     name:                   str                   = 'Component'
     segments:               List[ComponentType]   = field(default_factory=list)
+    subcomponents:          List[ComponentType] = field(default_factory=list)
     origin:                 np.ndarray            = field(default_factory=lambda: np.zeros(3))
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
@@ -124,6 +127,48 @@ class Component:
 
     def add_segment(self, segment: ComponentType, index: int = -1):
         self.segments.insert(index, segment)
+
+    def sum_mass(self):
+
+        self.mass_properties.subcomponent_total = np.sum([c.mass_properties.total for c in self.subcomponents])
+
+    def sum_moments_of_inertia(self):
+
+        raise NotImplementedError("Subcomponent moments of inertia calculation is not implemented for the System class.")
+
+    def sum_center_of_gravity(self):
+
+        self.mass_properties.center_of_gravity = np.zeros(3)
+
+        for sc in self.subcomponents:
+            rel_origin = sc.origin - self.origin
+            rel_cg = rel_origin + sc.mass_properties.center_of_gravity
+
+            mass_fraction = sc.mass_properties.total / self.mass_properties.total
+            weighted_cg = rel_cg * mass_fraction
+
+            self.mass_properties.center_of_gravity += weighted_cg
+
+    def add_subcomponent(self,
+                         subcomponent: Component,
+                         sum_mass=True,
+                         sum_center_of_gravity=True,
+                         sum_moments_of_inertia=False
+                         ):
+
+        if isinstance(subcomponent, Component):
+            vars(self)[subcomponent.name] = subcomponent
+            self.subcomponents.append(subcomponent)
+        else:
+            raise TypeError(f"Attempted to add a subcomponent to {self.name} "
+                            f"which was not a Component datastructure.")
+
+        if sum_mass:
+            self.sum_mass()
+            if sum_center_of_gravity:
+                self.sum_center_of_gravity()
+            if sum_moments_of_inertia:
+                self.sum_moments_of_inertia()
 
 
 # ----------------------------------------------------------------------------------------------------------------------

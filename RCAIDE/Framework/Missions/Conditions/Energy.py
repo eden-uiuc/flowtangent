@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import unittest
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, make_dataclass
 
 # package imports
 import numpy as np
@@ -19,52 +19,6 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks and Stores
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-@dataclass
-class EnergyNetworkConditions(Conditions):
-    """
-    Represents the conditions of an energy network in a simulation.
-
-    This class encapsulates various attributes related to the energy state,
-    efficiency, power, and forces acting on an energy network.
-
-    Attributes
-    ----------
-    name : str
-        The name of the energy network. Default is 'Energy Network'.
-    
-    total_energy : np.ndarray
-        The total energy in the network.
-    total_efficiency : np.ndarray
-        The overall efficiency of the network.
-    
-    throttle : np.ndarray
-        The throttle setting of the network.
-    
-    total_power : np.ndarray
-        The total power output of the network.
-    total_force_vector : np.ndarray
-        The total force vector acting on the network.
-    total_moment_vector : np.ndarray
-        The total moment vector acting on the network.
-
-    Notes
-    -----
-    All numpy array attributes are initialized with zero values.
-    """
-
-    # Attribute             Type        Default Value
-    name:                   str         = 'Energy Network'
-
-    total_energy:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    total_efficiency:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    throttle:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    total_power:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    total_force_vector:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    total_moment_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
 
 
 @dataclass(kw_only=True)
@@ -280,6 +234,59 @@ class FuelConditions(EnergyStoreConditions):
     name:               str         = 'Fuel'
 
     mass:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+
+@dataclass
+class EnergyNetworkConditions(Conditions):
+    """
+    Represents the conditions of an energy network in a simulation.
+
+    This class encapsulates various attributes related to the energy state,
+    efficiency, power, and forces acting on an energy network.
+
+    Attributes
+    ----------
+    name : str
+        The name of the energy network. Default is 'Energy Network'.
+
+    total_energy : np.ndarray
+        The total energy in the network.
+    total_efficiency : np.ndarray
+        The overall efficiency of the network.
+
+    throttle : np.ndarray
+        The throttle setting of the network.
+
+    total_power : np.ndarray
+        The total power output of the network.
+    total_force_vector : np.ndarray
+        The total force vector acting on the network.
+    total_moment_vector : np.ndarray
+        The total moment vector acting on the network.
+
+    Notes
+    -----
+    All numpy array attributes are initialized with zero values.
+    """
+
+    # Attribute             Type        Default Value
+    name:                   str         = 'Energy Network'
+
+    total_energy:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    total_efficiency:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    throttle:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    total_power:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    total_force_vector:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    total_moment_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+
+    converters:             dataclass   = field(default_factory=
+                                                lambda: make_dataclass('NetworkConverterConditions', []))
+    stores:                 dataclass   = field(default_factory=
+                                                lambda: make_dataclass('NetworkStoreConditions', []))
+    distributors:           dataclass   = field(default_factory=
+                                                lambda: make_dataclass('NetworkDistributorConditions', []))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

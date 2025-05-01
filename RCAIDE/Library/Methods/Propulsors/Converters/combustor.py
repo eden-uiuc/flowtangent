@@ -48,7 +48,7 @@ def turbojet_combustor_performance(
     T_t_in = comp_outputs.stagnation_temperature
     P_t_in = comp_outputs.stagnation_pressure
 
-    T_t_out = system.energy.converters.turbine.intake_temperature
+    T_t_out = system.energy.converters.turbines[0].design_intake_temperature
 
     Cp      = state.freestream.Cp
 
@@ -56,7 +56,7 @@ def turbojet_combustor_performance(
     PR          = combustor.pressure_ratio
     n_b         = combustor.efficiency
 
-    h_t_f       = system.energy.fuel.specific_enthalpy
+    h_t_f       = system.energy.fuel.specific_energy
 
     # Call the function
     P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, Cp, PR, n_b, h_t_f)

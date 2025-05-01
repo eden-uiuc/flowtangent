@@ -71,7 +71,7 @@ class Airfoil(rcf.Component):
         x_upper = np.linspace(0, 1, int(np.ceil(n_pts / 2)))
         x_lower = np.linspace(0, 1, int(np.ceil(n_pts / 2)))
 
-        # Concenctrate coordinates near edges
+        # Concentrate coordinates near edges
 
         if edge_factor:
             ef = edge_factor

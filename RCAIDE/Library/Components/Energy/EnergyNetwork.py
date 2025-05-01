@@ -7,23 +7,24 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, make_dataclass
 
 # package imports
 import numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Network
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def _Network(State: rcf.State,
-                   Settings: rcf.Settings,
-                   System: rcf.System):
+@dataclass(kw_only=True)
+class EnergyNetwork(rcl.Component):
 
+    propulsors:         list[rcl.Component] = field(default_factory=list)
 
-                   
-    return State, Settings, System
+    distributors:   dataclass = field(default_factory=lambda: make_dataclass('NetworkDistributors', []))
+    converters:     dataclass = field(default_factory=lambda: make_dataclass('NetworkConverters', []))
+    stores:         dataclass = field(default_factory=lambda: make_dataclass('NetworkStores', []))

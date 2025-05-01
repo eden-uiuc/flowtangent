@@ -90,7 +90,7 @@ def thrust_and_power(
         alpha               = tf.bypass_ratio
 
         tf_state = state.energy.propulsors[idx]
-        f                   = tf_state.compressor.fuel_air_ratio
+        f                   = tf_state.combustor.fuel_air_ratio
         throttle            = tf_state.throttle
 
         fn_out = tf_state.fan_nozzle.outputs

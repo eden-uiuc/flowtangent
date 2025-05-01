@@ -7,5 +7,9 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------  
-from . import Fuel_Tanks
-from . import Distribution   
+
+from .EnergyNetwork import EnergyNetwork, Fuel
+from .Converters import EnergyConverter, FlowConverter, OfftakeShaft, Propulsor
+
+import Networks
+

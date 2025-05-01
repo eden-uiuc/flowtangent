@@ -13,17 +13,10 @@ from dataclasses import dataclass, field
 import numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
+from RCAIDE.Library.Components.Energy.EnergyNetwork import EnergyNetwork, Fuel
+from RCAIDE.Library.Components.Energy.Converters import Propulsor, FlowConverter, OfftakeShaft
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-def RCAIDE/Library/Components/Energy/Networks_Jets(State: rcf.State,
-                   Settings: rcf.Settings,
-                   System: rcf.System):
-
-
-                   
-    return State, Settings, System

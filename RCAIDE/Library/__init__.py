@@ -8,8 +8,12 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
  
-from . import Attributes
-from . import Components 
-from . import Methods
+import Attributes
+import Components
+import Methods
 
 from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness
+
+from .Gases import Gas, Air, Steam, CO2, O2
+
+from .Propellants import Propellant, JetA
