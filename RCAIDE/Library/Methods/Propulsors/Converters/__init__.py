@@ -10,11 +10,16 @@
 
 from . import Combustor
 from . import Compression_Nozzle
-from . import Compressor
 from . import DC_Motor
 from . import Engine
-from . import Expansion_Nozzle
-from . import Fan 
-from . import Ram 
-from . import Shaft_Power_Offtake
-from . import Turbine
+
+
+from .combustor import func_combustor_performance, turbojet_combustor_performance
+from .fan_compressor import func_fan_compressor_performance, fan_performance, compressor_performance
+from .nozzles import (func_isentropic_nozzle_performance,
+                      func_compression_nozzle_performance,
+                      func_expansion_nozzle_performance,
+                      compression_nozzle_performance,
+                      fan_nozzle_performance,
+                      core_nozzle_performance)
+from .turbine import func_turbine_performance, turbine_performance

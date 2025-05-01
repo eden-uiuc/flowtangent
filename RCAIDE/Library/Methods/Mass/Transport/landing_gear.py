@@ -12,51 +12,11 @@
 #  Functional/Library Version
 # -------------------------------------------------------------------------------
 
-def func_landing_gear(*args,
-                      **kwargs
-                      ):
-    """
-    Library version of landing_gear.
-    
-    Parameters
-    ----------
-    
-    args : type
-        Description of arguments
-    
-    kwargs : type
-        Description of keyword arguments
-                
-    Returns
-    -------
-    output : type
-        Description of outputs
-       
-    See Also
-    --------
-    code :
-        Description of related functions
-    
-    Notes
-    -----
-    Details/explanation of what this function implements. [1]
-    
-    References
-    ----------
-    [1] Reference to works cited in the Notes section
-    
-    Examples
-    --------
-    func_landing_gear():
-        Example output
-    
-    Description of example.  
-    
-    """
+def func_landing_gear(
+    MTOW: float,
+    lg_wt_factor: float = 0.04):
 
-    # TODO: Implement functional version of landing_gear
-
-    return results
+    return MTOW * lg_wt_factor
 
 
 # -------------------------------------------------------------------------------

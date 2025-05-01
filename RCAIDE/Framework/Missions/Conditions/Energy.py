@@ -281,6 +281,8 @@ class EnergyNetworkConditions(Conditions):
     total_force_vector:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
     total_moment_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
 
+    propulsors:             dataclass   = field(default_factory=
+                                                lambda: make_dataclass('NetworkPropulsorConditions', []))
     converters:             dataclass   = field(default_factory=
                                                 lambda: make_dataclass('NetworkConverterConditions', []))
     stores:                 dataclass   = field(default_factory=

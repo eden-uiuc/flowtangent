@@ -14,6 +14,7 @@ import numpy as np
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
 from RCAIDE.Framework.Core import Units as U
 
 
@@ -22,7 +23,7 @@ from RCAIDE.Framework.Core import Units as U
 # ----------------------------------------------------------------------------------------------------------------------
 
 def func_thrust_and_power(
-        g,
+        gamma,
         u0,
         a0,
         M0,
@@ -49,12 +50,12 @@ def func_thrust_and_power(
     f_core = 1 / (1 + alpha)
 
     # Fan and Core Components of Non-Dimensional Thrust
-    F_fan   = f_fan  * (g * M0 ** 2 * (v_fan_nozzle  / u0 - 1) + AR_fan_nozzle  * (P_fan_nozzle  / P0 - 1))
-    F_core  = f_core * (g * M0 ** 2 * (v_core_nozzle / u0 - 1) + AR_core_nozzle * (P_core_nozzle / P0 - 1))
+    F_fan   = f_fan  * (gamma * M0 ** 2 * (v_fan_nozzle / u0 - 1) + AR_fan_nozzle * (P_fan_nozzle / P0 - 1))
+    F_core  = f_core * (gamma * M0 ** 2 * (v_core_nozzle / u0 - 1) + AR_core_nozzle * (P_core_nozzle / P0 - 1))
     F_total = F_fan + F_core                                                # Total Non-Dimensional Thrust
-    F_sp    = 1 / (g * M0) * F_total                                        # Specific Thrust
-    I_sp    = F_sp * a0 * (1 + alpha) / (f * g)                             # Specific Impulse
-    TSFC    = f * g / (F_sp * a0 * (1 + alpha)) * (1 - delta_SFC) * U.hour  # Thrust-Specific Fuel Consumption (TSFC)
+    F_sp    = 1 / (gamma * M0) * F_total                                        # Specific Thrust
+    I_sp    = F_sp * a0 * (1 + alpha) / (f * gamma)                             # Specific Impulse
+    TSFC    = f * gamma / (F_sp * a0 * (1 + alpha)) * (1 - delta_SFC) * U.hour  # Thrust-Specific Fuel Consumption (TSFC)
     mdot_c  = mdhc * np.sqrt(T_ref / T_t_ref) * (P_t_ref / P_ref)           # Core flow rate
     F       = F_sp * a0 * (1 + alpha) * mdot_c * throttle                   # Dimensional Thrust
     p       = F * u0                                                        # Power
@@ -62,6 +63,53 @@ def func_thrust_and_power(
 
     return F, F_sp, I_sp, TSFC, mdot_c, p, ff
 
+def func_sea_level_static_thrust(
+    gamma,
+    u0,
+    a0,
+    M0,
+    P0,
+    G0,
+    T_ref,
+    T_t_ref,
+    P_ref,
+    P_t_ref,
+    mdhc,
+    delta_SFC,
+    f,
+    v_fan_nozzle,
+    AR_fan_nozzle,
+    P_fan_nozzle,
+    v_core_nozzle,
+    AR_core_nozzle,
+    P_core_nozzle,
+    alpha,
+    throttle
+):
+
+    sls_thrust, _, _, _, _, _, _ = def func_thrust_and_power(
+        gamma = 1.4,
+        u0 = 0.,
+        a0 = 0.,
+        M0 = 0.,
+        P0 = 101325.,
+        G0 = 9.81,
+        T_ref,
+        T_t_ref,
+        P_ref,
+        P_t_ref,
+        mdhc,
+        delta_SFC,
+        f,
+        v_fan_nozzle,
+        AR_fan_nozzle,
+        P_fan_nozzle,
+        v_core_nozzle,
+        AR_core_nozzle,
+        P_core_nozzle,
+        alpha,
+        throttle
+):
 
 def thrust_and_power(
         state: rcf.State,
@@ -80,6 +128,8 @@ def thrust_and_power(
     G0  = fs.gravity
 
     for idx, tf in enumerate(system.energy.propulsors):
+
+        tf: rcl.Components.Energy.Converters.TurbofanEngine
 
         T_ref               = tf.reference_temperature
         T_t_ref             = tf.reference_total_temperature

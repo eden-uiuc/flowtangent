@@ -12,21 +12,31 @@ from dataclasses import dataclass, field, make_dataclass
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 
+from RCAIDE.Library.Methods.Propulsors.Converters import *
+from RCAIDE.Library.Methods.Propulsors.Turbofan import thrust_and_power
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbofan_Performance
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 @dataclass(kw_only=True)
-class Turbofan_Performance():
+class TurbofanPerformance(rcf.Process):
 
-    name: str = 'Turbofan_Performance'
+    name: str = 'Turbofan Performance'
 
-def Turbofan_Performance(
-        state: rcf.State,
-        system: rcf.System,
-        settings: rcf.Settings
-        ):
-        
-        
-        
-        return state, system, settings
+    def __post_init__(self):
+
+        self.steps = [
+            compression_nozzle_performance,
+            fan_performance,
+            compressor_performance,
+            turbojet_combustor_performance,
+            turbine_performance,
+            core_nozzle_performance,
+            fan_nozzle_performance,
+            thrust_and_power
+        ]
+
+

@@ -36,7 +36,7 @@ def propulsor_moment(state: rcf.State,
                      settings: rcf.Settings,
                      system: rcf.System):
 
-    vehicle_center_of_gravity = system.center_of_gravity
+    vehicle_center_of_gravity = system.mass_properties.center_of_gravity
 
     for idx, propulsor in enumerate(system.energy.propulsors):
 

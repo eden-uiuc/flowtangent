@@ -30,7 +30,7 @@ class Process(Container):
                 kwarg : keyword arguments of the classs [-]
                                             
             Returns:
-                resutls : results of the Evaluate Functions [-]
+                results : results of the Evaluate Functions [-]
                 
             """        
         

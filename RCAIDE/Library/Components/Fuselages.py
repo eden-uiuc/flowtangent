@@ -54,11 +54,11 @@ class Fuselage(rcl.Component):
     seats_abreast: int      = 0.0
     seat_pitch: float       = 0.0
 
-    heights: FuselageHeights = field(default_factory=FuselageHeights())
-    lengths: FuselageLengths = field(default_factory=FuselageLengths())
+    heights: FuselageHeights = field(default_factory=FuselageHeights)
+    lengths: FuselageLengths = field(default_factory=FuselageLengths)
 
-    diameters: rcl.ComponentDimensions  = field(default_factory=rcl.ComponentDimensions())
-    fineness: rcl.ComponentFineness     = field(default_factory=rcl.ComponentFineness())
+    diameters: rcl.ComponentDimensions  = field(default_factory=rcl.ComponentDimensions)
+    fineness: rcl.ComponentFineness     = field(default_factory=rcl.ComponentFineness)
 
     def __post_init__(self):
         self.lengths.ordinal_direction = True

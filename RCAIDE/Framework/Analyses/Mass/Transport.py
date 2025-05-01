@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from RCAIDE.Framework import Process, ProcessStep
-from RCAIDE.Library.Methods.Mass.Correlation import Transport as Mass
+from RCAIDE.Library.Methods.Mass import Transport as Mass
 
 
 @dataclass(kw_only=True)

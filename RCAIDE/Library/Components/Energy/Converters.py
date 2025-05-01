@@ -57,12 +57,17 @@ class OfftakeShaft(EnergyConverter):
 
 
 @dataclass(kw_only=True)
-class DesignThrustParameters:
+class DesignParameters:
 
-    total_thrust:   float = 0.0
-    altitude:       float = 0.0
-    mach_number:    float = 0.0
-    isa_deviation:  float = 0.0
+    total_thrust:           float = 0.0
+
+    altitude:               float = 0.0
+    mach_number:            float = 0.0
+    isa_deviation:          float = 0.0
+
+    SLS_thrust:             float = 0.0
+
+    mass_flow_through_rate: float = 0.0
 
 
 @dataclass(kw_only=True)
@@ -70,9 +75,9 @@ class Propulsor(EnergyConverter):
 
     converters:                 dataclass               = field(default_factory=
                                                                 lambda: make_dataclass(cls_name='PropulsorConverters',
-                                                                                       fields=[]))
+                                                                    fields=[]))
 
-    design_thrust_parameters:   DesignThrustParameters = field(default_factory=DesignThrustParameters)
+    design_thrust_parameters:   DesignParameters = field(default_factory=DesignParameters)
 
     def compute_thrust(self):
         raise NotImplementedError("Subclasses must implement this method")
@@ -87,7 +92,7 @@ class JetInstallationGeometry:
 
     xe: float = 1.
     ye: float = 1.
-    Ce: float = 1.
+    Ce: float = 2.
 
 
 @dataclass(kw_only=True)
@@ -96,18 +101,20 @@ class JetEngine(Propulsor):
     name:                   str             = 'Jet'
     plug_diameter:          float           = 0.0
 
-    fuel:                   rcl.Propellant  = field(default_factory=rcl.Propellants.JetA)
-    design_fuel_air_ratio:  float           = 0.0
+    reference_temperature:  float           = 288.15      # Kelvin
+    reference_pressure:     float           = 101325.0    # Pascal
 
-    working_fluid:          rcl.Gas         = field(default_factory=rcl.Air)
+    fuel:                   rcl.Propellant          = field(default_factory=rcl.Propellants.JetA)
+    working_fluid:          rcl.Gas                 = field(default_factory=rcl.Air)
 
-    engine_length:          float           = 0.0
+    installation_geometry: JetInstallationGeometry  = field(default_factory=JetInstallationGeometry)
 
-    installation_geometry: JetInstallationGeometry = field(default_factory=JetInstallationGeometry)
 
     def __post_init__(self):
 
         self.converters.combustor = FlowConverter(name='Combustor')
+
+        self.design_thrust_parameters.fuel_air_ratio = 0.0
 
 
 @dataclass(kw_only=True)
