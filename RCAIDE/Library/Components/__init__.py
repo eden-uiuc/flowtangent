@@ -14,6 +14,7 @@ from .Mass_Properties  import Mass_Properties
 from .Fuselages import Fuselage, FuselageSegment
 from .Nacelles import Nacelle
 from .Airfoils import Airfoil
+from .Landing_Gear import LandingGear
   
 from . import Propulsors
 from . import Energy

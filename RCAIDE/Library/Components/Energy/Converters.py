@@ -23,7 +23,7 @@ import RCAIDE.Library as rcl
 @dataclass(kw_only=True)
 class EnergyConverter(rcl.Component):
 
-    efficiency:             float = field(default=1.0)
+    efficiency:             float = 1.0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -33,20 +33,23 @@ class EnergyConverter(rcl.Component):
 @dataclass(kw_only=True)
 class FlowConverter(EnergyConverter):
 
-    mechanical_efficiency:      float = field(default=1.0)
-    polytropic_efficiency:      float = field(default=1.0)
+    mechanical_efficiency:      float = 1.0
+    polytropic_efficiency:      float = 1.0
 
-    pressure_ratio:             float = field(default=1.0)
+    pressure_ratio:             float = 1.0
 
-    design_intake_temperature:  float = field(default=298.15)    # Kelvin
+    design_intake_temperature:  float = 298.15    # Kelvin
+
+    rotation_speed:             float = 0.0
+    noise_speed:                float = 0.0
 
 
 @dataclass(kw_only=True)
 class OfftakeShaft(EnergyConverter):
 
-    power_draw:             float = field(default=0.0)
-    reference_temperature:  float = field(default=298.15)    # Kelvin
-    reference_pressure:     float = field(default=101325.0)  # Pascal
+    power_draw:             float = 0.0
+    reference_temperature:  float = 298.15      # Kelvin
+    reference_pressure:     float = 101325.0    # Pascal
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors
@@ -54,9 +57,22 @@ class OfftakeShaft(EnergyConverter):
 
 
 @dataclass(kw_only=True)
+class DesignThrustParameters:
+
+    total_thrust:   float = 0.0
+    altitude:       float = 0.0
+    mach_number:    float = 0.0
+    isa_deviation:  float = 0.0
+
+
+@dataclass(kw_only=True)
 class Propulsor(EnergyConverter):
 
-    converters: dataclass = field(default_factory=lambda: make_dataclass('PropulsorConverters', []))
+    converters:                 dataclass               = field(default_factory=
+                                                                lambda: make_dataclass(cls_name='PropulsorConverters',
+                                                                                       fields=[]))
+
+    design_thrust_parameters:   DesignThrustParameters = field(default_factory=DesignThrustParameters)
 
     def compute_thrust(self):
         raise NotImplementedError("Subclasses must implement this method")
@@ -67,16 +83,27 @@ class Propulsor(EnergyConverter):
 
 
 @dataclass(kw_only=True)
+class JetInstallationGeometry:
+
+    xe: float = 1.
+    ye: float = 1.
+    Ce: float = 1.
+
+
+@dataclass(kw_only=True)
 class JetEngine(Propulsor):
 
-    name: str = 'Jet'
+    name:                   str             = 'Jet'
+    plug_diameter:          float           = 0.0
 
-    fuel:                   rcl.Propellant  = field(default_factory=lambda: rcl.Components.Energy.Fuel())
+    fuel:                   rcl.Propellant  = field(default_factory=rcl.Propellants.JetA)
     design_fuel_air_ratio:  float           = 0.0
 
-    working_fluid:          rcl.Air         = field(default_factory=lambda: rcl.Air())
+    working_fluid:          rcl.Gas         = field(default_factory=rcl.Air)
 
     engine_length:          float           = 0.0
+
+    installation_geometry: JetInstallationGeometry = field(default_factory=JetInstallationGeometry)
 
     def __post_init__(self):
 
@@ -104,14 +131,13 @@ class TurbojetEngine(JetEngine):
         self.converters.core_nozzle = FlowConverter(name='Core Outlet Nozzle')
 
 
-
-
 @dataclass(kw_only=True)
 class TurbofanEngine(TurbojetEngine):
 
     name: str = 'Turbofan'
 
     bypass_ratio = 1.0
+    exa: float = 1.0        # Fan Face-to-Exit Distance
 
     def __post_init__(self):
         super().__post_init__()

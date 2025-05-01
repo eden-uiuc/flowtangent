@@ -7,26 +7,25 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclassess import dataclass, field, make_dataclass
+from dataclasses import dataclass, field, make_dataclass
 
-import RCAIDE.Framework as rcf
+
 import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Landing_Gear
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 @dataclass(kw_only=True)
-class Landing_Gear():
+class LandingGear(rcl.Component):
 
-    name: str = 'Landing_Gear'
+    name: str = 'Landing Gear'
 
-def Landing_Gear(
-        state: rcf.State,
-        system: rcf.System
-        settings: rcf.Settings,
-        ):
-        
-        
-        
-        return state, system, settings
+    deployed: bool = False
+
+    number_of_units:    int = 1
+    number_of_wheels:   int = 0
+
+    strut_length:       float = 0.
+    tire_diameter:      float = 0.

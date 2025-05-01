@@ -42,6 +42,7 @@ class ComponentDimensions:
     total:              float   = 0.0
     maximum:            float   = 0.0
     effective:          float   = 0.0
+
     projected:          float   = 0.0
     front_projected:    float   = 0.0
     top_projected:      float   = 0.0
@@ -86,6 +87,7 @@ class MassProperties:
 
     # Attribute                         Type        Default Value
     total:                              float       = 0.0
+    empty:                              float       = 0.0
     subcomponent_total:                 float       = 0.0
 
     volume:                             float       = 1.0
@@ -110,7 +112,7 @@ class Component:
 
     name:                   str                   = 'Component'
     segments:               List[ComponentType]   = field(default_factory=list)
-    subcomponents:          List[ComponentType] = field(default_factory=list)
+    subcomponents:          List[ComponentType]   = field(default_factory=list)
     origin:                 np.ndarray            = field(default_factory=lambda: np.zeros(3))
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
@@ -120,6 +122,7 @@ class Component:
     lengths:                ComponentDimensions   = field(default_factory=ComponentDimensions)
     widths:                 ComponentDimensions   = field(default_factory=ComponentDimensions)
     heights:                ComponentDimensions   = field(default_factory=ComponentDimensions)
+    diameters:              ComponentDimensions   = field(default_factory=ComponentDimensions)
 
     # -----------------------------------------------MASS & MATERIALS---------------------------------------------------
     mass_properties:        MassProperties        = field(default_factory=MassProperties)
@@ -149,8 +152,11 @@ class Component:
 
             self.mass_properties.center_of_gravity += weighted_cg
 
+    def __getitem__(self, item):
+        return vars(self)[item]
+
     def add_subcomponent(self,
-                         subcomponent: Component,
+                         subcomponent: ComponentType,
                          sum_mass=True,
                          sum_center_of_gravity=True,
                          sum_moments_of_inertia=False

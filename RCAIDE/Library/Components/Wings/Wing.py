@@ -27,7 +27,7 @@ class WingDimensions(rcl.ComponentDimensions):
 
 
 @dataclass(kw_only=True)
-class WingSegment(rcf.Component):
+class WingSegment(rcl.Component):
 
     name: str = 'Wing Segment'
     airfoil: rcl.Components.Airfoil = field(default_factory=lambda: rcl.Component.Airfoil.NACA_4_Series(2412))
@@ -48,7 +48,7 @@ class WingSegment(rcf.Component):
 
 
 @dataclass(kw_only=True)
-class WingControlSurface(rcf.Component):
+class WingControlSurface(rcl.Component):
 
     name: str = 'Wing Control Surface'
 
@@ -67,11 +67,11 @@ class WingControlSurface(rcf.Component):
 
 
 @dataclass(kw_only=True)
-class Wing(rcf.Component):
+class Wing(rcl.Component):
 
     name: str = 'Wing'
     airfoil: rcl.Components.Wings.Airfoil = field(default_factory=lambda: rcl.Components.Airfoil.NACA_4_Series(2412))
-    control_surfaces: list[WingControlSurface] = field(default_factory=list)
+    control_surfaces: dataclass = field(default_factory=lambda: make_dataclass('WingControlSurfaces', []))
 
     # Specialty Attributes
 

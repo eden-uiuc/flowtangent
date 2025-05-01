@@ -8,9 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import unittest
-from dataclasses import dataclass, field
-from warnings import warn
-from typing import TypeVar, List
+from dataclasses import dataclass, field, make_dataclass
+from typing import TypeVar
 
 # package imports
 import numpy as np
@@ -26,138 +25,28 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 
 
 @dataclass(kw_only=True)
-class ComponentRatios:
-
-    # Attribute     Type    Default Value
-    effective:      float   = 1.0
-    nose:           float   = 0.0
-    tail:           float   = 0.0
-
-
-@dataclass(kw_only=True)
-class ComponentDimensions:
-
-    # Attribute         Type    Default Value
-    ordinal_direction:  bool    = field(default=False)
-
-    reference:          float   = field(default=0.0)
-    total:              float   = field(default=0.0)
-    maximum:            float   = field(default=0.0)
-    effective:          float   = field(default=0.0)
-
-    projected:          float   = field(default=0.0)
-    front_projected:    float   = field(default=0.0)
-    top_projected:      float   = field(default=0.0)
-    side_projected:     float   = field(default=0.0)
-
-
-@dataclass(kw_only=True)
-class ComponentAreas:
-
-    # Attribute         Type    Default Value
-    reference:          float   = field(default=0.0)
-    total:              float   = field(default=0.0)
-    maximum:            float   = field(default=0.0)
-    effective:          float   = field(default=0.0)
-
-    inflow:             float   = field(default=0.0)
-    outflow:            float   = field(default=0.0)
-    exit:               float   = field(default=0.0)
-
-    projected:          float   = field(default=0.0)
-    front_projected:    float   = field(default=0.0)
-    top_projected:      float   = field(default=0.0)
-    side_projected:     float   = field(default=0.0)
-
-    wetted:             float   = field(default=0.0)
-    exposed:            float   = field(default=0.0)
-
-
-@dataclass(kw_only=True)
-class MaterialProperties:
-
-    # Attribute                 Type        Default Value
-    tensile_stress_carrier:     dataclass   = field(default_factory=dataclass)
-    torsional_stress_carrier:   dataclass   = field(default_factory=dataclass)
-    shear_stress_carrier:       dataclass   = field(default_factory=dataclass)
-
-
-@dataclass(kw_only=True)
-class MassProperties:
-
-    # Attribute                         Type        Default Value
-    total:                              float       = field(default=0.0)
-    subcomponent_total:                 float       = field(default=0.0)
-
-    volume:                             float       = field(default=1.0)
-    density:                            float       = field(default=0.0)
-
-    center_of_gravity:                  np.ndarray  = field(default_factory=lambda: np.zeros(3))
-    moments_of_inertia:                 np.ndarray  = field(default_factory=lambda: np.zeros((3, 3)))
-    subcomponent_moments_of_inertia:    np.ndarray  = field(default_factory=lambda: np.zeros((3, 3)))
-
-    def __post_init__(self):
-        if not np.any(self.density):
-            try:
-                self.density = self.total / self.volume
-            except (ValueError, ZeroDivisionError) as e:
-                warn("Error in calculating component density. Check mass and volume specifications.")
-
-@dataclass(kw_only=True)
 class VehicleEnvelope:
     # Attribute                 Type        Default Value
     ultimate_load:             float        = 0.0
     limit_load_factor:         float        = 0.0
 
-@dataclass(kw_only=True)
-class Component:
-
-    # ------------------------------------------------IDENTIFIERS-------------------------------------------------------
-
-    name:                   str                   = 'Component'
-    segments:               List[ComponentType]   = field(default_factory=list)
-    origin:                 np.ndarray            = field(default_factory=lambda: np.zeros(3))
-
-    # ---------------------------------------------------AREAS----------------------------------------------------------
-    areas:                  ComponentAreas        = field(default_factory=ComponentAreas)
-
-    # -------------------------------------------------DIMENSIONS-------------------------------------------------------
-    lengths:                ComponentDimensions   = field(default_factory=ComponentDimensions)
-    widths:                 ComponentDimensions   = field(default_factory=ComponentDimensions)
-    heights:                ComponentDimensions   = field(default_factory=ComponentDimensions)
-
-    # -----------------------------------------------MASS & MATERIALS---------------------------------------------------
-    mass_properties:        MassProperties        = field(default_factory=MassProperties)
-    material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
-
-    def add_segment(self, segment: ComponentType, index: int = -1):
-        self.segments.insert(index, segment)
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  System
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 @dataclass(kw_only=True)
-class System(Component):
+class System(rcl.Component):
 
     name: str = 'System'
 
-
     energy: rcl.Components.Energy.EnergyNetwork = field(default_factory=lambda: rcl.Components.Energy.EnergyNetwork())
 
-
-
-
+    configurations: dataclass = field(default_factory=lambda: make_dataclass('SystemConfigurations', []))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
 
 class TestSystem(unittest.TestCase):
     def setUp(self):
