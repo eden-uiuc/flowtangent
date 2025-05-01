@@ -26,3 +26,5 @@ from . import Nacelles
 from . import Payloads
 from . import Systems
 from . import Wings
+
+from .Fuselages import Fuselage, FuselageSegment

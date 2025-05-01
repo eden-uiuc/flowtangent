@@ -381,7 +381,7 @@ def vehicle_setup():
     segment.percent_z_location                  = -0.00144 
     segment.height                              = 0.7500
     segment.width                               = 0.6500
-    fuselage.Segments.append(segment)   
+    fuselage.Segments.append(segment)
     
     # Segment                                   
     segment                                     = SUAVE.Components.Lofted_Body_Segment.Segment()
@@ -512,7 +512,7 @@ def vehicle_setup():
     nacelle.inlet_diameter             = 1.90
     nacelle.diameter                   = 2.05
     nacelle.areas.wetted               = 1.1*np.pi*nacelle.diameter*nacelle.length
-    nacelle.origin                     = [[13.72, -4.86,-1.9]]
+    nacelle.origin                     = [[13.72, -4.86, -1.9]]
     nacelle.flow_through               = True   
     nacelle.Airfoil.NACA_4_series_flag = True 
     nacelle.Airfoil.coordinate_file    = '2410'  
