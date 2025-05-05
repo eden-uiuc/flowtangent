@@ -40,7 +40,6 @@ def func_passenger_payload(n_passengers,
 
     baggage_mass = n_passengers * m_baggage
 
-
     return passenger_mass, baggage_mass
 
 

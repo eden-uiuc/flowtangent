@@ -19,7 +19,7 @@ jax.config.update("jax_enable_x64", True)
 from jax import jit, grad
 
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, NonlinearConstraint
 
 # RCAIDE imports
 
@@ -148,7 +148,7 @@ class OptimalSegment(Process):
     finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
     calculate_objective:    Callable = None
-    bounds:                 List[Tuple[np.array, np.array]] = None
+    bounds:                 List[Any] = None
 
     def _results_parser(self, res):
 
@@ -196,6 +196,47 @@ class OptimalSegment(Process):
         self.state, self.system, self.settings = self.finalize(self.state, self.system, self.settings)
 
         return self.state, self.system, self.settings
+
+
+def energy_use(
+        state: "rcf.State",
+        system: "rcf.System",
+        settings: "rcf.Settings"):
+
+    energy_start    = state.energy.total_energy[0]
+    energy_end      = state.energy.total_energy[-1]
+    energy_used     = energy_end - energy_start
+
+    return energy_used[0]
+
+
+@dataclass(kw_only=True)
+class EnergyOptimalCruise(OptimalSegment):
+
+    name: str = 'Energy Optimal Cruise'
+
+    altitude: float = 0.0
+    distance: float = 0.0
+
+    calculate_objective: Callable = energy_use
+
+
+@dataclass(kw_only=True)
+class EnergyOptimalAltitudeChange(OptimalSegment):
+
+    name: str = 'Energy Optimal Altitude Change'
+
+    altitude_start: float = 0.0
+    altitude_end:   float = 0.0
+
+    calculate_objective: Callable = energy_use
+
+    def __post_init__(self):
+        start_check = lambda: self.state.frames.inertial.position_vector[0, 2]
+        end_check = lambda: self.state.frames.inertial.position_vector[-1, 2]
+        self.bounds = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
+                       NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
+
 
 
 if __name__ == '__main__':
