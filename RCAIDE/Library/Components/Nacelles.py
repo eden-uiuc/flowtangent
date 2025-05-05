@@ -34,8 +34,7 @@ class Nacelle(rcl.Component):
     aerodynamic_center:         np.ndarray              = field(default_factory=np.zeros(3))
     orientation_euler_angles:   np.ndarray              = field(default_factory=np.zeros(3))
 
-    airfoil:                    rcl.Components.Airfoil  = field(default_factory=
-                                                                rcl.Components.Airfoil.NACA_4_Series('2410'))
+    airfoil:                    rcl.Component           = None
     cowling_airfoil_angle:      float                   = 0.0
 
     diameters:                  rcl.ComponentDimensions = field(default_factory=rcl.ComponentDimensions)

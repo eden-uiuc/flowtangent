@@ -1,7 +1,7 @@
-# RCAIDE/Library/Components/Energy/Networks/Jets.py
+# $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, RCAIDE Team
+# Created: May 2025, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -13,29 +13,33 @@ from dataclasses import dataclass, field
 import numpy as np
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
-from RCAIDE.Library.Components.Energy.EnergyNetwork import EnergyNetwork
-from RCAIDE.Library.Components.Energy.Converters import Propulsor, FlowConverter, OfftakeShaft
+import RCAIDE.Framework as rcf
 
+from .Segments import ConvergedSegment, OptimalSegment
 # ----------------------------------------------------------------------------------------------------------------------
-#  Jets
+#  Cruise
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+def energy_use(
+        state: rcf.State,
+        system: rcf.System,
+        settings: rcf.Settings):
+
+    energy_start    = state.energy.total_energy[0]
+    energy_end      = state.energy.total_energy[-1]
+    energy_used     = energy_end - energy_start
+
+    return energy_used
+
+
 @dataclass(kw_only=True)
-class JetNetwork(EnergyNetwork):
+class EnergyOptimalCruise(OptimalSegment):
 
-    name = 'Jet Network'
+    name: str = 'Energy Optimal Cruise'
 
+    altitude: float = 0.0
+    distance: float = 0.0
 
-@dataclass(kw_only=True)
-class TurbojetNetwork(JetNetwork):
-
-    name = 'Turbojet Network'
-
-
-@dataclass(kw_only=True)
-class TurbofanNetwork(TurbojetNetwork):
-
-    name = 'Turbofan Network'
+    calculate_objective: Callable = energy_use
 

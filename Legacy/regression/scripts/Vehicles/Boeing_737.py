@@ -724,9 +724,6 @@ def vehicle_setup():
     turbofan.geometry_Ce          = 2. # Geometry information for the installation effects function
 
 
-
-
-
     #size the turbofan
     turbofan_sizing(turbofan,mach_number,altitude)
 

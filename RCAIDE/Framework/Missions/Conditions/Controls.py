@@ -16,7 +16,6 @@ import numpy as np
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
 from RCAIDE.Framework.Missions.Conditions.Stability import StaticCoefficients
-from RCAIDE.Framework.System import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Controls
@@ -134,8 +133,6 @@ class PropulsionControlVariable(Conditions):
     ----------
     name : str
         The name of the propulsion control variable. Defaults to 'Propulsion Control Variable'.
-    propulsors : list[Component]
-        A list of Component objects representing the propulsors associated with this control variable.
     """
 
     #Attribute  Type            Default Value

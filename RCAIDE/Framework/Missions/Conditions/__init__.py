@@ -7,7 +7,7 @@ from .Controls import (DynamicsResiduals, ControlVariable, SurfaceControlVariabl
                        ControlsConditions)
 
 from .Energy import (EnergyNetworkConditions, EnergyStoreConditions, EnergyConverterConditions, BatteryCellConditions,
-                     BatteryPackConditions, FuelConditions, CombustorConditions)
+                     BatteryPackConditions, FuelConditions)
 
 from .Frames import Frame, InertialFrame, BodyFrame, WindFrame, PlanetFrame, FrameConditions
 

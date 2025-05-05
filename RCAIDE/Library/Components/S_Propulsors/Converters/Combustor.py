@@ -7,7 +7,7 @@
 #  IMPORT
 # ---------------------------------------------------------------------------------------------------------------------- 
  # RCAIDE imports   
-from RCAIDE.Library.Components                      import Component  
+from RCAIDE.Library.Components import Component
 
 # ---------------------------------------------------------------------------------------------------------------------- 
 #  Combustor

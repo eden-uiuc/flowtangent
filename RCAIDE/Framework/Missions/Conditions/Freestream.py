@@ -15,8 +15,6 @@ import numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
-from RCAIDE.Library.Attributes.Atmospheres import Atmosphere
-from RCAIDE.Library.Attributes.Atmospheres.Earth import US_Standard_1976
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
@@ -80,7 +78,7 @@ class FreestreamConditions(Conditions):
     """
 
     name:                   str         = 'Freestream'
-    atmosphere:             Atmosphere  = field(default_factory=US_Standard_1976())
+    atmosphere:             dataclass   = None
 
     speed:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 

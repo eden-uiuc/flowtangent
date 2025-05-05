@@ -40,9 +40,10 @@ class System(rcl.Component):
 
     name: str = 'System'
 
-    energy: rcl.Components.Energy.EnergyNetwork = field(default_factory=lambda: rcl.Components.Energy.EnergyNetwork())
+    energy:         rcl.Components.Energy.EnergyNetwork = field(default_factory=rcl.Components.Energy.EnergyNetwork)
 
-    configurations: dataclass = field(default_factory=lambda: make_dataclass('SystemConfigurations', []))
+    configurations: dataclass                           = field(default_factory=
+                                                                lambda: make_dataclass('SystemConfigurations', []))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

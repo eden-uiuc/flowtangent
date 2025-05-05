@@ -104,11 +104,10 @@ class JetEngine(Propulsor):
     reference_temperature:  float           = 288.15      # Kelvin
     reference_pressure:     float           = 101325.0    # Pascal
 
-    fuel:                   rcl.Propellant          = field(default_factory=rcl.Propellants.JetA)
-    working_fluid:          rcl.Gas                 = field(default_factory=rcl.Air)
+    fuel:                   rcl.Propellant              = field(default_factory=rcl.Propellants.JetA)
+    working_fluid:          rcl.Gas                     = field(default_factory=rcl.Air)
 
-    installation_geometry: JetInstallationGeometry  = field(default_factory=JetInstallationGeometry)
-
+    installation_geometry:  JetInstallationGeometry     = field(default_factory=JetInstallationGeometry)
 
     def __post_init__(self):
 

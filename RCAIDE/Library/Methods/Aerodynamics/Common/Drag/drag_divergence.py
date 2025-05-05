@@ -7,7 +7,7 @@
 #  IMPORT
 # ---------------------------------------------------------------------------------------------------------------------- 
    
-from RCAIDE.Library.Components.Wings          import Main_Wing 
+from RCAIDE.Library.Components.S_Wings          import Main_Wing
 
 # package imports
 import numpy as np

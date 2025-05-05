@@ -8,20 +8,15 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Fuselages     import Fuselage, FuselageSegment
-from .S_Nacelles    import Nacelle
+from .Fuselages     import Fuselage, FuselageSegment, BWBFuselage
 from .Airfoils      import Airfoil
+from .Nacelles      import Nacelle
 from .Landing_Gear  import LandingGear
+from .Wings         import Wing, WingSegment, WingControlSurface
 
-import Energy
-  
-from . import Propulsors
 from . import Energy
-from . import Airfoils
-from . import Booms
-from . import Fuselages
-from . import Landing_Gear
-from . import S_Nacelles
-from . import Payloads
-from . import Systems
-from . import Wings
+
+# from . import Booms
+# from . import Payloads
+# from . import Systems
+# from . import Wings

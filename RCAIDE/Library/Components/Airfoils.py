@@ -16,7 +16,7 @@ import numpy as np
 from scipy import interpolate
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -24,16 +24,16 @@ import RCAIDE.Framework as rcf
 
 
 @dataclass(kw_only=True)
-class Airfoil(rcf.Component):
+class Airfoil(rcl.Component):
 
     thickness_to_chord: float = 0.0
     max_thickness: float = 0.0
     camber: float = 0.0
 
-    coordinates: np.ndarray = field(default_factory=np.empty(shape=(0, 2)))
+    coordinates:    np.ndarray  = field(default_factory=np.empty(shape=(0, 2)))
 
-    x_coordinates: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))
-    y_coordinates: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))
+    x_coordinates:  np.ndarray  = field(default_factory=np.empty(shape=(0, 1)))
+    y_coordinates:  np.ndarray  = field(default_factory=np.empty(shape=(0, 1)))
 
     x_upper_surface: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))
     x_lower_surface: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))

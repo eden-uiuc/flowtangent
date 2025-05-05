@@ -8,6 +8,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from .State import State
+from .Settings import Settings
+from .System import Component, System
+
 from . import Core
 from . import Analyses
 from . import External_Interfaces
@@ -15,8 +19,6 @@ from . import Optimization
 from . import Mission
 from . import Networks
 
-from .State import State
-from .Settings import Settings
-from .System import Component, System
-
 from .Process import Process, ProcessStep
+
+import Missions

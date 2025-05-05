@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------   
 # RCAIDE imports
 import RCAIDE
-from RCAIDE.Library.Components.Fuselages import Blended_Wing_Body_Fuselage as BWB_Fuselage
+from RCAIDE.Library.Components.Fuselages import BWBFuselage
  
 # package imports
 import numpy as np  
@@ -58,7 +58,7 @@ def parasite_total(state, settings, geometry):
                                            vehicle_reference_area)
 
     # Renomralize fuselage drag using fuselage front projected area
-    fuselages = [f for f in geometry.fuselages if not isinstance(f, BWB_Fuselage)]
+    fuselages = [f for f in geometry.fuselages if not isinstance(f, BWBFuselage)]
     for fuselage in fuselages:
         total_parasite_drag += renormalize(fuselage.tag,
                                            fuselage.areas.front_projected,

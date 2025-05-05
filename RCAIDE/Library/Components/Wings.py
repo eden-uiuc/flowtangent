@@ -30,7 +30,7 @@ class WingDimensions(rcl.ComponentDimensions):
 class WingSegment(rcl.Component):
 
     name: str = 'Wing Segment'
-    airfoil: rcl.Components.Airfoil = field(default_factory=lambda: rcl.Component.Airfoil.NACA_4_Series(2412))
+    airfoil: rcl.Component = None
 
     # Specialty Attributes
 
@@ -69,25 +69,26 @@ class WingControlSurface(rcl.Component):
 @dataclass(kw_only=True)
 class Wing(rcl.Component):
 
-    name: str = 'Wing'
-    airfoil: rcl.Components.Wings.Airfoil = field(default_factory=lambda: rcl.Components.Airfoil.NACA_4_Series(2412))
-    control_surfaces: dataclass = field(default_factory=lambda: make_dataclass('WingControlSurfaces', []))
+    name:               str             = 'Wing'
+    airfoil:            rcl.Component   = None
+    control_surfaces:   dataclass       = field(default_factory=lambda: make_dataclass('WingControlSurfaces', []))
 
     # Specialty Attributes
 
-    symmetric: bool = True
-    vertical: bool = False
-    t_tail: bool = False
-    high_lift: bool = False
-    symbolic: bool = False
-    high_mach: bool = False
-    vortex_lift: bool = False
+    symmetric: bool     = True
+    vertical: bool      = False
+    t_tail: bool        = False
+    high_lift: bool     = False
+    symbolic: bool      = False
+    high_mach: bool     = False
+    vortex_lift: bool   = False
 
-    taper: float = 0.0
-    dihedral: float = 0.0
-    aspect_ratio: float = 0.0
-    thickness_to_chord: float = 0.0
-    exposed_root_chord_offset: float = 0.0
+    taper:                      float   = 0.0
+    dihedral:                   float   = 0.0
+    aspect_ratio:               float   = 0.0
+    thickness_to_chord:         float   = 0.0
+    exposed_root_chord_offset:  float   = 0.0
+
     single_side_aerodynamic_center: np.ndarray = None
 
     transition_x_upper: float = 0.0
@@ -97,10 +98,10 @@ class Wing(rcl.Component):
 
     aerodynamic_center: np.ndarray = field(default_factory=lambda: np.zeros(3))
 
-    spans:  WingDimensions = field(default_factory=WingDimensions())
-    chords: WingDimensions = field(default_factory=WingDimensions())
-    twists: WingDimensions = field(default_factory=WingDimensions())
-    sweeps: WingDimensions = field(default_factory=WingDimensions())
+    spans:  WingDimensions = field(default_factory=WingDimensions)
+    chords: WingDimensions = field(default_factory=WingDimensions)
+    twists: WingDimensions = field(default_factory=WingDimensions)
+    sweeps: WingDimensions = field(default_factory=WingDimensions)
 
     def __post_init__(self):
 

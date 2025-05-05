@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------------------------------------------------------- 
 # RCAIDE imports    
 from RCAIDE.Framework.Core              import Data 
-from RCAIDE.Library.Components          import Component   
+from RCAIDE.Library.Components       import Component
 import scipy as sp
 import numpy as np
  

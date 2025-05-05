@@ -8,7 +8,6 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass, field
-from typing import Self
 
 # package imports
 import numpy as np
@@ -26,20 +25,21 @@ class State(Conditions):
 
     # Attribute         Type                        Default Value
     name:               str                         = 'State'
-    initials:           Self                        = None
-    numerics:           Numerics                    = field(default_factory=lambda: Numerics())
+    initials:           Conditions                  = None
+    numerics:           Numerics                    = field(default_factory=Numerics)
 
-    frames:             FrameConditions             = field(default_factory=lambda: FrameConditions())
-    freestream:         FreestreamConditions        = field(default_factory=lambda: FreestreamConditions())
+    frames:             FrameConditions             = field(default_factory=FrameConditions)
+    freestream:         FreestreamConditions        = field(default_factory=FreestreamConditions)
 
-    mass:               MassConditions              = field(default_factory=lambda: MassConditions())
-    energy:             EnergyNetworkConditions     = field(default_factory=lambda: EnergyNetworkConditions())
+    mass:               MassConditions              = field(default_factory=MassConditions)
+    energy:             EnergyNetworkConditions     = field(default_factory=EnergyNetworkConditions)
 
-    aerodynamics:       AerodynamicsConditions      = field(default_factory=lambda: AerodynamicsConditions())
-    controls:           ControlsConditions          = field(default_factory=lambda: ControlsConditions())
+    aerodynamics:       AerodynamicsConditions      = field(default_factory=AerodynamicsConditions)
+    controls:           ControlsConditions          = field(default_factory=ControlsConditions)
 
     unknowns:           Conditions                  = field(default_factory=lambda: Conditions(name='Unknowns'))
     residuals:          Conditions                  = field(default_factory=lambda: Conditions(name='Residuals'))
+    objective:          ObjectiveConditions         = field(default_factory=lambda: Conditions(name='Objective'))
 
     # def __post_init__(self):
         # self.initials = State(name='Initial State')

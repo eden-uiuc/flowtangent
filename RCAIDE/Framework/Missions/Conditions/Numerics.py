@@ -16,11 +16,80 @@ import numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
-from RCAIDE.Library.Methods.Numerical import chebyshev_matrices
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Numerics
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+def chebyshev_matrices(n: int = 16,
+                       calculate_integration: bool = True,
+                       spacing_function: Callable = lambda n: 0.5 * (1 - np.cos(np.pi * np.arange(n) / (n - 1)))
+                       ):
+    """
+    Calculate Chebyshev pseudospectral matrices for numerical differentiation and integration.
+
+    This function computes the Chebyshev collocation points and the corresponding
+    differentiation and integration matrices used in spectral methods.
+
+    Parameters:
+    -----------
+    n : int, optional
+        Number of collocation points (default is 16).
+    spacing_function : Callable, optional
+        A function that takes an integer n and returns an array of n points
+        between 0 and 1. By default, it uses a cosine spacing function.
+
+    Returns:
+    --------
+    tuple
+        A tuple containing three elements:
+        - x : numpy.ndarray
+            A 2D array of shape (1, n) containing the collocation points.
+        - D : numpy.ndarray
+            The differentiation matrix of shape (n, n).
+        - I : numpy.ndarray
+            The integration matrix of shape (n, n).
+
+    Raises:
+    -------
+    AssertionError
+        If n is not a positive integer.
+
+    Notes:
+    ------
+    The function uses the Chebyshev differentiation matrix formula and its inverse
+    for integration. The first row and column of the integration matrix are set to zero
+    to handle the arbitrary constant of integration.
+    """
+
+    assert n > 0, "Attempted to calculate Chebyshev matrices with non-positive number of control points."
+
+    x = spacing_function(n)
+
+    c = np.array([2.] + [1.] * (n - 2) + [2.])
+    c *= (-1.) ** np.arange(n)
+    c_inv = 1./c
+
+    A = np.tile(x, (n, 1)).T
+    dA = A - A.T + np.eye(n)
+
+    cs = np.multiply(np.atleast_2d(c), np.atleast_2d(c_inv).T)
+    D = np.divide(cs.T, dA)
+
+    D -= np.diag(np.sum(D.T, axis=0))
+
+    if calculate_integration:
+        # Invert D, trimming first row and column
+        I = np.linalg.inv(D[1:, 1:])
+
+        # Repack missing columns with zeros
+        I = np.append(np.zeros((1, n - 1)), I, axis=0)
+        I = np.append(np.zeros((n, 1)), I, axis=1)
+    else:
+        I = None
+
+    return np.atleast_2d(x), D, I
 
 
 @dataclass(kw_only=True)

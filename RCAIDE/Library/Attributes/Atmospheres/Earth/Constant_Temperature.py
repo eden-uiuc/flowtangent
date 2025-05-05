@@ -8,9 +8,9 @@
 # ---------------------------------------------------------------------------------------------------------------------- 
  
 from RCAIDE.Framework.Core import Data , Units
-from RCAIDE.Library.Attributes.Gases import Air
+from RCAIDE.Library.Gases import Air
 from RCAIDE.Library.Attributes.Atmospheres import Atmosphere
-from RCAIDE.Library.Attributes.Planets import Earth 
+from RCAIDE.Library.Attributes.Planets import Earth
 import numpy as np
 
 # ---------------------------------------------------------------------------------------------------------------------- 

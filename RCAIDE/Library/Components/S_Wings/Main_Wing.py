@@ -9,7 +9,7 @@
 # RCAIDE imports   
 from .Wing import Wing
 from RCAIDE.Framework.Core import Container 
-from RCAIDE.Library.Components.Wings.Segment import Segment
+from RCAIDE.Library.Components.S_Wings.Segment import Segment
 
 # ---------------------------------------------------------------------------------------------------------------------- 
 #  Main Wing 
