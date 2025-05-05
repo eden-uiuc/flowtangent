@@ -60,8 +60,8 @@ class MassConditions(Conditions):
     volume:                 np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     density:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    center_of_gravity:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    moments_of_inertia:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3, 3)))
+    center_of_gravity:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
+    moments_of_inertia:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3, 3)))
 
     breakdown:              Conditions  = field(default_factory=lambda: Conditions(name='Mass Breakdown'))
 

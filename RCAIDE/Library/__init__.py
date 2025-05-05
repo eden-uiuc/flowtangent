@@ -14,6 +14,10 @@ from .Gases import Gas, Air, Steam, CO2, O2
 
 from .Propellants import Propellant, JetA
 
+from .Planets import Planet, Earth
+
+from .Atmospheres import Atmosphere, USStandard1976, ConstantTemperature
+
 from . import Attributes
 from . import Components
 from . import Methods

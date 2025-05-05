@@ -1,7 +1,6 @@
 from .Conditions import *
 
-from .Segments import (MissionSegment,
-                       InitializeSegment,
+from .Segments import (InitializeSegment,
                        AnalyzeSegment,
                        ConvergedSegment,
                        OptimalSegment,

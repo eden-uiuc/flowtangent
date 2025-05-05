@@ -6,7 +6,7 @@
 #  Imports
 # -------------------------------------------------------------------------------
 
-# TODO: ADD IMPORTS
+import RCAIDE.Framework as rcf
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version
@@ -23,7 +23,9 @@ def func_landing_gear(
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
 
-def landing_gear(State, Settings, System):
+def landing_gear(state: "rcf.State",
+                 system: "rcf.System",
+                 settings: "rcf.Settings"):
     """
     Framework version of landing_gear
     
@@ -41,4 +43,4 @@ def landing_gear(State, Settings, System):
 
     # TODO: Unpack results
 
-    return State, Settings, System
+    return state, system, settings

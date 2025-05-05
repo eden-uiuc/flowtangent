@@ -20,15 +20,16 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_angular_acceleration(State: rcf.State,
-                                Settings: rcf.Settings,
-                                System: rcf.System):
+def update_angular_acceleration(state: "rcf.State",
+                                system: "rcf.System",
+                                settings: "rcf.Settings",
+                                ):
 
-    w = State.frames.inertial.angular_velocity
-    D = State.numerics.time.differentiate
+    w = state.frames.inertial.angular_velocity_vector
+    D = state.numerics.time.differentiate
 
     aa = np.dot(D, w)
 
-    State.frames.inertial.angular_acceleration = aa
+    state.frames.inertial.angular_acceleration = aa
                    
-    return State, Settings, System
+    return state, system, settings

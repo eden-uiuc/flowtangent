@@ -88,7 +88,6 @@ class Air(Gas):
     thermal_coefficients    = [1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4]
 
     def __post_init__(self):
-        super().__post_init__()
 
         self.composition.O2         = 0.20946
         self.composition.Ar         = 0.00934
@@ -111,7 +110,6 @@ class Steam(Gas):
     cp_coefficients    = [5e-9, 1e-4, .9202, 1524.7]
 
     def __post_init__(self):
-        super().__post_init__()
 
         self.composition.H2O       = 1.0
 
@@ -134,7 +132,6 @@ class CO2(Gas):
     specific_heat_capacity = 839.
 
     def __post_init__(self):
-        super().__post_init__()
 
         self.composition.CO2       = 1.0
 
@@ -168,7 +165,6 @@ class O2(Gas):
     specific_heat_capacity = 918.
 
     def __post_init__(self):
-        super().__post_init__()
 
         self.composition.O2       = 1.0
 

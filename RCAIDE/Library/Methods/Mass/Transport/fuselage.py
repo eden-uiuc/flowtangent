@@ -6,7 +6,9 @@
 #  Imports
 #-------------------------------------------------------------------------------
 
-from RCAIDE.Reference.Core import Units
+import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
+from RCAIDE.Framework.Core import Units
 
 import numpy as np
 
@@ -111,7 +113,9 @@ def func_fuselage(
 #  Stateful/Framework Version
 #-------------------------------------------------------------------------------
 
-def fuselage(State, Settings, System):
+def fuselage(state: "rcf.State",
+             system: "rcf.System",
+             settings: "rcf.Settings"):
     """
     Framework version of fuselage
     
@@ -121,16 +125,18 @@ def fuselage(State, Settings, System):
         Functional implementation which this method calls.
     """
 
-    fuselage_wetted_area            = np.atleast_1d([f.areas.wetted for f in System.fuselages])
-    fuselage_width                  = np.atleast_1d([f.widths.maximum for f in System.fuselages])
-    fuselage_maximum_height         = np.atleast_1d([f.heights.maximum for f in System.fuselages])
-    fuselage_total_length           = np.atleast_1d([f.lengths.total for f in System.fuselages])
-    fuselage_differential_pressure  = np.atleast_1d([f.differential_pressure for f in System.fuselages])
-    vehicle_limit_load              = np.atleast_1d(System.envelope.limit_load)
-    vehicle_max_zero_fuel_mass      = np.atleast_1d(System.mass_properties.max_zero_fuel_mass)
-    vehicle_main_wing_mass          = np.atleast_1d(System.wings.main_wing.mass_properties.total)
-    vehicle_main_wing_root_chord    = np.atleast_1d(System.wings.main_wing.chords.root)
-    vehicle_propulsion_mass         = np.atleast_1d(System.energy_network.converters.propulsors.mass_properties.total)
+    fuses = [f for f in system.subcomponents if isinstance(f, rcl.Components.Fuselage)]
+
+    fuselage_wetted_area            = np.atleast_1d([f.areas.wetted     for f in fuses])
+    fuselage_width                  = np.atleast_1d([f.widths.maximum   for f in fuses])
+    fuselage_maximum_height         = np.atleast_1d([f.heights.maximum  for f in fuses])
+    fuselage_total_length           = np.atleast_1d([f.lengths.total    for f in fuses])
+    fuselage_differential_pressure  = np.atleast_1d([f.differential_pressure for f in fuses])
+    vehicle_limit_load              = np.atleast_1d(system.envelope.limit_load)
+    vehicle_max_zero_fuel_mass      = np.atleast_1d(system.mass_properties.max_zero_fuel_mass)
+    vehicle_main_wing_mass          = np.atleast_1d(system['Main Wing'].mass_properties.total)
+    vehicle_main_wing_root_chord    = np.atleast_1d(system['Main Wing'].chords.root)
+    vehicle_propulsion_mass         = np.atleast_1d(system.energy.converters.propulsors.mass_properties.total)
 
     results = func_fuselage(fuselage_wetted_area,
                             fuselage_width,
@@ -143,11 +149,11 @@ def fuselage(State, Settings, System):
                             vehicle_main_wing_root_chord,
                             vehicle_propulsion_mass)
                            
-    for idx, fuse in enumerate(System.fuselages):
+    for idx, fuse in enumerate(fuses):
         fuse.mass_properties.total = results[idx]
 
-    System.sum_mass()
+    system.sum_mass()
     
-    return State, Settings, System
+    return state, system, settings
                            
     

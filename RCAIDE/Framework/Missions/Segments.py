@@ -16,10 +16,10 @@ import jax
 import jax.numpy as jnp
 jax.config.update("jax_enable_x64", True)
 
-from jax import jit, grad, value_and_grad
+from jax import jit, grad
 
 import numpy as np
-from scipy.optimize import fsolve, minimize
+from scipy.optimize import minimize
 
 # RCAIDE imports
 
@@ -93,6 +93,7 @@ class FinalizeSegment(Process):
 # Converge/Optimize Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 @dataclass(kw_only=True)
 class ConvergedSegment(Process):
 
@@ -102,28 +103,28 @@ class ConvergedSegment(Process):
 
     root_finder_args:       List = field(default_factory=list)
     root_finder_kwargs:     dict = None
-    results_parser:         Callable[[Any], Tuple[rcf.State, rcf.Settings, rcf.System]] = skip
+    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = skip
 
     initial_unknowns:       np.ndarray  = None
 
     # Special override of process call to handle root finding, still follows process type flow
     def __call__(self,
-                 state: rcf.State,
-                 settings: rcf.Settings,
-                 system: rcf.System) -> Tuple[rcf.State, rcf.Settings, rcf.System]:
+                 state: "rcf.State",
+                 system: "rcf.System",
+                 settings: "rcf.Settings") -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
         self.update_details()
 
         # Converge root of residuals
 
-        root_finder = Settings.root_finder
+        root_finder = settings.root_finder
 
         if self.root_finder_kwargs is None:
             # Assume fsolve is the default root finder and that the calculate_residuals function is provided
             self.root_finder_kwargs = {
                 'func': self.calculate_residuals,
                 'x0': state.unknowns.pack_array(),
-                'args': (state, settings, system),
+                'args': (state, system, settings),
                 'xtol': state.numerics.solution_tolerance,
                 'maxfev': state.numerics.max_evaluations,
                 'epsfcn': state.numerics.step_size,
@@ -142,7 +143,7 @@ class OptimalSegment(Process):
     optimization_method:    str     = 'SLSQP'
     display_optimization:   bool    = False
 
-    initalize:              InitializeSegment   = field(default_factory=InitializeSegment)
+    initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
     update:                 AnalyzeSegment      = field(default_factory=AnalyzeSegment)
     finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
@@ -156,15 +157,24 @@ class OptimalSegment(Process):
 
         return self.state, self.settings, self.system
 
-    def __call__(self) -> Tuple[rcf.State, rcf.Settings, rcf.System]:
+    def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
+        self.state, self.system, self.settings = args[0]
+        self.state.initials = self.state
         self.update_details()
 
-        self.state, self.system, self.settings = self.initalize(self.state, self.settings, self.system)
+        self.initialize.state = self.state
+        self.initialize.system = self.system
+        self.initialize.settings = self.settings
+
+        self.state, self.system, self.settings = self.initialize((self.state, self.system, self.settings))
 
         def _obj(U):
             self.state.unknowns.unpack_array(U)
-            self.state, self.system, self.settings = self.update(self.state, self.system, self.settings)
+            self.update.state = self.state
+            self.update.system = self.system
+            self.update.settings = self.settings
+            self.state, self.system, self.settings = self.update()
             return self.calculate_objective(self.state, self.system, self.settings)
 
         _obj_fcn    = jit(_obj)

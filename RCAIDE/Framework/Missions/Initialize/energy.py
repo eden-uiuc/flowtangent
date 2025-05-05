@@ -18,9 +18,10 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def initialize_energy(State: rcf.State,
-                      Settings: rcf.Settings,
-                      System: rcf.System):
+def initialize_energy(state: "rcf.State",
+                      system: "rcf.System",
+                      settings: "rcf.Settings",
+                      ):
     def _recursive_initialize_energy(conditions: Conditions, initial_conditions: Conditions):
 
         for k, v in vars(conditions).items():
@@ -32,6 +33,6 @@ def initialize_energy(State: rcf.State,
             if isinstance(v, Conditions):
                 _recursive_initialize_energy(v, vars(initial_conditions)[k])
 
-    _recursive_initialize_energy(State.energy, State.initials.energy)
+    _recursive_initialize_energy(state.energy, state.initials.energy)
 
-    return State, Settings, System
+    return state, system, settings

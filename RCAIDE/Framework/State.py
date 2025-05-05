@@ -8,12 +8,15 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass, field
+from typing import Self
 
 # package imports
 import numpy as np
 
 # RCAIDE imports
-from RCAIDE.Framework.Missions.Conditions import *
+from RCAIDE.Framework.Missions.Conditions import (
+    Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
+    AerodynamicsConditions, ControlsConditions)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  State
@@ -25,7 +28,7 @@ class State(Conditions):
 
     # Attribute         Type                        Default Value
     name:               str                         = 'State'
-    initials:           Conditions                  = None
+    initials:           Self                        = None
     numerics:           Numerics                    = field(default_factory=Numerics)
 
     frames:             FrameConditions             = field(default_factory=FrameConditions)
@@ -39,7 +42,4 @@ class State(Conditions):
 
     unknowns:           Conditions                  = field(default_factory=lambda: Conditions(name='Unknowns'))
     residuals:          Conditions                  = field(default_factory=lambda: Conditions(name='Residuals'))
-    objective:          ObjectiveConditions         = field(default_factory=lambda: Conditions(name='Objective'))
-
-    # def __post_init__(self):
-        # self.initials = State(name='Initial State')
+    objective:          Conditions                  = field(default_factory=lambda: Conditions(name='Objective'))

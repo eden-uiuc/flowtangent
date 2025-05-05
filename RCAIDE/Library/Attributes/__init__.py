@@ -11,7 +11,5 @@
 
 from . import Costs 
 from . import Coolants
-from . import Planets
-from . import Atmospheres
 from . import Materials
 from . import Cryogens

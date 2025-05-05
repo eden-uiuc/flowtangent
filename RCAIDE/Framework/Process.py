@@ -9,14 +9,15 @@
 
 import dataclasses
 from dataclasses import field
-from typing import Callable, Iterable, Self, TypeVar, List
+from typing import Callable, Iterable, Self, List
 
 # package imports
 import pandas as pd
 import chex
+from chex import dataclass
 
 # RCAIDE imports
-from RCAIDE.Framework import State, Settings, System
+import RCAIDE.Framework as rcf
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -24,7 +25,7 @@ from RCAIDE.Framework import State, Settings, System
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def skip(*args, **kwargs):
+def skip(*args):
     """
     skip(*args, **kwargs)
 
@@ -46,7 +47,7 @@ def skip(*args, **kwargs):
     --------
     """
     
-    return *args, kwargs
+    return args
 
 
 @chex.dataclass(kw_only=True)
@@ -66,12 +67,12 @@ class ProcessStep:
     __call__():             Executes the function with the provided state, settings, and system objects.
     """
 
-    function:       Callable    = skip
-    name:           str         = "Process Step"
-    last_result:    object      = None
-    state:          State       = field(default_factory=State)
-    settings:       Settings    = field(default_factory=Settings)
-    system:         System      = field(default_factory=System)
+    function:       Callable        = skip
+    name:           str             = "Process Step"
+    last_result:    object          = None
+    state:          "rcf.State"     = None
+    system:         "rcf.System"    = None
+    settings:       "rcf.Settings"  = None
 
     def __call__(self):
         """
@@ -96,7 +97,7 @@ class ProcessStep:
         Examples
         --------
         """
-        framework_args = (self.state, self.settings, self.system)
+        framework_args = (self.state, self.system, self.settings)
         return self.function(*framework_args)
 
 
@@ -186,21 +187,21 @@ class Process:
     update_details(self):   Updates the details DataFrame with the current process steps.
     """
 
-    name:               str                 = "Process"
+    name:               str             = "Process"
 
-    steps:              List[Callable]      = field(default_factory=list)
-    details:            pd.DataFrame        = field(default_factory=_create_details)
+    steps:              List[Callable]  = field(default_factory=list)
+    details:            pd.DataFrame    = field(default_factory=_create_details)
 
-    step:               int                 = 0
-    initial_step:       int                 = 0
+    step:               int             = 0
+    initial_step:       int             = 0
 
-    initial_state:      State               = field(default_factory=State)
-    initial_settings:   Settings            = field(default_factory=Settings)
-    initial_system:     System              = field(default_factory=System)
+    initial_state:      "rcf.State"     = None
+    initial_settings:   "rcf.Settings"  = None
+    initial_system:     "rcf.System"    = None
 
-    state:              State               = None
-    settings:           Settings            = None
-    system:             System              = None
+    state:              "rcf.State"     = None
+    settings:           "rcf.Settings"  = None
+    system:             "rcf.System"    = None
 
     def __getitem__(self, item):
         """
@@ -280,15 +281,15 @@ class Process:
     
         self.update_details()
     
-        framework_args = (self.initial_state,
-                          self.initial_settings,
-                          self.initial_system)
+        framework_args = (self.state.initials,
+                          self.system,
+                          self.settings,)
     
         for index, step in enumerate(self.steps[self.initial_step:]):
 
             step.state = framework_args[0]
-            step.settings = framework_args[1]
-            step.system = framework_args[2]
+            step.system = framework_args[1]
+            step.settings = framework_args[2]
 
             framework_args = step()
 
@@ -762,24 +763,24 @@ if __name__ == "__main__":
     def lib_sq_func(x):
         return x**2
 
-    def fw_sq_func(State, Settings, System):
-        x = State.x
+    def fw_sq_func(state, system, setting):
+        x = state.x
         results = lib_sq_func(x)
-        State.x = results
+        state.x = results
 
-        return State, Settings, System
+        return state, system, settings
 
 
     def lib_add_func(x, y):
         return x + y
 
-    def fw_add_func(State, Settings, System):
-        x = State.x
-        y = State.y
+    def fw_add_func(state, system, settings):
+        x = state.x
+        y = state.y
         results = lib_add_func(x, y)
-        State.x = results
+        state.x = results
 
-        return State, Settings, System
+        return state, system, settings
 
     square_and_add = Process(
         steps=[fw_sq_func, fw_add_func],

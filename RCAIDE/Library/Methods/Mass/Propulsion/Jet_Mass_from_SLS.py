@@ -37,9 +37,10 @@ def func_Jet_Mass_from_SLS(
 # -------------------------------------------------------------------------------
 
 def Jet_Mass_from_SLS(
-    state: rcf.State,
-    settings: rcf.Settings,
-    system: rcf.System):
+    state: "rcf.State",
+    system: "rcf.System",
+    settings: "rcf.Settings",
+    ):
     """
     Framework version of Jet_Mass_from_SLS. Assumes a turbofan engine.
     
@@ -58,14 +59,14 @@ def Jet_Mass_from_SLS(
             T_ref = jet.reference_temperature
 
             F = func_thrust_and_power(
-                gamma=jet.working_fluid.
+                gamma=jet.working_fluid.compute_gamma(T_ref)
             )
 
         sls_thrust = jet.design_thrust_parameters.SLS_thrust
 
         jet_mass = func_Jet_Mass_from_SLS(sls_thrust)
-        jet.mass_properties.
+        jet.mass_properties.total = jet_mass
 
     # TODO: Unpack results
 
-    return state, settings, system
+    return state, system, settings

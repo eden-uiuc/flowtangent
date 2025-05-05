@@ -23,9 +23,9 @@ import RCAIDE.Framework as rcf
 
 def fsolve_results_parser(
         fsolve_result: Tuple,
-        State: rcf.State,
-        Settings: rcf.Settings,
-        System: rcf.System
+        state: "rcf.State",
+        system: rcf.System,
+        settings: "rcf.Settings",
         ):
 
         unknowns:       np.ndarray      = fsolve_result[0]
@@ -35,10 +35,11 @@ def fsolve_results_parser(
 
         if ier != 1:
             print("Segment Convergence Failed:", mesg)
-            State.numerics.converged = False
+            state.numerics.converged = False
         else:
             print("Segment Converged.")
             print("Number of function evaluations:", infodict['nfev'])
-            State.numerics.converged = True
+            state.unknowns.unpack_array(unknowns)
+            state.numerics.converged = True
         
-        return State, Settings, System
+        return state, system, settings

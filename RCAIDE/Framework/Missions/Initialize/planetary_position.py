@@ -17,11 +17,12 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def initialize_planetary_position(State: rcf.State,
-                                  Settings: rcf.Settings,
-                                  System: rcf.System):
+def initialize_planetary_position(state: "rcf.State",
+                                  system: "rcf.System",
+                                  settings: "rcf.Settings",
+                                  ):
 
-    State.frames.planet.longitude[:, 0] = State.initials.frames.planet.longitude[-1, 0]
-    State.frames.planet.latitude[:, 0]  = State.initials.frames.planet.latitude[-1, 0]
+    state.frames.planet.longitude[:, 0] = state.initials.frames.planet.longitude[-1, 0]
+    state.frames.planet.latitude[:, 0]  = state.initials.frames.planet.latitude[-1, 0]
 
-    return State, Settings, System
+    return state, system, settings

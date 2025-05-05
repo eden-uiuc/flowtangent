@@ -54,7 +54,7 @@ class Propellant:
 @dataclass(kw_only=True)
 class JetA(Propellant):
 
-    oxidizer: rcl.Gas = field(default_factory=lambda: rcl.O2())
+    oxidizer: rcl.Gas = field(default_factory=rcl.O2)
 
     density         = 820.
     specific_energy = 43.02e6

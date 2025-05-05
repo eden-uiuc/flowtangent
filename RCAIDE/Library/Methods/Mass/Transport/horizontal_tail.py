@@ -8,7 +8,8 @@
 #  Imports
 # ---------------------------------------------------------------------- 
 
-from RCAIDE.Reference.Core import Units
+import RCAIDE.Framework as rcf
+from RCAIDE.Framework.Core import Units
 
 import numpy as np
 
@@ -80,10 +81,12 @@ def func_horizontal_tail(wingspan : float,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def horizontal_tail(State, Settings, System):
+def horizontal_tail(state: "rcf.State",
+                    system: "rcf.System",
+                    settings: "rcf.Settings"):
 
 
-    h_tail = System.wings.horizontal_tail
+    h_tail = system.wings.horizontal_tail
 
     wingspan                            = h_tail.spans.projected
     quarter_chord_sweep                 = h_tail.sweeps.quarter_chord
@@ -92,10 +95,10 @@ def horizontal_tail(State, Settings, System):
     exposed_area                        = h_tail.areas.exposed
     wetted_area                         = h_tail.areas.wetted
 
-    vehicle_max_takeoff_weight          = System.mass_properties.max_takeoff
-    vehicle_ultimate_load               = System.envelope.ultimate_load
+    vehicle_max_takeoff_weight          = system.mass_properties.max_takeoff
+    vehicle_ultimate_load               = system.envelope.ultimate_load
 
-    main_wing = System.wings.main_wing
+    main_wing = system.wings.main_wing
 
 
     main_wing_mean_aerodynamic_chord    = main_wing.chords.mean_aerodynamic
@@ -113,8 +116,8 @@ def horizontal_tail(State, Settings, System):
                                    main_wing_mean_aerodynamic_chord,
                                    moment_arm_length)
 
-    h_tail.mass_properties.total = h_tail_mass * (1. - Settings.mass_reduction_factors.empennage)
+    h_tail.mass_properties.total = h_tail_mass * (1. - settings.mass_reduction_factors.empennage)
 
-    System.sum_mass()
+    system.sum_mass()
 
-    return State, Settings, System
+    return state, system, settings

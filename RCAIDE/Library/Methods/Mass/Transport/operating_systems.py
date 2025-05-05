@@ -9,9 +9,10 @@
 # ---------------------------------------------------------------------- 
 
 import numpy as np
-from RCAIDE.Reference.Core import Units
-from RCAIDE.Reference.Components import Component
-from RCAIDE.Reference.Components import Horizontal_Tail, Vertical_Tail, Main_Wing
+from RCAIDE.Framework.Core import Units
+
+import RCAIDE.Framework as rcf
+import RCAIDE.Library as rcl
 
 # -----------------------------------------------------------------------
 # Functional/Library Version
@@ -51,7 +52,9 @@ def func_operating_systems(fixed_masses : np.ndarray,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def operating_systems(State, Settings, System):
+def operating_systems(state: "rcf.State",
+                      system: "rcf.System",
+                      settings: "rcf.Settings",):
 
     fixed_masses = []
     fixed_mass_names = []
@@ -59,9 +62,9 @@ def operating_systems(State, Settings, System):
     per_seat_masses = []
     per_seat_mass_names = []
 
-    adjustment = 1.0 - Settings.mass_reduction_factors.systems
+    adjustment = 1.0 - settings.mass_reduction_factors.systems
 
-    for key, value in System.aircraft_type.__dict__.items():
+    for key, value in system.aircraft_type.__dict__.items():
         if key[-4:] == 'mass' and value.metadata['fixed']:
             fixed_masses.append(value)
             fixed_mass_names.append(key)
@@ -70,54 +73,54 @@ def operating_systems(State, Settings, System):
             per_seat_mass_names.append(key)
 
     s_tail = 0.
-    for wing in System.wings:
+    for wing in system.wings:
         if isinstance(wing, Horizontal_Tail) or isinstance(wing, Vertical_Tail):
             s_tail += wing.areas.reference
 
     if s_tail == 0:
-        for wing in System.wings:
+        for wing in system.wings:
             if isinstance(wing, Main_Wing):
                 s_tail += wing.areas.reference * 0.01
 
     results = func_operating_systems(np.asarray(fixed_masses),
                                      np.asarray(per_seat_masses),
-                                     System.number_of_passengers,
-                                     System.reference_area,
+                                     system.number_of_passengers,
+                                     system.reference_area,
                                      s_tail)
 
     total_opsys_mass    = results[0] * adjustment
     fc_mass             = results[1] * adjustment
     hp_mass             = results[2] * adjustment
 
-    if not hasattr(System, 'operating_systems'):
-        System.add_subcomponent(Component(name='operating_systems'))
+    if not hasattr(system, 'operating_systems'):
+        system.add_subcomponent(rcl.Component(name='operating_systems'))
 
-    output = System.operating_systems.mass_properties
+    output = system.operating_systems.mass_properties
     output.total = total_opsys_mass
 
     if not hasattr(output, 'flight_controls'):
-        output.add_subcomponent(Component(name='flight_controls'))
+        output.add_subcomponent(rcl.Component(name='flight_controls'))
 
     output.flight_controls.mass_properties.total = fc_mass
 
     if not hasattr(output, 'hydraulics'):
-        output.add_subcomponent(Component(name='hydraulics'))
+        output.add_subcomponent(rcl.Component(name='hydraulics'))
 
     output.hydraulics.mass_properties.total = hp_mass
 
     for i in range(len(fixed_mass_names)):
         if not hasattr(output, fixed_mass_names[i]):
-            output.add_subcomponent(Component(name=fixed_mass_names[i]))
+            output.add_subcomponent(rcl.Component(name=fixed_mass_names[i]))
         output.__dict__[fixed_mass_names[i]].mass_properties.total = (
             fixed_masses[i] * adjustment)
 
     for i in range(len(per_seat_mass_names)):
         if not hasattr(output, per_seat_mass_names[i]):
-            output.add_subcomponent(Component(name=per_seat_mass_names[i]))
+            output.add_subcomponent(rcl.Component(name=per_seat_mass_names[i]))
         output.__dict__[per_seat_mass_names[i]].mass_properties.total = (
-                per_seat_masses[i] * System.number_of_passengers * adjustment)
+                per_seat_masses[i] * system.number_of_passengers * adjustment)
 
     output.sum_mass()
-    System.sum_mass()
+    system.sum_mass()
 
-    return State, Settings, System
+    return state, system, settings

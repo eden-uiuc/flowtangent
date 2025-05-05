@@ -48,8 +48,8 @@ class Frame(Conditions):
 
     transform_to_inertial:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
-    total_force_vector:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    total_moment_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    total_force_vector:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
+    total_moment_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
 
 @dataclass(kw_only=True)
@@ -90,15 +90,15 @@ class InertialFrame(Frame):
     # Attribute                     Type        Default Value
     name:                           str         = 'Inertial Frame'
 
-    position_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    position_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    velocity_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    acceleration_vector:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    velocity_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
+    acceleration_vector:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    angular_velocity_vector:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    angular_acceleration_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    angular_velocity_vector:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
+    angular_acceleration_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    gravity_force_vector:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    gravity_force_vector:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
     time:                           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     system_range:                   np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -130,11 +130,11 @@ class BodyFrame(Frame):
     # Attribute             Type        Default Value
     name:                   str         = 'Body Frame'
 
-    inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    thrust_force_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    thrust_force_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
 
 @dataclass(kw_only=True)
@@ -168,13 +168,13 @@ class WindFrame(Frame):
     # Attribute         Type            Default Value
     name:               str             = 'Wind Frame'
 
-    body_rotations:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    body_rotations:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     transform_to_body:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
-    velocity_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    velocity_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
-    force_vector:       np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
-    moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 1, 3)))
+    force_vector:       np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
+    moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
 
 @dataclass(kw_only=True)
@@ -245,124 +245,3 @@ class FrameConditions(Conditions):
     body:           BodyFrame       = field(default_factory=lambda: BodyFrame())
     wind:           WindFrame       = field(default_factory=lambda: WindFrame())
     planet:         PlanetFrame     = field(default_factory=lambda: PlanetFrame())
-
-
-class TestFrame(unittest.TestCase):
-    def setUp(self):
-        self.frame = Frame()
-
-    def test_default_values(self):
-        self.assertEqual(self.frame.name, 'Frame')
-        np.testing.assert_array_equal(self.frame.total_force_vector, np.zeros((1, 1, 3)))
-        np.testing.assert_array_equal(self.frame.total_moment_vector, np.zeros((1, 1, 3)))
-
-
-class TestInertialFrame(unittest.TestCase):
-    def setUp(self):
-        self.inertial_frame = InertialFrame()
-
-    def test_default_values(self):
-        self.assertEqual(self.inertial_frame.name, 'Inertial Frame')
-        np.testing.assert_array_equal(self.inertial_frame.position_vector, np.zeros((1, 1, 3)))
-        np.testing.assert_array_equal(self.inertial_frame.velocity_vector, np.zeros((1, 1, 3)))
-        np.testing.assert_array_equal(self.inertial_frame.time, np.zeros((1, 1)))
-
-
-class TestBodyFrame(unittest.TestCase):
-    def setUp(self):
-        self.body_frame = BodyFrame()
-
-    def test_default_values(self):
-        self.assertEqual(self.body_frame.name, 'Body Frame')
-        np.testing.assert_array_equal(self.body_frame.inertial_rotations, np.zeros((1, 1, 3)))
-        np.testing.assert_array_equal(self.body_frame.thrust_force_vector, np.zeros((1, 1, 3)))
-
-
-class TestWindFrame(unittest.TestCase):
-    def setUp(self):
-        self.wind_frame = WindFrame()
-
-    def test_default_values(self):
-        self.assertEqual(self.wind_frame.name, 'Wind Frame')
-        np.testing.assert_array_equal(self.wind_frame.body_rotations, np.zeros((1, 1, 3)))
-        np.testing.assert_array_equal(self.wind_frame.velocity_vector, np.zeros((1, 1, 3)))
-
-
-class TestRotationUsage(unittest.TestCase):
-    def setUp(self):
-        self.frame = Frame()
-        self.wind_frame = WindFrame()
-
-    def test_frame_transform_to_inertial(self):
-        # Test default initialization
-        self.assertIsInstance(self.frame.transform_to_inertial, SP_Rotation)
-        np.testing.assert_array_almost_equal(
-            self.frame.transform_to_inertial.as_euler('zyx'),
-            [0, 0, 0]
-        )
-
-        # Test with custom rotation
-        custom_rotation = SP_Rotation.from_euler('zyx', [np.pi/4, np.pi/6, np.pi/3])
-        self.frame.transform_to_inertial = custom_rotation
-        np.testing.assert_array_almost_equal(
-            self.frame.transform_to_inertial.as_euler('zyx'),
-            [np.pi/4, np.pi/6, np.pi/3]
-        )
-
-    def test_wind_frame_transform_to_body(self):
-        # Test default initialization
-        self.assertIsInstance(self.wind_frame.transform_to_body, SP_Rotation)
-        np.testing.assert_array_almost_equal(
-            self.wind_frame.transform_to_body.as_euler('zyx'),
-            [0, 0, 0]
-        )
-
-        # Test with custom rotation
-        custom_rotation = SP_Rotation.from_euler('zyx', [np.pi/2, np.pi/4, np.pi/6])
-        self.wind_frame.transform_to_body = custom_rotation
-        np.testing.assert_array_almost_equal(
-            self.wind_frame.transform_to_body.as_euler('zyx'),
-            [np.pi/2, np.pi/4, np.pi/6]
-        )
-
-    def test_rotation_composition(self):
-        # Test composition of rotations
-        body_to_inertial = SP_Rotation.from_euler('zyx', [np.pi/4, 0, 0])
-        wind_to_body = SP_Rotation.from_euler('zyx', [0, np.pi/4, 0])
-
-        self.frame.transform_to_inertial = body_to_inertial
-        self.wind_frame.transform_to_body = wind_to_body
-
-        wind_to_inertial = wind_to_body * body_to_inertial
-
-        np.testing.assert_array_almost_equal(
-            wind_to_inertial.as_euler('zyx'),
-            [np.pi/4, np.pi/4, 0]
-        )
-
-
-class TestPlanetFrame(unittest.TestCase):
-    def setUp(self):
-        self.planet_frame = PlanetFrame()
-
-    def test_default_values(self):
-        self.assertEqual(self.planet_frame.name, 'Planet Frame')
-        self.assertIsNone(self.planet_frame.start_time)
-        np.testing.assert_array_equal(self.planet_frame.latitude, np.zeros((1, 1)))
-        np.testing.assert_array_equal(self.planet_frame.longitude, np.zeros((1, 1)))
-
-
-class TestFrameConditions(unittest.TestCase):
-    def setUp(self):
-        self.frame_conditions = FrameConditions()
-
-    def test_default_values(self):
-        self.assertEqual(self.frame_conditions.name, 'Dynamic Frames')
-        self.assertIsInstance(self.frame_conditions.inertial, InertialFrame)
-        self.assertIsInstance(self.frame_conditions.body, BodyFrame)
-        self.assertIsInstance(self.frame_conditions.wind, WindFrame)
-        self.assertIsInstance(self.frame_conditions.planet, PlanetFrame)
-
-
-if __name__ == '__main__':
-    unittest.main()

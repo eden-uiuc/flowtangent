@@ -15,21 +15,21 @@ import RCAIDE.Framework as rcf
 
 
 def update_forces(
-        State: rcf.State,
-        Settings: rcf.Settings,
-        System: rcf.System
+        state: "rcf.State",
+        system: "rcf.System",
+        settings: "rcf.Settings",
         ):
         
-        wind    = State.frames.wind.total_force
-        thrust  = State.frames.body.thrust_force
-        gravity = State.frames.inertial.gravity_force
+        wind    = state.frames.wind.total_force_vector
+        thrust  = state.frames.body.thrust_force_vector
+        gravity = state.frames.inertial.gravity_force_vector
 
-        TB2I = State.frames.body.transform_to_inertial
-        TW2I = State.frames.wind.transform_to_inertial
+        TB2I = state.frames.body.transform_to_inertial
+        TW2I = state.frames.wind.transform_to_inertial
 
         F = TW2I.apply(wind)
         T = TB2I.apply(thrust)
 
-        State.frames.inertial.total_force = F + T + gravity
+        state.frames.inertial.total_force_vector = F + T + gravity
         
-        return State, Settings, System
+        return state, system, settings

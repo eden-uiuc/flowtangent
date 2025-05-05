@@ -8,6 +8,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from os import path
+from pathlib import Path
+Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
+
 from .Fuselages     import Fuselage, FuselageSegment, BWBFuselage
 from .Airfoils      import Airfoil
 from .Nacelles      import Nacelle

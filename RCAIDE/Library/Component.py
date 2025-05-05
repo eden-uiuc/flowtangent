@@ -157,8 +157,8 @@ class Component:
 
     def add_subcomponent(self,
                          subcomponent: ComponentType,
-                         sum_mass=True,
-                         sum_center_of_gravity=True,
+                         sum_mass=False,
+                         sum_center_of_gravity=False,
                          sum_moments_of_inertia=False
                          ):
 

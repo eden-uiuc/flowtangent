@@ -50,9 +50,10 @@ class Fuselage(rcl.Component):
 
     aerodynamic_center: np.ndarray = field(default_factory=lambda: np.zeros(3))
 
-    number_of_seats: int    = 1
-    seats_abreast: int      = 0.0
-    seat_pitch: float       = 0.0
+    number_of_seats:        int   = 1
+    seats_abreast:          int   = 0.0
+    seat_pitch:             float = 0.0
+    differential_pressure:  float = 0.0
 
     heights: FuselageHeights = field(default_factory=FuselageHeights)
     lengths: FuselageLengths = field(default_factory=FuselageLengths)

@@ -55,13 +55,15 @@ class Conditions:
     name: str = 'Conditions'
 
     _number_of_rows:        int = field(default=1, init=False)
-    _number_of_columns:     int = field(default=1, init=False)
+    # _number_of_columns:     int = field(default=1, init=False)
 
     row_size_adjustment:    int = 0
 
+    value:                  np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
+
     def __post_init__(self):
         self.expand_rows(self._number_of_rows)
-        self.expand_columns(self._number_of_columns)
+        # self.expand_columns(self._number_of_columns)
 
     def expand_rows(self, rows: int):
         """
@@ -94,28 +96,28 @@ class Conditions:
         self._number_of_rows = rows
 
         for k, v in vars(self).items():
-            if isinstance(v, Conditions):
+            if isinstance(v, Conditions) and k != 'initials':
                 v.expand_rows(rows)
             elif isinstance(v, np.ndarray) and len(v.shape) <= 2:  # Scalar-valued arrays
                 vars(self)[k] = np.resize(v, (self._number_of_rows, v.shape[1]))
             elif isinstance(v, np.ndarray):  # Vector-valued arrays
                 new_shape = list(v.shape)
-                new_shape[:2] = [self._number_of_rows, self._number_of_columns]
+                new_shape[0] = self._number_of_rows
                 vars(self)[k] = np.resize(v, tuple(new_shape))
 
-    def expand_columns(self, columns: int):
-
-        super(Conditions, self).__setattr__('number_of_columns', columns)
-
-        for k, v in vars(self).items():
-            if isinstance(v, Conditions):
-                v.expand_columns(columns)
-            elif isinstance(v, np.ndarray) and len(v.shape) <= 2:  # Scalar-valued arrays
-                vars(self)[k] = np.resize(v, (self._number_of_rows, columns))
-            elif isinstance(v, np.ndarray):  # Vector-valued arrays
-                new_shape = list(v.shape)
-                new_shape[:2] = [self._number_of_rows, self._number_of_columns]
-                vars(self)[k] = np.resize(v, tuple(new_shape))
+    # def expand_columns(self, columns: int):
+    #
+    #     super(Conditions, self).__setattr__('number_of_columns', columns)
+    #
+    #     for k, v in vars(self).items():
+    #         if isinstance(v, Conditions):
+    #             v.expand_columns(columns)
+    #         elif isinstance(v, np.ndarray) and len(v.shape) <= 2:  # Scalar-valued arrays
+    #             vars(self)[k] = np.resize(v, (self._number_of_rows, columns))
+    #         elif isinstance(v, np.ndarray):  # Vector-valued arrays
+    #             new_shape = list(v.shape)
+    #             new_shape[:2] = [self._number_of_rows, self._number_of_columns]
+    #             vars(self)[k] = np.resize(v, tuple(new_shape))
 
 
 

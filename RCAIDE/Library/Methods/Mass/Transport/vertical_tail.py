@@ -8,7 +8,11 @@
 #  Imports
 # ---------------------------------------------------------------------- 
 
+import numpy as np
+
 from RCAIDE.Framework.Core import Units
+
+import RCAIDE.Framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version
@@ -77,20 +81,22 @@ def func_vertical_tail(wingspan : float,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def vertical_tail(State, Settings, System):
+def vertical_tail(state: "rcf.State",
+                  system: "rcf.System",
+                  settings: "rcf.Settings",):
 
-    v_tail = System.wings.vertical_tail
+    v_tail = system.wings.vertical_tail
 
     wingspan                        = v_tail.spans.projected
     quarter_chord_sweep             = v_tail.sweeps.quarter_chord
     thickness_to_chord              = v_tail.thickness_to_chord
     reference_area                  = v_tail.areas.reference
 
-    rudder_fraction                 = Settings.sizing.rudder_fraction
+    rudder_fraction                 = settings.sizing.rudder_fraction
 
-    vehicle_maximum_takeoff_weight  = System.mass_properties.max_takeoff
-    vehicle_reference_area          = System.areas.reference
-    vehicle_ultimate_load           = System.envelope.ultimate_load
+    vehicle_maximum_takeoff_weight  = system.mass_properties.max_takeoff
+    vehicle_reference_area          = system.areas.reference
+    vehicle_ultimate_load           = system.envelope.ultimate_load
 
     v_tail_mass = func_vertical_tail(wingspan,
                                      quarter_chord_sweep,
@@ -103,8 +109,8 @@ def vertical_tail(State, Settings, System):
                                      )
 
 
-    v_tail.mass_properties.total = v_tail_mass * (1. - Settings.mass_reduction_factors.empennage)
+    v_tail.mass_properties.total = v_tail_mass * (1. - settings.mass_reduction_factors.empennage)
 
-    System.sum_mass()
+    system.sum_mass()
 
-    return State, Settings, System
+    return state, system, settings

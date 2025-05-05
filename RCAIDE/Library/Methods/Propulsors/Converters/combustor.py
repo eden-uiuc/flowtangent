@@ -38,9 +38,9 @@ def func_combustor_performance(T_t_in,
 
 
 def turbojet_combustor_performance(
-    state: rcf.State,
-    system: rcf.System,
-    settings: rcf.Settings
+    state: "rcf.State",
+    system: "rcf.System",
+    settings: "rcf.Settings"
 ):
 
     for idx, jet in system.energy.propulsors:

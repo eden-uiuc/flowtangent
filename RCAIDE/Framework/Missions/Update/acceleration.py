@@ -20,15 +20,15 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_acceleration(state: rcf.State,
-                        system: rcf.System,
-                        settings: rcf.Settings):
+def update_acceleration(state: "rcf.State",
+                        system: "rcf.System",
+                        settings: "rcf.Settings"):
 
-    v = state.frames.inertial.velocity
+    v = state.frames.inertial.velocity_vector
     D = state.numerics.time.differentiate
 
     a = np.dot(D, v)
 
     state.frames.inertial.acceleration = a
                    
-    return state, settings, system
+    return state, system, settings

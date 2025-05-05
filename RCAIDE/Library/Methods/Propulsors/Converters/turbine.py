@@ -39,8 +39,8 @@ def func_turbine_performance(
 
 
 def turbine_performance(
-    state: rcf.State,
-    system: rcf.System,
+    state: "rcf.State",
+    system: "rcf.System",
     settings: rcf.Settings
 ):
 

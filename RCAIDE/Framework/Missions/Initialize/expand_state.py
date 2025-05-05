@@ -20,10 +20,11 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def expand_state(State: rcf.State,
-                 Settings: rcf.Settings,
-                 System: rcf.System):
+def expand_state(state: "rcf.State",
+                 system: "rcf.System",
+                 settings: "rcf.Settings",
+                 ):
 
-    State.expand_rows(rows=State.numerics.number_of_control_points)
+    state.expand_rows(rows=state.numerics.number_of_control_points)
 
-    return State, Settings, System
+    return state, system, settings

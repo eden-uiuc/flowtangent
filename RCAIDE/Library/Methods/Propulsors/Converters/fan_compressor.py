@@ -40,8 +40,8 @@ def func_fan_compressor_performance(
     return work, P_t_out, T_t_out, h_t_out
 
 
-def fan_performance(state: rcf.State,
-                    system: rcf.System,
+def fan_performance(state: "rcf.State",
+                    system: "rcf.System",
                     settings: rcf.Settings):
 
     # Get inputs
@@ -78,8 +78,8 @@ def fan_performance(state: rcf.State,
     return state, system, settings
 
 
-def compressor_performance(state: rcf.State,
-                           system: rcf.System,
+def compressor_performance(state: "rcf.State",
+                           system: "rcf.System",
                            settings: rcf.Settings):
 
     # Get inputs

@@ -31,8 +31,8 @@ class Nacelle(rcl.Component):
     has_pylon:                  bool    = True
     fuselage_integrated:        bool    = False
 
-    aerodynamic_center:         np.ndarray              = field(default_factory=np.zeros(3))
-    orientation_euler_angles:   np.ndarray              = field(default_factory=np.zeros(3))
+    aerodynamic_center:         np.ndarray              = field(default_factory=lambda: np.zeros(3))
+    orientation_euler_angles:   np.ndarray              = field(default_factory=lambda: np.zeros(3))
 
     airfoil:                    rcl.Component           = None
     cowling_airfoil_angle:      float                   = 0.0

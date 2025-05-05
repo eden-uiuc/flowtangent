@@ -121,8 +121,8 @@ def func_expansion_nozzle_performance(
 
 
 def compression_nozzle_performance(
-    state: rcf.State,
-    system: rcf.System,
+    state: "rcf.State",
+    system: "rcf.System",
     settings: rcf.Settings
 ):
 
@@ -182,9 +182,9 @@ def compression_nozzle_performance(
 
 
 def _expansion_nozzle_performance(
-    state: rcf.State,
-    system: rcf.System,
-    settings: rcf.Settings,
+    state: "rcf.State",
+    system: "rcf.System",
+    settings: "rcf.Settings",
     input_converter_state,
     output_converter_state,
     PR,
@@ -255,8 +255,8 @@ def _expansion_nozzle_performance(
 
 
 def fan_nozzle_performance(
-    state: rcf.State,
-    system: rcf.System,
+    state: "rcf.State",
+    system: "rcf.System",
     settings: rcf.Settings
 ):
     # Get Inputs
@@ -274,8 +274,8 @@ def fan_nozzle_performance(
 
 
 def core_nozzle_performance(
-    state: rcf.State,
-    system: rcf.System,
+    state: "rcf.State",
+    system: "rcf.System",
     settings: rcf.Settings
 ):
     # Get Inputs

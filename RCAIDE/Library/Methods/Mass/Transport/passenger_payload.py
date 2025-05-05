@@ -8,15 +8,17 @@
 # ---------------------------------------------------------------------- 
 
 from Legacy.trunk.S.Core import Units
-from RCAIDE.Framework import Component
+
+import RCAIDE.Library as rcl
+import RCAIDE.Framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version
 # -----------------------------------------------------------------------
 
 def func_passenger_payload(n_passengers,
-                           m_passenger = 195. * Units.lbm,
-                           m_baggage = 30. * Units.lbm,
+                           m_passenger=195. * Units.lbm,
+                           m_baggage=30. * Units.lbm,
                            *args, **kwargs):
     """
     Calculate the total mass of passengers and their baggage.
@@ -46,39 +48,41 @@ def func_passenger_payload(n_passengers,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def passenger_payload(State, Settings, System):
+def passenger_payload(state: "rcf.State",
+                      system: "rcf.System",
+                      settings: "rcf.Settings"):
 
-    n_passengers    = System.number_of_passengers
+    n_passengers    = system.number_of_passengers
 
     passenger_mass, baggage_mass = func_passenger_payload(n_passengers)
 
-    def _build_payload(payload: PhysicalComponent):
+    def _build_payload(payload: "rcl.Component"):
 
         if hasattr(payload, 'passengers'):
             payload.passengers.mass_properties.total = passenger_mass
         else:
-            passengers = PhysicalComponent(name='passengers')
+            passengers = rcl.Component(name='passengers')
             passengers.mass_properties.total = passenger_mass
             payload.add_subcomponent(passengers)
 
         if hasattr(payload, 'baggage'):
             payload.baggage.mass_properties.total = baggage_mass
         else:
-            baggage = PhysicalComponent(name='baggage')
+            baggage = rcl.Component(name='baggage')
             baggage.mass_properties.total = baggage_mass
             payload.add_subcomponent(baggage)
 
-        payload.sum_mass
+        payload.sum_mass()
 
         return payload
 
-    if hasattr(System, 'payload'):
-        _payload = System.payload
-        System.payload = _build_payload(_payload)
-        System.sum_mass()
+    if hasattr(system, 'payload'):
+        _payload = system.payload
+        system.payload = _build_payload(_payload)
+        system.sum_mass()
     else:
-        _payload = PhysicalComponent(name='payload')
+        _payload = rcl.Component(name='payload')
         payload = _build_payload(_payload)
-        System.add_subcomponent(payload)
+        system.add_subcomponent(payload)
 
-    return State, Settings, System
+    return state, system, settings

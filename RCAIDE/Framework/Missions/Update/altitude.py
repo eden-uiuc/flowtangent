@@ -20,10 +20,11 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_altitude(State: rcf.State,
-                    Settings: rcf.Settings,
-                    System: rcf.System):
+def update_altitude(state: "rcf.State",
+                    system: "rcf.System",
+                    settings: "rcf.Settings",
+                    ):
 
-    State.freestream.altitude[:, 0] = State.frames.inertial.position[:, 2]
+    state.freestream.altitude = state.frames.inertial.position_vector[:, 2]
                    
-    return State, Settings, System
+    return state, system, settings

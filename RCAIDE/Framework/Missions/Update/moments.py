@@ -15,18 +15,18 @@ import RCAIDE.Framework as rcf
 
 
 def update_moments(
-        State: rcf.State,
-        Settings: rcf.Settings,
-        System: rcf.System
+        state: "rcf.State",
+        system: "rcf.System",
+        settings: "rcf.Settings",
         ):
 
-        wind = State.frames.wind.total_moment
-        thrust = State.energy.total_moment
+        wind    = state.frames.wind.total_moment_vector
+        thrust  = state.energy.total_moment_vector
 
-        TW2I = State.frames.wind.transform_to_inertial
+        TW2I    = state.frames.wind.transform_to_inertial
 
         M = TW2I.apply(wind)
 
-        State.frames.inertial.total_moment = M + thrust
+        state.frames.inertial.total_moment = M + thrust
         
-        return State, Settings, System
+        return state, system, settings

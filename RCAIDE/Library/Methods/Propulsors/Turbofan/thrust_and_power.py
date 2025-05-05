@@ -64,12 +64,6 @@ def func_thrust_and_power(
     return F, F_sp, I_sp, TSFC, mdot_c, p, ff
 
 def func_sea_level_static_thrust(
-    gamma,
-    u0,
-    a0,
-    M0,
-    P0,
-    G0,
     T_ref,
     T_t_ref,
     P_ref,
@@ -87,33 +81,34 @@ def func_sea_level_static_thrust(
     throttle
 ):
 
-    sls_thrust, _, _, _, _, _, _ = def func_thrust_and_power(
+    sls_thrust, _, _, _, _, _, _ = func_thrust_and_power(
         gamma = 1.4,
         u0 = 0.,
         a0 = 0.,
         M0 = 0.,
         P0 = 101325.,
         G0 = 9.81,
-        T_ref,
-        T_t_ref,
-        P_ref,
-        P_t_ref,
-        mdhc,
-        delta_SFC,
-        f,
-        v_fan_nozzle,
-        AR_fan_nozzle,
-        P_fan_nozzle,
-        v_core_nozzle,
-        AR_core_nozzle,
-        P_core_nozzle,
-        alpha,
-        throttle
-):
+        T_ref = T_ref,
+        T_t_ref = T_t_ref,
+        P_ref = P_ref,
+        P_t_ref = P_t_ref,
+        mdhc = mdhc,
+        delta_SFC = delta_SFC,
+        f = f,
+        v_fan_nozzle = v_fan_nozzle,
+        AR_fan_nozzle = AR_fan_nozzle,
+        P_fan_nozzle = P_fan_nozzle,
+        v_core_nozzle = v_core_nozzle,
+        AR_core_nozzle = AR_core_nozzle,
+        P_core_nozzle = P_core_nozzle,
+        alpha = alpha,
+        throttle= throttle)
+
+    return sls_thrust
 
 def thrust_and_power(
-        state: rcf.State,
-        system: rcf.System,
+        state: "rcf.State",
+        system: "rcf.System",
         settings: rcf.Settings
 ):
 

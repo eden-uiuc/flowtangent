@@ -33,8 +33,8 @@ def func_shaft_offtake(
 
 
 def shaft_offtake(
-        state: rcf.State,
-        system: rcf.System,
+        state: "rcf.State",
+        system: "rcf.System",
         settings: rcf.Settings
         ):
 

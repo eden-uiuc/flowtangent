@@ -20,22 +20,23 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_time_differentials(State: rcf.State,
-                              Settings: rcf.Settings,
-                              System: rcf.System):
+def update_time_differentials(state: "rcf.State",
+                              system: "rcf.System",
+                              settings: "rcf.Settings",
+                              ):
 
-    x = State.numerics.dimensionless.control_points
-    D = State.numerics.dimensionless.differentiate
-    I = State.numerics.dimensionless.integrate
+    x = state.numerics.dimensionless.control_points
+    D = state.numerics.dimensionless.differentiate
+    I = state.numerics.dimensionless.integrate
 
-    time = State.frames.inertial.time
+    time = state.frames.inertial.time
     T = time[-1] - time[0]
     t_scaled = x * T
     D_scaled = D / T
     I_scaled = I * T
 
-    State.numerics.time.control_points  = t_scaled
-    State.numerics.time.differentiate   = D_scaled
-    State.numerics.time.integrate       = I_scaled
+    state.numerics.time.control_points  = t_scaled
+    state.numerics.time.differentiate   = D_scaled
+    state.numerics.time.integrate       = I_scaled
 
-    return State, Settings, System
+    return state, system, settings

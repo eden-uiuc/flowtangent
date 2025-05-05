@@ -245,9 +245,11 @@ def func_segmented_main_wing(wingspan: float,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def segmented_main_wing(State, Settings, System):
+def segmented_main_wing(state: "rcf.State",
+                        system: "rcf.System",
+                        settings: "rcf.Settings",):
 
-    wing = System.wings.main_wing
+    wing = system.wings.main_wing
 
     wingspan                        = wing.spans.projected
     wing_reference_area             = wing.areas.reference
@@ -266,10 +268,10 @@ def segmented_main_wing(State, Settings, System):
     material_density                = material.density
     material_yield_tensile_strength = material.yield_tensile_strength
 
-    vehicle_reference_area          = System.areas.reference
-    vehicle_ultimate_load_factor    = System.envelope.ultimate_load
-    vehicle_maximum_takeoff_weight  = System.mass_properties.max_takeoff
-    vehicle_zero_fuel_weight        = System.mass_properties.max_zero_fuel
+    vehicle_reference_area          = system.areas.reference
+    vehicle_ultimate_load_factor    = system.envelope.ultimate_load
+    vehicle_maximum_takeoff_weight  = system.mass_properties.max_takeoff
+    vehicle_zero_fuel_weight        = system.mass_properties.max_zero_fuel
 
     main_wing_mass = func_segmented_main_wing(wingspan,
                                               wing_reference_area,
@@ -285,8 +287,8 @@ def segmented_main_wing(State, Settings, System):
                                               vehicle_maximum_takeoff_weight,
                                               vehicle_zero_fuel_weight)
 
-    wing.mass_properties.total = main_wing_mass * (1. - Settings.mass_reduction_factors.main_wing)
+    wing.mass_properties.total = main_wing_mass * (1. - settings.mass_reduction_factors.main_wing)
 
-    System.sum_mass()
+    system.sum_mass()
 
-    return State, Settings, System
+    return state, system, settings
