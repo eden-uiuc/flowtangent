@@ -149,6 +149,7 @@ class OptimalSegment(Process):
 
     calculate_objective:    Callable = None
     bounds:                 List[Any] = None
+    constraints:            List[Any] = None
 
     def _results_parser(self, res):
 
@@ -159,7 +160,14 @@ class OptimalSegment(Process):
 
     def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
-        self.state, self.system, self.settings = args[0]
+        # Fix Bounds
+        NCP = self.state.numerics.number_of_control_points
+        new_bounds = []
+        for b in self.bounds:
+            new_bounds.extend([b for _ in range(NCP)])
+        self.bounds = new_bounds
+
+        # self.state, self.system, self.settings = args[0]
         self.state.initials = self.state
         self.update_details()
 
@@ -186,6 +194,7 @@ class OptimalSegment(Process):
             x0=self.state.unknowns.pack_array(),
             method=self.optimization_method,
             bounds=self.bounds,
+            constraints=self.constraints,
             options={'disp': self.display_optimization,
                      'maxiter': self.state.numerics.max_evaluations},
             tol=self.state.numerics.solution_tolerance,
@@ -220,6 +229,11 @@ class EnergyOptimalCruise(OptimalSegment):
 
     calculate_objective: Callable = energy_use
 
+    def __post_init__(self):
+        distance_check = lambda x: self.state.frames.inertial.position_vector[-1, 0]
+        self.bounds = [(-np.pi/12, np.pi/12), (0., 1.)]
+        self.constraints = [NonlinearConstraint(distance_check, lb=self.distance, ub=self.distance)]
+
 
 @dataclass(kw_only=True)
 class EnergyOptimalAltitudeChange(OptimalSegment):
@@ -232,10 +246,11 @@ class EnergyOptimalAltitudeChange(OptimalSegment):
     calculate_objective: Callable = energy_use
 
     def __post_init__(self):
-        start_check = lambda: self.state.frames.inertial.position_vector[0, 2]
-        end_check = lambda: self.state.frames.inertial.position_vector[-1, 2]
-        self.bounds = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
-                       NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
+        start_check = lambda x: self.state.frames.inertial.position_vector[0, 2]
+        end_check = lambda x: self.state.frames.inertial.position_vector[-1, 2]
+        self.bounds = [(-np.pi/4, np.pi/4), (0., 1.)]
+        self.constraints = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
+                            NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
 
 
 

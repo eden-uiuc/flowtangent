@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 
 # package imports
 import numpy as np
-from matplotlib.backends.backend_gtk4 import ToolCopyToClipboardGTK4
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
@@ -160,12 +159,6 @@ def rayleigh_line_flow(
             combustor_state.outputs.fuel_to_air_ratio       = f
 
     return state, system, settings
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Supersonic Combustion
-# ----------------------------------------------------------------------------------------------------------------------
-
-def f
 
 
 

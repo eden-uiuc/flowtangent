@@ -59,8 +59,6 @@ class Conditions:
 
     row_size_adjustment:    int = 0
 
-    value:                  np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
-
     def __post_init__(self):
         self.expand_rows(self._number_of_rows)
         # self.expand_columns(self._number_of_columns)

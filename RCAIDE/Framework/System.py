@@ -78,14 +78,12 @@ class Aircraft(System):
                          sum_moments_of_inertia=False
                          ):
 
-        field_name = subcomponent.name.replace(' ', '_').lower()
-
         if isinstance(subcomponent, rcl.Components.Wing):
-            setattr(self.wings, field_name, subcomponent)
+            setattr(self.wings, subcomponent.get_field_name(), subcomponent)
         elif isinstance(subcomponent, rcl.Components.Fuselage):
-            setattr(self.fuselages, field_name, subcomponent)
+            setattr(self.fuselages, subcomponent.get_field_name(), subcomponent)
         elif isinstance(subcomponent, rcl.Components.Nacelle):
-            setattr(self.nacelles, field_name, subcomponent)
+            setattr(self.nacelles, subcomponent.get_field_name(), subcomponent)
 
         super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 

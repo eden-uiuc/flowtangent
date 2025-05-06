@@ -18,6 +18,7 @@ from chex import dataclass
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
+from RNUMPY import less_equal
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -202,6 +203,8 @@ class Process:
     state:              "rcf.State"     = None
     settings:           "rcf.Settings"  = None
     system:             "rcf.System"    = None
+
+    last_result:        object          = None
 
     def __getitem__(self, item):
         """
@@ -756,7 +759,11 @@ class Process:
         new_details_list = [[step.name,
                              step.function.__name__,
                              step.last_result]
-                            for step in self.steps]
+                            if isinstance(step, ProcessStep)
+                            else [step.name,
+                                  step.__class__.__name__,
+                                  step.last_result]
+                             for step in self.steps]
 
         new_details = pd.DataFrame(new_details_list,
                                    columns=self.details.columns,

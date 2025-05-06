@@ -41,7 +41,7 @@ class Propellant:
 
     name: str = 'Propellant'
 
-    oxidizer: rcl.Gas = field(default_factory=rcl.Gas)
+    oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.Gas)
 
     density:            float = 0.0
     specific_energy:    float = 0.0
@@ -54,7 +54,7 @@ class Propellant:
 @dataclass(kw_only=True)
 class JetA(Propellant):
 
-    oxidizer: rcl.Gas = field(default_factory=rcl.O2)
+    oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.O2)
 
     density         = 820.
     specific_energy = 43.02e6

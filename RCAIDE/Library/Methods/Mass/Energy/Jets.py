@@ -15,7 +15,7 @@ import numpy as np
 import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf
 
-from RCAIDE.Library.Methods.Propulsors.Turbofan import func_thrust_and_power
+from RCAIDE.Library.Methods.Energy.Converters.Turbofans import func_thrust_and_power
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

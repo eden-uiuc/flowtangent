@@ -33,9 +33,9 @@ class AtmosphericBreakpoints:
 @dataclass(kw_only=True)
 class Atmosphere:
 
-    fluid: rcl.Gas = field(default_factory=rcl.Air)
+    fluid: rcl.Gases.Gas = field(default_factory=rcl.Gases.Air)
 
-    planet: rcl.Planet = field(default_factory=rcl.Earth)
+    planet: rcl.Planets.Planet = field(default_factory=rcl.Planets.Earth)
 
     breaks: AtmosphericBreakpoints = field(default_factory=AtmosphericBreakpoints)
 

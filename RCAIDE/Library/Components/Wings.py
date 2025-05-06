@@ -13,6 +13,8 @@ from dataclasses import dataclass, field, make_dataclass
 
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
+from RCAIDE.Library.Component import ComponentType
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing
@@ -178,7 +180,6 @@ class Wing(rcl.Component):
             self.areas.wetted    = total_wetted_area
 
 
-
     def make_segmented_planform(self):
 
         def _segment_centroid(le_sweep,
@@ -326,6 +327,20 @@ class Wing(rcl.Component):
 
         # update remainder segment properties
         self._update_segment_properties()
+
+        def add_subcomponent(self,
+                         subcomponent: ComponentType,
+                         sum_mass=False,
+                         sum_center_of_gravity=False,
+                         sum_moments_of_inertia=False
+                         ):
+
+            if isinstance(subcomponent, WingSegment):
+                self.segments.append(subcomponent)
+            elif isinstance(subcomponent, WingControlSurface):
+                setattr(self.control_surfaces, subcomponent.get_field_name(), subcomponent)
+
+            super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
 
 

@@ -24,8 +24,8 @@ import RCAIDE.Library as rcl
 @dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
-    converters:     dataclass = field(default_factory=lambda: make_dataclass('LinePropulsors', []))
-    stores:         dataclass = field(default_factory=lambda: make_dataclass('LineStores', []))
+    converters:     dataclass = field(default_factory=lambda: rcl.Component(name='Converters'))
+    stores:         dataclass = field(default_factory=lambda: rcl.Component(name='Stores'))
 
     def add_subcomponent(self,
                          subcomponent: rcl.Component,
@@ -41,6 +41,10 @@ class EnergyLine(rcl.Component):
         if (isinstance(subcomponent, rcl.Components.Energy.Stores.FuelTank) or
             isinstance(subcomponent, rcl.Components.Energy.Stores.Battery)):
             setattr(self.stores, field_name, subcomponent)
+
+    def __post_init__(self):
+        self.add_subcomponent(rcl.Component(name='Converters'))
+        self.add_subcomponent(rcl.Component(name='Stores'))
 
     @staticmethod
     def calculate_performance(state: "rcf.State",

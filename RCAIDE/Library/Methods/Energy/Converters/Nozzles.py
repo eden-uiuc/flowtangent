@@ -128,7 +128,7 @@ def compression_nozzle_performance(
 
     # Get inputs
 
-    fs = state.conditions.freestream
+    fs = state.freestream
     T_t = fs.stagnation_temperature
     P_t = fs.stagnation_pressure
     P0  = fs.pressure

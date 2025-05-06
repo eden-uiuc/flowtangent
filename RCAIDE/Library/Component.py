@@ -128,6 +128,9 @@ class Component:
     mass_properties:        MassProperties        = field(default_factory=MassProperties)
     material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
 
+    def get_field_name(self):
+        return self.name.replace(' ', '_').lower()
+
     def add_segment(self, segment: ComponentType, index: int = -1):
         self.segments.insert(index, segment)
 
@@ -153,7 +156,10 @@ class Component:
             self.mass_properties.center_of_gravity += weighted_cg
 
     def __getitem__(self, item):
-        return vars(self)[item]
+        if isinstance(item, int):
+            return self.subcomponents[item]
+        else:
+            return vars(self)[item]
 
     def add_subcomponent(self,
                          subcomponent: ComponentType,

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, make_dataclass
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Library.Methods.Mass import Transport as Mass
 
@@ -49,18 +49,27 @@ class Transport(Process):
 
     def __post_init__(self):
         # If the appropriate datastructures aren't already in settings, create them:
-        if 'mass_reduction_factors' not in vars(self.initial_settings).keys():
-            self.initial_settings.mass_reduction_factors = dataclass()
-        if 'sizing' not in vars(self.initial_settings).keys():
-            self.initial_settings.sizing = dataclass()
+        if 'mass_reduction_factors' not in vars(self.settings).keys():
+            self.settings.mass_reduction_factors = make_dataclass(cls_name='MassReductionFactors',
+                                                                  fields=[
+                                                                      ('main_wing', float),
+                                                                      ('fuselage', float),
+                                                                      ('empennage', float),
+                                                                      ('systems', float)
+                                                                  ])
+        if 'sizing' not in vars(self.settings).keys():
+            self.settings.sizing = make_dataclass(cls_name='Sizing',
+                                                  fields=[
+                                                      ('rudder_fraction', float)
+                                                  ])
 
         # Map analysis settings into settings datastructure for later retrieval
-        self.initial_settings.mass_reduction_factors.main_wing    = self.main_wing_mass_reduction_factor
-        self.initial_settings.mass_reduction_factors.fuselage     = self.fuselage_mass_reduction_factor
-        self.initial_settings.mass_reduction_factors.empennage    = self.empennage_mass_reduction_factor
-        self.initial_settings.mass_reduction_factors.systems      = self.systems_mass_reduction_factor
+        self.settings.mass_reduction_factors.main_wing    = self.main_wing_mass_reduction_factor
+        self.settings.mass_reduction_factors.fuselage     = self.fuselage_mass_reduction_factor
+        self.settings.mass_reduction_factors.empennage    = self.empennage_mass_reduction_factor
+        self.settings.mass_reduction_factors.systems      = self.systems_mass_reduction_factor
 
-        self.initial_settings.sizing.rudder_fraction              = self.rudder_sizing_fraction
+        self.settings.sizing.rudder_fraction              = self.rudder_sizing_fraction
 
         ###---Default Process Steps---###
 

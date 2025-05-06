@@ -10,13 +10,13 @@
 
 from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness
 
-from .Gases import Gas, Air, Steam, CO2, O2
+from .import Gases
 
-from .Propellants import Propellant, JetA
+from . import Propellants
 
-from .Planets import Planet, Earth
+from . import Planets
 
-from .Atmospheres import Atmosphere, USStandard1976, ConstantTemperature
+from . import Atmospheres
 
 from . import Attributes
 from . import Components

@@ -7,7 +7,6 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from .thrust_and_power              import func_thrust_and_power, thrust_and_power
 
 # from .compute_stream_thrust         import compute_stream_thrust
 # from .size_core                     import size_core

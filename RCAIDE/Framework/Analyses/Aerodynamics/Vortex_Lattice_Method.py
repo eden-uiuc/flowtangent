@@ -34,7 +34,8 @@ class Vortex_Lattice_Method(Aerodynamics):
         Source:
             None 
         """          
-        self.tag                                                    = 'Vortex_Lattice_Method' 
+        self.tag                                                    = 'Vortex_Lattice_Method'
+        self.__name__                                               = 'Vortex Lattice Method'
         self.vehicle                                                = Data()  
         self.process                                                = Process()
         self.process.initialize                                     = Process()  
@@ -187,7 +188,7 @@ class Vortex_Lattice_Method(Aerodynamics):
         else:
             compute.lift.inviscid_wings  = evaluate_no_surrogate  
         return 
-            
+
     def evaluate(self,segment):
         """Subsonic Vortex Lattice Method evaluate function which calls listed processes in the analysis method.
 
@@ -209,3 +210,6 @@ class Vortex_Lattice_Method(Aerodynamics):
         results  = self.process.compute.evaluate(segment,settings,vehicle)
         
         return results
+
+    def __call__(self, segment):
+        return self.evaluate(segment)
