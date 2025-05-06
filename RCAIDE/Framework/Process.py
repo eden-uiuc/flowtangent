@@ -227,7 +227,18 @@ class Process:
         Examples
         --------
         """
-        return self.steps[item]
+        if isinstance(item, str):
+            return self.steps[self._index_name(item)]
+        else:
+            return self.steps[item]
+
+    def __setitem__(self, key, value):
+        if isinstance(key, str):
+            self.steps[self._index_name(key)] = value
+            self.update_details()
+        else:
+            self.steps[key] = value
+            self.update_details()
 
     def __delitem__(self, key):
         """

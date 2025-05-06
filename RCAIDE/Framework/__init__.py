@@ -13,7 +13,7 @@ from .Process import Process, ProcessStep
 
 from .State import State
 from .Settings import Settings
-from .System import System
+from .System import System, Aircraft
 
 from . import Missions
 from . import Core

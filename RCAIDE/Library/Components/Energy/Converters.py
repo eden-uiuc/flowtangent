@@ -37,6 +37,7 @@ class FlowConverter(EnergyConverter):
     polytropic_efficiency:      float = 1.0
 
     pressure_ratio:             float = 1.0
+    area_ratio:                 float = 1.0
 
     design_intake_temperature:  float = 298.15    # Kelvin
 

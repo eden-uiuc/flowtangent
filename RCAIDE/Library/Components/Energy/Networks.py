@@ -13,9 +13,8 @@ from dataclasses import dataclass, field, make_dataclass
 import numpy as np
 
 # RCAIDE imports
+import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
-from RCAIDE.Library.Component import ComponentType
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Network
@@ -25,12 +24,11 @@ from RCAIDE.Library.Component import ComponentType
 @dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
-    propulsors:     dataclass = field(default_factory=lambda: make_dataclass('LinePropulsors', []))
-    converters:     dataclass = field(default_factory=lambda: make_dataclass('LineConverters', []))
+    converters:     dataclass = field(default_factory=lambda: make_dataclass('LinePropulsors', []))
     stores:         dataclass = field(default_factory=lambda: make_dataclass('LineStores', []))
 
     def add_subcomponent(self,
-                         subcomponent: ComponentType,
+                         subcomponent: rcl.Component,
                          sum_mass=False,
                          sum_center_of_gravity=False,
                          sum_moments_of_inertia=False
@@ -38,11 +36,19 @@ class EnergyLine(rcl.Component):
 
         field_name = subcomponent.name.replace(' ', '_').lower()
 
-        if isinstance(subcomponent, rcl.Components.Energy.EnergyConverter):
+        if isinstance(subcomponent, rcl.Components.Energy.Converters.EnergyConverter):
             setattr(self.converters, field_name, subcomponent)
-        if (isinstance(subcomponent, rcl.Components.Energy.FuelTank) or
-            isinstance(subcomponent, rcl.Components.Energy.Battery)):
+        if (isinstance(subcomponent, rcl.Components.Energy.Stores.FuelTank) or
+            isinstance(subcomponent, rcl.Components.Energy.Stores.Battery)):
             setattr(self.stores, field_name, subcomponent)
+
+    @staticmethod
+    def calculate_performance(state: "rcf.State",
+                              system: "rcf.System",
+                              settings: "rcf.Settings"
+                              ):
+
+        raise NotImplementedError('Subclasses must implement this method')
 
 
 @dataclass(kw_only=True)
@@ -50,5 +56,18 @@ class EnergyNetwork(rcl.Component):
 
     name: str = 'Energy Network'
 
-    lines: dataclass = field(default_factory=lambda: make_dataclass('NetworkLines', []))
+    efficiency: float = 1.0
+
+    lines: list[rcl.Component] = field(default_factory=list)
+
+    @staticmethod
+    def calculate_performance(state: "rcf.State",
+                              system: "rcf.System",
+                              settings: "rcf.Settings"
+                              ):
+
+        for line in system.energy.lines:
+            state, system, settings = line.calculate_performance(state, system, settings)
+
+        return state, system, settings
 

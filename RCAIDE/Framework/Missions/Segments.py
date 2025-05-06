@@ -43,13 +43,13 @@ class InitializeSegment(Process):
     def __post_init__(self):
 
         default_steps = [
-            # Step Name                         Step Functions
-            ("Expand State",                    expand_state),
-            ("Initialize Time",                 initialize_time),
-            ("Initialize Mass",                 initialize_mass),
-            ("Initialize Energy",               initialize_energy),
-            ("Initialize Inertial Position",    initialize_inertial_position),
-            ("Initialize Planetary Position",   initialize_planetary_position)
+            # Step Name              Step Functions
+            ("Expand State",         expand_state),
+            ("Time",                 initialize_time),
+            ("Mass",                 initialize_mass),
+            ("Energy",               initialize_energy),
+            ("Inertial Position",    initialize_inertial_position),
+            ("Planetary Position",   initialize_planetary_position)
         ]
 
         for name, function in default_steps:
@@ -64,20 +64,20 @@ class AnalyzeSegment(Process):
     def __post_init__(self):
 
         default_steps = [
-            ("Update Time Differentials",   update_time_differentials),
-            ("Update Acceleration",         update_acceleration),
-            ("Update Angular Acceleration", update_angular_acceleration),
-            ("Update Altitude",             update_altitude),
-            ("Update Gravity",              skip),
-            ("Update Freestream",           update_freestream),
-            ("Update Orientations",         update_orientations),
-            ("Update Energy",               skip),
-            ("Update Aerodynamics",         skip),
-            ("Update Stability",            skip),
-            ("Update Mass",                 skip),
-            ("Update Forces",               update_forces),
-            ("Update Moments",              update_moments),
-            ("Update Planetary Position",   skip)
+            ("Time Differentials",   update_time_differentials),
+            ("Acceleration",         update_acceleration),
+            ("Angular Acceleration", update_angular_acceleration),
+            ("Altitude",             update_altitude),
+            ("Gravity",              skip),
+            ("Freestream",           update_freestream),
+            ("Orientations",         update_orientations),
+            ("Energy",               skip),
+            ("Aerodynamics",         skip),
+            ("Stability",            skip),
+            ("Mass",                 skip),
+            ("Forces",               update_forces),
+            ("Moments",              update_moments),
+            ("Planetary Position",   skip)
         ]
 
         for name, function in default_steps:
@@ -144,7 +144,7 @@ class OptimalSegment(Process):
     display_optimization:   bool    = False
 
     initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
-    update:                 AnalyzeSegment      = field(default_factory=AnalyzeSegment)
+    analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
     finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
     calculate_objective:    Callable = None
@@ -171,10 +171,10 @@ class OptimalSegment(Process):
 
         def _obj(U):
             self.state.unknowns.unpack_array(U)
-            self.update.state = self.state
-            self.update.system = self.system
-            self.update.settings = self.settings
-            self.state, self.system, self.settings = self.update()
+            self.analyze.state = self.state
+            self.analyze.system = self.system
+            self.analyze.settings = self.settings
+            self.state, self.system, self.settings = self.analyze()
             return self.calculate_objective(self.state, self.system, self.settings)
 
         _obj_fcn    = jit(_obj)

@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Library.Methods.Mass import Transport as Mass
 
+import RCAIDE.Library as rcl
+
 
 @dataclass(kw_only=True)
-class TransportMassAnalysis(Process):
+class Transport(Process):
     """
     Transport Mass Analysis Class
 
@@ -63,7 +65,7 @@ class TransportMassAnalysis(Process):
         ###---Default Process Steps---###
 
         self.append(ProcessStep(name='Propulsion Mass',
-                                function=Mass.Propulsion.jet_mass_from_sls))
+                                function=rcl.Methods.Mass.Energy.Jets.Jet_Mass_from_SLS))
         self.append(ProcessStep(name='Passenger & Payload Mass',
                                 function=Mass.passenger_payload))
         self.append(ProcessStep(name='Operating System Mass',

@@ -12,6 +12,27 @@ from dataclasses import dataclass, field, make_dataclass
 import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
+# Energy Store
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@dataclass(kw_only=True)
+class EnergyStore(rcl.Component):
+
+    name = 'Energy Store'
+
+    max_energy: float = 0.0
+
+    specific_energy: float = 0.0
+    specific_volume: float = 0.0
+
+    def __post_init__(self):
+        if self.mass_properties.total and not self.specific_energy:
+            self.specific_energy = self.max_energy / self.mass_properties.total
+        if self.mass_properties.volume and not self.specific_volume:
+            self.specific_volume = self.max_energy / self.mass_properties.volume
+
+# ----------------------------------------------------------------------------------------------------------------------
 # Fuel Tank
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -52,7 +73,6 @@ class Battery(rcl.Component):
     max_power:      float = 0.0
     max_voltage:    float = 0.0
 
-    energy_density: float = 0.0
     resistance:     float = 0.0
 
     ragone: BatteryRagoneParameters = field(default_factory=BatteryRagoneParameters)

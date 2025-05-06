@@ -40,9 +40,53 @@ class System(rcl.Component):
 
     name: str = 'System'
 
-    energy:         dataclass = field(default_factory=rcl.Components.Energy.EnergyNetwork)
-
     configurations: dataclass = field(default_factory=
                                       lambda: make_dataclass('SystemConfigurations', []))
+
+
+@dataclass(kw_only=True)
+class Aircraft(System):
+
+    name:           str = 'Aircraft'
+
+    energy:         dataclass = field(default_factory=rcl.Components.Energy.EnergyNetwork)
+
+    wings:          dataclass = field(default_factory=
+                                      lambda: make_dataclass(cls_name='Wings',
+                                                             fields=[])
+                                      )
+
+    fuselages:      dataclass = field(default_factory=
+                                      lambda: make_dataclass(cls_name='Fuselages',
+                                                             fields=[])
+                                      )
+
+    nacelles:       dataclass = field(default_factory=
+                                      lambda: make_dataclass(cls_name='Nacelles',
+                                                             fields=[])
+                                      )
+
+    landing_gear:   dataclass = field(default_factory=
+                                      lambda: make_dataclass(cls_name='LandingGear',
+                                                             fields=[])
+                                      )
+
+    def add_subcomponent(self,
+                         subcomponent: rcl.Component,
+                         sum_mass=False,
+                         sum_center_of_gravity=False,
+                         sum_moments_of_inertia=False
+                         ):
+
+        field_name = subcomponent.name.replace(' ', '_').lower()
+
+        if isinstance(subcomponent, rcl.Components.Wing):
+            setattr(self.wings, field_name, subcomponent)
+        elif isinstance(subcomponent, rcl.Components.Fuselage):
+            setattr(self.fuselages, field_name, subcomponent)
+        elif isinstance(subcomponent, rcl.Components.Nacelle):
+            setattr(self.nacelles, field_name, subcomponent)
+
+        super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
 

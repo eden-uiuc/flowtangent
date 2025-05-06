@@ -8,10 +8,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------  
 
-from .EnergyNetwork import EnergyNetwork
+from .Networks import EnergyLine, EnergyNetwork
 
-from .Converters import EnergyConverter, FlowConverter, OfftakeShaft, Propulsor
-from .Stores import FuelTank, Battery
-
-# from . import Networks
+from . import Lines
+from . import Converters
+from . import Stores
 

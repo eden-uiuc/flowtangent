@@ -12,8 +12,13 @@ from dataclasses import dataclass, field, make_dataclass
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 
-from RCAIDE.Library.Methods.Propulsors.Converters import *
-from RCAIDE.Library.Methods.Propulsors.Turbofan import thrust_and_power
+
+from RCAIDE.Library.Methods.Energy.Converters.Nozzles import *
+from RCAIDE.Library.Methods.Energy.Converters.Turbines import *
+from RCAIDE.Library.Methods.Energy.Converters.Turbofans import *
+from RCAIDE.Library.Methods.Energy.Converters.Combustors import *
+from RCAIDE.Library.Methods.Energy.Converters.Fan_Compressors import *
+from RCAIDE.Library.Methods.Energy.Converters.Shaft_Offtake import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------

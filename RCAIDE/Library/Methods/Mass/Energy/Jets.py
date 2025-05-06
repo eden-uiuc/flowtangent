@@ -38,7 +38,7 @@ def func_Jet_Mass_from_SLS(
 
 def Jet_Mass_from_SLS(
     state: "rcf.State",
-    system: "rcf.System",
+    system: "rcf.Aircraft",
     settings: "rcf.Settings",
     ):
     """
@@ -50,22 +50,26 @@ def Jet_Mass_from_SLS(
         Functional implementation which this method calls.
     """
 
-    for jet in system.energy.propulsors:
+    for line in system.energy.lines:
+        for jet in line.converters:
 
-        jet: rcl.Components.Energy.Converters.TurbofanEngine
+            jet: rcl.Components.Energy.Converters.TurbofanEngine
 
-        if jet.design_thrust_parameters.SLS_thrust == 0.:
+            if jet.design_thrust_parameters.SLS_thrust == 0.:
 
-            T_ref = jet.reference_temperature
+                T_ref = jet.reference_temperature
 
-            F = func_thrust_and_power(
-                gamma=jet.working_fluid.compute_gamma(T_ref)
-            )
+                F = func_thrust_and_power(
+                    gamma=jet.working_fluid.compute_gamma(T_ref)
+                )
 
-        sls_thrust = jet.design_thrust_parameters.SLS_thrust
+                jet.design_thrust_parameters.SLS_thrust = F
 
-        jet_mass = func_Jet_Mass_from_SLS(sls_thrust)
-        jet.mass_properties.total = jet_mass
+
+            sls_thrust = jet.design_thrust_parameters.SLS_thrust
+
+            jet_mass = func_Jet_Mass_from_SLS(sls_thrust)
+            jet.mass_properties.total = jet_mass
 
     # TODO: Unpack results
 

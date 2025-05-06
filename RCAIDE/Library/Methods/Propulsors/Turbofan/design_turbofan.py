@@ -10,13 +10,13 @@
 # RCAIDE Imports
 import RCAIDE
 from RCAIDE.Framework.Mission.Common                                 import Conditions
-from RCAIDE.Library.Methods.Propulsors.Converters.Ram                import compute_ram_performance
-from RCAIDE.Library.Methods.Propulsors.Converters.Combustor          import compute_combustor_performance
-from RCAIDE.Library.Methods.Propulsors.Converters.Compressor         import compute_compressor_performance 
-from RCAIDE.Library.Methods.Propulsors.Converters.Fan                import compute_fan_performance
-from RCAIDE.Library.Methods.Propulsors.Converters.Turbine            import compute_turbine_performance
-from RCAIDE.Library.Methods.Propulsors.Converters.Expansion_Nozzle   import compute_expansion_nozzle_performance 
-from RCAIDE.Library.Methods.Propulsors.Converters.Compression_Nozzle import compute_compression_nozzle_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_ram_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_combustor_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_compressor_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_fan_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_turbine_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_expansion_nozzle_performance
+from RCAIDE.Library.Methods.Energy.Converters import compute_compression_nozzle_performance
 from RCAIDE.Library.Methods.Propulsors.Turbofan_Propulsor            import size_core
 from RCAIDE.Library.Methods.Propulsors.Common                        import compute_static_sea_level_performance
 
