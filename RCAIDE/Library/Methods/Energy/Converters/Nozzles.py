@@ -67,9 +67,9 @@ def func_compression_nozzle_performance(
 
     # Combine Outputs
 
-    P_t_out = P_t_out.at(M0 > 1.0).set(ns_P_t)
-    T_t_out = T_out.at(M0 > 1.0).set(ns_T)
-    M_out = M_out.at(M0 > 1.0).set(ns_M)
+    P_t_out[M0[:, 0] > 1.0] = ns_P_t[M0[:, 0] > 1.0]
+    T_out[M0[:, 0] > 1.0] = ns_T[M0[:, 0] > 1.0]
+    M_out[M0[:, 0] > 1.0] = ns_M[M0[:, 0] > 1.0]
 
     h_out   = Cp * T_out                        # Output static enthalpy
     h_t_out = Cp * T_t_out                      # Output stagnation enthalpy
@@ -120,10 +120,10 @@ def func_expansion_nozzle_performance(
     return AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
 
-def compression_nozzle_performance(
+def inlet_nozzle_performance(
     state: "rcf.State",
-    system: "rcf.System",
-    settings: rcf.Settings
+    system: "rcf.Aircraft",
+    settings: "rcf.Settings"
 ):
 
     # Get inputs
@@ -136,47 +136,50 @@ def compression_nozzle_performance(
     Cp  = fs.Cp
     g   = fs.gamma
 
-    nozzle = system.energy.converters.compression_nozzle
-    PR  = nozzle.pressure_ratio
-    n_r = nozzle.recovery_efficiency
-    n_p = nozzle.polytropic_efficiency
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, propulsor in enumerate(line.propulsors):
 
-    # Call function
-    M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out = func_compression_nozzle_performance(T_t,
-                                                                                                P_t,
-                                                                                                P0,
-                                                                                                M0,
-                                                                                                Cp,
-                                                                                                g,
-                                                                                                PR,
-                                                                                                n_r,
-                                                                                                n_p)
+            nozzle = propulsor.converters.inlet_nozzle
+            PR  = nozzle.pressure_ratio
+            n_r = nozzle.pressure_recovery
+            n_p = nozzle.polytropic_efficiency
 
-    # Set Input State
-    nozzle_state = state.energy.converters.compression_nozzle
+            # Call function
+            M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out = func_compression_nozzle_performance(T_t,
+                                                                                                        P_t,
+                                                                                                        P0,
+                                                                                                        M0,
+                                                                                                        Cp,
+                                                                                                        g,
+                                                                                                        PR,
+                                                                                                        n_r,
+                                                                                                        n_p)
 
-    inputs = nozzle_state.inputs
+            # Set Input State
+            nozzle_state = state.energy.lines[l_idx].propulsors[p_idx].converters.inlet_nozzle
 
-    inputs.stagnation_temperature = T_t
-    inputs.stagnation_pressure    = P_t
-    inputs.freestream_pressure    = P0
-    inputs.freestream_mach_number = M0
-    inputs.freestream_Cp          = Cp
-    inputs.freestream_gamma       = g
+            inputs = nozzle_state.inputs
 
-    # Set Output State
-    outputs = nozzle_state.outputs
+            inputs.stagnation_temperature = T_t
+            inputs.stagnation_pressure    = P_t
+            inputs.freestream_pressure    = P0
+            inputs.freestream_mach_number = M0
+            inputs.freestream_Cp          = Cp
+            inputs.freestream_gamma       = g
 
-    outputs.mach_number             = M_out
-    outputs.velocity                = u_out
+            # Set Output State
+            outputs = nozzle_state.outputs
 
-    outputs.stagnation_pressure     = P_t_out
+            outputs.mach_number             = M_out
+            outputs.velocity                = u_out
 
-    outputs.stagnation_temperature  = T_t_out
-    outputs.static_temperature      = T_out
+            outputs.stagnation_pressure     = P_t_out
 
-    outputs.stagnation_enthalpy     = h_t_out
-    outputs.static_enthalpy         = h_out
+            outputs.stagnation_temperature  = T_t_out
+            outputs.static_temperature      = T_out
+
+            outputs.stagnation_enthalpy     = h_t_out
+            outputs.static_enthalpy         = h_out
 
     return state, system, settings
 
@@ -195,7 +198,7 @@ def _expansion_nozzle_performance(
     T_t = input_converter_state.outputs.stagnation_temperature
     P_t = input_converter_state.stagnation_pressure
 
-    fs      = state.conditions.freestream
+    fs      = state.freestream
     P0      = fs.pressure
     M0      = fs.mach_number
     Cp      = fs.Cp
@@ -217,10 +220,8 @@ def _expansion_nozzle_performance(
                                                                                                             PR,
                                                                                                             n_p)
 
-    core_nozzle_state = state.energy.converters.core_nozzle
-
     # Set Input State
-    inputs = core_nozzle_state.inputs
+    inputs = input_converter_state
 
     inputs.stagnation_temperature               = T_t
     inputs.stagnation_pressure                  = P_t
@@ -234,7 +235,7 @@ def _expansion_nozzle_performance(
     inputs.freestream_R                         = R
 
     # Set Output State
-    outputs = core_nozzle_state.outputs
+    outputs = output_converter_state
 
     outputs.area_ratio                          = AR
     outputs.mach_number                         = M
@@ -256,37 +257,43 @@ def _expansion_nozzle_performance(
 
 def fan_nozzle_performance(
     state: "rcf.State",
-    system: "rcf.System",
-    settings: rcf.Settings
+    system: "rcf.Aircraft",
+    settings: "rcf.Settings"
 ):
     # Get Inputs
 
-    nozzle = system.energy.converters.fan_nozzle
-    PR  = nozzle.pressure_ratio
-    n_p = nozzle.polytropic_efficiency
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, prop in enumerate(line.propulsors):
 
-    state, system, settings = _expansion_nozzle_performance(state, system, settings,
-                                                            state.energy.converters.fan,
-                                                            state.energy.converters.fan_nozzle,
-                                                            PR, n_p)
+            nozzle = prop.converters.fan_nozzle
+            PR  = nozzle.pressure_ratio
+            n_p = nozzle.polytropic_efficiency
+
+            state, system, settings = _expansion_nozzle_performance(state, system, settings,
+                                                                    prop.converters.fan,
+                                                                    prop.converters.fan_nozzle,
+                                                                    PR, n_p)
 
     return state, system, settings
 
 
 def core_nozzle_performance(
     state: "rcf.State",
-    system: "rcf.System",
-    settings: rcf.Settings
+    system: "rcf.Aircraft",
+    settings: "rcf.Settings"
 ):
     # Get Inputs
 
-    nozzle = system.energy.converters.core_nozzle
-    PR = nozzle.pressure_ratio
-    n_p = nozzle.polytropic_efficiency
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, prop in enumerate(line.propulsors):
 
-    state, system, settings = _expansion_nozzle_performance(state, system, settings,
-                                                            state.energy.converters.turbines[-1],
-                                                            state.energy.converters.core_nozzle,
-                                                            PR, n_p)
+            nozzle = prop.converters.core_nozzle
+            PR = nozzle.pressure_ratio
+            n_p = nozzle.polytropic_efficiency
+
+            state, system, settings = _expansion_nozzle_performance(state, system, settings,
+                                                                    prop.converters.turbines[-1],
+                                                                    prop.converters.core_nozzle,
+                                                                    PR, n_p)
 
     return state, system, settings

@@ -41,81 +41,87 @@ def func_fan_compressor_performance(
 
 
 def fan_performance(state: "rcf.State",
-                    system: "rcf.System",
+                    system: "rcf.Aircraft",
                     settings: rcf.Settings):
 
     # Get inputs
 
-    fs      = state.conditions.freestream
+    fs      = state.freestream
     g       = fs.gamma
     Cp      = fs.Cp
 
-    inputs  = system.energy.converters.compression_nozzle.outputs
-    T_t     = inputs.stagnation_temperature
-    P_t     = inputs.stagnation_pressure
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, propulsor in enumerate(line.propulsors):
 
-    fan     = system.energy.converters.fan
-    PR      = fan.pressure_ratio
-    n_p     = fan.polytropic_efficiency
+            inputs  = state.energy.lines[l_idx].propulsors[p_idx].converters.inlet_nozzle.outputs
+            T_t     = inputs.stagnation_temperature
+            P_t     = inputs.stagnation_pressure
 
-    work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
+            fan     = propulsor.converters.fan
+            PR      = fan.pressure_ratio
+            n_p     = fan.polytropic_efficiency
 
-    # Set Input State
+            work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 
-    inputs = state.energy.converters.fan.inputs
-    inputs.freestream_gamma         = g
-    inputs.freestream_Cp            = Cp
-    inputs.stagnation_temperature   = T_t
-    inputs.stagnation_pressure      = P_t
+            # Set Input State
 
-    # Set Output State
-    outputs = state.energy.converters.fan.outputs
-    outputs.work                   = work
-    outputs.stagnation_pressure    = P_t_out
-    outputs.stagnation_temperature = T_t_out
-    outputs.stagnation_enthalpy    = h_t_out
+            inputs = state.energy.lines[l_idx].propulsors[p_idx].converters.fan.inputs
+            inputs.freestream_gamma         = g
+            inputs.freestream_Cp            = Cp
+            inputs.stagnation_temperature   = T_t
+            inputs.stagnation_pressure      = P_t
+
+            # Set Output State
+            outputs = state.energy.lines[l_idx].propulsors[p_idx].converters.fan.outputs
+            outputs.work                   = work
+            outputs.stagnation_pressure    = P_t_out
+            outputs.stagnation_temperature = T_t_out
+            outputs.stagnation_enthalpy    = h_t_out
 
     return state, system, settings
 
 
 def compressor_performance(state: "rcf.State",
-                           system: "rcf.System",
+                           system: "rcf.Aircraft",
                            settings: rcf.Settings):
 
     # Get inputs
 
-    fs  = state.conditions.freestream
+    fs  = state.freestream
     g   = fs.gamma
     Cp  = fs.Cp
 
-    inputs = system.energy.converters.compression_nozzle.outputs
-    T_t = inputs.stagnation_temperature
-    P_t = inputs.stagnation_pressure
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, propulsor in enumerate(line.propulsors):
 
-    for idx, comp in enumerate(system.energy.converters.compressors):
+            inputs = state.energy.lines[l_idx].propulsors[p_idx].converters.inlet_nozzle.outputs
+            T_t = inputs.stagnation_temperature
+            P_t = inputs.stagnation_pressure
 
-        PR = comp.pressure_ratio
-        n_p = comp.polytropic_efficiency
+            for c_idx, comp in enumerate(propulsor.converters.compressors):
 
-        work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
+                PR = comp.pressure_ratio
+                n_p = comp.polytropic_efficiency
 
-        # Set Input State for current compressor
+                work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 
-        inputs = state.energy.compressors[idx].inputs
-        inputs.freestream_gamma         = g
-        inputs.freestream_Cp            = Cp
-        inputs.stagnation_temperature   = T_t
-        inputs.stagnation_pressure      = P_t
+                # Set Input State for current compressor
 
-        # Set Output State for current compressor
-        outputs = state.energy.compressors[idx].outputs
-        outputs.work                   = work
-        outputs.stagnation_pressure    = P_t_out
-        outputs.stagnation_temperature = T_t_out
-        outputs.stagnation_enthalpy    = h_t_out
+                inputs = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[c_idx].inputs
+                inputs.freestream_gamma         = g
+                inputs.freestream_Cp            = Cp
+                inputs.stagnation_temperature   = T_t
+                inputs.stagnation_pressure      = P_t
 
-        # Set outputs of current compressor as inputs for next compressor
-        T_t = T_t_out
-        P_t = P_t_out
+                # Set Output State for current compressor
+                outputs = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[c_idx].outputs
+                outputs.work                   = work
+                outputs.stagnation_pressure    = P_t_out
+                outputs.stagnation_temperature = T_t_out
+                outputs.stagnation_enthalpy    = h_t_out
+
+                # Set outputs of current compressor as inputs for next compressor
+                T_t = T_t_out
+                P_t = P_t_out
 
     return state, system, settings

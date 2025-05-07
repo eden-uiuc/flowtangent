@@ -34,7 +34,7 @@ class TurbofanPerformance(rcf.Process):
     def __post_init__(self):
 
         self.steps = [
-            compression_nozzle_performance,
+            inlet_nozzle_performance,
             fan_performance,
             compressor_performance,
             turbojet_combustor_performance,

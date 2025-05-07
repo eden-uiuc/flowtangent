@@ -39,7 +39,7 @@ def shaft_offtake(
         ):
 
         # Get Inputs
-        shaft = system.energy.converters.shaft_offtake
+        shaft = system.energy.propulsors.shaft_offtake
         power = shaft.power_draw
         T_ref = shaft.reference_temperature
         P_ref = shaft.reference_pressure

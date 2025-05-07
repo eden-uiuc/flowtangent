@@ -239,11 +239,10 @@ class FuelConditions(EnergyStoreConditions):
 @dataclass(kw_only=True)
 class EnergyLineConditions(Conditions):
 
-    converters: dataclass = field(default_factory=
-                                  lambda: make_dataclass('NetworkConverterConditions', []))
+    converters: Conditions = field(default_factory=lambda: Conditions(name='Energy Line Converters'))
 
-    stores: dataclass = field(default_factory=
-                              lambda: make_dataclass('NetworkStoreConditions', []))
+    stores:     Conditions = field(default_factory=lambda: Conditions(name='Energy Line Stores'))
+
 
 @dataclass
 class EnergyNetworkConditions(Conditions):
@@ -291,5 +290,4 @@ class EnergyNetworkConditions(Conditions):
     total_force_vector:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
     total_moment_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    lines:                   dataclass   = field(default_factory=
-                                                 lambda: make_dataclass('NetworkLineConditions', []))
+    lines:                  Conditions  = field(default_factory=lambda: Conditions(name='Energy Network Lines'))

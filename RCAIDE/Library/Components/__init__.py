@@ -12,12 +12,11 @@ from os import path
 from pathlib import Path
 Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
-from .Fuselages     import Fuselage, FuselageSegment, BWBFuselage
-from .Airfoils      import Airfoil
-from .Nacelles      import Nacelle
-from .Landing_Gear  import LandingGear
-from .Wings         import Wing, WingSegment, WingControlSurface
-
+from . import Fuselages
+from . import Airfoils
+from . import Nacelles
+from . import Landing_Gear
+from . import Wings
 from . import Energy
 
 # from . import Booms

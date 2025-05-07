@@ -40,7 +40,7 @@ def func_turbine_performance(
 
 def turbine_performance(
     state: "rcf.State",
-    system: "rcf.System",
+    system: "rcf.Aircraft",
     settings: rcf.Settings
 ):
 
@@ -49,78 +49,80 @@ def turbine_performance(
     g       = state.freestream.gamma
     Cp      = state.freestream.Cp
 
-    f       = state.energy.converters.combustor.outputs.fuel_air_ratio
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, prop in enumerate(line.propulsors):
+            f       = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.fuel_air_ratio
 
-    w_s     = state.energy.converters.shaft_offtake.outputs.work
-    w_f     = state.energy.converters.fan.outputs.work
+            w_s     = state.energy.lines[l_idx].propulsors[p_idx].converters.offtake_shaft.outputs.work
+            w_f     = state.energy.lines[l_idx].propulsors[p_idx].converters.fan.outputs.work
 
-    T_t     = state.energy.converters.combustor.outputs.stagnation_temperature
-    P_t     = state.energy.converters.combustor.outputs.stagnation_pressure
+            T_t     = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_temperature
+            P_t     = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_pressure
 
-    for idx, turb in enumerate(system.energy.converters.turbines)[:-1]:
+            for idx, turb in enumerate(prop.converters.turbines)[:-1]:
 
-        w_c     = state.energy.converters.compressors[-(idx + 1)].outputs.work
+                w_c     = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[-(idx + 1)].outputs.work
 
-        n_m     = turb.mechanical_efficiency
-        n_p     = turb.polytropic_efficiency
+                n_m     = turb.mechanical_efficiency
+                n_p     = turb.polytropic_efficiency
 
-        # Call Functions
-        T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, 0., w_c, w_s, w_f, n_m, T_t, P_t, n_p)
+                # Call Functions
+                T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, 0., w_c, w_s, w_f, n_m, T_t, P_t, n_p)
 
-        turb_state = state.energy.converters.turbines[idx]
+                turb_state = state.energy.lines[l_idx].propulsors[p_idx].converters.turbines[idx]
 
-        # Set Input State
-        inputs = turb_state.inputs
-        inputs.gamma = g
-        inputs.Cp = Cp
-        inputs.fuel_air_ratio = f
-        inputs.bypass_ratio = 0.
-        inputs.shaft_work = w_s
-        inputs.fan_work = w_f
-        inputs.compressor_work = w_c
-        inputs.stagnation_temperature = T_t
-        inputs.stagnation_pressure = P_t
+                # Set Input State
+                inputs = turb_state.inputs
+                inputs.gamma = g
+                inputs.Cp = Cp
+                inputs.fuel_air_ratio = f
+                inputs.bypass_ratio = 0.
+                inputs.shaft_work = w_s
+                inputs.fan_work = w_f
+                inputs.compressor_work = w_c
+                inputs.stagnation_temperature = T_t
+                inputs.stagnation_pressure = P_t
 
-        # Set Output State
-        outputs = turb_state.outputs
-        outputs.stagnation_temperature = T_t_out
-        outputs.stagnation_pressure = P_t_out
-        outputs.stagnation_enthalpy = h_t_out
+                # Set Output State
+                outputs = turb_state.outputs
+                outputs.stagnation_temperature = T_t_out
+                outputs.stagnation_pressure = P_t_out
+                outputs.stagnation_enthalpy = h_t_out
 
-        T_t = T_t_out
-        P_t = P_t_out
+                T_t = T_t_out
+                P_t = P_t_out
 
-    # Run final turbine with fan bypass
-    a = system.energy.bypass_ratio
+            # Run final turbine with fan bypass
+            a = prop.bypass_ratio
 
-    w_c = state.energy.converters.compressors[0].outputs.work
+            w_c = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[0].outputs.work
 
-    n_m = system.energy.converters.turbines[-1].mechanical_efficiency
-    n_p = system.energy.converters.turbines[-1].polytropic_efficiency
+            n_m = prop.converters.turbines[-1].mechanical_efficiency
+            n_p = prop.converters.turbines[-1].polytropic_efficiency
 
-    # Call Functions
-    T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, a, w_c, w_s, w_f, n_m, T_t, P_t, n_p)
+            # Call Functions
+            T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, a, w_c, w_s, w_f, n_m, T_t, P_t, n_p)
 
-    turb_state = state.energy.converters.turbines[-1]
+            turb_state = state.energy.lines[l_idx].propulsors[p_idx].converters.turbines[-1]
 
-    # Set Input State
-    inputs = turb_state.inputs
+            # Set Input State
+            inputs = turb_state.inputs
 
-    inputs.gamma                    = g
-    inputs.Cp                       = Cp
-    inputs.fuel_air_ratio           = f
-    inputs.bypass_ratio             = a
-    inputs.shaft_work               = w_s
-    inputs.fan_work                 = w_f
-    inputs.compressor_work          = w_c
-    inputs.stagnation_temperature   = T_t
-    inputs.stagnation_pressure      = P_t
+            inputs.gamma                    = g
+            inputs.Cp                       = Cp
+            inputs.fuel_air_ratio           = f
+            inputs.bypass_ratio             = a
+            inputs.shaft_work               = w_s
+            inputs.fan_work                 = w_f
+            inputs.compressor_work          = w_c
+            inputs.stagnation_temperature   = T_t
+            inputs.stagnation_pressure      = P_t
 
-    # Set Output State
-    outputs = turb_state.outputs
+            # Set Output State
+            outputs = turb_state.outputs
 
-    outputs.stagnation_temperature  = T_t_out
-    outputs.stagnation_pressure     = P_t_out
-    outputs.stagnation_enthalpy     = h_t_out
+            outputs.stagnation_temperature  = T_t_out
+            outputs.stagnation_pressure     = P_t_out
+            outputs.stagnation_enthalpy     = h_t_out
 
     return state, system, settings

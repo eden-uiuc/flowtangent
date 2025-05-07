@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
+import scipy.optimize
+
 jax.config.update("jax_enable_x64", True)
 
 from jax import jit, grad
@@ -151,10 +153,14 @@ class OptimalSegment(Process):
     bounds:                 List[Any] = None
     constraints:            List[Any] = None
 
+    function: Callable = scipy.optimize.minimize
+
     def _results_parser(self, res):
 
         self.state.unknowns.unpack_array(res.x)
         self.state.objective.unpack_array(res.fun)
+
+        self.last_result = res
 
         return self.state, self.settings, self.system
 

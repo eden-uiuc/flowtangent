@@ -63,6 +63,7 @@ def func_thrust_and_power(
 
     return F, F_sp, I_sp, TSFC, mdot_c, p, ff
 
+
 def func_sea_level_static_thrust(
     T_ref,
     T_t_ref,
@@ -106,9 +107,10 @@ def func_sea_level_static_thrust(
 
     return sls_thrust
 
+
 def thrust_and_power(
         state: "rcf.State",
-        system: "rcf.System",
+        system: "rcf.Aircraft",
         settings: rcf.Settings
 ):
 
@@ -122,65 +124,66 @@ def thrust_and_power(
     P0  = fs.pressure
     G0  = fs.gravity
 
-    for idx, tf in enumerate(system.energy.propulsors):
+    for l_idx, line in enumerate(system.energy.lines):
+        for tf_idx, tf in enumerate(line.propulsors):
 
-        tf: rcl.Components.Energy.Converters.TurbofanEngine
+            tf: rcl.Components.Energy.Propulsors.TurbofanEngine
 
-        T_ref               = tf.reference_temperature
-        T_t_ref             = tf.reference_total_temperature
-        P_ref               = tf.reference_pressure
-        P_t_ref             = tf.reference_total_pressure
-        mdhc                = tf.compressor_nondimensional_massflow
-        delta_SFC           = tf.specific_fuel_consumption_adjustment
-        alpha               = tf.bypass_ratio
+            T_ref               = tf.reference_temperature
+            T_t_ref             = tf.reference_total_temperature
+            P_ref               = tf.reference_pressure
+            P_t_ref             = tf.reference_total_pressure
+            mdhc                = tf.compressor_nondimensional_massflow
+            delta_SFC           = tf.specific_fuel_consumption_adjustment
+            alpha               = tf.bypass_ratio
 
-        tf_state = state.energy.propulsors[idx]
-        f                   = tf_state.combustor.fuel_air_ratio
-        throttle            = tf_state.throttle
+            tf_state = state.energy.lines[l_idx].propulsors[tf_idx]
+            f                   = tf_state.combustor.fuel_air_ratio
+            throttle            = tf_state.throttle
 
-        fn_out = tf_state.fan_nozzle.outputs
-        v_fan_nozzle        = fn_out.velocity
-        AR_fan_nozzle       = fn_out.area_ratio
-        P_fan_nozzle        = fn_out.pressure
+            fn_out = tf_state.fan_nozzle.outputs
+            v_fan_nozzle        = fn_out.velocity
+            AR_fan_nozzle       = fn_out.area_ratio
+            P_fan_nozzle        = fn_out.pressure
 
-        cn_out = tf_state.core_nozzle.outputs
-        v_core_nozzle       = cn_out.velocity
-        AR_core_nozzle      = cn_out.area_ratio
-        P_core_nozzle       = cn_out.pressure
+            cn_out = tf_state.core_nozzle.outputs
+            v_core_nozzle       = cn_out.velocity
+            AR_core_nozzle      = cn_out.area_ratio
+            P_core_nozzle       = cn_out.pressure
 
-        # Call function
-        F, F_sp, I_sp, TSFC, mdot_c, p, ff = func_thrust_and_power(
-            g,
-            u0,
-            a0,
-            M0,
-            P0,
-            G0,
-            T_ref,
-            T_t_ref,
-            P_ref,
-            P_t_ref,
-            mdhc,
-            delta_SFC,
-            f,
-            v_fan_nozzle,
-            AR_fan_nozzle,
-            P_fan_nozzle,
-            v_core_nozzle,
-            AR_core_nozzle,
-            P_core_nozzle,
-            alpha,
-            throttle
-        )
+            # Call function
+            F, F_sp, I_sp, TSFC, mdot_c, p, ff = func_thrust_and_power(
+                g,
+                u0,
+                a0,
+                M0,
+                P0,
+                G0,
+                T_ref,
+                T_t_ref,
+                P_ref,
+                P_t_ref,
+                mdhc,
+                delta_SFC,
+                f,
+                v_fan_nozzle,
+                AR_fan_nozzle,
+                P_fan_nozzle,
+                v_core_nozzle,
+                AR_core_nozzle,
+                P_core_nozzle,
+                alpha,
+                throttle
+            )
 
-        # Update Energy State
+            # Update Energy State
 
-        tf_state.thrust                             = F
-        tf_state.non_dimensional_thrust             = F_sp
-        tf_state.specific_impulse                   = I_sp
-        tf_state.thrust_specific_fuel_consumption   = TSFC
-        tf_state.core_mass_flow_rate                = mdot_c
-        tf_state.power                              = p
-        tf_state.fuel_flow_rate                     = ff
+            tf_state.thrust                             = F
+            tf_state.non_dimensional_thrust             = F_sp
+            tf_state.specific_impulse                   = I_sp
+            tf_state.thrust_specific_fuel_consumption   = TSFC
+            tf_state.core_mass_flow_rate                = mdot_c
+            tf_state.power                              = p
+            tf_state.fuel_flow_rate                     = ff
                    
     return state, system, settings

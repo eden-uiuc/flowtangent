@@ -169,7 +169,7 @@ class Component:
                          ):
 
         if isinstance(subcomponent, Component):
-            vars(self)[subcomponent.name] = subcomponent
+            setattr(self, subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:
             raise TypeError(f"Attempted to add a subcomponent to {self.name} "

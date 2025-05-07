@@ -49,27 +49,16 @@ class Aircraft(System):
 
     name:           str = 'Aircraft'
 
-    energy:         dataclass = field(default_factory=rcl.Components.Energy.EnergyNetwork)
+    energy:         rcl.Components.Energy.Networks.EnergyNetwork = field(default_factory=
+                                                                         rcl.Components.Energy.Networks.EnergyNetwork)
 
-    wings:          dataclass = field(default_factory=
-                                      lambda: make_dataclass(cls_name='Wings',
-                                                             fields=[])
-                                      )
+    wings:          rcl.Component = field(default_factory=lambda: rcl.Component(name='Wings'))
 
-    fuselages:      dataclass = field(default_factory=
-                                      lambda: make_dataclass(cls_name='Fuselages',
-                                                             fields=[])
-                                      )
+    fuselages:      rcl.Component = field(default_factory=lambda: rcl.Component(name='Fuselages'))
 
-    nacelles:       dataclass = field(default_factory=
-                                      lambda: make_dataclass(cls_name='Nacelles',
-                                                             fields=[])
-                                      )
+    nacelles:       rcl.Component = field(default_factory=lambda: rcl.Component(name='Nacelles'))
 
-    landing_gear:   dataclass = field(default_factory=
-                                      lambda: make_dataclass(cls_name='LandingGear',
-                                                             fields=[])
-                                      )
+    landing_gear:   rcl.Component = field(default_factory=lambda: rcl.Component(name='Landing Gear'))
 
     def add_subcomponent(self,
                          subcomponent: rcl.Component,
@@ -78,13 +67,22 @@ class Aircraft(System):
                          sum_moments_of_inertia=False
                          ):
 
-        if isinstance(subcomponent, rcl.Components.Wing):
-            setattr(self.wings, subcomponent.get_field_name(), subcomponent)
-        elif isinstance(subcomponent, rcl.Components.Fuselage):
-            setattr(self.fuselages, subcomponent.get_field_name(), subcomponent)
-        elif isinstance(subcomponent, rcl.Components.Nacelle):
-            setattr(self.nacelles, subcomponent.get_field_name(), subcomponent)
+        if isinstance(subcomponent, rcl.Components.Wings.Wing):
+            self.wings.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        elif isinstance(subcomponent, rcl.Components.Fuselages.Fuselage):
+            self.fuselages.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        elif isinstance(subcomponent, rcl.Components.Nacelles.Nacelle):
+            self.nacelles.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        elif isinstance(subcomponent, rcl.Components.Landing_Gear.LandingGear):
+            self.landing_gear.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        else:
+            super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
-        super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+    def __post_init__(self):
+        self.add_subcomponent(self.energy)
+        self.add_subcomponent(self.wings)
+        self.add_subcomponent(self.fuselages)
+        self.add_subcomponent(self.nacelles)
+        self.add_subcomponent(self.landing_gear)
 
 

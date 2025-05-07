@@ -41,44 +41,45 @@ def func_combustor_performance(T_t_in,
 
 def turbojet_combustor_performance(
     state: "rcf.State",
-    system: "rcf.System",
+    system: "rcf.Aircraft",
     settings: "rcf.Settings"
 ):
 
-    for idx, jet in system.energy.propulsors:
+    for l_idx, line in enumerate(system.energy.lines):
+        for p_idx, propulsor in enumerate(line.propulsors):
 
-        comp_outputs = state.energy.propulsors[idx].compressors[-1].outputs
-        T_t_in = comp_outputs.stagnation_temperature
-        P_t_in = comp_outputs.stagnation_pressure
+            comp_outputs = state.energy.lines[l_idx].propulsors[p_idx].compressors[-1].outputs
+            T_t_in = comp_outputs.stagnation_temperature
+            P_t_in = comp_outputs.stagnation_pressure
 
-        T_t_out = jet.turbines[0].design_intake_temperature
+            T_t_out = propulsor.converters.turbines[0].design_intake_temperature
 
-        Cp      = state.freestream.Cp
+            Cp      = state.freestream.Cp
 
-        combustor   = jet.cconverters.ombustor
-        PR          = combustor.pressure_ratio
-        n_b         = combustor.efficiency
+            combustor   = propulsor.converters.combustor
+            PR          = combustor.pressure_ratio
+            n_b         = combustor.efficiency
 
-        h_t_f       = jet.fuel.specific_energy
+            h_t_f       = propulsor.fuel.specific_energy
 
-        # Call the function
-        P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, Cp, PR, n_b, h_t_f)
+            # Call the function
+            P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, Cp, PR, n_b, h_t_f)
 
-        # Set Input State
-        combustor_state = state.energy.propulsors[idx].combustor
+            # Set Input State
+            combustor_state = state.energy.lines[l_idx].propulsors[p_idx].combustor
 
-        inputs = combustor_state.inputs
-        inputs.freestream_Cp                            = Cp
-        inputs.stagnation_temperature                   = T_t_in
-        inputs.stagnation_pressure                      = P_t_in
+            inputs = combustor_state.inputs
+            inputs.freestream_Cp                            = Cp
+            inputs.stagnation_temperature                   = T_t_in
+            inputs.stagnation_pressure                      = P_t_in
 
-        # Set Output State
+            # Set Output State
 
-        outputs = combustor_state.outputs
-        outputs.stagnation_pressure            = P_t_out
-        outputs.stagnation_temperature         = T_t_out
-        outputs.stagnation_enthalpy            = h_t_out
-        outputs.fuel_air_ratio                 = f
+            outputs = combustor_state.outputs
+            outputs.stagnation_pressure            = P_t_out
+            outputs.stagnation_temperature         = T_t_out
+            outputs.stagnation_enthalpy            = h_t_out
+            outputs.fuel_air_ratio                 = f
 
     return state, system, settings
 
@@ -131,10 +132,10 @@ def rayleigh_line_flow(
 ):
 
     for l_idx, line in system.energy.lines:
-        for p_idx, propulsor in enumerate(line.converters):
+        for p_idx, propulsor in enumerate(line.propulsors):
 
-            combustor = propulsor.converters.combustor
-            combustor_state = state.energy.lines[l_idx].converters[p_idx].combustor
+            combustor = propulsor.propulsors.combustor
+            combustor_state = state.energy.lines[l_idx].propulsors[p_idx].combustor
 
             Tt_in   = combustor_state.inputs.stagnation_temperature
             Pt_in   = combustor_state.inputs.stagnation_pressure
@@ -144,7 +145,7 @@ def rayleigh_line_flow(
             AR      = combustor.area_ratio
 
             ht_f    = propulsor.fuel.specific_energy
-            Tt_4    = propulsor.converters.turbines[0].design_intake_temperature
+            Tt_4    = propulsor.propulsors.turbines[0].design_intake_temperature
 
             g       = state.freestream.gamma
             Cp      = state.freestream.Cp

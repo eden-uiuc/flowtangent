@@ -38,7 +38,7 @@ class EnergyStore(rcl.Component):
 
 
 @dataclass(kw_only=True)
-class FuelTank(rcl.Component):
+class FuelTank(EnergyStore):
 
     name = 'Fuel Tank'
 
@@ -65,7 +65,7 @@ class BatteryRagoneParameters:
 
 
 @dataclass(kw_only=True)
-class Battery(rcl.Component):
+class Battery(EnergyStore):
 
     name = 'Battery'
 

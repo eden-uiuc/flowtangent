@@ -136,7 +136,7 @@ def fuselage(state: "rcf.State",
     vehicle_max_zero_fuel_mass      = np.atleast_1d(system.mass_properties.max_zero_fuel_mass)
     vehicle_main_wing_mass          = np.atleast_1d(system['Main Wing'].mass_properties.total)
     vehicle_main_wing_root_chord    = np.atleast_1d(system['Main Wing'].chords.root)
-    vehicle_propulsion_mass         = np.atleast_1d(system.energy.converters.propulsors.mass_properties.total)
+    vehicle_propulsion_mass         = np.atleast_1d(system.energy.propulsors.propulsors.mass_properties.total)
 
     results = func_fuselage(fuselage_wetted_area,
                             fuselage_width,

@@ -59,6 +59,24 @@ class Conditions:
 
     row_size_adjustment:    int = 0
 
+    def _get_subconditions(self):
+        return [getattr(self, k) for k in dir(self) if isinstance(getattr(self, k), Conditions)]
+
+    def __getitem__(self, key):
+        if isinstance(key, slice | int):
+            return self._get_subconditions()[key]
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        if isinstance(key, int):
+            subconkeys = [k for k in dir(self) if isinstance(getattr(self, k), Conditions)]
+            if key < len(subconkeys):
+                setattr(self, subconkeys.index(key), value)
+            else:
+                setattr(self, str(key), value)
+        else:
+            setattr(self, key, value)
+
     def __post_init__(self):
         self.expand_rows(self._number_of_rows)
         # self.expand_columns(self._number_of_columns)

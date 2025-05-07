@@ -18,7 +18,6 @@ from chex import dataclass
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
-from RNUMPY import less_equal
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -781,7 +780,7 @@ if __name__ == "__main__":
     def lib_sq_func(x):
         return x**2
 
-    def fw_sq_func(state, system, setting):
+    def fw_sq_func(state, system, settings):
         x = state.x
         results = lib_sq_func(x)
         state.x = results

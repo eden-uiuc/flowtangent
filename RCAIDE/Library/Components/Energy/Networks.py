@@ -24,8 +24,9 @@ import RCAIDE.Library as rcl
 @dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
-    converters:     dataclass = field(default_factory=lambda: rcl.Component(name='Converters'))
-    stores:         dataclass = field(default_factory=lambda: rcl.Component(name='Stores'))
+    propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Propulsors'))
+    converters:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Converters'))
+    stores:         rcl.Component = field(default_factory=lambda: rcl.Component(name='Stores'))
 
     def add_subcomponent(self,
                          subcomponent: rcl.Component,
@@ -34,17 +35,19 @@ class EnergyLine(rcl.Component):
                          sum_moments_of_inertia=False
                          ):
 
-        field_name = subcomponent.name.replace(' ', '_').lower()
-
-        if isinstance(subcomponent, rcl.Components.Energy.Converters.EnergyConverter):
-            setattr(self.converters, field_name, subcomponent)
-        if (isinstance(subcomponent, rcl.Components.Energy.Stores.FuelTank) or
-            isinstance(subcomponent, rcl.Components.Energy.Stores.Battery)):
-            setattr(self.stores, field_name, subcomponent)
+        if isinstance(subcomponent, rcl.Components.Energy.Propulsors.Propulsor):
+            self.propulsors.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        elif isinstance(subcomponent, rcl.Components.Energy.Converters.EnergyConverter):
+            self.converters.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        elif isinstance(subcomponent, rcl.Components.Energy.Stores.EnergyStore):
+            self.stores.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        else:
+            super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
     def __post_init__(self):
-        self.add_subcomponent(rcl.Component(name='Converters'))
-        self.add_subcomponent(rcl.Component(name='Stores'))
+        self.add_subcomponent(self.propulsors)
+        self.add_subcomponent(self.converters)
+        self.add_subcomponent(self.stores)
 
     @staticmethod
     def calculate_performance(state: "rcf.State",
@@ -62,7 +65,10 @@ class EnergyNetwork(rcl.Component):
 
     efficiency: float = 1.0
 
-    lines: list[rcl.Component] = field(default_factory=list)
+    lines: rcl.Component = field(default_factory=lambda: rcl.Component(name='Lines'))
+
+    def __post_init__(self):
+        self.add_subcomponent(self.lines)
 
     @staticmethod
     def calculate_performance(state: "rcf.State",
