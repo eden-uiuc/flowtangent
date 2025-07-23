@@ -12,6 +12,8 @@ from os import path
 from pathlib import Path
 Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
+# Component Types
+
 from . import Fuselages
 from . import Airfoils
 from . import Nacelles
@@ -19,7 +21,10 @@ from . import Landing_Gear
 from . import Wings
 from . import Energy
 
-# from . import Booms
-# from . import Payloads
-# from . import Systems
-# from . import Wings
+# Top-Level Components for Direct Import
+
+from .Airfoils import Airfoil
+from .Fuselages import Fuselage
+from .Landing_Gear import LandingGear
+from .Wings import Wing
+from .Nacelles import Nacelle
