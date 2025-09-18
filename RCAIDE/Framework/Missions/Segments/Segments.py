@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from typing import Callable, List, Any, Tuple
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 
@@ -37,7 +38,7 @@ from RCAIDE.Framework.Missions.Update       import *
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class InitializeSegment(Process):
 
     name: str = 'Segment Initialization'
@@ -58,7 +59,7 @@ class InitializeSegment(Process):
             self.append(ProcessStep(name=name, function=function))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
     name: str = "Segment Iteration"
@@ -86,7 +87,7 @@ class AnalyzeSegment(Process):
             self.append(ProcessStep(name=name, function=function))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class FinalizeSegment(Process):
 
     name: str = "Mission Finalization"
@@ -96,7 +97,7 @@ class FinalizeSegment(Process):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ConvergedSegment(Process):
 
     name: str = "Segment Convergence"
@@ -138,7 +139,7 @@ class ConvergedSegment(Process):
         return self.results_parser(results)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class OptimalSegment(Process):
 
     name:                   str     = 'Optimize Segment'
@@ -225,7 +226,7 @@ def energy_use(
     return energy_used[0]
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyOptimalCruise(OptimalSegment):
 
     name: str = 'Energy Optimal Cruise'
@@ -241,7 +242,7 @@ class EnergyOptimalCruise(OptimalSegment):
         self.constraints = [NonlinearConstraint(distance_check, lb=self.distance, ub=self.distance)]
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyOptimalAltitudeChange(OptimalSegment):
 
     name: str = 'Energy Optimal Altitude Change'
