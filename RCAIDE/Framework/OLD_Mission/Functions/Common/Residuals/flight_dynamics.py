@@ -18,6 +18,7 @@ import numpy as np
 #  Residual Total Forces
 # ---------------------------------------------------------------------------------------------------------------------- 
 
+
 def flight_dynamics(segment):
     """Computes residuals for the force and moment equations of motion of aircraft in varying altitude flight.
 

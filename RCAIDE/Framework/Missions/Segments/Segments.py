@@ -7,8 +7,10 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import inspect
+
+from functools import reduce
 from typing import Callable, List, Any, Tuple
-import chex
 from dataclasses import field
 
 # package imports
@@ -16,6 +18,8 @@ from dataclasses import field
 import jax
 import jax.numpy as jnp
 import scipy.optimize
+
+import chex
 
 jax.config.update("jax_enable_x64", True)
 
@@ -97,6 +101,8 @@ class FinalizeSegment(Process):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+
+
 @chex.dataclass(kw_only=True)
 class ConvergedSegment(Process):
 
@@ -106,9 +112,38 @@ class ConvergedSegment(Process):
 
     root_finder_args:       List = field(default_factory=list)
     root_finder_kwargs:     dict = None
-    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = skip
+    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = None
 
-    initial_unknowns:       np.ndarray  = None
+    def unpack_unknowns(self):
+        """
+        Finds the active control variables and assigns the unknowns to their locations in state.
+        """
+
+        state       = self.state
+        unknowns    = state.unknowns.pack_array()
+        controls    = state.conditions.controls
+        n_points    = state.numerics.number_of_control_points
+
+        control_idx = 0
+
+        for name, control_var in inspect.getmembers(controls):
+            if hasattr(control_var, 'active') and control_var.active:
+                values = unknowns[control_idx : control_idx + n_points]     # Extract control values from unknowns
+                values = np.reshape(values, (-1, 1))               # Reshape to column vector
+                destination = reduce(getattr, control_var.path, state)      # Find destination within state
+                destination[control_var.path_indices] = values.flatten()    # Assign to destination in state
+                control_idx += n_points
+
+        return
+
+    def fsolve_parser(self, results):
+        self.unknowns.unpack_array(results.x)
+        self.unpack_unknowns()
+        return self.state, self.system, self.settings
+
+    def __post_init__(self):
+        if self.results_parser is None:
+            self.results_parser = self.fsolve_parser  # Default to fsolve parser if no parser is provided
 
     # Special override of process call to handle root finding, still follows process type flow
     def __call__(self,
@@ -156,9 +191,9 @@ class OptimalSegment(Process):
     analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
     finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
-    calculate_objective:    Callable = None
-    bounds:                 List[Any] = None
-    constraints:            List[Any] = None
+    calculate_objective:    Callable    = None
+    bounds:                 List[Any]   = None
+    constraints:            dict        = None
 
     function: Callable = scipy.optimize.minimize
 

@@ -122,22 +122,6 @@ class Conditions:
                 new_shape[0] = self._number_of_rows
                 vars(self)[k] = np.resize(v, tuple(new_shape))
 
-    # def expand_columns(self, columns: int):
-    #
-    #     super(Conditions, self).__setattr__('number_of_columns', columns)
-    #
-    #     for k, v in vars(self).items():
-    #         if isinstance(v, Conditions):
-    #             v.expand_columns(columns)
-    #         elif isinstance(v, np.ndarray) and len(v.shape) <= 2:  # Scalar-valued arrays
-    #             vars(self)[k] = np.resize(v, (self._number_of_rows, columns))
-    #         elif isinstance(v, np.ndarray):  # Vector-valued arrays
-    #             new_shape = list(v.shape)
-    #             new_shape[:2] = [self._number_of_rows, self._number_of_columns]
-    #             vars(self)[k] = np.resize(v, tuple(new_shape))
-
-
-
     def pack_array(self):
         """
         Pack all numpy arrays in the Conditions object into a single flattened array.

@@ -24,6 +24,15 @@ from RCAIDE.Framework.Missions.Conditions.Stability import StaticCoefficients
 
 
 @chex.dataclass(kw_only=True)
+class Residual(Conditions):
+
+    name:   str     = 'residual'
+    type:   str     = None
+    active: bool    = False
+    index:  int     = None
+
+
+@chex.dataclass(kw_only=True)
 class DynamicsResiduals(Conditions):
     """
     Represents the dynamics variables for a simulation.
@@ -51,13 +60,12 @@ class DynamicsResiduals(Conditions):
 
     name:       str         = 'Dynamics'
 
-    force_x:    bool        = False
-    force_y:    bool        = False
-    force_z:    bool        = False
-
-    moment_x:   bool        = False
-    moment_y:   bool        = False
-    moment_z:   bool        = False
+    force_x:    Residual    = field(default_factory=lambda: Residual(name='F_x', type='force', index=0))
+    force_y:    Residual    = field(default_factory=lambda: Residual(name='F_y', type='force', index=1))
+    force_z:    Residual    = field(default_factory=lambda: Residual(name='F_z', type='force', index=2))
+    moment_x:   Residual    = field(default_factory=lambda: Residual(name='M_x', type='moment', index=0))
+    moment_y:   Residual    = field(default_factory=lambda: Residual(name='M_y', type='moment', index=1))
+    moment_z:   Residual    = field(default_factory=lambda: Residual(name='M_z', type='moment', index=2))
 
 
 @chex.dataclass(kw_only=True)
@@ -82,8 +90,10 @@ class ControlVariable(Conditions):
 
     """
 
-    #Attribute      Type        Default Value
+    # Attribute     Type        Default Value
     name:           str         = 'Control Variable'
+    path:           tuple[str]  = None
+    path_indices:   tuple       = None
     active:         bool        = False
     initial_guess:  float       = None
 
@@ -195,8 +205,8 @@ class ControlsConditions(Conditions):
 
     dynamics:       DynamicsResiduals           = field(default_factory=lambda: DynamicsResiduals())
 
-    body_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(name='Body Angle'))
     bank_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(name='Bank Angle'))
+    body_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(name='Body Angle'))
     wind_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(name='Wind Angle'))
 
     elapsed_time:   ControlVariable             = field(default_factory=lambda: ControlVariable(name='Elapsed Time'))
@@ -212,6 +222,24 @@ class ControlsConditions(Conditions):
     flaps:          SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(name='Flap Controls'))
     slats:          SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(name='Slat Controls'))
     ailerons:       SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(name='Aileron Controls'))
+
+    def __post_init__(self):
+
+        # Map body angle to the Y-axis of the body frame
+        self.body_angle.path = ('frames', 'body', 'inertial_rotations')
+        self.body_angle.path_indices = (slice(None), 1)
+
+        # Map bank angle to the X-axis of the body frame
+        self.bank_angle.path = ('frames', 'body', 'inertial_rotations')
+        self.bank_angle.path_indices = (slice(None), 0)
+
+        # Map velocity to the X-axis of the inertial frame
+        self.velocity.path = ('frames', 'inertial', 'velocity_vector')
+        self.velocity.path_indices = (slice(None), 0)
+
+        # Map altitude to the Z-axis of the inertial frame
+        self.altitude.path = ('frames', 'inertial', 'position_vector')
+        self.altitude.path_indices = (slice(None), 2)
 
 
 class TestDynamicsVariables(unittest.TestCase):
