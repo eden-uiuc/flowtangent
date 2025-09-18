@@ -14,7 +14,6 @@ from typing import Callable, Iterable, Self, List
 # package imports
 import pandas as pd
 import chex
-from chex import dataclass
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf

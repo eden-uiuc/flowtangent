@@ -7,7 +7,8 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 
 import RCAIDE.Library as rcl
@@ -17,7 +18,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class LandingGear(rcl.Component):
 
     name: str = 'Landing Gear'

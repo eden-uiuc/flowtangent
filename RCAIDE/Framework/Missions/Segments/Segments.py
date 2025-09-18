@@ -93,7 +93,7 @@ class FinalizeSegment(Process):
     name: str = "Mission Finalization"
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Converge/Optimize Segment
+# Converged Segments
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -137,6 +137,12 @@ class ConvergedSegment(Process):
         results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
 
         return self.results_parser(results)
+
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Optimal Segments
+#-----------------------------------------------------------------------------------------------------------------------
 
 
 @chex.dataclass(kw_only=True)
@@ -213,6 +219,9 @@ class OptimalSegment(Process):
 
         return self.state, self.system, self.settings
 
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Energy Optimal Segments
 
 def energy_use(
         state: "rcf.State",

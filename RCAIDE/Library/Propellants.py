@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -20,14 +21,14 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class MaxPropellantMassFractions:
 
     Air:    float = 0.0
     O2:     float = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class PropellantTemperatures:
 
     flash:          float = 0.0
@@ -36,7 +37,7 @@ class PropellantTemperatures:
     boiling:        float = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Propellant:
 
     name: str = 'Propellant'
@@ -51,7 +52,7 @@ class Propellant:
     temperatures:       PropellantTemperatures      = field(default_factory=PropellantTemperatures)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class JetA(Propellant):
 
     oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.O2)

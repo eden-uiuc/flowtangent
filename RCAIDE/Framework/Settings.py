@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from typing import Callable
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -21,7 +22,7 @@ from scipy.optimize import fsolve
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Settings:
 
     name: str = 'Settings'

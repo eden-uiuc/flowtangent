@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import unittest
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -21,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class MassConditions(Conditions):
     """
     Represents the mass conditions for a vehicle or system.

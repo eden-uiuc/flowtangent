@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import unittest
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -22,7 +23,7 @@ from RCAIDE.Framework.Missions.Conditions.Stability import StaticCoefficients
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class DynamicsResiduals(Conditions):
     """
     Represents the dynamics variables for a simulation.
@@ -59,7 +60,7 @@ class DynamicsResiduals(Conditions):
     moment_z:   bool        = False
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ControlVariable(Conditions):
     """
     Represents a control variable in a simulation or control system.
@@ -89,7 +90,7 @@ class ControlVariable(Conditions):
     value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class SurfaceControlVariable(Conditions):
     """
     Represents a control variable for a surface in an aircraft or vehicle.
@@ -121,7 +122,7 @@ class SurfaceControlVariable(Conditions):
     static_stability:   StaticCoefficients  = field(default_factory=lambda: StaticCoefficients())
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class PropulsionControlVariable(Conditions):
     """
     Represents a control variable for propulsion systems in a vehicle or aircraft.
@@ -141,7 +142,7 @@ class PropulsionControlVariable(Conditions):
     value:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ControlsConditions(Conditions):
     """
     Represents the control conditions for an aircraft or vehicle simulation.

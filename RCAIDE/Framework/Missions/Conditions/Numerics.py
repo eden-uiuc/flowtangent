@@ -9,7 +9,8 @@
 
 import unittest
 from typing import Callable
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -92,7 +93,7 @@ def chebyshev_matrices(n: int = 16,
     return np.atleast_2d(x), D, I
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class NumericalTime(Conditions):
     """
     A class representing numerical time conditions.
@@ -125,7 +126,7 @@ class NumericalTime(Conditions):
     integrate:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Numerics(Conditions):
 
     """

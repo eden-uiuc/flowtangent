@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from typing import Tuple
 from copy import deepcopy
 

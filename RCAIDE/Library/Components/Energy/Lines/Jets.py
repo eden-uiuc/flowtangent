@@ -19,19 +19,19 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class JetEnergyLine(EnergyLine):
 
     name = 'Jet Network'
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class TurbojetEnergyLine(EnergyLine):
 
     name = 'Turbojet Network'
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class TurbofanEnergyLine(EnergyLine):
 
     name = 'Turbofan Network'

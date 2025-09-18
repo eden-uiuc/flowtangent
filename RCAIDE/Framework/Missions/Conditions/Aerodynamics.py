@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 import unittest
 
 # package imports
@@ -21,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class AerodynamicAngles(Conditions):
     """
     A class to represent aerodynamic angles.
@@ -48,7 +49,7 @@ class AerodynamicAngles(Conditions):
     phi:                np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class LiftCoefficients(Conditions):
     """
     A class to represent lift coefficients for aerodynamic analysis.
@@ -76,7 +77,7 @@ class LiftCoefficients(Conditions):
     compressible:   Conditions      = field(default_factory=lambda: Conditions(name='Compressible Bodies'))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class InducedDrag(Conditions):
     """
     A class to represent induced drag for aerodynamic analysis.
@@ -102,7 +103,7 @@ class InducedDrag(Conditions):
 
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class DragCoefficients(Conditions):
     """
     A class to represent drag coefficients for aerodynamic analysis.
@@ -140,7 +141,7 @@ class DragCoefficients(Conditions):
     induced:            InducedDrag     = field(default_factory=lambda: InducedDrag())
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class AerodynamicCoefficients(Conditions):
     """
     A class to represent aerodynamic coefficients for lift and drag.
@@ -164,7 +165,7 @@ class AerodynamicCoefficients(Conditions):
     drag:  DragCoefficients  = field(default_factory=lambda: DragCoefficients())
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class AerodynamicsConditions(Conditions):
     """
     A class representing aerodynamic conditions for a flight simulation.

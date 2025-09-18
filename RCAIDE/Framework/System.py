@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import unittest
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 from typing import TypeVar
 
 # package imports
@@ -24,7 +25,7 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class VehicleEnvelope:
     # Attribute                 Type        Default Value
     ultimate_load:             float        = 0.0
@@ -35,7 +36,7 @@ class VehicleEnvelope:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class System(rcl.Component):
 
     name: str = 'System'
@@ -44,7 +45,7 @@ class System(rcl.Component):
                                       lambda: make_dataclass('SystemConfigurations', []))
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Aircraft(System):
 
     name:           str = 'Aircraft'

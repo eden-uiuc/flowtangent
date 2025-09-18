@@ -9,7 +9,8 @@
 #-------------------------------------------------------------------------------
 
 from Legacy.trunk.S.Core import Units
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 #-------------------------------------------------------------------------------
 # Business Jet Aircraft Attributes
@@ -22,7 +23,7 @@ per_seat_masses = {'fixed': False,
                    'per_seat': True}
 
 
-@dataclass
+@chex.dataclass
 class BusinessJet:
 
     """

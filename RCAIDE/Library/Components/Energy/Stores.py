@@ -7,7 +7,8 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 import RCAIDE.Library as rcl
 
@@ -16,7 +17,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyStore(rcl.Component):
 
     name = 'Energy Store'
@@ -37,7 +38,7 @@ class EnergyStore(rcl.Component):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class FuelTank(EnergyStore):
 
     name = 'Fuel Tank'
@@ -55,7 +56,7 @@ class FuelTank(EnergyStore):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class BatteryRagoneParameters:
 
     const_1: float = 0.0
@@ -64,7 +65,7 @@ class BatteryRagoneParameters:
     i: float = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Battery(EnergyStore):
 
     name = 'Battery'

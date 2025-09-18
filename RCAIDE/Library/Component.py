@@ -9,7 +9,8 @@
 
 import unittest
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from warnings import warn
 from typing import TypeVar, List
 
@@ -23,7 +24,7 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 # ----------------------------------------------------------------------------------------------------------------------         
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ComponentFineness:
 
     # Attribute     Type    Default Value
@@ -32,7 +33,7 @@ class ComponentFineness:
     tail:           float   = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ComponentDimensions:
 
     # Attribute         Type    Default Value
@@ -49,7 +50,7 @@ class ComponentDimensions:
     side_projected:     float   = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ComponentAreas:
 
     # Attribute         Type    Default Value
@@ -73,7 +74,7 @@ class ComponentAreas:
     exposed:            float   = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class MaterialProperties:
 
     # Attribute                 Type        Default Value
@@ -82,7 +83,7 @@ class MaterialProperties:
     shear_stress_carrier:       dataclass   = field(default_factory=dataclass)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class MassProperties:
 
     # Attribute                         Type        Default Value
@@ -105,7 +106,7 @@ class MassProperties:
                 warn("Error in calculating component density. Check mass and volume specifications.")
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Component:
 
     # ------------------------------------------------IDENTIFIERS-------------------------------------------------------

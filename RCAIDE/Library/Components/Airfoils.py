@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,7 +24,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Airfoil(rcl.Component):
 
     thickness_to_chord: float = 0.0

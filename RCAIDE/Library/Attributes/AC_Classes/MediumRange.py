@@ -10,7 +10,8 @@
 
 from pint import UnitRegistry
 Units = UnitRegistry()
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 
 #-------------------------------------------------------------------------------
 # Medium Range Aircraft Attributes
@@ -23,7 +24,7 @@ per_seat_masses = {'fixed': False,
                    'per_seat': True}
 
 
-@dataclass
+@chex.dataclass
 class MediumRange:
 
     """

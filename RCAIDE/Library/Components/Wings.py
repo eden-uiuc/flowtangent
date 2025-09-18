@@ -9,7 +9,8 @@
 
 import numpy as np
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
@@ -21,14 +22,14 @@ from RCAIDE.Library.Component import ComponentType
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class WingDimensions(rcl.ComponentDimensions):
 
     root: float = 0.0
     tip: float = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class WingSegment(rcl.Component):
 
     name: str = 'Wing Segment'
@@ -49,7 +50,7 @@ class WingSegment(rcl.Component):
         self.sweeps.half_chord = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class WingControlSurface(rcl.Component):
 
     name: str = 'Wing Control Surface'
@@ -68,7 +69,7 @@ class WingControlSurface(rcl.Component):
     gain: float                 = 1.0  # deflection multiplier used only for AVL
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Wing(rcl.Component):
 
     name:               str             = 'Wing'

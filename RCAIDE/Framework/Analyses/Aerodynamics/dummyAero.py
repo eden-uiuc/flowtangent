@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from typing import Callable
 
 # package imports
@@ -22,7 +23,7 @@ from RCAIDE.Framework.Core import Units
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class SupersonicSettings:
 
     peak_mach_number                        = 1.04
@@ -36,7 +37,7 @@ class SupersonicSettings:
     wave_drag_type                          = 'Raymer'
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class CorrectionFactors:
 
     fuselage_lift: float = 1.14
@@ -47,50 +48,50 @@ class CorrectionFactors:
     CL_max: float = 1.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EfficiencyFactors:
 
     span: float = None
     oswald: float = None
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class ParasiteDragFormFactors:
 
     wing: float = 1.1
     fuselage: float = 2.3
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Training:
 
     angle_of_attack:        np.ndarray  = None
     Mach:                   np.ndarray  = None
 
-    sideslip_angle:         np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
-    aileron_deflection:     np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
-    elevator_deflection:    np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
-    rudder_deflection:      np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
-    flap_deflection:        np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
-    slat_deflection:        np.ndarray  = np.array([30  , 10.0 , 1E-12]) * Units.deg
+    sideslip_angle:         np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    aileron_deflection:     np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    elevator_deflection:    np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    rudder_deflection:      np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    flap_deflection:        np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    slat_deflection:        np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
 
-    u:                      np.ndarray  = np.array([0.2 , 0.1  , 1E-12])
-    v:                      np.ndarray  = np.array([0.2 , 0.1  , 1E-12])
-    w:                      np.ndarray  = np.array([0.2 , 0.1  , 1E-12])
+    u:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
+    v:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
+    w:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
 
-    pitch_rate:             np.ndarray  = np.array([0.3 ,0.15  , 0.0 ])  * Units.rad / Units.sec
-    roll_rate:              np.ndarray  = np.array([0.3 ,0.15  , 0.0])  * Units.rad / Units.sec
-    yaw_rate:               np.ndarray  = np.array([0.3 ,0.15  , 0.0])  * Units.rad / Units.sec
+    pitch_rate:             np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
+    roll_rate:              np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
+    yaw_rate:               np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Vortices:
 
     spanwise:   int = 15
     chordwise:  int = 5
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class VLMSettings:
 
     discretize_control_surfaces:    bool    = True
@@ -113,7 +114,7 @@ class VLMSettings:
     vortices:       Vortices                = field(default_factory=Vortices)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class VLM(rcf.Process):
 
     def __post_init__(self):
@@ -138,7 +139,7 @@ class VLM(rcf.Process):
         ]
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class VLMSurrogate(VLM):
 
     subsonic:   Callable = None

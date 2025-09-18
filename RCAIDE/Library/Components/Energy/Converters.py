@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 # package imports
 import numpy as np
@@ -20,7 +21,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyConverter(rcl.Component):
 
     efficiency:             float = 1.0
@@ -30,7 +31,7 @@ class EnergyConverter(rcl.Component):
 # Propulsor Subcomponents
 # ----------------------------------------------------------------------------------------------------------------------
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class FlowConverter(EnergyConverter):
 
     mechanical_efficiency:      float = 1.0
@@ -46,7 +47,7 @@ class FlowConverter(EnergyConverter):
     noise_speed:                float = 0.0
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class OfftakeShaft(EnergyConverter):
 
     name: str = "Offtake Shaft"

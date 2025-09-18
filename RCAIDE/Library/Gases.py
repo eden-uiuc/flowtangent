@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 # package imports
 import numpy as np
@@ -19,14 +20,14 @@ import numpy as np
 #  Gases
 # ----------------------------------------------------------------------------------------------------------------------
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class GasComposition:
 
     elements: list = field(default_factory=list)
     mass_fractions: list = field(default_factory=list)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Gas:
 
     name:                   str     = 'Gas'
@@ -72,7 +73,7 @@ class Gas:
         return self.compute_absolute_viscosity(T) * self.specific_heat_capacity / self.compute_thermal_conductivity(T)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Air(Gas):
 
     name                    = 'Air'
@@ -98,7 +99,7 @@ class Air(Gas):
         return 1.458e-6 * (T ** 1.5) / (T + 110.4)
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Steam(Gas):
 
     name            = 'Steam'
@@ -121,7 +122,7 @@ class Steam(Gas):
         raise NotImplementedError('Compute thermal conductivity not implemented steam.')
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class CO2(Gas):
 
     name            = 'Carbon Dioxide'
@@ -154,7 +155,7 @@ class CO2(Gas):
         raise NotImplementedError('Compute Prandtl number not implemented for carbon dioxide.')
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class O2(Gas):
 
     name            = 'Oxygen'

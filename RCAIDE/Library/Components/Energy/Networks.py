@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 # package imports
 import numpy as np
@@ -21,7 +22,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
     propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Propulsors'))
@@ -58,7 +59,7 @@ class EnergyLine(rcl.Component):
         raise NotImplementedError('Subclasses must implement this method')
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class EnergyNetwork(rcl.Component):
 
     name: str = 'Energy Network'

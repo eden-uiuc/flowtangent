@@ -1,11 +1,12 @@
-from dataclasses import dataclass, make_dataclass
+import chex
+from dataclasses import make_dataclass
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Library.Methods.Mass import Transport as Mass
 
 import RCAIDE.Library as rcl
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Transport(Process):
     """
     Transport Mass Analysis Class

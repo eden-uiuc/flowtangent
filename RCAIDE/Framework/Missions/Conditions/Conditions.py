@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from warnings import warn
 import unittest
 
@@ -19,7 +20,7 @@ import numpy as np
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class Conditions:
     """
     A class representing a set of conditions for engineering simulations.
@@ -181,7 +182,7 @@ class Conditions:
                 i += v.size
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class _ArrayConditions(Conditions):
     test_array: np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
 

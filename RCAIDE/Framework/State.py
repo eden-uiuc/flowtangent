@@ -7,7 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
+import chex
+from dataclasses import field
 from typing import Self
 
 # package imports
@@ -23,7 +24,7 @@ from RCAIDE.Framework.Missions.Conditions import (
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class State(Conditions):
 
     # Attribute         Type                        Default Value

@@ -7,7 +7,8 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field, make_dataclass
+import chex
+from dataclasses import field, make_dataclass
 
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
@@ -26,7 +27,7 @@ from RCAIDE.Library.Methods.Energy.Converters.Shaft_Offtake import *
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@dataclass(kw_only=True)
+@chex.dataclass(kw_only=True)
 class TurbofanPerformance(rcf.Process):
 
     name: str = 'Turbofan Performance'
