@@ -28,4 +28,22 @@ class ConvergedClimb(rcf.Missions.ConvergedSegment):
     altitude_end:   float = 0.0
 
     def __post_init__(self):
+        super().__post_init__()
         self.state.controls.throttle.active = True
+
+        self._initialize.append(rcf.ProcessStep(name='Altitude Differential'))
+
+
+@chex.dataclass(kw_only=True)
+class SpeedRateClimb(ConvergedClimb):
+
+    name: str = 'Constant Speed & Rate Climb'
+
+    climb_rate:     float = 0.0
+    air_speed:      float = 0.0
+    true_course:    float = 0.0
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self._initialize.

@@ -36,6 +36,7 @@ from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Conditions   import Conditions
 from RCAIDE.Framework.Missions.Initialize   import *
 from RCAIDE.Framework.Missions.Update       import *
+from RCAIDE.Framework.Missions              import flight_dynamics_residuals
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
@@ -66,7 +67,7 @@ class InitializeSegment(Process):
 @chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
-    name: str = "Segment Iteration"
+    name: str = "Segment Analysis"
 
     def __post_init__(self):
 
@@ -94,13 +95,12 @@ class AnalyzeSegment(Process):
 @chex.dataclass(kw_only=True)
 class FinalizeSegment(Process):
 
-    name: str = "Mission Finalization"
+    name: str = "Segment Finalization"
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Converged Segments
 # ----------------------------------------------------------------------------------------------------------------------
-
-
 
 
 @chex.dataclass(kw_only=True)
@@ -113,6 +113,20 @@ class ConvergedSegment(Process):
     root_finder_args:       List = field(default_factory=list)
     root_finder_kwargs:     dict = None
     results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = None
+
+    def __post_init__(self):
+        if self.calculate_residuals is None:
+            self.calculate_residuals = flight_dynamics_residuals
+
+        self.steps = [
+            InitializeSegment(name=f'Initialize {self.name}'),
+            AnalyzeSegment(name=f'Analyze {self.name}'),
+            FinalizeSegment(name=f'Finalize {self.name}')
+        ]
+
+        self._initialize = self.steps[0]
+        self._analyze = self.steps[1]
+        self._finalize = self.steps[2]
 
     def unpack_unknowns(self):
         """
@@ -153,6 +167,9 @@ class ConvergedSegment(Process):
 
         self.update_details()
 
+        state, system, settings = self._initialize(state, system, settings)
+        state, system, settings = self._analyze(state, system, settings)
+
         # Converge root of residuals
 
         root_finder = settings.root_finder
@@ -171,8 +188,9 @@ class ConvergedSegment(Process):
 
         results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
 
-        return self.results_parser(results)
+        state, system, settings = self.results_parser(results)
 
+        return self._finalize(state, system, settings)
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -302,7 +320,6 @@ class EnergyOptimalAltitudeChange(OptimalSegment):
         self.bounds = [(-np.pi/4, np.pi/4), (0., 1.)]
         self.constraints = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
                             NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
-
 
 
 if __name__ == '__main__':
