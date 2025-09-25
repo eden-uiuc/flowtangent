@@ -29,12 +29,13 @@ class EnergyLine(rcl.Component):
     converters:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Converters'))
     stores:         rcl.Component = field(default_factory=lambda: rcl.Component(name='Stores'))
 
-    def add_subcomponent(self,
-                         subcomponent: rcl.Component,
-                         sum_mass=False,
-                         sum_center_of_gravity=False,
-                         sum_moments_of_inertia=False
-                         ):
+    def add_subcomponent(
+            self,
+            subcomponent: rcl.Component,
+            sum_mass=False,
+            sum_center_of_gravity=False,
+            sum_moments_of_inertia=False
+    ):
 
         if isinstance(subcomponent, rcl.Components.Energy.Propulsors.Propulsor):
             self.propulsors.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
@@ -43,7 +44,7 @@ class EnergyLine(rcl.Component):
         elif isinstance(subcomponent, rcl.Components.Energy.Stores.EnergyStore):
             self.stores.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
         else:
-            super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+            super(EnergyLine, self).add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
     def __post_init__(self):
         self.add_subcomponent(self.propulsors)

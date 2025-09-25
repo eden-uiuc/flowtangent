@@ -7,26 +7,25 @@
 # Imports
 #-------------------------------------------------------------------------------
 
-from .Solid import Solid 
+import chex
+
+from RCAIDE.Library.Attributes.Materials import Solid
 
 #-------------------------------------------------------------------------------
-# Aluminum for WavyChannel for battery cooling
+# Aluminum
 #------------------------------------------------------------------------------- 
-class Aluminum(Solid): 
-    """ Physical Constants Specific to 6061-T6 Aluminum
+
+
+@chex.dataclass
+class Aluminum(Solid):
+    """
+    Physical Constants Specific to 6061-T6 Aluminum
+
+    Source:
+            Cao W, Zhao C, Wang Y, et al. Thermal modeling of full-size-scale cylindrical battery pack cooled
+            by channeled liquid flow[J]. International journal of heat and mass transfer, 2019, 138: 1178-1187.
     """
 
-    def __defaults__(self):
-        """Sets material properties at instantiation. 
-
-        Assumptions:
-            None
-    
-        Source:
-            Cao W, Zhao C, Wang Y, et al. Thermal modeling of full-size-scale cylindrical battery pack cooled
-            by channeled liquid flow[J]. International journal of heat and mass transfer, 2019, 138: 1178-1187. 
-        """
-
-        self.density                    = 2719
-        self.thermal_conductivity       = 202.4
-        self.specific_heat_capacity     = 871
+    density                    = 2719
+    thermal_conductivity       = 202.4
+    specific_heat_capacity     = 871

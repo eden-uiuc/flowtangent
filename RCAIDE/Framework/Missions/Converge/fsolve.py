@@ -24,9 +24,9 @@ import RCAIDE.Framework as rcf
 def fsolve_results_parser(
         fsolve_result: Tuple,
         state: "rcf.State",
-        system: rcf.System,
+        system: "rcf.System",
         settings: "rcf.Settings",
-        ):
+) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
         unknowns:       np.ndarray      = fsolve_result[0]
         infodict:       dict            = fsolve_result[1]

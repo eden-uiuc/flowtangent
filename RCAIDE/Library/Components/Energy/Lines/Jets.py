@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass
+import chex
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf

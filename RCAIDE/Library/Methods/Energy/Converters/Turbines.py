@@ -41,8 +41,8 @@ def func_turbine_performance(
 def turbine_performance(
     state: "rcf.State",
     system: "rcf.Aircraft",
-    settings: rcf.Settings
-):
+    settings: "rcf.Settings",
+) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
     # Get inputs
 

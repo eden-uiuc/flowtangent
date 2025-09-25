@@ -112,8 +112,8 @@ def func_sea_level_static_thrust(
 def thrust_and_power(
         state: "rcf.State",
         system: "rcf.Aircraft",
-        settings: rcf.Settings
-):
+        settings: "rcf.Settings",
+) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
     # Get inputs
 

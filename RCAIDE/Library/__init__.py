@@ -8,6 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from . import Attributes
+
 from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness
 
 from .import Gases
@@ -18,7 +20,6 @@ from . import Planets
 
 from . import Atmospheres
 
-from . import Attributes
 from . import Components
 from . import Methods
 

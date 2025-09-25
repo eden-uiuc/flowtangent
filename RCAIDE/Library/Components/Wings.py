@@ -74,7 +74,7 @@ class Wing(rcl.Component):
 
     name:               str             = 'Wing'
     airfoil:            rcl.Component   = None
-    control_surfaces:   dataclass       = field(default_factory=lambda: make_dataclass('WingControlSurfaces', []))
+    control_surfaces:   rcl.Component   = field(default_factory=lambda: rcl.Component(name='Control Surfaces'))
 
     # Specialty Attributes
 

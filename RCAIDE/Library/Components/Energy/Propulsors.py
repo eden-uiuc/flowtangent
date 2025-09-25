@@ -92,7 +92,7 @@ class TurbojetEngine(JetEngine):
     name: str = 'Turbojet'
 
     def __post_init__(self):
-        super().__post_init__()
+        super(TurbojetEngine, self).__post_init__()
 
         self.converters.add_subcomponent(FlowConverter(name='Inlet Nozzle'))
 
@@ -118,7 +118,7 @@ class TurbofanEngine(TurbojetEngine):
     exa: float = 1.0        # Fan Face-to-Exit Distance
 
     def __post_init__(self):
-        super().__post_init__()
+        super(TurbofanEngine, self).__post_init__()
 
         self.converters.add_subcomponent(FlowConverter(name='Fan'))
 

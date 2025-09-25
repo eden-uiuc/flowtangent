@@ -5,30 +5,21 @@
 # Imports
 #-------------------------------------------------------------------------------
 
-from RCAIDE.Framework.Core import Data
+import chex
 
 #-------------------------------------------------------------------------------
 # Solid Data Class
 #------------------------------------------------------------------------------- 
-class Solid(Data):
-    """ Default Template for Solid Attribute Classes  
-    """
 
-    def __defaults__(self):
-        """Default Instantiation of Physical Property Values
-        
-        Assumptions:
-            None
-        
-        Source:
-            None
-        """
 
-        self.ultimate_tensile_strength  = None
-        self.ultimate_shear_strength    = None
-        self.ultimate_bearing_strength  = None
-        self.yield_tensile_strength     = None
-        self.yield_shear_strength       = None
-        self.yield_bearing_strength     = None
-        self.minimum_gage_thickness     = None
-        self.density                    = None
+@chex.dataclass(kw_only=True)
+class Solid:
+
+    ultimate_tensile_strength:  float = None
+    ultimate_shear_strength:    float = None
+    ultimate_bearing_strength:  float = None
+    yield_tensile_strength:     float = None
+    yield_shear_strength:       float = None
+    yield_bearing_strength:     float = None
+    minimum_gage_thickness:     float = None
+    density:                    float = None

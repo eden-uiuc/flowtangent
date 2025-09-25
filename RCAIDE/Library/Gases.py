@@ -44,8 +44,7 @@ class Gas:
     cp_coefficients:        list = field(default_factory=list)
     thermal_coefficients:   list = field(default_factory=list)
 
-    composition: dataclass = field(default_factory=
-                                   lambda: make_dataclass('GasComposition', []))
+    composition:            GasComposition = field(default_factory=GasComposition)
 
     def __post_init__(self):
         self.molar_mass = self.R / self.R_specific

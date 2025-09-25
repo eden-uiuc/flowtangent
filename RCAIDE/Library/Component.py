@@ -17,6 +17,9 @@ from typing import TypeVar, List
 # package imports 
 import numpy as np
 
+# RCAIDE imports
+from RCAIDE.Library.Attributes.Materials import Solid, Aluminum
+
 ComponentType = TypeVar("ComponentType", bound="Component")
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -78,9 +81,9 @@ class ComponentAreas:
 class MaterialProperties:
 
     # Attribute                 Type        Default Value
-    tensile_stress_carrier:     dataclass   = field(default_factory=dataclass)
-    torsional_stress_carrier:   dataclass   = field(default_factory=dataclass)
-    shear_stress_carrier:       dataclass   = field(default_factory=dataclass)
+    tensile_stress_carrier:     Solid   = field(default_factory=Aluminum)
+    torsional_stress_carrier:   Solid   = field(default_factory=Aluminum)
+    shear_stress_carrier:       Solid   = field(default_factory=Aluminum)
 
 
 @chex.dataclass(kw_only=True)
@@ -156,12 +159,6 @@ class Component:
 
             self.mass_properties.center_of_gravity += weighted_cg
 
-    def __getitem__(self, item):
-        if isinstance(item, int):
-            return self.subcomponents[item]
-        else:
-            return vars(self)[item]
-
     def add_subcomponent(self,
                          subcomponent: ComponentType,
                          sum_mass=False,
@@ -183,6 +180,21 @@ class Component:
             if sum_moments_of_inertia:
                 self.sum_moments_of_inertia()
 
+# Overwrite Chex dataclass's __getitem__ method to allow indexing of subcomponents.
+
+
+def _component_getitem(self, item):
+    if isinstance(item, int):
+        if hasattr(self, 'subcomponents'):
+            return self.subcomponents[item]
+        raise IndexError("Integer indexing is for subcomponents, but 'subcomponents' attribute not found.")
+    elif isinstance(item, str):
+        return self.__dict__[item]
+    else:
+        raise TypeError(f"Component indices must be integers or strings, not {type(item).__name__}")
+
+
+Component.__getitem__ = _component_getitem
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests
