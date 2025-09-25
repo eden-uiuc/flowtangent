@@ -7,9 +7,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Callable
+
 import chex
 from dataclasses import field
+from typing import Callable
 
 # package imports
 import numpy as np
@@ -23,9 +24,17 @@ from scipy.optimize import fsolve
 
 
 @chex.dataclass(kw_only=True)
+class AnalysisSettings:
+
+    aerodynamics: chex.dataclass = None
+
+
+@chex.dataclass(kw_only=True)
 class Settings:
 
     name: str = 'Settings'
 
     # Mission Settings
     root_finder: Callable = fsolve
+
+    analysis: AnalysisSettings =  field(default_factory=lambda: AnalysisSettings())

@@ -68,12 +68,12 @@ class Training:
     angle_of_attack:        np.ndarray  = None
     Mach:                   np.ndarray  = None
 
-    sideslip_angle:         np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
-    aileron_deflection:     np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
-    elevator_deflection:    np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
-    rudder_deflection:      np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
-    flap_deflection:        np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
-    slat_deflection:        np.ndarray  = np.array([30, 10.0 , 1E-12]) * Units.deg
+    sideslip_angle:         np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    aileron_deflection:     np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    elevator_deflection:    np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    rudder_deflection:      np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    flap_deflection:        np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    slat_deflection:        np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
 
     u:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
     v:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])

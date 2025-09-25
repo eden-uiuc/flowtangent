@@ -1,1 +1,2 @@
-from .Segments import InitializeSegment, AnalyzeSegment, FinalizeSegment, ConvergedSegment
+from .segments import ConvergedSegment
+from .climb import ConvergedClimb, SpeedRateClimb

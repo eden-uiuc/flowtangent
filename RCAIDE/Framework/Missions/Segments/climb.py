@@ -13,7 +13,10 @@ import numpy as np
 from dataclasses import field, make_dataclass
 
 import RCAIDE.Framework as rcf
-import RCAIDE.Library as rcl
+
+from RCAIDE.Framework import ProcessStep
+from RCAIDE.Framework.Missions.Segments import ConvergedSegment
+from RCAIDE.Framework.Missions.Initialize import altitude_differential
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Climb
@@ -21,7 +24,7 @@ import RCAIDE.Library as rcl
 
 
 @chex.dataclass(kw_only=True)
-class ConvergedClimb(rcf.Missions.ConvergedSegment):
+class ConvergedClimb(ConvergedSegment):
 
     name: str = 'Climb'
 
@@ -29,11 +32,10 @@ class ConvergedClimb(rcf.Missions.ConvergedSegment):
     altitude_end:   float = 0.0
 
     def __post_init__(self):
-        super().__post_init__()
-        self.state.controls.throttle.active = True
+        super(ConvergedClimb, self).__post_init__()
 
-        self._initialize.append(rcf.ProcessStep(name='Altitude Differential',
-                                                function=rcf.Missions.Initialize.altitude_differential))
+        self._initialize.append(ProcessStep(name='Altitude Differential',
+                                            function=altitude_differential))
 
 
 @chex.dataclass(kw_only=True)
@@ -90,7 +92,9 @@ class SpeedRateClimb(ConvergedClimb):
 
         return state, system, settings
 
+
+
     def __post_init__(self):
-        super().__post_init__()
-        self._initialize.append(rcf.ProcessStep(name='Dynamics and Controls',
-                                                function=self.initialize_dynamics_and_controls))
+        super(SpeedRateClimb, self).__post_init__()
+        self._initialize.append(ProcessStep(name='Dynamics and Controls',
+                                            function=self.initialize_dynamics_and_controls))
