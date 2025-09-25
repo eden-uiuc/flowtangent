@@ -93,12 +93,6 @@ class AnalyzeSegment(Process):
             self.append(ProcessStep(name=name, function=function))
 
 
-@chex.dataclass(kw_only=True)
-class FinalizeSegment(Process):
-
-    name: str = "Segment Finalization"
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 # Converged Segments
 # ----------------------------------------------------------------------------------------------------------------------
@@ -131,12 +125,10 @@ class ConvergedSegment(Process):
         self.steps = [
             InitializeSegment(name=f'Initialize {self.name}'),
             AnalyzeSegment(name=f'Analyze {self.name}'),
-            FinalizeSegment(name=f'Finalize {self.name}')
         ]
 
         self._initialize = self.steps[0]
         self._analyze = self.steps[1]
-        self._finalize = self.steps[2]
 
     def unpack_unknowns(self):
         """
@@ -161,14 +153,15 @@ class ConvergedSegment(Process):
         return
 
     # Special override of process call to handle root finding, still follows process type flow
-    def __call__(self,
-                 state: "rcf.State",
-                 system: "rcf.System",
-                 settings: "rcf.Settings") -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
+    def __call__(self) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
         self.update_details()
 
-        state, system, settings = self._initialize(state, system, settings)
+        self._initialize.state = self.state
+        self._initialize.system = self.system
+        self._initialize.settings = self.settings
+
+        state, system, settings = self._initialize()
 
         # Converge root of residuals
 
@@ -190,13 +183,17 @@ class ConvergedSegment(Process):
 
         state, system, settings = self.results_parser(results, state, system, settings)
 
-        state, system, settings = self._analyze(state, system, settings)
+        self._analyze.state = state
+        self._analyze.system = system
+        self._analyze.settings = settings
+
+        state, system, settings = self._analyze()
 
         self.state = state
         self.system = system
         self.settings = settings
 
-        return self._finalize(state, system, settings)
+        return
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -213,7 +210,6 @@ class OptimalSegment(Process):
 
     initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
     analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
-    finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
     calculate_objective:    Callable    = None
     bounds:                 List[Any]   = None

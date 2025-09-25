@@ -60,16 +60,11 @@ class Conditions:
     row_size_adjustment:    int = 0
 
     def _get_subconditions(self):
-        return [getattr(self, k) for k in dir(self) if isinstance(getattr(self, k), Conditions)]
-
-    def __getitem__(self, key):
-        if isinstance(key, slice | int):
-            return self._get_subconditions()[key]
-        return getattr(self, key)
+        return [getattr(self, k) for k in vars(self) if isinstance(getattr(self, k), Conditions)]
 
     def __setitem__(self, key, value):
         if isinstance(key, int):
-            subconkeys = [k for k in dir(self) if isinstance(getattr(self, k), Conditions)]
+            subconkeys = [k for k in vars(self) if isinstance(getattr(self, k), Conditions)]
             if key < len(subconkeys):
                 setattr(self, subconkeys.index(key), value)
             else:
@@ -164,6 +159,19 @@ class Conditions:
                 vars(self)[k] = array[i:i+v.size].reshape(v.shape)
                 i += v.size
 
+# Overwrite Chex dataclass's __getitem__ method to allow indexing of subconditions.
+
+
+def _conditions_getitem(self, item):
+    if isinstance(item, slice | int):
+        return self._get_subconditions()[item]
+    elif isinstance(item, str):
+        return self.__dict__[item]
+    else:
+        raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
+
+
+Conditions.__getitem__ = _conditions_getitem
 
 @chex.dataclass(kw_only=True)
 class _ArrayConditions(Conditions):

@@ -184,7 +184,7 @@ class Component:
 
 
 def _component_getitem(self, item):
-    if isinstance(item, int):
+    if isinstance(item, slice | int):
         if hasattr(self, 'subcomponents'):
             return self.subcomponents[item]
         raise IndexError("Integer indexing is for subcomponents, but 'subcomponents' attribute not found.")

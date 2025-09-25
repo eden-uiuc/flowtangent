@@ -26,12 +26,14 @@ def get_active_residuals(
 ):
     dyn = state.controls.dynamics
 
-    active_residuals = [dyn[name] for name, active in inspect.getmembers(dyn) if active]
+    possible_residuals = [v for v in vars(dyn).values() if isinstance(v, rcf.Missions.Residual)]
+    active_residuals = [res for res in possible_residuals if res.active]
 
     return active_residuals
 
 
 def flight_dynamics_residuals(
+    unknowns,
     state: "rcf.State",
     settings: "rcf.Settings",
     system: "rcf.System"
@@ -39,6 +41,7 @@ def flight_dynamics_residuals(
     """
     Calculates the residuals from the flight dynamics equations.
     """
+    state.unknowns.unpack_array(unknowns)
 
     active_residuals = get_active_residuals(state)
     force_residuals = [res for res in active_residuals if res.type == 'force']

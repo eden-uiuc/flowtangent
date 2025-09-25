@@ -3,7 +3,7 @@ from .Conditions import Conditions
 from .Aerodynamics import (AerodynamicAngles, LiftCoefficients, InducedDrag, DragCoefficients, AerodynamicCoefficients,
                            AerodynamicsConditions)
 
-from .Controls import (DynamicsResiduals, ControlVariable, SurfaceControlVariable, PropulsionControlVariable,
+from .Controls import (Residual, DynamicsResiduals, ControlVariable, SurfaceControlVariable, PropulsionControlVariable,
                        ControlsConditions)
 
 from .Energy import (EnergyNetworkConditions, EnergyStoreConditions, EnergyConverterConditions, BatteryCellConditions,

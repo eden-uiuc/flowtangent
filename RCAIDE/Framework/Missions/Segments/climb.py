@@ -16,7 +16,7 @@ import RCAIDE.Framework as rcf
 
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import ConvergedSegment
-from RCAIDE.Framework.Missions.Initialize import altitude_differential
+from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differential
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Climb
@@ -35,7 +35,7 @@ class ConvergedClimb(ConvergedSegment):
         super(ConvergedClimb, self).__post_init__()
 
         self._initialize.append(ProcessStep(name='Altitude Differential',
-                                            function=altitude_differential))
+                                            function=initialize_altitude_differential))
 
 
 @chex.dataclass(kw_only=True)

@@ -29,7 +29,7 @@ class State(Conditions):
 
     # Attribute         Type                        Default Value
     name:               str                         = 'State'
-    initials:           Self                        = None
+    initials:           chex.dataclass              = None
     numerics:           Numerics                    = field(default_factory=Numerics)
 
     frames:             FrameConditions             = field(default_factory=FrameConditions)

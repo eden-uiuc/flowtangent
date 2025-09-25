@@ -241,7 +241,7 @@ class FuelConditions(EnergyStoreConditions):
 class EnergyLineConditions(Conditions):
 
     converters: Conditions = field(default_factory=lambda: Conditions(name='Energy Line Converters'))
-
+    propulsors: Conditions = field(default_factory=lambda: Conditions(name='Energy Line Converters'))
     stores:     Conditions = field(default_factory=lambda: Conditions(name='Energy Line Stores'))
 
 

@@ -27,14 +27,14 @@ def initialize_energy(state: "rcf.State",
                       settings: "rcf.Settings",
                       ):
 
-    for l_idx, line in enumerate(system.energy.lines):
+    for l_idx, line in enumerate(system.energy.lines.subcomponents):
         state.energy.lines[l_idx] = Line()
-        for p_idx, propulsor in enumerate(line.propulsors):
+        for p_idx, propulsor in enumerate(line.propulsors.subcomponents):
             state.energy.lines[l_idx].propulsors[p_idx] = Converter()
             state.energy.lines[l_idx].propulsors[p_idx].propulsors = Converter()
-            for converter in propulsor.converters:
+            for converter in propulsor.converters.subcomponents:
                 state.energy.lines[l_idx].propulsors[p_idx].propulsors[converter.get_field_name()] = Converter()
-        for store in enumerate(line.stores):
+        for store in enumerate(line.stores.subcomponents):
             state.energy.lines[l_idx].stores[store.get_field_name()] = Store()
 
 
