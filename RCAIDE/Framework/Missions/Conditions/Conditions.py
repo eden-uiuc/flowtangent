@@ -56,7 +56,6 @@ class Conditions:
     name: str = 'Conditions'
 
     _number_of_rows:        int = field(default=1, init=False)
-    # _number_of_columns:     int = field(default=1, init=False)
 
     row_size_adjustment:    int = 0
 

@@ -36,6 +36,7 @@ from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Conditions   import Conditions
 from RCAIDE.Framework.Missions.Initialize   import *
 from RCAIDE.Framework.Missions.Update       import *
+from RCAIDE.Framework.Missions.Converge     import fsolve_results_parser
 from RCAIDE.Framework.Missions              import flight_dynamics_residuals
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -108,15 +109,24 @@ class ConvergedSegment(Process):
 
     name: str = "Segment Convergence"
 
+    # Functions for calculating residuals and solving root-finding problem
     calculate_residuals:    Callable = None
 
+    # Root-finder arguments and parser
     root_finder_args:       List = field(default_factory=list)
     root_finder_kwargs:     dict = None
     results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = None
 
+    # Global dynamics variables
+    sideslip_angle:         float = 0.0
+    temperature_deviation:  float = 0.0
+
     def __post_init__(self):
         if self.calculate_residuals is None:
             self.calculate_residuals = flight_dynamics_residuals
+
+        if self.results_parser is None:
+            self.results_parser = fsolve_results_parser
 
         self.steps = [
             InitializeSegment(name=f'Initialize {self.name}'),
@@ -135,7 +145,7 @@ class ConvergedSegment(Process):
 
         state       = self.state
         unknowns    = state.unknowns.pack_array()
-        controls    = state.conditions.controls
+        controls    = state.controls
         n_points    = state.numerics.number_of_control_points
 
         control_idx = 0
@@ -150,15 +160,6 @@ class ConvergedSegment(Process):
 
         return
 
-    def fsolve_parser(self, results):
-        self.unknowns.unpack_array(results.x)
-        self.unpack_unknowns()
-        return self.state, self.system, self.settings
-
-    def __post_init__(self):
-        if self.results_parser is None:
-            self.results_parser = self.fsolve_parser  # Default to fsolve parser if no parser is provided
-
     # Special override of process call to handle root finding, still follows process type flow
     def __call__(self,
                  state: "rcf.State",
@@ -168,7 +169,6 @@ class ConvergedSegment(Process):
         self.update_details()
 
         state, system, settings = self._initialize(state, system, settings)
-        state, system, settings = self._analyze(state, system, settings)
 
         # Converge root of residuals
 
@@ -188,7 +188,13 @@ class ConvergedSegment(Process):
 
         results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
 
-        state, system, settings = self.results_parser(results)
+        state, system, settings = self.results_parser(results, state, system, settings)
+
+        state, system, settings = self._analyze(state, system, settings)
+
+        self.state = state
+        self.system = system
+        self.settings = settings
 
         return self._finalize(state, system, settings)
 
