@@ -120,7 +120,7 @@ class Airfoil(rcl.Component):
         y       = np.hstack((y_lo, y_up))
 
         return cls(
-            name='NACA ' + str(series_number),
+            tag='NACA ' + str(series_number),
             camber=camber,
             max_thickness=thickness,
             thickness_to_chord=thickness / (max(x) - min(x)),
@@ -317,7 +317,7 @@ class Airfoil(rcl.Component):
         t_c            = max_t/max_c
 
         return cls(
-            name=Path(file_path).stem,
+            tag=Path(file_path).stem,
             camber=camber,
             max_thickness=max_t,
             thickness_to_chord=t_c,

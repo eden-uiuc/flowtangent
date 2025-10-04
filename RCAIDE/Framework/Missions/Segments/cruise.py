@@ -42,7 +42,7 @@ class CSACruise(Cruise):
     altitude: float = None
     air_speed: float = None
 
-    def initalize_dynamics_and_controls(
+    def initialize_dynamics_and_controls(
             self,
             state: "rcf.State",
             system: "rcf.System",

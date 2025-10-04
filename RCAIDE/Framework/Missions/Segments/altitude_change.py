@@ -32,7 +32,7 @@ class AltitudeChange(Segment):
     altitude_end:   float = 0.0
 
     def __post_init__(self):
-        super(Climb, self).__post_init__()
+        super(AltitudeChange, self).__post_init__()
 
         self._initialize.append(ProcessStep(tag='Altitude Differential',
                                             function=initialize_altitude_differential))
@@ -95,6 +95,6 @@ class CSRAltitudeChange(AltitudeChange):
 
 
     def __post_init__(self):
-        super(SpeedRateClimb, self).__post_init__()
+        super(CSRAltitudeChange, self).__post_init__()
         self._initialize.append(ProcessStep(tag='Dynamics and Controls',
                                             function=self.initialize_dynamics_and_controls))

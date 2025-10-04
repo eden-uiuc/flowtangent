@@ -68,20 +68,20 @@ class Training:
     angle_of_attack:        np.ndarray  = None
     Mach:                   np.ndarray  = None
 
-    sideslip_angle:         np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
-    aileron_deflection:     np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
-    elevator_deflection:    np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
-    rudder_deflection:      np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
-    flap_deflection:        np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
-    slat_deflection:        np.ndarray  = np.array([30, 10.0, 1E-12]) * Units.deg
+    sideslip_angle:         np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    aileron_deflection:     np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    elevator_deflection:    np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    rudder_deflection:      np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    flap_deflection:        np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    slat_deflection:        np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
 
-    u:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
-    v:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
-    w:                      np.ndarray  = np.array([0.2, 0.1, 1E-12])
+    u:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
+    v:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
+    w:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
 
-    pitch_rate:             np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
-    roll_rate:              np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
-    yaw_rate:               np.ndarray  = np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec
+    pitch_rate:             np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
+    roll_rate:              np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
+    yaw_rate:               np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
 
 
 @chex.dataclass(kw_only=True)
