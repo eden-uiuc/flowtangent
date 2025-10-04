@@ -176,7 +176,8 @@ def _conditions_getitem(self, item):
 
 def _conditions_setattr(self, key, value):
         if not hasattr(self, key) and self._attributes_frozen:
-            raise AttributeError(f"Cannot add new attribute {key!r}")
+            allowable = [f for f in self.__dataclass_fields__.keys() if f[0] is not "_"]
+            raise AttributeError(f"Cannot add new attribute {key!r}. Allowable attributes:\n\t{'\n\t'.join(allowable)}")
         super(Conditions, self).__setattr__(key, value)
 
 Conditions.__getitem__ = _conditions_getitem

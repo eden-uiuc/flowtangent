@@ -97,7 +97,7 @@ class ControlVariable(Conditions):
     path:           tuple[str]  = None
     path_indices:   tuple       = None
     active:         bool        = False
-    initial_guess:  float       = None
+    initial_guess:  float | np.ndarray       = None
 
     value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -127,7 +127,7 @@ class SurfaceControlVariable(Conditions):
     """
 
     #Attribute          Type                Default Value
-    tag:               str                 = 'Surface Control Variable'
+    tag:                str                 = 'Surface Control Variable'
 
     deflection:         np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
 
