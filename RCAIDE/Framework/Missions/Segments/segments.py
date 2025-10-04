@@ -99,7 +99,7 @@ class AnalyzeSegment(Process):
 
 
 @chex.dataclass(kw_only=True)
-class ConvergedSegment(Process):
+class Segment(Process):
 
     tag: str = "Segment Convergence"
 
@@ -325,6 +325,6 @@ class EnergyOptimalAltitudeChange(OptimalSegment):
 
 
 if __name__ == '__main__':
-    seg = ConvergedSegment()
+    seg = Segment()
     print(seg.details)
     print('Done')

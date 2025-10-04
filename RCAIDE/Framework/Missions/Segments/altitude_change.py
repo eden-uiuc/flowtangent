@@ -24,9 +24,9 @@ from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differentia
 
 
 @chex.dataclass(kw_only=True)
-class Climb(Segment):
+class AltitudeChange(Segment):
 
-    tag: str = 'Climb'
+    tag: str = 'Altitude Change'
 
     altitude_start: float = None
     altitude_end:   float = 0.0
@@ -39,11 +39,11 @@ class Climb(Segment):
 
 
 @chex.dataclass(kw_only=True)
-class SpeedRateClimb(Climb):
+class CSRAltitudeChange(AltitudeChange):
 
-    tag: str = 'Constant Speed & Rate Climb'
+    tag: str = 'Constant Speed & Rate Altitude Change'
 
-    climb_rate:     float = 0.0
+    rate:           float = 0.0
     air_speed:      float = None
     true_course:    float = 0.0
 
@@ -55,7 +55,7 @@ class SpeedRateClimb(Climb):
     ):
         # Unpack inputs from segment parameters and state
 
-        cr      = self.climb_rate
+        rate    = self.rate
         av      = self.air_speed
 
         alt0    = self.altitude_start
@@ -73,13 +73,13 @@ class SpeedRateClimb(Climb):
             alt0 = -1.0 * state.frames.inertial.position_vector[-1, 2]
 
         # Calculate velocity vector in inertial frame
-        v_xy    = np.sqrt(av ** 2 - (-cr) ** 2)
+        v_xy    = np.sqrt(av ** 2 - rate ** 2)
         v_x     = np.cos(beta) * v_xy
         v_y     = np.sin(beta) * v_xy
 
         state.frames.inertial.velocity_vector[:, 0] = v_x
         state.frames.inertial.velocity_vector[:, 1] = v_y
-        state.frames.inertial.velocity_vector[:, 2] = -cr
+        state.frames.inertial.velocity_vector[:, 2] = -rate
 
         # Calculate altitude using time discretization
         alt = t_nondim * (altf - alt0) + alt0
