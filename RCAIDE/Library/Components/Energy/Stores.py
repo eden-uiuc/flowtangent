@@ -17,7 +17,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EnergyStore(rcl.Component):
 
     name = 'Energy Store'
@@ -38,7 +38,7 @@ class EnergyStore(rcl.Component):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class FuelTank(EnergyStore):
 
     name = 'Fuel Tank'
@@ -56,7 +56,7 @@ class FuelTank(EnergyStore):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class BatteryRagoneParameters:
 
     const_1: float = 0.0
@@ -65,7 +65,7 @@ class BatteryRagoneParameters:
     i: float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Battery(EnergyStore):
 
     name = 'Battery'

@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Segments import Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Cruise(Segment):
 
     tag: str = 'Cruise'
@@ -34,7 +34,7 @@ class Cruise(Segment):
         super(Cruise, self).__post_init__()
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class CSACruise(Cruise):
 
     tag: str = 'Constant Speed & Altitude Cruise'

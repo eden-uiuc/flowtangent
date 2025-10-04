@@ -23,13 +23,13 @@ from scipy.optimize import fsolve
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class AnalysisSettings:
 
     aerodynamics: chex.dataclass = None
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Settings:
 
     tag: str = 'Settings'

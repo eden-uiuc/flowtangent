@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StaticCoefficients(Conditions):
     """
     Static stability coefficients for an aircraft.
@@ -76,7 +76,7 @@ class StaticCoefficients(Conditions):
     e:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StaticForces(Conditions):
     """
     Static forces acting on an aircraft.
@@ -116,7 +116,7 @@ class StaticForces(Conditions):
     Z:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StaticMoments(Conditions):
     """
     Represents the static moments acting on an aircraft.
@@ -149,7 +149,7 @@ class StaticMoments(Conditions):
     N:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class CoefficientDerivatives(Conditions):
     """
     Represents the coefficient derivatives for static stability analysis of an aircraft.
@@ -226,7 +226,7 @@ class CoefficientDerivatives(Conditions):
     r:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StaticDerivatives(Conditions):
     """
     Represents the static stability coefficient derivatives for an aircraft.
@@ -284,7 +284,7 @@ class StaticDerivatives(Conditions):
                                            CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StaticStability(Conditions):
     """
     Represents the static stability characteristics of an aircraft.
@@ -340,7 +340,7 @@ class StaticStability(Conditions):
     yaw_rate:           np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class DynamicStability(Conditions):
     """
     Represents the dynamic stability characteristics of an aircraft.
@@ -362,7 +362,7 @@ class DynamicStability(Conditions):
     Notes:
     -----
     This class inherits from the Conditions base class and uses the dataclass decorator
-    with kw_only=True, meaning all attributes must be specified as keyword arguments when instantiating.
+    with kw_only=True, slots=True, meaning all attributes must be specified as keyword arguments when instantiating.
     """
 
     #Attribute      Type        Default Value
@@ -373,7 +373,7 @@ class DynamicStability(Conditions):
 
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class StabilityConditions(Conditions):
     """
     Represents the overall stability conditions of an aircraft, including both static and dynamic stability.
@@ -393,7 +393,7 @@ class StabilityConditions(Conditions):
     Notes:
     -----
     This class inherits from the Conditions base class and uses the dataclass decorator
-    with kw_only=True, meaning all attributes must be specified as keyword arguments when instantiating.
+    with kw_only=True, slots=True, meaning all attributes must be specified as keyword arguments when instantiating.
     """
 
     # Attribute     Type                Default Value

@@ -21,14 +21,14 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class MaxPropellantMassFractions:
 
     Air:    float = 0.0
     O2:     float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class PropellantTemperatures:
 
     flash:          float = 0.0
@@ -37,7 +37,7 @@ class PropellantTemperatures:
     boiling:        float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Propellant:
 
     tag: str = 'Propellant'
@@ -52,7 +52,7 @@ class Propellant:
     temperatures:       PropellantTemperatures      = field(default_factory=PropellantTemperatures)
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class JetA(Propellant):
 
     oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.O2)

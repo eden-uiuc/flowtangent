@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class MassConditions(Conditions):
     """
     Represents the mass conditions for a vehicle or system.

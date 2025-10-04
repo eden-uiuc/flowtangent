@@ -12,7 +12,7 @@ import chex
 #------------------------------------------------------------------------------- 
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Solid:
 
     ultimate_tensile_strength:  float = None

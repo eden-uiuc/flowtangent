@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class FreestreamConditions(Conditions):
     """
     Represents the freestream conditions in a flight environment.

@@ -6,7 +6,7 @@ from RCAIDE.Library.Methods.Mass import Transport as Mass
 import RCAIDE.Library as rcl
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Transport(Process):
     """
     Transport Mass Analysis Class

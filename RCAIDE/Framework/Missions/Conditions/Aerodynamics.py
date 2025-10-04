@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class AerodynamicAngles(Conditions):
     """
     A class to represent aerodynamic angles.
@@ -49,7 +49,7 @@ class AerodynamicAngles(Conditions):
     phi:                np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class LiftCoefficients(Conditions):
     """
     A class to represent lift coefficients for aerodynamic analysis.
@@ -77,7 +77,7 @@ class LiftCoefficients(Conditions):
     compressible:   Conditions      = field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class InducedDrag(Conditions):
     """
     A class to represent induced drag for aerodynamic analysis.
@@ -103,7 +103,7 @@ class InducedDrag(Conditions):
 
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class DragCoefficients(Conditions):
     """
     A class to represent drag coefficients for aerodynamic analysis.
@@ -141,7 +141,7 @@ class DragCoefficients(Conditions):
     induced:            InducedDrag     = field(default_factory=lambda: InducedDrag())
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class AerodynamicCoefficients(Conditions):
     """
     A class to represent aerodynamic coefficients for lift and drag.
@@ -165,7 +165,7 @@ class AerodynamicCoefficients(Conditions):
     drag:  DragCoefficients  = field(default_factory=lambda: DragCoefficients())
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class AerodynamicsConditions(Conditions):
     """
     A class representing aerodynamic conditions for a flight simulation.

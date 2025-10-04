@@ -49,7 +49,7 @@ def skip(*args):
     return args
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ProcessStep:
     """
     A class representing a single step in a process.
@@ -133,7 +133,7 @@ def _create_details():
     return details
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Process:
     """
     A class representing a process made up of multiple process steps.

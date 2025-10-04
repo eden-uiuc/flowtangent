@@ -23,7 +23,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Nacelle(rcl.Component):
 
     tag:                       str     = 'Nacelle'

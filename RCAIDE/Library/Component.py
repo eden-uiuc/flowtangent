@@ -27,7 +27,7 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 # ----------------------------------------------------------------------------------------------------------------------         
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ComponentFineness:
 
     # Attribute     Type    Default Value
@@ -36,7 +36,7 @@ class ComponentFineness:
     tail:           float   = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ComponentDimensions:
 
     # Attribute         Type    Default Value
@@ -53,7 +53,7 @@ class ComponentDimensions:
     side_projected:     float   = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ComponentAreas:
 
     # Attribute         Type    Default Value
@@ -77,7 +77,7 @@ class ComponentAreas:
     exposed:            float   = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class MaterialProperties:
 
     # Attribute                 Type        Default Value
@@ -86,7 +86,7 @@ class MaterialProperties:
     shear_stress_carrier:       Solid   = field(default_factory=Aluminum)
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class MassProperties:
 
     # Attribute                         Type        Default Value
@@ -109,7 +109,7 @@ class MassProperties:
                 warn("Error in calculating component density. Check mass and volume specifications.")
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Component:
 
     # ------------------------------------------------IDENTIFIERS-------------------------------------------------------

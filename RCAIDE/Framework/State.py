@@ -24,7 +24,7 @@ from RCAIDE.Framework.Missions.Conditions import (
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class State(Conditions):
 
     # Attribute         Type                        Default Value

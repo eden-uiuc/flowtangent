@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EnergyStoreConditions(Conditions):
     """
     Represents the conditions of an energy store in a simulation.
@@ -51,7 +51,7 @@ class EnergyStoreConditions(Conditions):
     total_energy:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EnergyConverterConditions(Conditions):
     """
     Represents the conditions of an energy converter in a simulation.
@@ -107,7 +107,7 @@ class EnergyConverterConditions(Conditions):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class BatteryCellConditions(EnergyStoreConditions):
     """
     Represents the conditions of a battery cell in a simulation.
@@ -156,7 +156,7 @@ class BatteryCellConditions(EnergyStoreConditions):
     state_of_charge:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class BatteryPackConditions(EnergyStoreConditions):
     """
     Represents the conditions of a battery pack in a simulation.
@@ -207,7 +207,7 @@ class BatteryPackConditions(EnergyStoreConditions):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class FuelConditions(EnergyStoreConditions):
     """
     Represents the conditions of a fuel energy store in a simulation.
@@ -237,7 +237,7 @@ class FuelConditions(EnergyStoreConditions):
     mass:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EnergyLineConditions(Conditions):
 
     converters: Conditions = field(default_factory=lambda: Conditions(tag='Energy Line Converters'))

@@ -21,7 +21,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EnergyConverter(rcl.Component):
 
     efficiency:             float = 1.0
@@ -31,7 +31,7 @@ class EnergyConverter(rcl.Component):
 # Propulsor Subcomponents
 # ----------------------------------------------------------------------------------------------------------------------
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class FlowConverter(EnergyConverter):
 
     mechanical_efficiency:      float = 1.0
@@ -47,7 +47,7 @@ class FlowConverter(EnergyConverter):
     noise_speed:                float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class OfftakeShaft(EnergyConverter):
 
     tag: str = "Offtake Shaft"

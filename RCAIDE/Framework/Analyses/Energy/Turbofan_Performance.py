@@ -27,7 +27,7 @@ from RCAIDE.Library.Methods.Energy.Converters.Shaft_Offtake import *
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class TurbofanPerformance(rcf.Process):
 
     tag: str = 'Turbofan Performance'

@@ -23,7 +23,7 @@ from RCAIDE.Framework.Core import Units
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class SupersonicSettings:
 
     peak_mach_number                        = 1.04
@@ -37,7 +37,7 @@ class SupersonicSettings:
     wave_drag_type                          = 'Raymer'
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class CorrectionFactors:
 
     fuselage_lift: float = 1.14
@@ -48,21 +48,21 @@ class CorrectionFactors:
     CL_max: float = 1.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class EfficiencyFactors:
 
     span: float = None
     oswald: float = None
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ParasiteDragFormFactors:
 
     wing: float = 1.1
     fuselage: float = 2.3
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Training:
 
     angle_of_attack:        np.ndarray  = None
@@ -84,14 +84,14 @@ class Training:
     yaw_rate:               np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Vortices:
 
     spanwise:   int = 15
     chordwise:  int = 5
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class VLMSettings:
 
     discretize_control_surfaces:    bool    = True
@@ -114,7 +114,7 @@ class VLMSettings:
     vortices:       Vortices                = field(default_factory=Vortices)
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class VLM(rcf.Process):
 
     def __post_init__(self):
@@ -139,7 +139,7 @@ class VLM(rcf.Process):
         ]
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class VLMSurrogate(VLM):
 
     subsonic:   Callable = None

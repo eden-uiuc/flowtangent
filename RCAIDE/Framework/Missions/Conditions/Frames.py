@@ -23,7 +23,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Frame(Conditions):
     """
         A base class representing a reference frame for engineering simulations.
@@ -53,7 +53,7 @@ class Frame(Conditions):
     total_moment_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class InertialFrame(Frame):
     """
     A class representing an inertial reference frame for engineering simulations.
@@ -105,7 +105,7 @@ class InertialFrame(Frame):
     system_range:                   np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class BodyFrame(Frame):
     """
     A class representing a body-fixed reference frame for engineering simulations.
@@ -138,7 +138,7 @@ class BodyFrame(Frame):
     moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class WindFrame(Frame):
     """
     A class representing a wind reference frame for engineering simulations.
@@ -178,7 +178,7 @@ class WindFrame(Frame):
     moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class PlanetFrame(Frame):
     """
     A class representing a planet-fixed reference frame for engineering simulations.
@@ -213,7 +213,7 @@ class PlanetFrame(Frame):
     true_course:    SP_Rotation = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class FrameConditions(Conditions):
     """
     A class representing a collection of reference frames for dynamic simulations.

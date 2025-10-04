@@ -21,14 +21,14 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Planet:
 
     mass: float = 0.0
     mean_radius: float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Earth(Planet):
 
     mass: float = 5.972e24  # in kg

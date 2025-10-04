@@ -23,7 +23,7 @@ from RCAIDE.Library.Components.Energy.Converters import *
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class DesignParameters:
 
     total_thrust:           float = 0.0
@@ -37,7 +37,7 @@ class DesignParameters:
     mass_flow_through_rate: float = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Propulsor(EnergyConverter):
 
     converters:                 rcl.Component   = field(default_factory=
@@ -54,7 +54,7 @@ class Propulsor(EnergyConverter):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class JetInstallationGeometry:
 
     xe: float = 1.
@@ -62,7 +62,7 @@ class JetInstallationGeometry:
     Ce: float = 2.
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class JetEngine(Propulsor):
 
     tag:                           str             = 'Jet'
@@ -86,7 +86,7 @@ class JetEngine(Propulsor):
         self.design_thrust_parameters.fuel_air_ratio = 0.0
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class TurbojetEngine(JetEngine):
 
     tag: str = 'Turbojet'
@@ -109,7 +109,7 @@ class TurbojetEngine(JetEngine):
         self.converters.add_subcomponent(FlowConverter(tag='Core Nozzle'))
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class TurbofanEngine(TurbojetEngine):
 
     tag: str = 'Turbofan'

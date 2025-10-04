@@ -22,7 +22,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class AtmosphericBreakpoints:
 
     altitude: np.ndarray = None
@@ -31,7 +31,7 @@ class AtmosphericBreakpoints:
     density: np.ndarray = None
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class Atmosphere:
 
     fluid: rcl.Gases.Gas = field(default_factory=rcl.Gases.Air)
@@ -41,7 +41,7 @@ class Atmosphere:
     breaks: AtmosphericBreakpoints = field(default_factory=AtmosphericBreakpoints)
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class USStandard1976(Atmosphere):
 
     def __post_init__(self):
@@ -51,7 +51,7 @@ class USStandard1976(Atmosphere):
         self.breaks.density     = np.array([1.47808e0, 1.2250e0, 3.63918e-1, 8.80349e-2, 1.32250e-2, 1.42753e-3, 8.61606e-4, 6.42099e-5, 6.95792e-6])  # kg/m^3
 
 
-@chex.dataclass(kw_only=True)
+@chex.dataclass(kw_only=True, slots=True)
 class ConstantTemperature(Atmosphere):
 
     def __post_init__(self):
