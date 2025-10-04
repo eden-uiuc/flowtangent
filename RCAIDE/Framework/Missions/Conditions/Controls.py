@@ -31,6 +31,8 @@ class Residual(Conditions):
     active: bool    = False
     index:  int     = None
 
+    value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
 
 @chex.dataclass(kw_only=True)
 class DynamicsResiduals(Conditions):

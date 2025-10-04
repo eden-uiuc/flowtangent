@@ -63,4 +63,4 @@ def flight_dynamics_residuals(
                              f"I[{moment_res.index}, {moment_res.index}]")
         moment_res.value = MT[:, moment_res.index] / I[moment_res.index, moment_res.index] - wdot[:, moment_res.index]
 
-    return state, settings, system
+    return state, system, settings

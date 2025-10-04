@@ -142,7 +142,7 @@ class Segment(Process):
 
         control_idx = 0
 
-        for name, control_var in inspect.getmembers(controls):
+        for name, control_var in vars(controls).items():
             if hasattr(control_var, 'active') and control_var.active:
                 values = unknowns[control_idx : control_idx + n_points]     # Extract control values from unknowns
                 values = np.reshape(values, (-1, 1))               # Reshape to column vector
@@ -151,6 +151,37 @@ class Segment(Process):
                 control_idx += n_points
 
         return
+
+    def _get_residuals(
+            self,
+            unknowns,
+            state: "rcf.State",
+            system: "rcf.System",
+            settings: "rcf.Settings",
+    ):
+        """
+        Calculates and packs residuals into the state residuals conditions
+        """
+
+        state, system, settings = self.calculate_residuals(
+            unknowns,
+            state,
+            system,
+            settings,
+        )
+
+        n_points = state.numerics.number_of_control_points
+        dynamics = state.controls.dynamics
+
+        residual_array = np.empty((n_points, 1))
+
+        for name, residual in vars(dynamics).items():
+            if hasattr(residual, 'active') and residual.active:
+                residual_array = np.hstack((residual_array, residual.value))
+
+        state.residuals = residual_array
+
+        return residual_array
 
     # Special override of process call to handle root finding, still follows process type flow
     def __call__(self) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
@@ -170,7 +201,7 @@ class Segment(Process):
         if self.root_finder_kwargs is None:
             # Assume fsolve is the default root finder and that the calculate_residuals function is provided
             self.root_finder_kwargs = {
-                'func': self.calculate_residuals,
+                'func': self._get_residuals,
                 'x0': state.unknowns.pack_array(),
                 'args': (state, system, settings),
                 'xtol': state.numerics.solution_tolerance,

@@ -86,9 +86,12 @@ class CSRAltitudeChange(AltitudeChange):
         state.frames.inertial.position_vector[:, 2] = -alt[:, 0]
         state.freestream.altitude[:, 0] = alt[:, 0]
 
-        # Set active controls
+        # Set active controls and dynamics
         state.controls.throttle.active = True
         state.controls.body_angle = True
+
+        state.controls.dynamics.force_x.active = True
+        state.controls.dynamics.force_z.active = True
 
         return state, system, settings
 

@@ -73,8 +73,12 @@ class CSACruise(Cruise):
         state.frames.inertial.velocity_vector[:, 1] = v_y
         state.frames.inertial.time[:, 0] = time
 
+        # Set active controls and dynamics
         state.controls.throttle.active = True
         state.controls.body_angle = True
+
+        state.controls.dynamics.force_x.active = True
+        state.controls.dynamics.force_z.active = True
 
         return state, system, settings
 
