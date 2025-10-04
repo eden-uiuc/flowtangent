@@ -77,16 +77,16 @@ class AnalyzeSegment(Process):
             ("Acceleration",         update_acceleration),
             ("Angular Acceleration", update_angular_acceleration),
             ("Altitude",             update_altitude),
-            ("Gravity",              skip),
+            ("Gravity",              lambda: skip(warning=f"No gravity analysis set. Skipping...")),
             ("Freestream",           update_freestream),
             ("Orientations",         update_orientations),
-            ("Energy",               skip),
-            ("Aerodynamics",         skip),
-            ("Stability",            skip),
-            ("Mass",                 skip),
+            ("Energy",               lambda: skip(warning=f"No energy analysis set. Skipping...")),
+            ("Aerodynamics",         lambda: skip(warning=f"No aerodynamics analysis set. Skipping...")),
+            ("Stability",            lambda: skip(warning=f"No stability analysis set. Skipping...")),
+            ("Mass",                 lambda: skip(warning=f"No mass analysis set. Skipping...")),
             ("Forces",               update_forces),
             ("Moments",              update_moments),
-            ("Planetary Position",   skip)
+            ("Planetary Position",   lambda: skip(warning=f"No planetary position analysis set. Skipping..."))
         ]
 
         for name, function in default_steps:

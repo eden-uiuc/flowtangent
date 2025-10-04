@@ -24,7 +24,7 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def skip(*args):
+def skip(*args, warning: str = None):
     """
     skip(*args, **kwargs)
 
@@ -45,7 +45,10 @@ def skip(*args):
     Examples
     --------
     """
-    
+
+    if warning:
+        print(f"Warning: {warning}")
+
     return args
 
 
