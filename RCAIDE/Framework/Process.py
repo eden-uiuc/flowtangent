@@ -67,11 +67,12 @@ class ProcessStep:
     """
 
     function:       Callable        = skip
-    tag:           str             = "Process Step"
+    tag:            str             = "Process Step"
     last_result:    object          = None
     state:          "rcf.State"     = None
     system:         "rcf.System"    = None
     settings:       "rcf.Settings"  = None
+
 
     def __call__(self):
         """
@@ -98,39 +99,6 @@ class ProcessStep:
         """
         framework_args = (self.state, self.system, self.settings)
         return self.function(*framework_args)
-
-
-def _create_details():
-    """
-    _create_details()
-
-    Create a pandas DataFrame to store process step details.
-
-    Parameters
-    ----------
-    None
-
-    Returns
-    -------
-    pd.DataFrame
-        A pandas DataFrame with columns 'Name', 'Function', and 'Last Result'.
-
-    Notes
-    -----
-    This function initializes a pandas DataFrame with three columns: 'Name', 'Function', and 'Last Result'.
-    The DataFrame is used to keep track of the name, function, and last result of each process step.
-
-    Examples
-    --------
-    """
-
-    details = pd.DataFrame(
-        columns=['Name',
-                 'Function',
-                 'Last Result']
-    )
-
-    return details
 
 
 @chex.dataclass(kw_only=True)
@@ -186,10 +154,11 @@ class Process:
     update_details(self):   Updates the details DataFrame with the current process steps.
     """
 
-    tag:               str             = "Process"
+    tag:                str             = "Process"
+    keep_details:       bool             = False
 
     steps:              List[Callable]  = field(default_factory=list)
-    details:            pd.DataFrame    = field(default_factory=_create_details)
+    details:            pd.DataFrame    = None
 
     step:               int             = 0
     initial_step:       int             = 0
@@ -744,6 +713,17 @@ class Process:
         Examples
         --------
         """
+
+        if not self.keep_details:
+            return None
+
+        if not self.details:
+
+            self.details = pd.DataFrame(
+                columns=['Name',
+                 'Function',
+                 'Last Result']
+            )
 
         if any(not isinstance(s, ProcessStep) for s in self.steps):
             if not all(isinstance(s, Callable) for s in self.steps):
