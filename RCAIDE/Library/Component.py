@@ -167,7 +167,7 @@ class Component:
                          ):
 
         if isinstance(subcomponent, Component):
-            setattr(self, subcomponent.get_field_name(), subcomponent)
+            super(Component,self).__setattr__(self, subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:
             raise TypeError(f"Attempted to add a subcomponent to {self.tag} "
@@ -180,7 +180,7 @@ class Component:
             if sum_moments_of_inertia:
                 self.sum_moments_of_inertia()
 
-# Overwrite Chex dataclass's __getitem__ method to allow indexing of subcomponents.
+# Overwrite Chex dataclass's getitem, setattr methods to allow indexing of subcomponents and semi-freeze attributes
 
 
 def _component_getitem(self, item):
@@ -193,8 +193,13 @@ def _component_getitem(self, item):
     else:
         raise TypeError(f"Component indices must be integers or strings, not {type(item).__name__}")
 
+def _component_setattr(self, key, value):
+        if not hasattr(self, key):
+            raise AttributeError(f"Cannot add new attribute {key!r}")
+        super(Component, self).__setattr__(key, value)
 
 Component.__getitem__ = _component_getitem
+Component.__setattr__ = _component_setattr
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

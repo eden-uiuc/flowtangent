@@ -159,7 +159,7 @@ class Conditions:
                 vars(self)[k] = array[i:i+v.size].reshape(v.shape)
                 i += v.size
 
-# Overwrite Chex dataclass's __getitem__ method to allow indexing of subconditions.
+# Overwrite Chex dataclass's getitem, setattr methods to allow indexing of subcomponents and semi-freeze attributes
 
 
 def _conditions_getitem(self, item):
@@ -170,8 +170,13 @@ def _conditions_getitem(self, item):
     else:
         raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
 
+def _conditions_setattr(self, key, value):
+        if not hasattr(self, key):
+            raise AttributeError(f"Cannot add new attribute {key!r}")
+        super(Conditions, self).__setattr__(key, value)
 
 Conditions.__getitem__ = _conditions_getitem
+Conditions.__setattr__ = _conditions_setattr
 
 @chex.dataclass(kw_only=True)
 class _ArrayConditions(Conditions):
