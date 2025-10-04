@@ -170,7 +170,7 @@ class Numerics(Conditions):
     """
 
     # Attribute                 Type            Default Value
-    tag:                       str             = 'Numerics'
+    tag:                        str             = 'Numerics'
 
     number_of_control_points:   int             = 16
     control_point_spacing:      str             = 'cosine'
@@ -208,6 +208,8 @@ class Numerics(Conditions):
         (self.dimensionless.control_points,
          self.dimensionless.differentiate,
          self.dimensionless.integrate) = self.discretization_method()
+
+        super(Numerics, self).__post_init__()
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

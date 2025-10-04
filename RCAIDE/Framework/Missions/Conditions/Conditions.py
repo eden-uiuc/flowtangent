@@ -59,6 +59,8 @@ class Conditions:
 
     row_size_adjustment:    int = 0
 
+    _attributes_frozen: bool = False
+
     def _get_subconditions(self):
         return [getattr(self, k) for k in vars(self) if isinstance(getattr(self, k), Conditions)]
 
@@ -75,6 +77,7 @@ class Conditions:
     def __post_init__(self):
         self.expand_rows(self._number_of_rows)
         # self.expand_columns(self._number_of_columns)
+        self._attributes_frozen = True
 
     def expand_rows(self, rows: int):
         """
@@ -170,8 +173,9 @@ def _conditions_getitem(self, item):
     else:
         raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
 
+
 def _conditions_setattr(self, key, value):
-        if not hasattr(self, key):
+        if not hasattr(self, key) and self._attributes_frozen:
             raise AttributeError(f"Cannot add new attribute {key!r}")
         super(Conditions, self).__setattr__(key, value)
 
