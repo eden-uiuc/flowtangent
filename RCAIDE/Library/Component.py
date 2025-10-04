@@ -132,6 +132,11 @@ class Component:
     mass_properties:        MassProperties        = field(default_factory=MassProperties)
     material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
 
+    _attributes_frozen: bool = False
+
+    def __post_init__(self):
+        self._attributes_frozen = True
+
     def get_field_name(self):
         return self.tag.replace(' ', '_').lower()
 
@@ -167,7 +172,7 @@ class Component:
                          ):
 
         if isinstance(subcomponent, Component):
-            super(Component,self).__setattr__(self, subcomponent.get_field_name(), subcomponent)
+            super(Component, self).__setattr__(self, subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:
             raise TypeError(f"Attempted to add a subcomponent to {self.tag} "
@@ -194,7 +199,7 @@ def _component_getitem(self, item):
         raise TypeError(f"Component indices must be integers or strings, not {type(item).__name__}")
 
 def _component_setattr(self, key, value):
-        if not hasattr(self, key):
+        if not hasattr(self, key) and self._attributes_frozen:
             raise AttributeError(f"Cannot add new attribute {key!r}")
         super(Component, self).__setattr__(key, value)
 
