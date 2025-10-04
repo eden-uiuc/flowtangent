@@ -18,7 +18,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class LandingGear(rcl.Component):
 
     tag: str = 'Landing Gear'

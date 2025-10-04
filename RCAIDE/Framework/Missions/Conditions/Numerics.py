@@ -93,7 +93,7 @@ def chebyshev_matrices(n: int = 16,
     return np.atleast_2d(x), D, I
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class NumericalTime(Conditions):
     """
     A class representing numerical time conditions.
@@ -116,7 +116,7 @@ class NumericalTime(Conditions):
     Notes
     -----
     All attributes are initialized as 1x1 numpy arrays of zeros by default.
-    The class uses kw_only=True, slots=True, meaning all attributes must be specified as
+    The class uses kw_only=True, meaning all attributes must be specified as
     keyword arguments when instantiating the class.
     """
 
@@ -126,7 +126,7 @@ class NumericalTime(Conditions):
     integrate:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Numerics(Conditions):
 
     """

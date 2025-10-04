@@ -20,7 +20,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------  
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class FuselageHeights(rcl.ComponentDimensions):
 
     at_quarter_length: float                = 0.0
@@ -29,7 +29,7 @@ class FuselageHeights(rcl.ComponentDimensions):
     at_vertical_root_quarter_chord: float   = 0.0
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class FuselageLengths(rcl.ComponentDimensions):
 
     nose: float         = 0.0
@@ -39,14 +39,14 @@ class FuselageLengths(rcl.ComponentDimensions):
     aft_space: float    = 0.0
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class FuselageSegment(rcl.Component):
 
     percent_x_location: float = 0.0
     percent_z_location: float = 0.0
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Fuselage(rcl.Component):
 
     aerodynamic_center: np.ndarray = field(default_factory=lambda: np.zeros(3))
@@ -66,7 +66,7 @@ class Fuselage(rcl.Component):
         self.lengths.ordinal_direction = True
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class BWBFuselage(Fuselage):
 
     aft_centerbody_taper: float = 0.0

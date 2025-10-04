@@ -22,7 +22,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
     propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(tag='Propulsors'))
@@ -60,7 +60,7 @@ class EnergyLine(rcl.Component):
         raise NotImplementedError('Subclasses must implement this method')
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class EnergyNetwork(rcl.Component):
 
     tag: str = 'Energy Network'

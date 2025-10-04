@@ -25,7 +25,7 @@ ComponentType = TypeVar("ComponentType", bound="Component")
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class VehicleEnvelope:
     # Attribute                 Type        Default Value
     ultimate_load:             float        = 0.0
@@ -36,7 +36,7 @@ class VehicleEnvelope:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class System(rcl.Component):
 
     tag: str = 'System'
@@ -44,7 +44,7 @@ class System(rcl.Component):
     configurations: rcl.Component = field(default_factory=lambda: rcl.Component(tag='Configurations'))
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Aircraft(System):
 
     tag:           str = 'Aircraft'

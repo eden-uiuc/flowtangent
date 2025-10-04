@@ -20,7 +20,7 @@ import numpy as np
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Conditions:
     """
     A class representing a set of conditions for engineering simulations.
@@ -173,7 +173,7 @@ def _conditions_getitem(self, item):
 
 Conditions.__getitem__ = _conditions_getitem
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class _ArrayConditions(Conditions):
     test_array: np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
 

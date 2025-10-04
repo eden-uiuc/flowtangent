@@ -22,14 +22,14 @@ from RCAIDE.Library.Component import ComponentType
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class WingDimensions(rcl.ComponentDimensions):
 
     root: float = 0.0
     tip: float = 0.0
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class WingSegment(rcl.Component):
 
     tag: str = 'Wing Segment'
@@ -50,7 +50,7 @@ class WingSegment(rcl.Component):
         self.sweeps.half_chord = 0.0
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class WingControlSurface(rcl.Component):
 
     tag: str = 'Wing Control Surface'
@@ -69,7 +69,7 @@ class WingControlSurface(rcl.Component):
     gain: float                 = 1.0  # deflection multiplier used only for AVL
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Wing(rcl.Component):
 
     tag:               str             = 'Wing'

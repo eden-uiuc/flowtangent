@@ -44,7 +44,7 @@ from RCAIDE.Framework.Missions              import flight_dynamics_residuals
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
@@ -65,7 +65,7 @@ class InitializeSegment(Process):
             self.append(ProcessStep(tag=name, function=function))
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
     tag: str = "Segment Analysis"
@@ -98,7 +98,7 @@ class AnalyzeSegment(Process):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Segment(Process):
 
     tag: str = "Segment Convergence"
@@ -232,7 +232,7 @@ class Segment(Process):
 #-----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class OptimalSegment(Process):
 
     tag:                   str     = 'Optimize Segment'
@@ -321,7 +321,7 @@ def energy_use(
     return energy_used[0]
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class EnergyOptimalCruise(OptimalSegment):
 
     tag: str = 'Energy Optimal Cruise'
@@ -337,7 +337,7 @@ class EnergyOptimalCruise(OptimalSegment):
         self.constraints = [NonlinearConstraint(distance_check, lb=self.distance, ub=self.distance)]
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class EnergyOptimalAltitudeChange(OptimalSegment):
 
     tag: str = 'Energy Optimal Altitude Change'

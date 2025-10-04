@@ -23,7 +23,7 @@ from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differentia
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class AltitudeChange(Segment):
 
     tag: str = 'Altitude Change'
@@ -38,7 +38,7 @@ class AltitudeChange(Segment):
                                             function=initialize_altitude_differential))
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class CSRAltitudeChange(AltitudeChange):
 
     tag: str = 'Constant Speed & Rate Altitude Change'

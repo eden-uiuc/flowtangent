@@ -24,7 +24,7 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True, slots=True)
+@chex.dataclass(kw_only=True)
 class Airfoil(rcl.Component):
 
     thickness_to_chord: float = 0.0
