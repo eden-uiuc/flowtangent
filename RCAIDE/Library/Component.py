@@ -114,7 +114,7 @@ class Component:
 
     # ------------------------------------------------IDENTIFIERS-------------------------------------------------------
 
-    name:                   str                   = 'Component'
+    tag:                   str                   = 'Component'
     segments:               List[ComponentType]   = field(default_factory=list)
     subcomponents:          List[ComponentType]   = field(default_factory=list)
     origin:                 np.ndarray            = field(default_factory=lambda: np.zeros(3))
@@ -133,7 +133,7 @@ class Component:
     material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
 
     def get_field_name(self):
-        return self.name.replace(' ', '_').lower()
+        return self.tag.replace(' ', '_').lower()
 
     def add_segment(self, segment: ComponentType, index: int = -1):
         self.segments.insert(index, segment)
@@ -170,7 +170,7 @@ class Component:
             setattr(self, subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:
-            raise TypeError(f"Attempted to add a subcomponent to {self.name} "
+            raise TypeError(f"Attempted to add a subcomponent to {self.tag} "
                             f"which was not a Component datastructure.")
 
         if sum_mass:
@@ -202,18 +202,18 @@ Component.__getitem__ = _component_getitem
 
 class TestComponent(unittest.TestCase):
     def setUp(self):
-        self.component = Component(name="TestComponent")
+        self.component = Component(tag="TestComponent")
 
     def test_default_values(self):
-        self.assertEqual(self.component.name, "TestComponent")
+        self.assertEqual(self.component.tag, "TestComponent")
         self.assertEqual(self.component.segments, [])
         np.testing.assert_array_equal(self.component.origin, np.zeros(3))
 
     def test_add_segment(self):
-        segment = Component(name="Segment")
+        segment = Component(tag="Segment")
         self.component.add_segment(segment)
         self.assertEqual(len(self.component.segments), 1)
-        self.assertEqual(self.component.segments[0].name, "Segment")
+        self.assertEqual(self.component.segments[0].tag, "Segment")
 
 
 class TestMassProperties(unittest.TestCase):

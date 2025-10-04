@@ -50,7 +50,7 @@ class FlowConverter(EnergyConverter):
 @chex.dataclass(kw_only=True)
 class OfftakeShaft(EnergyConverter):
 
-    name: str = "Offtake Shaft"
+    tag: str = "Offtake Shaft"
 
     power_draw:             float = 0.0
     reference_temperature:  float = 298.15      # Kelvin

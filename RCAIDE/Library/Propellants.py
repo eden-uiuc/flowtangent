@@ -40,7 +40,7 @@ class PropellantTemperatures:
 @chex.dataclass(kw_only=True)
 class Propellant:
 
-    name: str = 'Propellant'
+    tag: str = 'Propellant'
 
     oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.Gas)
 

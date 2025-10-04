@@ -45,7 +45,7 @@ class Frame(Conditions):
         """
 
     # Attribute             Type            Default Value
-    name:                   str             = 'Frame'
+    tag:                   str             = 'Frame'
 
     transform_to_inertial:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
@@ -89,7 +89,7 @@ class InertialFrame(Frame):
     """
 
     # Attribute                     Type        Default Value
-    name:                           str         = 'Inertial Frame'
+    tag:                           str         = 'Inertial Frame'
 
     position_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
@@ -129,7 +129,7 @@ class BodyFrame(Frame):
     """
 
     # Attribute             Type        Default Value
-    name:                   str         = 'Body Frame'
+    tag:                   str         = 'Body Frame'
 
     inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
@@ -167,7 +167,7 @@ class WindFrame(Frame):
     """
 
     # Attribute         Type            Default Value
-    name:               str             = 'Wind Frame'
+    tag:               str             = 'Wind Frame'
 
     body_rotations:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     transform_to_body:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
@@ -204,7 +204,7 @@ class PlanetFrame(Frame):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Planet Frame'
+    tag:           str         = 'Planet Frame'
     start_time:     float       = None
 
     latitude:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -240,7 +240,7 @@ class FrameConditions(Conditions):
     """
 
     # Attribute     Type            Default Value
-    name:           str             = 'Dynamic Frames'
+    tag:           str             = 'Dynamic Frames'
 
     inertial:       InertialFrame   = field(default_factory=lambda: InertialFrame())
     body:           BodyFrame       = field(default_factory=lambda: BodyFrame())

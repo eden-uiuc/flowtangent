@@ -53,7 +53,7 @@ class Conditions:
     - It's designed to work with nested Conditions objects and numpy arrays.
     """
 
-    name: str = 'Conditions'
+    tag: str = 'Conditions'
 
     _number_of_rows:        int = field(default=1, init=False)
 
@@ -183,7 +183,7 @@ class TestConditions(unittest.TestCase):
         self.conditions = Conditions()
 
     def test_initial_state(self):
-        self.assertEqual(self.conditions.name, 'Conditions')
+        self.assertEqual(self.conditions.tag, 'Conditions')
         self.assertEqual(self.conditions._number_of_rows, 1)
         self.assertEqual(self.conditions.row_size_adjustment, 0)
 

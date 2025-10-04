@@ -39,25 +39,25 @@ class VehicleEnvelope:
 @chex.dataclass(kw_only=True)
 class System(rcl.Component):
 
-    name: str = 'System'
+    tag: str = 'System'
 
-    configurations: rcl.Component = field(default_factory=lambda: rcl.Component(name='Configurations'))
+    configurations: rcl.Component = field(default_factory=lambda: rcl.Component(tag='Configurations'))
 
 
 @chex.dataclass(kw_only=True)
 class Aircraft(System):
 
-    name:           str = 'Aircraft'
+    tag:           str = 'Aircraft'
 
     energy:         rcl.Component = field(default_factory=lambda: rcl.Components.Energy.Networks.EnergyNetwork())
 
-    wings:          rcl.Component = field(default_factory=lambda: rcl.Component(name='Wings'))
+    wings:          rcl.Component = field(default_factory=lambda: rcl.Component(tag='Wings'))
 
-    fuselages:      rcl.Component = field(default_factory=lambda: rcl.Component(name='Fuselages'))
+    fuselages:      rcl.Component = field(default_factory=lambda: rcl.Component(tag='Fuselages'))
 
-    nacelles:       rcl.Component = field(default_factory=lambda: rcl.Component(name='Nacelles'))
+    nacelles:       rcl.Component = field(default_factory=lambda: rcl.Component(tag='Nacelles'))
 
-    landing_gear:   rcl.Component = field(default_factory=lambda: rcl.Component(name='Landing Gear'))
+    landing_gear:   rcl.Component = field(default_factory=lambda: rcl.Component(tag='Landing Gear'))
 
     def add_subcomponent(
             self,

@@ -53,7 +53,7 @@ class MassConditions(Conditions):
     """
 
     # Attribute             Type    Default Value
-    name:                   str         = 'Mass Conditions'
+    tag:                   str         = 'Mass Conditions'
 
     total:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     rate_of_change:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -64,7 +64,7 @@ class MassConditions(Conditions):
     center_of_gravity:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
     moments_of_inertia:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3, 3)))
 
-    breakdown:              Conditions  = field(default_factory=lambda: Conditions(name='Mass Breakdown'))
+    breakdown:              Conditions  = field(default_factory=lambda: Conditions(tag='Mass Breakdown'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests
@@ -77,16 +77,16 @@ class TestMassConditions(unittest.TestCase):
         self.mass_conditions = MassConditions()
 
     def test_default_values(self):
-        self.assertEqual(self.mass_conditions.name, 'Mass Conditions')
+        self.assertEqual(self.mass_conditions.tag, 'Mass Conditions')
         np.testing.assert_array_equal(self.mass_conditions.total, np.zeros((1, 1)))
         np.testing.assert_array_equal(self.mass_conditions.rate_of_change, np.zeros((1, 1)))
         np.testing.assert_array_equal(self.mass_conditions.total_moment_of_inertia, np.zeros((1, 1, 3)))
         self.assertIsInstance(self.mass_conditions.breakdown, Conditions)
-        self.assertEqual(self.mass_conditions.breakdown.name, 'Mass Breakdown')
+        self.assertEqual(self.mass_conditions.breakdown.tag, 'Mass Breakdown')
 
     def test_custom_name(self):
-        custom_mass = MassConditions(name="Custom Mass Conditions")
-        self.assertEqual(custom_mass.name, "Custom Mass Conditions")
+        custom_mass = MassConditions(tag="Custom Mass Conditions")
+        self.assertEqual(custom_mass.tag, "Custom Mass Conditions")
 
     def test_total_mass(self):
         self.mass_conditions.total = np.array([[1000.0]])

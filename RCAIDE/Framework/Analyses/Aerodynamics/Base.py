@@ -17,7 +17,7 @@ import numpy as np
 # ----------------------------------------------------------------------------------------------------------------------
 #  Aerodynamics
 # ---------------------------------------------------------------------------------------------------------------------- 
-class Aerodynamics(Analysis):
+class BaseAerodynamics(Analysis):
     """This is the base class for aerodynamics analyses. 
     """
     def __defaults__(self):

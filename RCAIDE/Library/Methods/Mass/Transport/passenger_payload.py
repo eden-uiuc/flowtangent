@@ -60,14 +60,14 @@ def passenger_payload(state: "rcf.State",
         if hasattr(payload, 'passengers'):
             payload.passengers.mass_properties.total = passenger_mass
         else:
-            passengers = rcl.Component(name='passengers')
+            passengers = rcl.Component(tag='passengers')
             passengers.mass_properties.total = passenger_mass
             payload.add_subcomponent(passengers)
 
         if hasattr(payload, 'baggage'):
             payload.baggage.mass_properties.total = baggage_mass
         else:
-            baggage = rcl.Component(name='baggage')
+            baggage = rcl.Component(tag='baggage')
             baggage.mass_properties.total = baggage_mass
             payload.add_subcomponent(baggage)
 
@@ -80,7 +80,7 @@ def passenger_payload(state: "rcf.State",
         system.payload = _build_payload(_payload)
         system.sum_mass()
     else:
-        _payload = rcl.Component(name='payload')
+        _payload = rcl.Component(tag='payload')
         payload = _build_payload(_payload)
         system.add_subcomponent(payload)
 

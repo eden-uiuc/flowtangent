@@ -60,7 +60,7 @@ class StaticCoefficients(Conditions):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Static Stability Coefficients'
+    tag:           str         = 'Static Stability Coefficients'
 
     lift:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     drag:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -106,7 +106,7 @@ class StaticForces(Conditions):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Static Stability Forces'
+    tag:           str         = 'Static Stability Forces'
 
     lift:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     drag:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -142,7 +142,7 @@ class StaticMoments(Conditions):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Static Stability Moments'
+    tag:           str         = 'Static Stability Moments'
 
     L:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     M:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -200,7 +200,7 @@ class CoefficientDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Coefficient Static Stability Derivatives'
+    tag:           str         = 'Coefficient Static Stability Derivatives'
 
     # Throttle Derivative
     throttle:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -262,26 +262,26 @@ class StaticDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    name:           str         = 'Static Stability Coefficients Derivatives'
+    tag:           str         = 'Static Stability Coefficients Derivatives'
 
     Clift:  CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='Lift Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
     Cdrag:  CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='Drag Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='Drag Coefficient Static Stability Derivatives'))
 
     CX:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='X Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='X Coefficient Static Stability Derivatives'))
     CY:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='Y Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='Y Coefficient Static Stability Derivatives'))
     CZ:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='Z Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='Z Coefficient Static Stability Derivatives'))
 
     CL:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='L Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='L Coefficient Static Stability Derivatives'))
     CM:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='M Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='M Coefficient Static Stability Derivatives'))
     CN:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(name='N Coefficient Static Stability Derivatives'))
+                                           CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
 
 
 @chex.dataclass(kw_only=True)
@@ -323,7 +323,7 @@ class StaticStability(Conditions):
     These can be updated with actual values during stability analysis.
     """
 
-    name:               str                 = 'Static Stability'
+    tag:               str                 = 'Static Stability'
     
     forces:             StaticForces        = field(default_factory=lambda: StaticForces())
     moments:            StaticMoments       = field(default_factory=lambda: StaticMoments())
@@ -366,10 +366,10 @@ class DynamicStability(Conditions):
     """
 
     #Attribute      Type        Default Value
-    name:           str         = 'Dynamic Stability'
+    tag:           str         = 'Dynamic Stability'
 
-    LongModes:      Conditions  = field(default_factory=lambda: Conditions(name='Longitudinal Modes'))
-    LatModes:       Conditions  = field(default_factory=lambda: Conditions(name='Lateral Modes'))
+    LongModes:      Conditions  = field(default_factory=lambda: Conditions(tag='Longitudinal Modes'))
+    LatModes:       Conditions  = field(default_factory=lambda: Conditions(tag='Lateral Modes'))
 
 
 
@@ -397,7 +397,7 @@ class StabilityConditions(Conditions):
     """
 
     # Attribute     Type                Default Value
-    name:           str                 = 'Stability'
+    tag:           str                 = 'Stability'
 
     static:         StaticStability     = field(default_factory=lambda: StaticStability())
     dynamic:        DynamicStability    = field(default_factory=lambda: DynamicStability())
@@ -406,7 +406,7 @@ class StabilityConditions(Conditions):
 class TestStaticCoefficients(unittest.TestCase):
     def test_default_values(self):
         sc = StaticCoefficients()
-        self.assertEqual(sc.name, 'Static Stability Coefficients')
+        self.assertEqual(sc.tag, 'Static Stability Coefficients')
         np.testing.assert_array_equal(sc.lift, np.zeros((1, 1)))
         np.testing.assert_array_equal(sc.drag, np.zeros((1, 1)))
         np.testing.assert_array_equal(sc.X, np.zeros((1, 1)))
@@ -421,7 +421,7 @@ class TestStaticCoefficients(unittest.TestCase):
 class TestStaticForces(unittest.TestCase):
     def test_default_values(self):
         sf = StaticForces()
-        self.assertEqual(sf.name, 'Static Stability Forces')
+        self.assertEqual(sf.tag, 'Static Stability Forces')
         np.testing.assert_array_equal(sf.lift, np.zeros((1, 1)))
         np.testing.assert_array_equal(sf.drag, np.zeros((1, 1)))
         np.testing.assert_array_equal(sf.X, np.zeros((1, 1)))
@@ -432,7 +432,7 @@ class TestStaticForces(unittest.TestCase):
 class TestStaticMoments(unittest.TestCase):
     def test_default_values(self):
         sm = StaticMoments()
-        self.assertEqual(sm.name, 'Static Stability Moments')
+        self.assertEqual(sm.tag, 'Static Stability Moments')
         np.testing.assert_array_equal(sm.L, np.zeros((1, 1)))
         np.testing.assert_array_equal(sm.M, np.zeros((1, 1)))
         np.testing.assert_array_equal(sm.N, np.zeros((1, 1)))
@@ -441,7 +441,7 @@ class TestStaticMoments(unittest.TestCase):
 class TestCoefficientDerivatives(unittest.TestCase):
     def test_default_values(self):
         cd = CoefficientDerivatives()
-        self.assertEqual(cd.name, 'Coefficient Static Stability Derivatives')
+        self.assertEqual(cd.tag, 'Coefficient Static Stability Derivatives')
         np.testing.assert_array_equal(cd.alpha, np.zeros((1, 1)))
         np.testing.assert_array_equal(cd.beta, np.zeros((1, 1)))
         np.testing.assert_array_equal(cd.delta_a, np.zeros((1, 1)))
@@ -460,7 +460,7 @@ class TestCoefficientDerivatives(unittest.TestCase):
 class TestStaticDerivatives(unittest.TestCase):
     def test_default_values(self):
         sd = StaticDerivatives()
-        self.assertEqual(sd.name, 'Static Stability Coefficients Derivatives')
+        self.assertEqual(sd.tag, 'Static Stability Coefficients Derivatives')
         self.assertIsInstance(sd.Clift, CoefficientDerivatives)
         self.assertIsInstance(sd.Cdrag, CoefficientDerivatives)
         self.assertIsInstance(sd.CX, CoefficientDerivatives)
@@ -474,7 +474,7 @@ class TestStaticDerivatives(unittest.TestCase):
 class TestStaticStability(unittest.TestCase):
     def test_default_values(self):
         ss = StaticStability()
-        self.assertEqual(ss.name, 'Static Stability')
+        self.assertEqual(ss.tag, 'Static Stability')
         self.assertIsInstance(ss.forces, StaticForces)
         self.assertIsInstance(ss.moments, StaticMoments)
         self.assertIsInstance(ss.coefficients, StaticCoefficients)
@@ -490,17 +490,17 @@ class TestStaticStability(unittest.TestCase):
 class TestDynamicStability(unittest.TestCase):
     def test_default_values(self):
         ds = DynamicStability()
-        self.assertEqual(ds.name, 'Dynamic Stability')
+        self.assertEqual(ds.tag, 'Dynamic Stability')
         self.assertIsInstance(ds.LongModes, Conditions)
         self.assertIsInstance(ds.LatModes, Conditions)
-        self.assertEqual(ds.LongModes.name, 'Longitudinal Modes')
-        self.assertEqual(ds.LatModes.name, 'Lateral Modes')
+        self.assertEqual(ds.LongModes.tag, 'Longitudinal Modes')
+        self.assertEqual(ds.LatModes.tag, 'Lateral Modes')
 
 
 class TestStabilityConditions(unittest.TestCase):
     def test_default_values(self):
         sc = StabilityConditions()
-        self.assertEqual(sc.name, 'Stability')
+        self.assertEqual(sc.tag, 'Stability')
         self.assertIsInstance(sc.static, StaticStability)
         self.assertIsInstance(sc.dynamic, DynamicStability)
 

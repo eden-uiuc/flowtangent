@@ -25,9 +25,9 @@ import RCAIDE.Library as rcl
 @chex.dataclass(kw_only=True)
 class EnergyLine(rcl.Component):
 
-    propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Propulsors'))
-    converters:     rcl.Component = field(default_factory=lambda: rcl.Component(name='Converters'))
-    stores:         rcl.Component = field(default_factory=lambda: rcl.Component(name='Stores'))
+    propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(tag='Propulsors'))
+    converters:     rcl.Component = field(default_factory=lambda: rcl.Component(tag='Converters'))
+    stores:         rcl.Component = field(default_factory=lambda: rcl.Component(tag='Stores'))
 
     def add_subcomponent(
             self,
@@ -63,11 +63,11 @@ class EnergyLine(rcl.Component):
 @chex.dataclass(kw_only=True)
 class EnergyNetwork(rcl.Component):
 
-    name: str = 'Energy Network'
+    tag: str = 'Energy Network'
 
     efficiency: float = 1.0
 
-    lines: rcl.Component = field(default_factory=lambda: rcl.Component(name='Lines'))
+    lines: rcl.Component = field(default_factory=lambda: rcl.Component(tag='Lines'))
 
     def __post_init__(self):
         self.add_subcomponent(self.lines)

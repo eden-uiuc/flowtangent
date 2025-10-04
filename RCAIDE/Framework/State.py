@@ -28,7 +28,7 @@ from RCAIDE.Framework.Missions.Conditions import (
 class State(Conditions):
 
     # Attribute         Type                        Default Value
-    name:               str                         = 'State'
+    tag:               str                         = 'State'
     initials:           chex.dataclass              = None
     numerics:           Numerics                    = field(default_factory=Numerics)
 
@@ -41,6 +41,6 @@ class State(Conditions):
     aerodynamics:       AerodynamicsConditions      = field(default_factory=AerodynamicsConditions)
     controls:           ControlsConditions          = field(default_factory=ControlsConditions)
 
-    unknowns:           Conditions                  = field(default_factory=lambda: Conditions(name='Unknowns'))
-    residuals:          Conditions                  = field(default_factory=lambda: Conditions(name='Residuals'))
-    objective:          Conditions                  = field(default_factory=lambda: Conditions(name='Objective'))
+    unknowns:           Conditions                  = field(default_factory=lambda: Conditions(tag='Unknowns'))
+    residuals:          Conditions                  = field(default_factory=lambda: Conditions(tag='Residuals'))
+    objective:          Conditions                  = field(default_factory=lambda: Conditions(tag='Objective'))

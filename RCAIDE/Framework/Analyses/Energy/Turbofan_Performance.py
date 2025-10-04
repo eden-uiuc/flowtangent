@@ -30,7 +30,7 @@ from RCAIDE.Library.Methods.Energy.Converters.Shaft_Offtake import *
 @chex.dataclass(kw_only=True)
 class TurbofanPerformance(rcf.Process):
 
-    name: str = 'Turbofan Performance'
+    tag: str = 'Turbofan Performance'
 
     def __post_init__(self):
 

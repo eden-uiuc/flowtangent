@@ -41,7 +41,7 @@ class DesignParameters:
 class Propulsor(EnergyConverter):
 
     converters:                 rcl.Component   = field(default_factory=
-                                                        lambda: rcl.Component(name='Propulsor Converters'))
+                                                        lambda: rcl.Component(tag='Propulsor Converters'))
 
     design_thrust_parameters:   DesignParameters = field(default_factory=DesignParameters)
 
@@ -65,7 +65,7 @@ class JetInstallationGeometry:
 @chex.dataclass(kw_only=True)
 class JetEngine(Propulsor):
 
-    name:                           str             = 'Jet'
+    tag:                           str             = 'Jet'
     plug_diameter:                  float           = 0.0
 
     reference_temperature:          float           = 288.15      # Kelvin
@@ -81,7 +81,7 @@ class JetEngine(Propulsor):
 
     def __post_init__(self):
 
-        self.converters.add_subcomponent(FlowConverter(name='Combustor'))
+        self.converters.add_subcomponent(FlowConverter(tag='Combustor'))
 
         self.design_thrust_parameters.fuel_air_ratio = 0.0
 
@@ -89,30 +89,30 @@ class JetEngine(Propulsor):
 @chex.dataclass(kw_only=True)
 class TurbojetEngine(JetEngine):
 
-    name: str = 'Turbojet'
+    tag: str = 'Turbojet'
 
     def __post_init__(self):
         super(TurbojetEngine, self).__post_init__()
 
-        self.converters.add_subcomponent(FlowConverter(name='Inlet Nozzle'))
+        self.converters.add_subcomponent(FlowConverter(tag='Inlet Nozzle'))
 
-        self.converters.add_subcomponent(rcl.Component(name='Compressors'))
-        self.converters.compressors.add_subcomponent(FlowConverter(name='Low Pressure Compressor'))
-        self.converters.compressors.add_subcomponent(FlowConverter(name='High Pressure Compressor'))
+        self.converters.add_subcomponent(rcl.Component(tag='Compressors'))
+        self.converters.compressors.add_subcomponent(FlowConverter(tag='Low Pressure Compressor'))
+        self.converters.compressors.add_subcomponent(FlowConverter(tag='High Pressure Compressor'))
 
-        self.converters.add_subcomponent(rcl.Component(name='Turbines'))
-        self.converters.turbines.add_subcomponent(FlowConverter(name='High Pressure Turbine'))
-        self.converters.turbines.add_subcomponent(FlowConverter(name='Low Pressure Turbine'))
+        self.converters.add_subcomponent(rcl.Component(tag='Turbines'))
+        self.converters.turbines.add_subcomponent(FlowConverter(tag='High Pressure Turbine'))
+        self.converters.turbines.add_subcomponent(FlowConverter(tag='Low Pressure Turbine'))
 
         self.converters.add_subcomponent(OfftakeShaft())
 
-        self.converters.add_subcomponent(FlowConverter(name='Core Nozzle'))
+        self.converters.add_subcomponent(FlowConverter(tag='Core Nozzle'))
 
 
 @chex.dataclass(kw_only=True)
 class TurbofanEngine(TurbojetEngine):
 
-    name: str = 'Turbofan'
+    tag: str = 'Turbofan'
 
     bypass_ratio = 1.0
     exa: float = 1.0        # Fan Face-to-Exit Distance
@@ -120,6 +120,6 @@ class TurbofanEngine(TurbojetEngine):
     def __post_init__(self):
         super(TurbofanEngine, self).__post_init__()
 
-        self.converters.add_subcomponent(FlowConverter(name='Fan'))
+        self.converters.add_subcomponent(FlowConverter(tag='Fan'))
 
-        self.converters.add_subcomponent(FlowConverter(name='Fan Nozzle'))
+        self.converters.add_subcomponent(FlowConverter(tag='Fan Nozzle'))

@@ -59,7 +59,7 @@ def flight_dynamics_residuals(
         force_res.value = FT[:, force_res.index] / m[:, 0] - a[:, force_res.index]
     for moment_res in moment_residuals:
         if I[moment_res.index, moment_res.index] == 0:
-            raise ValueError(f"Moment of Inertia Matrix must be defined for residual: {moment_res.name} at "
+            raise ValueError(f"Moment of Inertia Matrix must be defined for residual: {moment_res.tag} at "
                              f"I[{moment_res.index}, {moment_res.index}]")
         moment_res.value = MT[:, moment_res.index] / I[moment_res.index, moment_res.index] - wdot[:, moment_res.index]
 

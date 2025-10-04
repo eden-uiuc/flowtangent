@@ -73,7 +73,7 @@ def generate_interpolated_airfoils(airfoil_1, airfoil_2, nairfoils, npoints=201,
         x_n_u = np.reshape(x_n_upper[j+1],(npoints//2,1))
         x_n_l = np.reshape(x_n_lower[j+1],(npoints//2,1))
         
-        airfoil_files.append(new_files[file].name)
+        airfoil_files.append(new_files[file].tag)
         upper_data = np.append(x_n_u, y_n_u,axis=1)
         lower_data = np.append(x_n_l, y_n_l,axis=1)
 

@@ -32,7 +32,7 @@ class WingDimensions(rcl.ComponentDimensions):
 @chex.dataclass(kw_only=True)
 class WingSegment(rcl.Component):
 
-    name: str = 'Wing Segment'
+    tag: str = 'Wing Segment'
     airfoil: rcl.Component = None
 
     # Specialty Attributes
@@ -53,7 +53,7 @@ class WingSegment(rcl.Component):
 @chex.dataclass(kw_only=True)
 class WingControlSurface(rcl.Component):
 
-    name: str = 'Wing Control Surface'
+    tag: str = 'Wing Control Surface'
 
     span: float                 = 0.0
     span_fraction_start: float  = 0.0
@@ -72,9 +72,9 @@ class WingControlSurface(rcl.Component):
 @chex.dataclass(kw_only=True)
 class Wing(rcl.Component):
 
-    name:               str             = 'Wing'
+    tag:               str             = 'Wing'
     airfoil:            rcl.Component   = None
-    control_surfaces:   rcl.Component   = field(default_factory=lambda: rcl.Component(name='Control Surfaces'))
+    control_surfaces:   rcl.Component   = field(default_factory=lambda: rcl.Component(tag='Control Surfaces'))
 
     # Specialty Attributes
 

@@ -42,7 +42,7 @@ class AerodynamicAngles(Conditions):
     """
 
     # Attribute         Type        Default Value
-    name:               str         = 'Aerodynamic Angles'
+    tag:               str         = 'Aerodynamic Angles'
 
     alpha:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
     beta:               np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
@@ -69,12 +69,12 @@ class LiftCoefficients(Conditions):
     """
 
     # Attribute     Type            Default Value
-    name:           str             = 'Lift Coefficients'
+    tag:           str             = 'Lift Coefficients'
 
     total:          np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
-    inviscid:       Conditions      = field(default_factory=lambda: Conditions(name='Inviscid Bodies'))
-    compressible:   Conditions      = field(default_factory=lambda: Conditions(name='Compressible Bodies'))
+    inviscid:       Conditions      = field(default_factory=lambda: Conditions(tag='Inviscid Bodies'))
+    compressible:   Conditions      = field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
 
 
 @chex.dataclass(kw_only=True)
@@ -95,11 +95,11 @@ class InducedDrag(Conditions):
     """
 
     # Attribute         Type            Default Value
-    name:               str             = 'Induced Drag'
+    tag:               str             = 'Induced Drag'
 
     total:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
-    inviscid_wings:     Conditions      = field(default_factory=lambda: Conditions(name='Inviscid Wings'))
+    inviscid_wings:     Conditions      = field(default_factory=lambda: Conditions(tag='Inviscid Wings'))
 
 
 
@@ -129,14 +129,14 @@ class DragCoefficients(Conditions):
     """
 
     # Attribute         Type            Default Value
-    name:               str             = 'Drag Coefficients'
+    tag:               str             = 'Drag Coefficients'
 
     total:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
-    parasite:           Conditions      = field(default_factory=lambda: Conditions(name='Parasite Drag'))
-    compressible:       Conditions      = field(default_factory=lambda: Conditions(name='Compressible Drag'))
-    miscellaneous:      Conditions      = field(default_factory=lambda: Conditions(name='Miscellaneous Drag'))
-    spoiler:            Conditions      = field(default_factory=lambda: Conditions(name='Spoiler Drag'))
+    parasite:           Conditions      = field(default_factory=lambda: Conditions(tag='Parasite Drag'))
+    compressible:       Conditions      = field(default_factory=lambda: Conditions(tag='Compressible Drag'))
+    miscellaneous:      Conditions      = field(default_factory=lambda: Conditions(tag='Miscellaneous Drag'))
+    spoiler:            Conditions      = field(default_factory=lambda: Conditions(tag='Spoiler Drag'))
 
     induced:            InducedDrag     = field(default_factory=lambda: InducedDrag())
 
@@ -159,7 +159,7 @@ class AerodynamicCoefficients(Conditions):
     """
 
     # Attribute         Type            Default Value
-    name:               str             = 'Aerodynamic Coefficients'
+    tag:               str             = 'Aerodynamic Coefficients'
 
     lift:  LiftCoefficients  = field(default_factory=lambda: LiftCoefficients())
     drag:  DragCoefficients  = field(default_factory=lambda: DragCoefficients())
@@ -186,7 +186,7 @@ class AerodynamicsConditions(Conditions):
     """
 
     # Attribute     Type                    Default Value
-    name:           str                     = 'Aerodynamics'
+    tag:           str                     = 'Aerodynamics'
 
     angles:         AerodynamicAngles       = field(default_factory=lambda: AerodynamicAngles())
 
@@ -201,43 +201,43 @@ class TestAerodynamics(unittest.TestCase):
 
     def test_aerodynamic_angles(self):
         angles = AerodynamicAngles()
-        self.assertEqual(angles.name, 'Aerodynamic Angles')
+        self.assertEqual(angles.tag, 'Aerodynamic Angles')
         self.assertTrue(np.array_equal(angles.alpha, np.zeros((1, 1))))
         self.assertTrue(np.array_equal(angles.beta, np.zeros((1, 1))))
         self.assertTrue(np.array_equal(angles.phi, np.zeros((1, 1))))
 
     def test_lift_coefficients(self):
         lift = LiftCoefficients()
-        self.assertEqual(lift.name, 'Lift Coefficients')
+        self.assertEqual(lift.tag, 'Lift Coefficients')
         self.assertTrue(np.array_equal(lift.total, np.zeros((1, 1))))
-        self.assertEqual(lift.inviscid_wings.name, 'Inviscid Wings')
-        self.assertEqual(lift.compressible_wings.name, 'Compressible Wings')
+        self.assertEqual(lift.inviscid_wings.tag, 'Inviscid Wings')
+        self.assertEqual(lift.compressible_wings.tag, 'Compressible Wings')
 
     def test_induced_drag(self):
         induced = InducedDrag()
-        self.assertEqual(induced.name, 'Induced Drag')
+        self.assertEqual(induced.tag, 'Induced Drag')
         self.assertTrue(np.array_equal(induced.total, np.zeros((1, 1))))
-        self.assertEqual(induced.inviscid_wings.name, 'Inviscid Wings')
+        self.assertEqual(induced.inviscid_wings.tag, 'Inviscid Wings')
 
     def test_drag_coefficients(self):
         drag = DragCoefficients()
-        self.assertEqual(drag.name, 'Drag Coefficients')
+        self.assertEqual(drag.tag, 'Drag Coefficients')
         self.assertTrue(np.array_equal(drag.total, np.zeros((1, 1))))
-        self.assertEqual(drag.parasite.name, 'Parasite Drag')
-        self.assertEqual(drag.compressible.name, 'Compressible Drag')
-        self.assertEqual(drag.miscellaneous.name, 'Miscellaneous Drag')
-        self.assertEqual(drag.spoiler.name, 'Spoiler Drag')
+        self.assertEqual(drag.parasite.tag, 'Parasite Drag')
+        self.assertEqual(drag.compressible.tag, 'Compressible Drag')
+        self.assertEqual(drag.miscellaneous.tag, 'Miscellaneous Drag')
+        self.assertEqual(drag.spoiler.tag, 'Spoiler Drag')
         self.assertIsInstance(drag.induced, InducedDrag)
 
     def test_aerodynamic_coefficients(self):
         coeff = AerodynamicCoefficients()
-        self.assertEqual(coeff.name, 'Aerodynamic Coefficients')
+        self.assertEqual(coeff.tag, 'Aerodynamic Coefficients')
         self.assertIsInstance(coeff.lift, LiftCoefficients)
         self.assertIsInstance(coeff.drag, DragCoefficients)
 
     def test_aerodynamics_conditions(self):
         cond = AerodynamicsConditions()
-        self.assertEqual(cond.name, 'Aerodynamics')
+        self.assertEqual(cond.tag, 'Aerodynamics')
         self.assertIsInstance(cond.angles, AerodynamicAngles)
         self.assertIsInstance(cond.coefficients, AerodynamicCoefficients)
 

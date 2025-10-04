@@ -74,19 +74,19 @@ class Transport(Process):
 
         ###---Default Process Steps---###
 
-        self.append(ProcessStep(name='Propulsion Mass',
+        self.append(ProcessStep(tag='Propulsion Mass',
                                 function=rcl.Methods.Mass.Energy.Jets.Jet_Mass_from_SLS))
-        self.append(ProcessStep(name='Passenger & Payload Mass',
+        self.append(ProcessStep(tag='Passenger & Payload Mass',
                                 function=Mass.passenger_payload))
-        self.append(ProcessStep(name='Operating System Mass',
+        self.append(ProcessStep(tag='Operating System Mass',
                                 function=Mass.operating_systems))
-        self.append(ProcessStep(name='Main Wing Mass',
+        self.append(ProcessStep(tag='Main Wing Mass',
                                 function=Mass.segmented_main_wing))
-        self.append(ProcessStep(name='Horizontal Tail Mass',
+        self.append(ProcessStep(tag='Horizontal Tail Mass',
                                 function=Mass.horizontal_tail))
-        self.append(ProcessStep(name='Vertical Tail Mass',
+        self.append(ProcessStep(tag='Vertical Tail Mass',
                                 function=Mass.vertical_tail))
-        self.append(ProcessStep(name='Fuselage Mass',
+        self.append(ProcessStep(tag='Fuselage Mass',
                                 function=Mass.fuselage))
-        self.append(ProcessStep(name='Landing Gear',
+        self.append(ProcessStep(tag='Landing Gear',
                                 function=Mass.landing_gear))

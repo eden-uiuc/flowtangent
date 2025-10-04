@@ -47,7 +47,7 @@ from RCAIDE.Framework.Missions              import flight_dynamics_residuals
 @chex.dataclass(kw_only=True)
 class InitializeSegment(Process):
 
-    name: str = 'Segment Initialization'
+    tag: str = 'Segment Initialization'
 
     def __post_init__(self):
 
@@ -62,13 +62,13 @@ class InitializeSegment(Process):
         ]
 
         for name, function in default_steps:
-            self.append(ProcessStep(name=name, function=function))
+            self.append(ProcessStep(tag=name, function=function))
 
 
 @chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
-    name: str = "Segment Analysis"
+    tag: str = "Segment Analysis"
 
     def __post_init__(self):
 
@@ -90,7 +90,7 @@ class AnalyzeSegment(Process):
         ]
 
         for name, function in default_steps:
-            self.append(ProcessStep(name=name, function=function))
+            self.append(ProcessStep(tag=name, function=function))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ class AnalyzeSegment(Process):
 @chex.dataclass(kw_only=True)
 class ConvergedSegment(Process):
 
-    name: str = "Segment Convergence"
+    tag: str = "Segment Convergence"
 
     # Functions for calculating residuals and solving root-finding problem
     calculate_residuals:    Callable = None
@@ -123,8 +123,8 @@ class ConvergedSegment(Process):
             self.results_parser = fsolve_results_parser
 
         self.steps = [
-            InitializeSegment(name=f'Initialize {self.name}'),
-            AnalyzeSegment(name=f'Analyze {self.name}'),
+            InitializeSegment(tag=f'Initialize {self.tag}'),
+            AnalyzeSegment(tag=f'Analyze {self.tag}'),
         ]
 
         self._initialize = self.steps[0]
@@ -204,7 +204,7 @@ class ConvergedSegment(Process):
 @chex.dataclass(kw_only=True)
 class OptimalSegment(Process):
 
-    name:                   str     = 'Optimize Segment'
+    tag:                   str     = 'Optimize Segment'
     optimization_method:    str     = 'SLSQP'
     display_optimization:   bool    = False
 
@@ -293,7 +293,7 @@ def energy_use(
 @chex.dataclass(kw_only=True)
 class EnergyOptimalCruise(OptimalSegment):
 
-    name: str = 'Energy Optimal Cruise'
+    tag: str = 'Energy Optimal Cruise'
 
     altitude: float = 0.0
     distance: float = 0.0
@@ -309,7 +309,7 @@ class EnergyOptimalCruise(OptimalSegment):
 @chex.dataclass(kw_only=True)
 class EnergyOptimalAltitudeChange(OptimalSegment):
 
-    name: str = 'Energy Optimal Altitude Change'
+    tag: str = 'Energy Optimal Altitude Change'
 
     altitude_start: float = 0.0
     altitude_end:   float = 0.0

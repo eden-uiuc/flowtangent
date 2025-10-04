@@ -32,7 +32,7 @@ class AnalysisSettings:
 @chex.dataclass(kw_only=True)
 class Settings:
 
-    name: str = 'Settings'
+    tag: str = 'Settings'
 
     # Mission Settings
     root_finder: Callable = fsolve

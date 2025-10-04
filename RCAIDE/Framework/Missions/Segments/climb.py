@@ -26,7 +26,7 @@ from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differentia
 @chex.dataclass(kw_only=True)
 class ConvergedClimb(ConvergedSegment):
 
-    name: str = 'Climb'
+    tag: str = 'Climb'
 
     altitude_start: float = None
     altitude_end:   float = 0.0
@@ -34,14 +34,14 @@ class ConvergedClimb(ConvergedSegment):
     def __post_init__(self):
         super(ConvergedClimb, self).__post_init__()
 
-        self._initialize.append(ProcessStep(name='Altitude Differential',
+        self._initialize.append(ProcessStep(tag='Altitude Differential',
                                             function=initialize_altitude_differential))
 
 
 @chex.dataclass(kw_only=True)
 class SpeedRateClimb(ConvergedClimb):
 
-    name: str = 'Constant Speed & Rate Climb'
+    tag: str = 'Constant Speed & Rate Climb'
 
     climb_rate:     float = 0.0
     air_speed:      float = None
@@ -96,5 +96,5 @@ class SpeedRateClimb(ConvergedClimb):
 
     def __post_init__(self):
         super(SpeedRateClimb, self).__post_init__()
-        self._initialize.append(ProcessStep(name='Dynamics and Controls',
+        self._initialize.append(ProcessStep(tag='Dynamics and Controls',
                                             function=self.initialize_dynamics_and_controls))

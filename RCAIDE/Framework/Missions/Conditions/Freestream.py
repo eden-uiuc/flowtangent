@@ -78,7 +78,7 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    name:                   str             = 'Freestream'
+    tag:                   str             = 'Freestream'
     atmosphere:             chex.dataclass  = None
 
     speed:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -120,7 +120,7 @@ class TestFreestreamConditions(unittest.TestCase):
         self.freestream = FreestreamConditions()
 
     def test_default_values(self):
-        self.assertEqual(self.freestream.name, 'Freestream')
+        self.assertEqual(self.freestream.tag, 'Freestream')
         np.testing.assert_array_equal(self.freestream.velocity, np.zeros((1, 1)))
         np.testing.assert_array_equal(self.freestream.u, np.zeros((1, 1)))
         np.testing.assert_array_equal(self.freestream.v, np.zeros((1, 1)))
@@ -138,8 +138,8 @@ class TestFreestreamConditions(unittest.TestCase):
         np.testing.assert_array_equal(self.freestream.delta_ISA, np.zeros((1, 1)))
 
     def test_custom_name(self):
-        custom_freestream = FreestreamConditions(name="Custom Freestream")
-        self.assertEqual(custom_freestream.name, "Custom Freestream")
+        custom_freestream = FreestreamConditions(tag="Custom Freestream")
+        self.assertEqual(custom_freestream.tag, "Custom Freestream")
 
     def test_custom_values(self):
         custom_freestream = FreestreamConditions(

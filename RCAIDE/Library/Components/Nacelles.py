@@ -26,7 +26,7 @@ import RCAIDE.Library as rcl
 @chex.dataclass(kw_only=True)
 class Nacelle(rcl.Component):
 
-    name:                       str     = 'Nacelle'
+    tag:                       str     = 'Nacelle'
 
     flow_through:               bool    = False
     has_pylon:                  bool    = True

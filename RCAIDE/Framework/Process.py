@@ -67,7 +67,7 @@ class ProcessStep:
     """
 
     function:       Callable        = skip
-    name:           str             = "Process Step"
+    tag:           str             = "Process Step"
     last_result:    object          = None
     state:          "rcf.State"     = None
     system:         "rcf.System"    = None
@@ -169,14 +169,14 @@ class Process:
     count(self, step: ProcessStep):         Returns the number of occurrences of the specified process step in the process.
     extend(self, extension: Iterable):      Extends the process with the process steps from the specified iterable.
     
-    _index_name(self, name: str):                               Returns the index of the process step with the specified name.
+    _index_name(self, tag: str):                               Returns the index of the process step with the specified name.
     _index_function(self, function: Callable):                  Returns the index of the process step with the specified function.
     index(self, value: str | Callable | ProcessStep | Self):    Returns the index of the process step with the specified value.
     
     insert(self, index: int, step: ProcessStep | Self): Inserts a process step at the specified index in the process.
     pop(self, index: int):                              Removes and returns the process step at the specified index.
     
-    _remove_name(self, name: str):                              Removes the process step with the specified name.
+    _remove_name(self, tag: str):                              Removes the process step with the specified name.
     _remove_function(self, function: Callable):                 Removes the process step with the specified function.
     remove(self, value: str | Callable | ProcessStep | Self):   Removes the process step with the specified value.
     
@@ -186,7 +186,7 @@ class Process:
     update_details(self):   Updates the details DataFrame with the current process steps.
     """
 
-    name:               str             = "Process"
+    tag:               str             = "Process"
 
     steps:              List[Callable]  = field(default_factory=list)
     details:            pd.DataFrame    = field(default_factory=_create_details)
@@ -441,7 +441,7 @@ class Process:
     
         return None
 
-    def _index_name(self, name: str):
+    def _index_tag(self, tag: str):
         """
         Find the index of the process step with the specified name.
     
@@ -464,8 +464,8 @@ class Process:
         --------
         """
     
-        names = [step.name for step in self.steps]
-        index = names.index(name)
+        tags = [step.tag for step in self.steps]
+        index = tags.index(tag)
     
         return index
 
@@ -588,7 +588,7 @@ class Process:
     
         return None
 
-    def _remove_name(self, name: str):
+    def _remove_tag(self, tag: str):
         """
         Remove the process step with the specified name.
 
@@ -611,7 +611,7 @@ class Process:
         --------
         """
 
-        self.steps.pop(self._index_name(name))
+        self.steps.pop(self._index_tag(tag))
         self.update_details()
 
         return None
@@ -752,13 +752,13 @@ class Process:
                 for i, step in enumerate(self.steps):
                     if not (isinstance(step, ProcessStep) or isinstance(step, Process)):
                         self.steps[i] = ProcessStep(function=step,
-                                                    name=step.__name__)
+                                                    tag=step.__name__)
 
-        new_details_list = [[step.name,
+        new_details_list = [[step.tag,
                              step.function.__name__,
                              step.last_result]
                             if isinstance(step, ProcessStep)
-                            else [step.name,
+                            else [step.tag,
                                   step.__class__.__name__,
                                   step.last_result]
                              for step in self.steps]

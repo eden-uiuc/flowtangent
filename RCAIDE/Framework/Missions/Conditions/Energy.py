@@ -46,7 +46,7 @@ class EnergyStoreConditions(Conditions):
     """
 
     # Attribute         Type        Default Value
-    name:               str         = 'Energy Store'
+    tag:               str         = 'Energy Store'
 
     total_energy:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -87,7 +87,7 @@ class EnergyConverterConditions(Conditions):
     """
 
     # Attribute         Type        Default Value
-    name:               str         = 'Energy Converter'
+    tag:               str         = 'Energy Converter'
 
     efficiency:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     power:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -98,8 +98,8 @@ class EnergyConverterConditions(Conditions):
     y_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     z_axis_rotation:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    inputs:             Conditions  = field(default_factory=lambda: Conditions(name='Energy Converter Inputs'))
-    outputs:            Conditions  = field(default_factory=lambda: Conditions(name='Energy Converter Outputs'))
+    inputs:             Conditions  = field(default_factory=lambda: Conditions(tag='Energy Converter Inputs'))
+    outputs:            Conditions  = field(default_factory=lambda: Conditions(tag='Energy Converter Outputs'))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -144,7 +144,7 @@ class BatteryCellConditions(EnergyStoreConditions):
     """
 
     # Attribute                 Type        Default Value
-    name:                       str         = 'Battery Cell'
+    tag:                       str         = 'Battery Cell'
 
     cycle_in_day:               int         = 0
     resistance_growth_factor:   float       = 0.0
@@ -192,7 +192,7 @@ class BatteryPackConditions(EnergyStoreConditions):
     """
 
     # Attribute             Type                    Default Value
-    name:                   str                     = 'Battery Pack'
+    tag:                   str                     = 'Battery Pack'
 
     maximum_total_energy:   float                   = 0.0
 
@@ -232,7 +232,7 @@ class FuelConditions(EnergyStoreConditions):
     """
 
     # Attribute         Type        Default Value
-    name:               str         = 'Fuel'
+    tag:               str         = 'Fuel'
 
     mass:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -240,9 +240,9 @@ class FuelConditions(EnergyStoreConditions):
 @chex.dataclass(kw_only=True)
 class EnergyLineConditions(Conditions):
 
-    converters: Conditions = field(default_factory=lambda: Conditions(name='Energy Line Converters'))
-    propulsors: Conditions = field(default_factory=lambda: Conditions(name='Energy Line Converters'))
-    stores:     Conditions = field(default_factory=lambda: Conditions(name='Energy Line Stores'))
+    converters: Conditions = field(default_factory=lambda: Conditions(tag='Energy Line Converters'))
+    propulsors: Conditions = field(default_factory=lambda: Conditions(tag='Energy Line Converters'))
+    stores:     Conditions = field(default_factory=lambda: Conditions(tag='Energy Line Stores'))
 
 
 @chex.dataclass
@@ -280,7 +280,7 @@ class EnergyNetworkConditions(Conditions):
     """
 
     # Attribute             Type        Default Value
-    name:                   str         = 'Energy Network'
+    tag:                   str         = 'Energy Network'
 
     total_energy:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     total_efficiency:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -291,4 +291,4 @@ class EnergyNetworkConditions(Conditions):
     total_force_vector:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
     total_moment_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
-    lines:                  Conditions  = field(default_factory=lambda: Conditions(name='Energy Network Lines'))
+    lines:                  Conditions  = field(default_factory=lambda: Conditions(tag='Energy Network Lines'))

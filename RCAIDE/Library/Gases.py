@@ -30,7 +30,7 @@ class GasComposition:
 @chex.dataclass(kw_only=True)
 class Gas:
 
-    name:                   str     = 'Gas'
+    tag:                   str     = 'Gas'
 
     molecular_mass:         float   = 0.0
     molar_mass:             float   = 0.0

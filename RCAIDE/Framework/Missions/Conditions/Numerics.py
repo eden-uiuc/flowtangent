@@ -170,7 +170,7 @@ class Numerics(Conditions):
     """
 
     # Attribute                 Type            Default Value
-    name:                       str             = 'Numerics'
+    tag:                       str             = 'Numerics'
 
     number_of_control_points:   int             = 16
     control_point_spacing:      str             = 'cosine'
@@ -184,8 +184,8 @@ class Numerics(Conditions):
     step_size:                  float           = None
     converged:                  bool            = False
 
-    dimensionless:              NumericalTime   = field(default_factory=lambda: NumericalTime(name='Dimensionless Time'))
-    time:                       NumericalTime   = field(default_factory=lambda: NumericalTime(name='Time'))
+    dimensionless:              NumericalTime   = field(default_factory=lambda: NumericalTime(tag='Dimensionless Time'))
+    time:                       NumericalTime   = field(default_factory=lambda: NumericalTime(tag='Time'))
 
     def __post_init__(self):
 
@@ -229,7 +229,7 @@ class TestNumerics(unittest.TestCase):
         self.numerics = Numerics()
 
     def test_default_values(self):
-        self.assertEqual(self.numerics.name, 'Numerics')
+        self.assertEqual(self.numerics.tag, 'Numerics')
         self.assertEqual(self.numerics.number_of_control_points, 16)
         self.assertEqual(self.numerics.control_point_spacing, 'cosine')
         self.assertTrue(self.numerics.calculate_integration)
@@ -242,8 +242,8 @@ class TestNumerics(unittest.TestCase):
     def test_dimensionless_and_time_attributes(self):
         self.assertIsInstance(self.numerics.dimensionless, NumericalTime)
         self.assertIsInstance(self.numerics.time, NumericalTime)
-        self.assertEqual(self.numerics.dimensionless.name, 'Dimensionless Time')
-        self.assertEqual(self.numerics.time.name, 'Time')
+        self.assertEqual(self.numerics.dimensionless.tag, 'Dimensionless Time')
+        self.assertEqual(self.numerics.time.tag, 'Time')
 
     def test_custom_values(self):
         custom_numerics = Numerics(
@@ -257,7 +257,7 @@ class TestNumerics(unittest.TestCase):
             step_size=0.1,
             converged=True
         )
-        self.assertEqual(custom_numerics.name, 'Custom Numerics')
+        self.assertEqual(custom_numerics.tag, 'Custom Numerics')
         self.assertEqual(custom_numerics.number_of_control_points, 20)
         self.assertEqual(custom_numerics.control_point_spacing, 'linear')
         self.assertFalse(custom_numerics.calculate_integration)
