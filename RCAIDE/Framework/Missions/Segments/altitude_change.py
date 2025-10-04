@@ -15,7 +15,7 @@ from dataclasses import field, make_dataclass
 import RCAIDE.Framework as rcf
 
 from RCAIDE.Framework import ProcessStep
-from RCAIDE.Framework.Missions.Segments import ConvergedSegment
+from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differential
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differentia
 
 
 @chex.dataclass(kw_only=True)
-class ConvergedClimb(ConvergedSegment):
+class Climb(Segment):
 
     tag: str = 'Climb'
 
@@ -32,14 +32,14 @@ class ConvergedClimb(ConvergedSegment):
     altitude_end:   float = 0.0
 
     def __post_init__(self):
-        super(ConvergedClimb, self).__post_init__()
+        super(Climb, self).__post_init__()
 
         self._initialize.append(ProcessStep(tag='Altitude Differential',
                                             function=initialize_altitude_differential))
 
 
 @chex.dataclass(kw_only=True)
-class SpeedRateClimb(ConvergedClimb):
+class SpeedRateClimb(Climb):
 
     tag: str = 'Constant Speed & Rate Climb'
 
@@ -68,7 +68,7 @@ class SpeedRateClimb(ConvergedClimb):
         # If air speed and altitude are not provided, inherit from previous segment
 
         if not self.air_speed:
-            av = state.frames.inertial.velocity_vector[-1]
+            av = np.linalg.norm(state.frames.inertial.velocity_vector[-1])
         if not self.altitude_start:
             alt0 = -1.0 * state.frames.inertial.position_vector[-1, 2]
 
