@@ -127,11 +127,6 @@ class NumericalTime(Conditions):
 
 
 @chex.dataclass(kw_only=True)
-class Unknowns(Conditions):
-
-    tag: str = "Unknowns"
-
-@chex.dataclass(kw_only=True)
 class Numerics(Conditions):
 
     """
@@ -208,7 +203,6 @@ class Numerics(Conditions):
         if not self.discretization_method:
             self.discretization_method = lambda: chebyshev_matrices(n=self.number_of_control_points,
                                                                     calculate_integration=self.calculate_integration)
-                                                                    # spacing_function=self.control_point_spacing)
 
         (self.dimensionless.control_points,
          self.dimensionless.differentiate,
@@ -254,7 +248,7 @@ class TestNumerics(unittest.TestCase):
 
     def test_custom_values(self):
         custom_numerics = Numerics(
-            name='Custom Numerics',
+            tag='Custom Numerics',
             number_of_control_points=20,
             control_point_spacing='linear',
             calculate_integration=False,
