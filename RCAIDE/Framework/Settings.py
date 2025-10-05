@@ -37,4 +37,5 @@ class Settings:
     # Mission Settings
     root_finder: Callable = fsolve
 
-    analysis: AnalysisSettings =  field(default_factory=lambda: AnalysisSettings())
+    analysis: AnalysisSettings = field(default_factory=lambda: AnalysisSettings())
+

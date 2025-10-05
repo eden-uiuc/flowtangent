@@ -26,7 +26,7 @@ def fsolve_results_parser(
         state: "rcf.State",
         system: "rcf.System",
         settings: "rcf.Settings",
-) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
+) -> ("rcf.State", "rcf.System", "rcf.Settings"):
 
         unknowns:       np.ndarray      = fsolve_result[0]
         infodict:       dict            = fsolve_result[1]
@@ -43,3 +43,15 @@ def fsolve_results_parser(
             state.numerics.converged = True
         
         return state, system, settings
+
+def fsolve_update_kwargs(
+        fsolve_kwargs: dict,
+        state: "rcf.State",
+        system: "rcf.System",
+        settings: "rcf.Settings",
+):
+
+        fsolve_kwargs['x0'] = state.unknowns
+        fsolve_kwargs['args'] = (state, system, settings)
+
+        return fsolve_kwargs

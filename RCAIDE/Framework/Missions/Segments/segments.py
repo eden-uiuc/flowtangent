@@ -26,7 +26,7 @@ jax.config.update("jax_enable_x64", True)
 from jax import jit, grad
 
 import numpy as np
-from scipy.optimize import minimize, NonlinearConstraint
+from scipy.optimize import minimize, NonlinearConstraint, fsolve
 
 # RCAIDE imports
 
@@ -36,7 +36,7 @@ from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Conditions   import Conditions
 from RCAIDE.Framework.Missions.Initialize   import *
 from RCAIDE.Framework.Missions.Update       import *
-from RCAIDE.Framework.Missions.Converge     import fsolve_results_parser
+from RCAIDE.Framework.Missions.Converge     import fsolve_results_parser, fsolve_update_kwargs
 from RCAIDE.Framework.Missions              import flight_dynamics_residuals
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -49,6 +49,10 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
+    conditions: Callable = lambda: skip(warning=f"No segment dynamics set. Skipping...")
+    controls:   Callable = lambda: skip(warning=f"No segment controls set. Skipping...")
+    residuals:  Callable = lambda: skip(warning=f"No segment residuals set. Skipping...")
+
     def __post_init__(self):
 
         default_steps = [
@@ -58,7 +62,10 @@ class InitializeSegment(Process):
             ("Mass",                 initialize_mass),
             ("Energy",               initialize_energy),
             ("Inertial Position",    initialize_inertial_position),
-            ("Planetary Position",   initialize_planetary_position)
+            ("Planetary Position",   initialize_planetary_position),
+            ("Conditions",           self.dynamics),
+            ("Controls",             self.controls),
+            ("Residuals",            self.residuals),
         ]
 
         for name, function in default_steps:
@@ -68,7 +75,16 @@ class InitializeSegment(Process):
 @chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
-    tag: str = "Segment Analysis"
+    tag: str = "Segment Analysis Specification"
+
+    gravity:                Callable = lambda: skip(warning=f"No gravity analysis set. Skipping...")
+    energy:                 Callable = lambda: skip(warning=f"No energy analysis set. Skipping...")
+    mass:                   Callable = lambda: skip(warning=f"No mass analysis set. Skipping...")
+    aerodynamics:           Callable = lambda: skip(warning=f"No aerodynamics analysis set. Skipping...")
+    stability:              Callable = lambda: skip(warning=f"No stability analysis set. Skipping...")
+    planetary_position:     Callable = lambda: skip(warning=f"No planetary position analysis set. Skipping...")
+
+    calculate_residuals:    Callable = flight_dynamics_residuals
 
     def __post_init__(self):
 
@@ -77,20 +93,93 @@ class AnalyzeSegment(Process):
             ("Acceleration",         update_acceleration),
             ("Angular Acceleration", update_angular_acceleration),
             ("Altitude",             update_altitude),
-            ("Gravity",              lambda: skip(warning=f"No gravity analysis set. Skipping...")),
+            ("Gravity",              self.gravity),
             ("Freestream",           update_freestream),
             ("Orientations",         update_orientations),
-            ("Energy",               lambda: skip(warning=f"No energy analysis set. Skipping...")),
-            ("Aerodynamics",         lambda: skip(warning=f"No aerodynamics analysis set. Skipping...")),
-            ("Stability",            lambda: skip(warning=f"No stability analysis set. Skipping...")),
-            ("Mass",                 lambda: skip(warning=f"No mass analysis set. Skipping...")),
+            ("Energy",               self.gravity),
+            ("Aerodynamics",         self.aerodynamics),
+            ("Stability",            self.stability),
+            ("Mass",                 self.mass),
             ("Forces",               update_forces),
             ("Moments",              update_moments),
-            ("Planetary Position",   lambda: skip(warning=f"No planetary position analysis set. Skipping..."))
+            ("Planetary Position",   self.planetary_position),
+            ("Calculate Residuals",  self.calculate_residuals)
         ]
 
         for name, function in default_steps:
             self.append(ProcessStep(tag=name, function=function))
+
+
+@chex.dataclass(kw_only=True)
+class IterateSegment(Process):
+
+    tag:            str     = 'Segment Convergence'
+
+    analyze:        Process = None
+
+    # Root-finder arguments and parser
+    root_finder:            Callable    = fsolve
+    root_finder_args:       Tuple       = None
+    root_finder_kwargs:     dict        = None
+
+    update_args:            Callable    = None
+    update_kwargs:          Callable    = fsolve_update_kwargs
+    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = fsolve_results_parser
+
+    def __call__(self):
+
+        self.state.unknowns = unknowns
+        self.state.unpack_unknowns()
+
+        self.analyze.state.initials = self.state
+        self.analyze.system         = self.system
+        self.analyze.settings       = self.settings
+
+        self.state, self.system, self.settings = self.analyze()
+
+        self.state.pack_residuals()
+
+        if self.update_args:
+            self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
+        if self.update_kwargs:
+            self.root_finder_kwargs = self.update_kwargs()
+
+        results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
+
+        self.state, self.system, self.settings = self.results_parser(results, state, system, settings)
+
+        return self.state, self.system, self.settings
+
+
+@chex.dataclass(kw_only=True)
+class FinalizeSegment(Process):
+
+    tag: str = 'Segment Finalization'
+
+    @staticmethod
+    def _reset_controls_and_residuals(
+            state: "rcf.State",
+            system: "rcf.System",
+            settings: "rcf.Settings",
+    ):
+        controls = state.controls
+
+        for name, control_var in vars(controls).items():
+            if hasattr(control_var, 'active') and control_var.active:
+                control_var.active = False
+
+        residuals = state.controls.residuals
+
+        for name, residual_var in vars(residuals).items():
+            if hasattr(residual_var, 'active') and residual_var.active:
+                residual_var.active = False
+
+        return state, system, settings
+
+    def __post_init__(self):
+        self.steps.append(ProcessStep(tag='Finalize Controls and Residuals',
+                                      function=self._reset_controls_and_residuals))
+
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -101,130 +190,32 @@ class AnalyzeSegment(Process):
 @chex.dataclass(kw_only=True)
 class Segment(Process):
 
-    tag: str = "Segment Convergence"
+    tag: str = "Segment"
 
-    # Functions for calculating residuals and solving root-finding problem
-    calculate_residuals:    Callable = None
-
-    # Root-finder arguments and parser
-    root_finder_args:       List = field(default_factory=list)
-    root_finder_kwargs:     dict = None
-    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = None
+    initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
+    analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
+    iterate:                IterateSegment     = field(default_factory=IterateSegment)
+    finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
 
     # Global dynamics variables
     sideslip_angle:         float = 0.0
     temperature_deviation:  float = 0.0
 
     def __post_init__(self):
-        if self.calculate_residuals is None:
-            self.calculate_residuals = flight_dynamics_residuals
 
-        if self.results_parser is None:
-            self.results_parser = fsolve_results_parser
+        self.initialize.tag = f'Initialize {self.tag}'
+        self.iterate.tag    = f'Iterate {self.tag}'
+        self.analyze.tag    = f'Analyze {self.tag}'
+        self.finalize.tag   = f'Finalize {self.tag}'
+
+        self.converge.analyze = self.analyze
 
         self.steps = [
-            InitializeSegment(tag=f'Initialize {self.tag}'),
-            AnalyzeSegment(tag=f'Analyze {self.tag}'),
+            self.initialize,
+            self.iterate,
+            self.analyze,
+            self.finalize,
         ]
-
-        self._initialize = self.steps[0]
-        self._analyze = self.steps[1]
-
-    def unpack_unknowns(self):
-        """
-        Finds the active control variables and assigns the unknowns to their locations in state.
-        """
-
-        state       = self.state
-        unknowns    = state.unknowns.pack_array()
-        controls    = state.controls
-        n_points    = state.numerics.number_of_control_points
-
-        control_idx = 0
-
-        for name, control_var in vars(controls).items():
-            if hasattr(control_var, 'active') and control_var.active:
-                values = unknowns[control_idx : control_idx + n_points]     # Extract control values from unknowns
-                values = np.reshape(values, (-1, 1))               # Reshape to column vector
-                destination = reduce(getattr, control_var.path, state)      # Find destination within state
-                destination[control_var.path_indices] = values.flatten()    # Assign to destination in state
-                control_idx += n_points
-
-        return
-
-    def _get_residuals(
-            self,
-            unknowns,
-            state: "rcf.State",
-            system: "rcf.System",
-            settings: "rcf.Settings",
-    ):
-        """
-        Calculates and packs residuals into the state residuals conditions
-        """
-
-        state, system, settings = self.calculate_residuals(
-            unknowns,
-            state,
-            system,
-            settings,
-        )
-
-        n_points = state.numerics.number_of_control_points
-        dynamics = state.controls.dynamics
-
-        residual_array = np.empty((n_points, 1))
-
-        for name, residual in vars(dynamics).items():
-            if hasattr(residual, 'active') and residual.active:
-                residual_array = np.hstack((residual_array, residual.value))
-
-        state.residuals = residual_array
-
-        return residual_array
-
-    # Special override of process call to handle root finding, still follows process type flow
-    def __call__(self) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
-
-        self.update_details()
-
-        self._initialize.state = self.state
-        self._initialize.system = self.system
-        self._initialize.settings = self.settings
-
-        state, system, settings = self._initialize()
-
-        # Converge root of residuals
-
-        root_finder = settings.root_finder
-
-        if self.root_finder_kwargs is None:
-            # Assume fsolve is the default root finder and that the calculate_residuals function is provided
-            self.root_finder_kwargs = {
-                'func': self._get_residuals,
-                'x0': state.unknowns.pack_array(),
-                'args': (state, system, settings),
-                'xtol': state.numerics.solution_tolerance,
-                'maxfev': state.numerics.max_evaluations,
-                'epsfcn': state.numerics.step_size,
-                'full_output': True
-            }
-
-        results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
-
-        state, system, settings = self.results_parser(results, state, system, settings)
-
-        self._analyze.state = state
-        self._analyze.system = system
-        self._analyze.settings = settings
-
-        state, system, settings = self._analyze()
-
-        self.state = state
-        self.system = system
-        self.settings = settings
-
-        return
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -236,8 +227,8 @@ class Segment(Process):
 class OptimalSegment(Process):
 
     tag:                   str     = 'Optimize Segment'
-    optimization_method:    str     = 'SLSQP'
-    display_optimization:   bool    = False
+    optimization_method:    str    = 'SLSQP'
+    display_optimization:   bool   = False
 
     initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
     analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)

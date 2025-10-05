@@ -93,7 +93,7 @@ class ControlVariable(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Control Variable'
+    tag:            str         = 'Control Variable'
     path:           tuple[str]  = None
     path_indices:   tuple       = None
     active:         bool        = False
@@ -167,7 +167,7 @@ class ControlsConditions(Conditions):
     ----------
     name : str
         The name of the control conditions, default is 'Controls'.
-    dynamics : DynamicsResiduals
+    residuals : DynamicsResiduals
         Object representing the dynamic variables of the simulation.
 
     body_angle : ControlVariable
@@ -203,27 +203,27 @@ class ControlsConditions(Conditions):
         Control variable for aileron surfaces.
     """
 
-    tag:           str                         = 'Controls'
+    tag:           str                  = 'Controls'
 
-    dynamics:       DynamicsResiduals           = field(default_factory=lambda: DynamicsResiduals())
+    residuals:      DynamicsResiduals   = field(default_factory=lambda: DynamicsResiduals())
 
-    bank_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Bank Angle'))
-    body_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Body Angle'))
-    wind_angle:     ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Wind Angle'))
+    bank_angle:     ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Bank Angle'))
+    body_angle:     ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Body Angle'))
+    wind_angle:     ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Wind Angle'))
 
-    elapsed_time:   ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Elapsed Time'))
-    velocity:       ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Velocity'))
-    acceleration:   ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Velocity'))
-    altitude:       ControlVariable             = field(default_factory=lambda: ControlVariable(tag='Altitude'))
+    elapsed_time:   ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Elapsed Time'))
+    velocity:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Velocity'))
+    acceleration:   ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Velocity'))
+    altitude:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Altitude'))
 
-    thrust:         PropulsionControlVariable   = field(default_factory=lambda: PropulsionControlVariable(tag='Thrust'))
-    throttle:       PropulsionControlVariable   = field(default_factory=lambda: PropulsionControlVariable(tag='Throttle'))
+    throttle:       ControlVariable     = field(default_factory=lambda: PropulsionControlVariable(tag='Throttle'))
+    thrust:         ControlVariable     = field(default_factory=lambda: PropulsionControlVariable(tag='Thrust'))
 
-    elevator:       SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(tag='Elevator Controls'))
-    rudder:         SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(tag='Rudder Controls'))
-    flaps:          SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(tag='Flap Controls'))
-    slats:          SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(tag='Slat Controls'))
-    ailerons:       SurfaceControlVariable      = field(default_factory=lambda: SurfaceControlVariable(tag='Aileron Controls'))
+    elevator:       ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Elevator Controls'))
+    rudder:         ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Rudder Controls'))
+    flaps:          ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Flap Controls'))
+    slats:          ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Slat Controls'))
+    ailerons:       ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Aileron Controls'))
 
     def __post_init__(self):
 
@@ -296,7 +296,7 @@ class TestControlsConditions(unittest.TestCase):
     def test_default_values(self):
         cc = ControlsConditions()
         self.assertEqual(cc.tag, 'Controls')
-        self.assertIsInstance(cc.dynamics, DynamicsResiduals)
+        self.assertIsInstance(cc.residuals, DynamicsResiduals)
         self.assertIsInstance(cc.body_angle, ControlVariable)
         self.assertIsInstance(cc.thrust, PropulsionControlVariable)
         self.assertIsInstance(cc.elevator, SurfaceControlVariable)

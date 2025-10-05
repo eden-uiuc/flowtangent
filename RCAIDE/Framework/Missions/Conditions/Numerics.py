@@ -127,6 +127,11 @@ class NumericalTime(Conditions):
 
 
 @chex.dataclass(kw_only=True)
+class Unknowns(Conditions):
+
+    tag: str = "Unknowns"
+
+@chex.dataclass(kw_only=True)
 class Numerics(Conditions):
 
     """

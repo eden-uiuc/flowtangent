@@ -24,7 +24,7 @@ import RCAIDE.Framework as rcf
 def get_active_residuals(
     state: "rcf.State"
 ):
-    dyn = state.controls.dynamics
+    dyn = state.controls.residuals
 
     possible_residuals = [v for v in vars(dyn).values() if isinstance(v, rcf.Missions.Residual)]
     active_residuals = [res for res in possible_residuals if res.active]
@@ -33,15 +33,13 @@ def get_active_residuals(
 
 
 def flight_dynamics_residuals(
-    unknowns,
     state: "rcf.State",
+    system: "rcf.System",
     settings: "rcf.Settings",
-    system: "rcf.System"
 ):
     """
     Calculates the residuals from the flight dynamics equations.
     """
-    state.unknowns.unpack_array(unknowns)
 
     active_residuals = get_active_residuals(state)
     force_residuals = [res for res in active_residuals if res.type == 'force']

@@ -77,8 +77,8 @@ class CSACruise(Cruise):
         state.controls.throttle.active = True
         state.controls.body_angle = True
 
-        state.controls.dynamics.force_x.active = True
-        state.controls.dynamics.force_z.active = True
+        state.controls.residuals.force_x.active = True
+        state.controls.residuals.force_z.active = True
 
         return state, system, settings
 
