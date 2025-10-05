@@ -172,7 +172,7 @@ class Component:
                          ):
 
         if isinstance(subcomponent, Component):
-            super(Component, self).__setattr__(self, subcomponent.get_field_name(), subcomponent)
+            super(Component,self).__setattr__(subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:
             raise TypeError(f"Attempted to add a subcomponent to {self.tag} "
@@ -201,7 +201,9 @@ def _component_getitem(self, item):
 def _component_setattr(self, key, value):
         if not hasattr(self, key) and self._attributes_frozen:
             allowable = [f for f in self.__dataclass_fields__.keys() if f[0] is not "_"]
-            raise AttributeError(f"Cannot add new attribute {key!r}. Allowable attributes:\n\t{'\n\t'.join(allowable)}")
+            raise AttributeError(f"Cannot add new attribute {key!r} to {self.tag}. "
+                                 f"Allowable attributes:\n\t{'\n\t'.join(allowable)}."
+                                 f"\nIf adding a subcomponent, use the 'add_subcomponent' method.")
         super(Component, self).__setattr__(key, value)
 
 Component.__getitem__ = _component_getitem

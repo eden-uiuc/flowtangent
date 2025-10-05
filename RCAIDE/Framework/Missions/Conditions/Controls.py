@@ -216,14 +216,14 @@ class ControlsConditions(Conditions):
     acceleration:   ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Velocity'))
     altitude:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Altitude'))
 
-    throttle:       ControlVariable     = field(default_factory=lambda: PropulsionControlVariable(tag='Throttle'))
-    thrust:         ControlVariable     = field(default_factory=lambda: PropulsionControlVariable(tag='Thrust'))
+    throttle:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Throttle'))
+    thrust:         ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Thrust'))
 
-    elevator:       ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Elevator Controls'))
-    rudder:         ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Rudder Controls'))
-    flaps:          ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Flap Controls'))
-    slats:          ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Slat Controls'))
-    ailerons:       ControlVariable     = field(default_factory=lambda: SurfaceControlVariable(tag='Aileron Controls'))
+    elevator:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Elevator Controls'))
+    rudder:         ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Rudder Controls'))
+    flaps:          ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Flap Controls'))
+    slats:          ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Slat Controls'))
+    ailerons:       ControlVariable     = field(default_factory=lambda: ControlVariable(tag='Aileron Controls'))
 
     def __post_init__(self):
 

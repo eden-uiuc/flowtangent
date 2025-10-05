@@ -135,7 +135,10 @@ class IterateSegment(Process):
     update_kwargs:          Callable    = fsolve_update_kwargs
     results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = fsolve_results_parser
 
-    def __call__(self):
+    def _get_fsolve_residuals(self, unknowns):
+        """
+        Wraps the analysis step to calculate residuals for fsolve.
+        """
 
         self.state.unknowns = unknowns
         self.state.unpack_unknowns()
@@ -152,6 +155,23 @@ class IterateSegment(Process):
             self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
         if self.update_kwargs:
             self.root_finder_kwargs = self.update_kwargs()
+
+        return self.state.residuals
+
+    def __post_init__(self):
+        if self.root_finder is fsolve and self.root_finder_kwargs is None:
+
+            self.root_finder_kwargs = {
+                'func': self._get_fsolve_residuals,
+                'x0': state.unknowns.pack_array(),
+                'args': (self.state, self.system, self.settings),
+                'xtol': state.numerics.solution_tolerance,
+                'maxfev': state.numerics.max_evaluations,
+                'epsfcn': state.numerics.step_size,
+                'full_output': True
+            }
+
+    def __call__(self):
 
         results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
 
@@ -186,8 +206,10 @@ class FinalizeSegment(Process):
         return state, system, settings
 
     def __post_init__(self):
-        self.steps.append(ProcessStep(tag='Reset Controls and Residuals',
-                                      function=self._reset_controls_and_residuals))
+        self.steps.append(
+            ProcessStep(tag='Reset Controls and Residuals',
+                        function=self._reset_controls_and_residuals)
+        )
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -218,12 +240,12 @@ class Segment(Process):
         self.initialize.active_controls     = self.active_controls
         self.initialize.active_residuals    = self.active_residuals
 
-        self.analyze.tag        = f'Analyze {self.tag}'
+        self.analyze.tag                    = f'Analyze {self.tag}'
 
-        self.iterate.tag        = f'Iterate {self.tag}'
-        self.interate.analyze   = self.analyze
+        self.iterate.tag                    = f'Iterate {self.tag}'
+        self.interate.analyze               = self.analyze
 
-        self.finalize.tag       = f'Finalize {self.tag}'
+        self.finalize.tag                   = f'Finalize {self.tag}'
 
         self.steps = [
             self.initialize,
@@ -317,7 +339,8 @@ class OptimalSegment(Process):
 def energy_use(
         state: "rcf.State",
         system: "rcf.System",
-        settings: "rcf.Settings"):
+        settings: "rcf.Settings"
+):
 
     energy_start    = state.energy.total_energy[0]
     energy_end      = state.energy.total_energy[-1]
@@ -358,9 +381,3 @@ class EnergyOptimalAltitudeChange(OptimalSegment):
         self.bounds = [(-np.pi/4, np.pi/4), (0., 1.)]
         self.constraints = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
                             NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
-
-
-if __name__ == '__main__':
-    seg = Segment()
-    print(seg.details)
-    print('Done')
