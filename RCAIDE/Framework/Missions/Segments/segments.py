@@ -49,9 +49,14 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    conditions: Callable = lambda: skip(warning=f"No segment dynamics set. Skipping...")
-    controls:   Callable = lambda: skip(warning=f"No segment controls set. Skipping...")
-    residuals:  Callable = lambda: skip(warning=f"No segment residuals set. Skipping...")
+    active_controls:   Tuple[str] = field(default_factory=list)
+    active_residuals:  Tuple[str] = field(default_factory=list)
+
+    def _activate_control(self, control_name: str) -> None:
+        self.state.controls[control_name].active = True
+
+    def _activate_residual(self, residual_name: str) -> None:
+        self.state.controls.residuals[residual_name].active = True
 
     def __post_init__(self):
 
@@ -63,13 +68,17 @@ class InitializeSegment(Process):
             ("Energy",               initialize_energy),
             ("Inertial Position",    initialize_inertial_position),
             ("Planetary Position",   initialize_planetary_position),
-            ("Conditions",           self.dynamics),
-            ("Controls",             self.controls),
-            ("Residuals",            self.residuals),
         ]
 
         for name, function in default_steps:
             self.append(ProcessStep(tag=name, function=function))
+
+    def __call__(self):
+        super(InitializeSegment, self).__call__()
+        for ctrl_name in self.active_controls:
+            self._activate_control(ctrl_name)
+        for res_name in self.active_residuals:
+            self._activate_residual(res_name)
 
 
 @chex.dataclass(kw_only=True)
@@ -177,9 +186,8 @@ class FinalizeSegment(Process):
         return state, system, settings
 
     def __post_init__(self):
-        self.steps.append(ProcessStep(tag='Finalize Controls and Residuals',
+        self.steps.append(ProcessStep(tag='Reset Controls and Residuals',
                                       function=self._reset_controls_and_residuals))
-
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -192,10 +200,13 @@ class Segment(Process):
 
     tag: str = "Segment"
 
-    initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
-    analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
-    iterate:                IterateSegment     = field(default_factory=IterateSegment)
-    finalize:               FinalizeSegment     = field(default_factory=FinalizeSegment)
+    active_controls:    Tuple[str]   = None
+    active_residuals:   Tuple[str]   = None
+
+    initialize:         InitializeSegment   = field(default_factory=InitializeSegment)
+    iterate:            IterateSegment      = field(default_factory=IterateSegment)
+    analyze:            AnalyzeSegment      = field(default_factory=AnalyzeSegment)
+    finalize:           FinalizeSegment     = field(default_factory=FinalizeSegment)
 
     # Global dynamics variables
     sideslip_angle:         float = 0.0
@@ -203,17 +214,20 @@ class Segment(Process):
 
     def __post_init__(self):
 
-        self.initialize.tag = f'Initialize {self.tag}'
-        self.iterate.tag    = f'Iterate {self.tag}'
-        self.analyze.tag    = f'Analyze {self.tag}'
-        self.finalize.tag   = f'Finalize {self.tag}'
+        self.initialize.tag                 = f'Initialize {self.tag}'
+        self.initialize.active_controls     = self.active_controls
+        self.initialize.active_residuals    = self.active_residuals
 
-        self.converge.analyze = self.analyze
+        self.analyze.tag        = f'Analyze {self.tag}'
+
+        self.iterate.tag        = f'Iterate {self.tag}'
+        self.interate.analyze   = self.analyze
+
+        self.finalize.tag       = f'Finalize {self.tag}'
 
         self.steps = [
             self.initialize,
             self.iterate,
-            self.analyze,
             self.finalize,
         ]
 

@@ -34,8 +34,10 @@ class AltitudeChange(Segment):
     def __post_init__(self):
         super(AltitudeChange, self).__post_init__()
 
-        self._initialize.append(ProcessStep(tag='Altitude Differential',
-                                            function=initialize_altitude_differential))
+        self.initialize.append(
+            ProcessStep(tag='Altitude Differential',
+                        function=initialize_altitude_differential)
+        )
 
 
 @chex.dataclass(kw_only=True)
@@ -47,7 +49,10 @@ class CSRAltitudeChange(AltitudeChange):
     air_speed:      float = None
     true_course:    float = 0.0
 
-    def initialize_dynamics_and_controls(
+    active_controls = ("body_angle", "throttle")
+    active_residuals = ("force_x", "force_z")
+
+    def initialize_conditions(
             self,
             state: "rcf.State",
             system: "rcf.System",
@@ -86,18 +91,12 @@ class CSRAltitudeChange(AltitudeChange):
         state.frames.inertial.position_vector[:, 2] = -alt[:, 0]
         state.freestream.altitude[:, 0] = alt[:, 0]
 
-        # Set active controls and dynamics
-        state.controls.throttle.active = True
-        state.controls.body_angle = True
-
-        state.controls.residuals.force_x.active = True
-        state.controls.residuals.force_z.active = True
-
         return state, system, settings
-
 
 
     def __post_init__(self):
         super(CSRAltitudeChange, self).__post_init__()
-        self._initialize.append(ProcessStep(tag='Dynamics and Controls',
-                                            function=self.initialize_dynamics_and_controls))
+        self.initialize.append(
+            ProcessStep(tag='Conditions',
+                        function=self.initialize_conditions)
+        )
