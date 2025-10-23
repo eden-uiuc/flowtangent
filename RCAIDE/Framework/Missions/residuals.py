@@ -26,7 +26,7 @@ def get_active_residuals(
 ):
     dyn = state.controls.residuals
 
-    possible_residuals = [v for v in vars(dyn).values() if isinstance(v, rcf.Missions.Residual)]
+    possible_residuals = [v for v in vars(dyn).values() if isinstance(v, rcf.Missions.DynamicResidual)]
     active_residuals = [res for res in possible_residuals if res.active]
 
     return active_residuals

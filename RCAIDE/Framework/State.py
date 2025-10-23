@@ -14,10 +14,11 @@ from typing import Self
 # package imports
 import numpy as np
 
+import RCAIDE.Library.Components
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import (
     Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
-    AerodynamicsConditions, ControlsConditions)
+    AerodynamicsConditions, ControlsConditions, DynamicsConditions)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  State
@@ -37,13 +38,38 @@ class State(Conditions):
 
     mass:               MassConditions              = field(default_factory=MassConditions)
     energy:             EnergyNetworkConditions     = field(default_factory=EnergyNetworkConditions)
-
     aerodynamics:       AerodynamicsConditions      = field(default_factory=AerodynamicsConditions)
+
     controls:           ControlsConditions          = field(default_factory=ControlsConditions)
+    dynamics:           DynamicsConditions          = field(default_factory=DynamicsConditions)
 
     unknowns:           np.ndarray                  = field(default_factory=lambda: np.zeros((1, 1)))
     residuals:          np.ndarray                  = field(default_factory=lambda: np.zeros((1, 1)))
-    objective:          np.ndarray                  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    def check_controls(self, verbose=True) -> bool:
+        """
+        Checks that the number of active controls is equal to the number of active dynamics residuals.
+        """
+
+        valid_controls = (self.controls.count_active_controls() == self.dynamics.count_active_residuals())
+
+        if verbose:
+            if valid_controls:
+                print("Number of active controls matches number of active dynamics residuals.")
+            else:
+                print("Number of active controls does not match number of active dynamics residuals.")
+
+            print(f"\nCurrent active controls:")
+            for control in self.controls.get_active_controls():
+                print(f"- {control.tag}")
+
+            print(f"\nCurrent active dynamics residuals:")
+            for residual in self.dynamics.get_active_residuals():
+                print(f"- {residual.tag}")
+
+        return valid_controls
+
+
 
     def unpack_unknowns(self):
         """
@@ -71,12 +97,41 @@ class State(Conditions):
         n_points = self.numerics.number_of_control_points
         residual_array = np.empty((n_points, 1))
 
-        for name, residual in vars(self.controls.residuals).items():
+        for name, residual in vars(self.dynamics).items():
             if hasattr(residual, 'active') and residual.active:
                 residual_array = np.hstack((residual_array, residual.value))
 
         self.residuals = residual_array
 
+        return
+
+    def build_controls_from_system(self, system: "System" | "Component", verbose=True) -> None:
+        if verbose:
+            print(f"Building controls from {system.tag}...")
+        for component in system.subcomponents:
+            self.build_controls_from_system(component)
+
+            if system.is_control_component:
+                if isinstance(component, RCAIDE.Library.Components.Wing):
+                    self.controls.add_control_variable(
+                        RCAIDE.Framework.Missions.SurfaceControlVariable(
+                            tag=component.tag + "_deflection",
+                            surfaces=[system],
+                        )
+                    )
+
+                else:
+                    self.controls.add_control_variable(
+                        RCAIDE.Framework.Missions.ControlVariable(
+                            tag=component.tag
+                        )
+                    )
+                if verbose:
+                    print(f"\tAdded controls.{system.get_field_name()} as a control variable.")
+        if verbose:
+            print(f"Completed building controls from {system.tag}.\n"
+                  f"Controls may be activated for mission segments by setting "
+                  f"segment.active_controls = ('control_variable', ...)")
         return
 
 

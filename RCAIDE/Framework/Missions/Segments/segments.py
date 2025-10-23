@@ -33,11 +33,11 @@ from scipy.optimize import minimize, NonlinearConstraint, fsolve
 import RCAIDE.Framework as rcf
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import skip
-from RCAIDE.Framework.Missions.Conditions   import Conditions
-from RCAIDE.Framework.Missions.Initialize   import *
-from RCAIDE.Framework.Missions.Update       import *
-from RCAIDE.Framework.Missions.Converge     import fsolve_results_parser, fsolve_update_kwargs
-from RCAIDE.Framework.Missions              import flight_dynamics_residuals
+from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.Framework.Missions.Initialize import *
+from RCAIDE.Framework.Missions.Update     import *
+from RCAIDE.Framework.Missions.Converge   import fsolve_results_parser, fsolve_update_kwargs
+from RCAIDE.Framework.Missions            import flight_dynamics_residuals
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
@@ -79,6 +79,12 @@ class InitializeSegment(Process):
             self._activate_control(ctrl_name)
         for res_name in self.active_residuals:
             self._activate_residual(res_name)
+
+        assert self.state.check_controls(verbose=False), (
+            f"During initialization of {self.tag} the number of active controls"
+            "did not match the number of active residuals.\n"
+            "Please run State.check_controls(verbose=True) to see details"
+        )
 
 
 @chex.dataclass(kw_only=True)

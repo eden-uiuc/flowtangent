@@ -114,7 +114,7 @@ class Component:
 
     # ------------------------------------------------IDENTIFIERS-------------------------------------------------------
 
-    tag:                   str                   = 'Component'
+    tag:                    str                   = 'Component'
     segments:               List[ComponentType]   = field(default_factory=list)
     subcomponents:          List[ComponentType]   = field(default_factory=list)
     origin:                 np.ndarray            = field(default_factory=lambda: np.zeros(3))
@@ -132,6 +132,10 @@ class Component:
     mass_properties:        MassProperties        = field(default_factory=MassProperties)
     material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
 
+    # -----------------------------------------------CONTROLS-----------------------------------------------------------
+    is_control_component:   bool                    = False
+
+    # -----------------------------------------------INTERNAL USE-------------------------------------------------------
     _attributes_frozen: bool = False
 
     def __post_init__(self):
@@ -176,7 +180,7 @@ class Component:
             self.subcomponents.append(subcomponent)
         else:
             raise TypeError(f"Attempted to add a subcomponent to {self.tag} "
-                            f"which was not a Component datastructure.")
+                            f"which was not a Component data structure.")
 
         if sum_mass:
             self.sum_mass()
