@@ -8,7 +8,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Common
-from . import Modulators
-
-from . import Turbofan
+from .moment import func_propulsor_moment, propulsor_moment

@@ -23,13 +23,15 @@ from RCAIDE.Library.Methods.Energy.Converters import fM, Rayleigh
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def func_combustor_performance(T_t_in,
-                               P_t_in,
-                               T_t_out,
-                               Cp,
-                               PR,
-                               n_b,
-                               h_t_f):
+def func_combustor_performance(
+        T_t_in,
+        P_t_in,
+        T_t_out,
+        Cp,
+        PR,
+        n_b,
+        h_t_f
+):
 
     P_t_out = P_t_in * PR                                   # Output stagnation pressure
 
