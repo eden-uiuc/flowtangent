@@ -138,7 +138,7 @@ def func_segmented_main_wing(wingspan: float,
 
     drt = drr * dtr  # Root Thicknesses
     dts = (drt - drc * dtc) / (dsp - dsr)  # Thickness slopes
-    def span_integral(x: A=drt, B=dts, C=dsr) -> np.ndarray:
+    def span_integral(x, A=drt, B=dts, C=dsr) -> np.ndarray:
         """ Integrate the wing bending moment over a section
 
             Assumptions:

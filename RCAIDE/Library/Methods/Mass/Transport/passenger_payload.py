@@ -18,8 +18,7 @@ import RCAIDE.Framework as rcf
 
 def func_passenger_payload(n_passengers,
                            m_passenger=195. * Units.lbm,
-                           m_baggage=30. * Units.lbm,
-                           *args, **kwargs):
+                           m_baggage=30. * Units.lbm):
     """
     Calculate the total mass of passengers and their baggage.
 

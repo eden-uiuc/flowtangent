@@ -133,7 +133,7 @@ class Component:
     material_properties:    MaterialProperties    = field(default_factory=MaterialProperties)
 
     # -----------------------------------------------CONTROLS-----------------------------------------------------------
-    is_control_component:   bool                    = False
+    is_control_component:   bool                  = False
 
     # -----------------------------------------------INTERNAL USE-------------------------------------------------------
     _attributes_frozen: bool = False

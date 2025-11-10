@@ -60,7 +60,7 @@ class StaticCoefficients(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Static Stability Coefficients'
+    tag:            str         = 'Static Stability Coefficients'
 
     lift:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     drag:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -200,7 +200,7 @@ class CoefficientDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Coefficient Static Stability Derivatives'
+    tag:            str         = 'Coefficient Static Stability Derivatives'
 
     # Throttle Derivative
     throttle:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -262,7 +262,7 @@ class StaticDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Static Stability Coefficients Derivatives'
+    tag:            str         = 'Static Stability Coefficients Derivatives'
 
     Clift:  CoefficientDerivatives = field(default_factory=lambda:
                                            CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
@@ -323,7 +323,7 @@ class StaticStability(Conditions):
     These can be updated with actual values during stability analysis.
     """
 
-    tag:               str                 = 'Static Stability'
+    tag:                str                 = 'Static Stability'
     
     forces:             StaticForces        = field(default_factory=lambda: StaticForces())
     moments:            StaticMoments       = field(default_factory=lambda: StaticMoments())
@@ -366,7 +366,7 @@ class DynamicStability(Conditions):
     """
 
     #Attribute      Type        Default Value
-    tag:           str         = 'Dynamic Stability'
+    tag:            str         = 'Dynamic Stability'
 
     LongModes:      Conditions  = field(default_factory=lambda: Conditions(tag='Longitudinal Modes'))
     LatModes:       Conditions  = field(default_factory=lambda: Conditions(tag='Lateral Modes'))
@@ -397,7 +397,7 @@ class StabilityConditions(Conditions):
     """
 
     # Attribute     Type                Default Value
-    tag:           str                 = 'Stability'
+    tag:            str                 = 'Stability'
 
     static:         StaticStability     = field(default_factory=lambda: StaticStability())
     dynamic:        DynamicStability    = field(default_factory=lambda: DynamicStability())

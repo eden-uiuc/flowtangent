@@ -14,7 +14,6 @@ from dataclasses import field
 import numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------

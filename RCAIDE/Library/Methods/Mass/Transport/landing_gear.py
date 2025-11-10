@@ -1,5 +1,5 @@
 # RCAIDE/Library/Methods/Mass/Correlation/Transport/landing_gear.py
-# (c) Copyright 2024 Aerospace Research Community LLC#
+# (c) Copyright 2024 Aerospace Research Community LLC
 # Created:  May 2024, J. Smart
 # Modified: 
 # -------------------------------------------------------------------------------

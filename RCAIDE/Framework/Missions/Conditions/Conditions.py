@@ -9,7 +9,6 @@
 
 import chex
 from dataclasses import field
-from warnings import warn
 import unittest
 
 # package imports

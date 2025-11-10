@@ -12,7 +12,6 @@ import numpy as np
 
 # RCAIDE Imports
 
-import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf
 
 # -------------------------------------------------------------------------------

@@ -7,9 +7,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-
 # package imports
 import numpy as np
 

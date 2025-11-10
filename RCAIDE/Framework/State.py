@@ -9,7 +9,6 @@
 
 import chex
 from dataclasses import field
-from typing import Self
 
 # package imports
 import numpy as np

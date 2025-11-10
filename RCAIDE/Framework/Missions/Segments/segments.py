@@ -7,9 +7,6 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import inspect
-
-from functools import reduce
 from typing import Callable, List, Any, Tuple
 from dataclasses import field
 
@@ -33,7 +30,6 @@ from scipy.optimize import minimize, NonlinearConstraint, fsolve
 import RCAIDE.Framework as rcf
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import skip
-from RCAIDE.Framework.Missions.Conditions import Conditions
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
 from RCAIDE.Framework.Missions.Converge   import fsolve_results_parser, fsolve_update_kwargs
@@ -268,7 +264,7 @@ class Segment(Process):
 @chex.dataclass(kw_only=True)
 class OptimalSegment(Process):
 
-    tag:                   str     = 'Optimize Segment'
+    tag:                    str    = 'Optimize Segment'
     optimization_method:    str    = 'SLSQP'
     display_optimization:   bool   = False
 

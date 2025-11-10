@@ -53,7 +53,7 @@ class MassConditions(Conditions):
     """
 
     # Attribute             Type    Default Value
-    tag:                   str         = 'Mass Conditions'
+    tag:                    str         = 'Mass Conditions'
 
     total:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     rate_of_change:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))

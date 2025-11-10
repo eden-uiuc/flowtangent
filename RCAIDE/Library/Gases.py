@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import chex
-from dataclasses import field, make_dataclass
+from dataclasses import field
 
 # package imports
 import numpy as np

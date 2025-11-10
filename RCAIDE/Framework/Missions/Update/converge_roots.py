@@ -6,8 +6,6 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-# package imports
-import numpy as np
 
 # RCAIDE Imports
 import RCAIDE.Framework as rcf

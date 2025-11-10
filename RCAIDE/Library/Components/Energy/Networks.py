@@ -7,11 +7,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field, make_dataclass
-
 # package imports
-import numpy as np
+import chex
+from dataclasses import field
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf

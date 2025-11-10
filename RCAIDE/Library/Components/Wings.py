@@ -10,9 +10,8 @@
 import numpy as np
 
 import chex
-from dataclasses import field, make_dataclass
+from dataclasses import field
 
-import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 from RCAIDE.Library.Component import ComponentType
 
@@ -72,7 +71,7 @@ class WingControlSurface(rcl.Component):
 @chex.dataclass(kw_only=True)
 class Wing(rcl.Component):
 
-    tag:               str             = 'Wing'
+    tag:                str             = 'Wing'
     airfoil:            rcl.Component   = None
     control_surfaces:   rcl.Component   = field(default_factory=lambda: rcl.Component(tag='Control Surfaces'))
 

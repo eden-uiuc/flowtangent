@@ -7,7 +7,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
 import chex
 from dataclasses import field
 
@@ -21,7 +20,6 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 #  Frames
 # ----------------------------------------------------------------------------------------------------------------------
-
 
 @chex.dataclass(kw_only=True)
 class Frame(Conditions):
@@ -45,7 +43,7 @@ class Frame(Conditions):
         """
 
     # Attribute             Type            Default Value
-    tag:                   str             = 'Frame'
+    tag:                    str             = 'Frame'
 
     transform_to_inertial:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
@@ -89,7 +87,7 @@ class InertialFrame(Frame):
     """
 
     # Attribute                     Type        Default Value
-    tag:                           str         = 'Inertial Frame'
+    tag:                            str         = 'Inertial Frame'
 
     position_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
@@ -129,12 +127,10 @@ class BodyFrame(Frame):
     """
 
     # Attribute             Type        Default Value
-    tag:                   str         = 'Body Frame'
+    tag:                    str         = 'Body Frame'
 
     inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
     thrust_force_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
     moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
 
 
@@ -173,7 +169,6 @@ class WindFrame(Frame):
     transform_to_body:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
 
     velocity_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-
     force_vector:       np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
@@ -204,7 +199,7 @@ class PlanetFrame(Frame):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Planet Frame'
+    tag:            str         = 'Planet Frame'
     start_time:     float       = None
 
     latitude:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -240,7 +235,7 @@ class FrameConditions(Conditions):
     """
 
     # Attribute     Type            Default Value
-    tag:           str             = 'Dynamic Frames'
+    tag:            str             = 'Dynamic Frames'
 
     inertial:       InertialFrame   = field(default_factory=lambda: InertialFrame())
     body:           BodyFrame       = field(default_factory=lambda: BodyFrame())

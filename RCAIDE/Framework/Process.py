@@ -757,7 +757,6 @@ class Process:
 
 if __name__ == "__main__":
 
-    import numpy as np
 
     def lib_sq_func(x):
         return x**2

@@ -7,9 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
 import chex
-from dataclasses import field, make_dataclass
+from dataclasses import field
 
 # package imports
 import numpy as np
@@ -46,7 +45,7 @@ class EnergyStoreConditions(Conditions):
     """
 
     # Attribute         Type        Default Value
-    tag:               str         = 'Energy Store'
+    tag:                str         = 'Energy Store'
 
     total_energy:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -87,7 +86,7 @@ class EnergyConverterConditions(Conditions):
     """
 
     # Attribute         Type        Default Value
-    tag:               str         = 'Energy Converter'
+    tag:                str         = 'Energy Converter'
 
     efficiency:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     power:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
@@ -144,7 +143,7 @@ class BatteryCellConditions(EnergyStoreConditions):
     """
 
     # Attribute                 Type        Default Value
-    tag:                       str         = 'Battery Cell'
+    tag:                        str         = 'Battery Cell'
 
     cycle_in_day:               int         = 0
     resistance_growth_factor:   float       = 0.0
@@ -192,7 +191,7 @@ class BatteryPackConditions(EnergyStoreConditions):
     """
 
     # Attribute             Type                    Default Value
-    tag:                   str                     = 'Battery Pack'
+    tag:                    str                     = 'Battery Pack'
 
     maximum_total_energy:   float                   = 0.0
 
@@ -232,7 +231,7 @@ class FuelConditions(EnergyStoreConditions):
     """
 
     # Attribute         Type        Default Value
-    tag:               str         = 'Fuel'
+    tag:                str         = 'Fuel'
 
     mass:               np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -280,7 +279,7 @@ class EnergyNetworkConditions(Conditions):
     """
 
     # Attribute             Type        Default Value
-    tag:                   str         = 'Energy Network'
+    tag:                    str         = 'Energy Network'
 
     total_energy:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     total_efficiency:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))

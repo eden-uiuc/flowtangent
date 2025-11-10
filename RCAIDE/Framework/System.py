@@ -7,13 +7,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
-import chex
-from dataclasses import field, make_dataclass
-from typing import TypeVar
-
 # package imports
-import numpy as np
+import chex
+from dataclasses import field
+from typing import TypeVar
 
 # RCAIDE imports
 import RCAIDE.Library as rcl
@@ -50,13 +47,9 @@ class Aircraft(System):
     tag:           str = 'Aircraft'
 
     energy:         rcl.Component = field(default_factory=lambda: rcl.Components.Energy.Networks.EnergyNetwork())
-
     wings:          rcl.Component = field(default_factory=lambda: rcl.Component(tag='Wings'))
-
     fuselages:      rcl.Component = field(default_factory=lambda: rcl.Component(tag='Fuselages'))
-
     nacelles:       rcl.Component = field(default_factory=lambda: rcl.Component(tag='Nacelles'))
-
     landing_gear:   rcl.Component = field(default_factory=lambda: rcl.Component(tag='Landing Gear'))
 
     def add_subcomponent(

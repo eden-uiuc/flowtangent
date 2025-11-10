@@ -7,14 +7,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+# package imports
 import chex
 from dataclasses import field
 
-# package imports
-import numpy as np
-
 # RCAIDE imports
-import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 from RCAIDE.Library.Components.Energy.Converters import *
 
@@ -65,7 +62,7 @@ class JetInstallationGeometry:
 @chex.dataclass(kw_only=True)
 class JetEngine(Propulsor):
 
-    tag:                           str             = 'Jet'
+    tag:                            str             = 'Jet'
     plug_diameter:                  float           = 0.0
 
     reference_temperature:          float           = 288.15      # Kelvin

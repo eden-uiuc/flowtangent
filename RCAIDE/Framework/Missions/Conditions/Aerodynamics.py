@@ -42,7 +42,7 @@ class AerodynamicAngles(Conditions):
     """
 
     # Attribute         Type        Default Value
-    tag:               str         = 'Aerodynamic Angles'
+    tag:                str         = 'Aerodynamic Angles'
 
     alpha:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
     beta:               np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
@@ -69,7 +69,7 @@ class LiftCoefficients(Conditions):
     """
 
     # Attribute     Type            Default Value
-    tag:           str             = 'Lift Coefficients'
+    tag:            str             = 'Lift Coefficients'
 
     total:          np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -95,7 +95,7 @@ class InducedDrag(Conditions):
     """
 
     # Attribute         Type            Default Value
-    tag:               str             = 'Induced Drag'
+    tag:                str             = 'Induced Drag'
 
     total:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -129,7 +129,7 @@ class DragCoefficients(Conditions):
     """
 
     # Attribute         Type            Default Value
-    tag:               str             = 'Drag Coefficients'
+    tag:                str             = 'Drag Coefficients'
 
     total:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -159,7 +159,7 @@ class AerodynamicCoefficients(Conditions):
     """
 
     # Attribute         Type            Default Value
-    tag:               str             = 'Aerodynamic Coefficients'
+    tag:                str             = 'Aerodynamic Coefficients'
 
     lift:  LiftCoefficients  = field(default_factory=lambda: LiftCoefficients())
     drag:  DragCoefficients  = field(default_factory=lambda: DragCoefficients())
@@ -186,7 +186,7 @@ class AerodynamicsConditions(Conditions):
     """
 
     # Attribute     Type                    Default Value
-    tag:           str                     = 'Aerodynamics'
+    tag:            str                     = 'Aerodynamics'
 
     angles:         AerodynamicAngles       = field(default_factory=lambda: AerodynamicAngles())
 

@@ -7,9 +7,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-
 # package imports
 import numpy as np
 
@@ -72,9 +69,9 @@ def turbojet_combustor_performance(
             combustor_state = state.energy.lines[l_idx].propulsors[p_idx].combustor
 
             inputs = combustor_state.inputs
-            inputs.freestream_Cp                            = Cp
-            inputs.stagnation_temperature                   = T_t_in
-            inputs.stagnation_pressure                      = P_t_in
+            inputs.freestream_Cp                   = Cp
+            inputs.stagnation_temperature          = T_t_in
+            inputs.stagnation_pressure             = P_t_in
 
             # Set Output State
 

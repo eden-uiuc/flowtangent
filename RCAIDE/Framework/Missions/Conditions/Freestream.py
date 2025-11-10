@@ -78,7 +78,7 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    tag:                   str             = 'Freestream'
+    tag:                    str             = 'Freestream'
     atmosphere:             chex.dataclass  = None
 
     speed:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))

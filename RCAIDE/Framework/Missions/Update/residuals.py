@@ -6,14 +6,8 @@
 #  Imports
 # -------------------------------------------------------------------------------
 
-# Package Imports
-
-import inspect
-import numpy as np
-
 # RCAIDE Imports
 
-import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf
 
 
@@ -32,7 +26,7 @@ def flight_dynamics_residuals(
     """
 
     active_residuals = get_active_residuals(state)
-    force_residuals = [res for res in active_residuals if res.type == 'force']
+    force_residuals  = [res for res in active_residuals if res.type == 'force']
     moment_residuals = [res for res in active_residuals if res.type == 'moment']
 
     FT      = state.frames.inertial.total_force_vector

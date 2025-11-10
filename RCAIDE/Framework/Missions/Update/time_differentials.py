@@ -7,12 +7,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-
-# package imports
-import numpy as np
-
 # RCAIDE imports
 import RCAIDE.Framework as rcf
 
