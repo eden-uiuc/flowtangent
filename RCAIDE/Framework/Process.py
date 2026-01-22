@@ -140,7 +140,7 @@ class Process:
     count(self, step: ProcessStep):         Returns the number of occurrences of the specified process step in the process.
     extend(self, extension: Iterable):      Extends the process with the process steps from the specified iterable.
     
-    _index_name(self, tag: str):                               Returns the index of the process step with the specified name.
+    _index_tag(self, tag: str):                               Returns the index of the process step with the specified name.
     _index_function(self, function: Callable):                  Returns the index of the process step with the specified function.
     index(self, value: str | Callable | ProcessStep | Self):    Returns the index of the process step with the specified value.
     
@@ -158,7 +158,7 @@ class Process:
     """
 
     tag:                str             = "Process"
-    keep_details:       bool             = False
+    keep_details:       bool            = False
 
     steps:              List[Callable]  = field(default_factory=list)
     details:            pd.DataFrame    = None
@@ -201,13 +201,13 @@ class Process:
         --------
         """
         if isinstance(item, str):
-            return self.steps[self._index_name(item)]
+            return self.steps[self._index_tag(item)]
         else:
             return self.steps[item]
 
     def __setitem__(self, key, value):
         if isinstance(key, str):
-            self.steps[self._index_name(key)] = value
+            self.steps[self._index_tag(key)] = value
             self.update_details()
         else:
             self.steps[key] = value
@@ -278,7 +278,8 @@ class Process:
             framework_args = step()
 
             self.steps[self.initial_step + index].last_result = framework_args
-            self.details.at[self.initial_step + index, 'Last Result'] = framework_args
+            if self.keep_details:
+                self.details.at[self.initial_step + index, 'Last Result'] = framework_args
 
         return framework_args
 
@@ -493,7 +494,7 @@ class Process:
         """
     
         if isinstance(value, str):
-            return self._index_name(value)
+            return self._index_tag(value)
         elif isinstance(value, Callable):
             return self._index_function(value)
         elif isinstance(value, ProcessStep):

@@ -27,6 +27,6 @@ def update_acceleration(state: "rcf.State",
 
     a = np.dot(D, v)
 
-    state.frames.inertial.acceleration = a
+    state.frames.inertial.acceleration_vector = a
                    
     return state, system, settings

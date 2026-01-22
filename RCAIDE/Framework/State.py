@@ -9,6 +9,7 @@
 
 import chex
 from dataclasses import field
+from functools import reduce
 
 # package imports
 import numpy as np
@@ -79,13 +80,13 @@ class State(Conditions):
         control_idx = 0
 
         for name, control_var in vars(self.controls).items():
-            if hasattr(control_var, 'active') and control_var.active:
-                values = self.unknowns[control_idx : control_idx + n_points]    # Extract control values from unknowns
-                values = np.reshape(values, (-1, 1))                            # Reshape to column vector
-                destination = reduce(getattr, control_var.path, state)          # Find destination within state
-                destination[control_var.path_indices] = values.flatten()        # Assign to destination in state
-                control_idx += n_points
-
+            if hasattr(control_var, 'path'):
+                if hasattr(control_var, 'active') and control_var.active:
+                    values = self.unknowns[control_idx : control_idx + n_points]   # Extract control values from unknowns
+                    values = np.reshape(values, (-1, 1))                  # Reshape to column vector
+                    destination = reduce(getattr, control_var.path, self)          # Find destination within state
+                    destination[control_var.path_indices] = values.flatten()       # Assign to destination in state
+                    control_idx += n_points
         return
 
     def pack_residuals(self):
@@ -98,13 +99,13 @@ class State(Conditions):
 
         for name, residual in vars(self.dynamics).items():
             if hasattr(residual, 'active') and residual.active:
-                residual_array = np.hstack((residual_array, residual.value))
+                residual_array = np.hstack((residual_array, np.atleast_2d(residual.value).T))
 
         self.residuals = residual_array
 
         return
 
-    def build_controls_from_system(self, system: "System" | "Component", verbose=True) -> None:
+    def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
         if verbose:
             print(f"Building controls from {system.tag}...")
         for component in system.subcomponents:

@@ -28,6 +28,6 @@ def update_angular_acceleration(state: "rcf.State",
 
     aa = np.dot(D, w)
 
-    state.frames.inertial.angular_acceleration = aa
+    state.frames.inertial.angular_acceleration_vector = aa
                    
     return state, system, settings

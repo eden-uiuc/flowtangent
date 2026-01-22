@@ -33,7 +33,7 @@ from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
 from RCAIDE.Framework.Missions.Converge   import fsolve_results_parser, fsolve_update_kwargs
-from RCAIDE.Framework.Missions            import flight_dynamics_residuals
+from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
@@ -45,14 +45,18 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   Tuple[str] = field(default_factory=list)
-    active_residuals:  Tuple[str] = field(default_factory=list)
+    active_controls:   Tuple[str] = field(default_factory=tuple)
+    active_residuals:  Tuple[str] = field(default_factory=tuple)
 
     def _activate_control(self, control_name: str) -> None:
+        control_name = control_name.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
+        if control_name not in self.state.controls.keys():
+            self.state.controls.add_control_variable(ControlVariable(tag=control_name))
         self.state.controls[control_name].active = True
 
     def _activate_residual(self, residual_name: str) -> None:
-        self.state.controls.residuals[residual_name].active = True
+        residual_name = residual_name.replace(' ', '_').lower()  # Normalize residual name to lowercase and replace spaces with underscores
+        self.state.dynamics[residual_name].active = True
 
     def __post_init__(self):
 
@@ -70,7 +74,6 @@ class InitializeSegment(Process):
             self.append(ProcessStep(tag=name, function=function))
 
     def __call__(self):
-        super(InitializeSegment, self).__call__()
         for ctrl_name in self.active_controls:
             self._activate_control(ctrl_name)
         for res_name in self.active_residuals:
@@ -82,18 +85,20 @@ class InitializeSegment(Process):
             "Please run State.check_controls(verbose=True) to see details"
         )
 
+        return super(InitializeSegment, self).__call__()
+
 
 @chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
     tag: str = "Segment Analysis Specification"
 
-    gravity:                Callable = lambda: skip(warning=f"No gravity analysis set. Skipping...")
-    energy:                 Callable = lambda: skip(warning=f"No energy analysis set. Skipping...")
-    mass:                   Callable = lambda: skip(warning=f"No mass analysis set. Skipping...")
-    aerodynamics:           Callable = lambda: skip(warning=f"No aerodynamics analysis set. Skipping...")
-    stability:              Callable = lambda: skip(warning=f"No stability analysis set. Skipping...")
-    planetary_position:     Callable = lambda: skip(warning=f"No planetary position analysis set. Skipping...")
+    gravity:                Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No gravity analysis set. Skipping...")
+    energy:                 Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No energy analysis set. Skipping...")
+    mass:                   Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No mass analysis set. Skipping...")
+    aerodynamics:           Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No aerodynamics analysis set. Skipping...")
+    stability:              Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No stability analysis set. Skipping...")
+    planetary_position:     Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No planetary position analysis set. Skipping...")
 
     calculate_residuals:    Callable = flight_dynamics_residuals
 
@@ -145,7 +150,7 @@ class IterateSegment(Process):
         self.state.unknowns = unknowns
         self.state.unpack_unknowns()
 
-        self.analyze.state.initials = self.state
+        self.analyze.state          = self.state
         self.analyze.system         = self.system
         self.analyze.settings       = self.settings
 
@@ -156,28 +161,28 @@ class IterateSegment(Process):
         if self.update_args:
             self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
         if self.update_kwargs:
-            self.root_finder_kwargs = self.update_kwargs()
+            self.root_finder_kwargs = self.update_kwargs(self.root_finder_kwargs, self.state, self.system, self.settings)
 
         return self.state.residuals
 
-    def __post_init__(self):
+
+    def __call__(self):
+
         if self.root_finder is fsolve and self.root_finder_kwargs is None:
 
             self.root_finder_kwargs = {
                 'func': self._get_fsolve_residuals,
-                'x0': state.unknowns.pack_array(),
-                'args': (self.state, self.system, self.settings),
-                'xtol': state.numerics.solution_tolerance,
-                'maxfev': state.numerics.max_evaluations,
-                'epsfcn': state.numerics.step_size,
+                'x0': self.state.unknowns,
+                # 'args': self.state.unknowns,
+                'xtol': self.state.numerics.solution_tolerance,
+                'maxfev': self.state.numerics.max_evaluations,
+                'epsfcn': self.state.numerics.step_size,
                 'full_output': True
             }
 
-    def __call__(self):
+        results = self.root_finder(**self.root_finder_kwargs)
 
-        results = root_finder(*self.root_finder_args, **self.root_finder_kwargs)
-
-        self.state, self.system, self.settings = self.results_parser(results, state, system, settings)
+        self.state, self.system, self.settings = self.results_parser(results, self.state, self.system, self.settings)
 
         return self.state, self.system, self.settings
 
@@ -224,8 +229,8 @@ class Segment(Process):
 
     tag: str = "Segment"
 
-    active_controls:    Tuple[str]   = None
-    active_residuals:   Tuple[str]   = None
+    active_controls:    Tuple[str, ...]   = None
+    active_residuals:   Tuple[str, ...]   = None
 
     initialize:         InitializeSegment   = field(default_factory=InitializeSegment)
     iterate:            IterateSegment      = field(default_factory=IterateSegment)
@@ -245,7 +250,7 @@ class Segment(Process):
         self.analyze.tag                    = f'Analyze {self.tag}'
 
         self.iterate.tag                    = f'Iterate {self.tag}'
-        self.interate.analyze               = self.analyze
+        self.iterate.analyze                = self.analyze
 
         self.finalize.tag                   = f'Finalize {self.tag}'
 

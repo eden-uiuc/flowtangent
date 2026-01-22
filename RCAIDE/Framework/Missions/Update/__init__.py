@@ -8,3 +8,4 @@ from .freestream import update_freestream
 from .orientations import update_orientations
 from .forces import update_forces
 from .moments import update_moments
+from .residuals import flight_dynamics_residuals

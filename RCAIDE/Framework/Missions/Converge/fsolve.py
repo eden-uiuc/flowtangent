@@ -51,16 +51,6 @@ def fsolve_update_kwargs(
         settings: "rcf.Settings",
 ):
 
-        self.root_finder_kwargs = {
-                'func': self._get_residuals,
-                'x0': state.unknowns.pack_array(),
-                'args': (state, system, settings),
-                'xtol': state.numerics.solution_tolerance,
-                'maxfev': state.numerics.max_evaluations,
-                'epsfcn': state.numerics.step_size,
-                'full_output': True
-            }
-
         fsolve_kwargs['x0'] = state.unknowns
         fsolve_kwargs['args'] = (state, system, settings)
 

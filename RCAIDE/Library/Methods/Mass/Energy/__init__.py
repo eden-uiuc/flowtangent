@@ -1,1 +1,1 @@
-from . import Jets
+from .Jets import func_Jet_Mass_from_SLS

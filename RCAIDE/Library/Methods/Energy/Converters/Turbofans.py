@@ -13,7 +13,6 @@ import numpy as np
 # RCAIDE imports
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
-from RCAIDE.Framework.Core import Units as U
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -50,14 +49,14 @@ def func_thrust_and_power(
     # Fan and Core Components of Non-Dimensional Thrust
     F_fan   = f_fan  * (gamma * M0 ** 2 * (v_fan_nozzle / u0 - 1) + AR_fan_nozzle * (P_fan_nozzle / P0 - 1))
     F_core  = f_core * (gamma * M0 ** 2 * (v_core_nozzle / u0 - 1) + AR_core_nozzle * (P_core_nozzle / P0 - 1))
-    F_total = F_fan + F_core                                                # Total Non-Dimensional Thrust
+    F_total = F_fan + F_core                                                    # Total Non-Dimensional Thrust
     F_sp    = 1 / (gamma * M0) * F_total                                        # Specific Thrust
     I_sp    = F_sp * a0 * (1 + alpha) / (f * gamma)                             # Specific Impulse
-    TSFC    = f * gamma / (F_sp * a0 * (1 + alpha)) * (1 - delta_SFC) * U.hour  # Thrust-Specific Fuel Consumption (TSFC)
-    mdot_c  = mdhc * np.sqrt(T_ref / T_t_ref) * (P_t_ref / P_ref)           # Core flow rate
-    F       = F_sp * a0 * (1 + alpha) * mdot_c * throttle                   # Dimensional Thrust
-    p       = F * u0                                                        # Power
-    ff      = np.maximum(F * TSFC / G0, 0.) * 1 / U.hour                    # Fuel Flow Rate
+    TSFC    = f * gamma / (F_sp * a0 * (1 + alpha)) * (1 - delta_SFC) * 3600    # Thrust-Specific Fuel Consumption (TSFC)
+    mdot_c  = mdhc * np.sqrt(T_ref / T_t_ref) * (P_t_ref / P_ref)               # Core flow rate
+    F       = F_sp * a0 * (1 + alpha) * mdot_c * throttle                       # Dimensional Thrust
+    p       = F * u0                                                            # Power
+    ff      = np.maximum(F * TSFC / G0, 0.) * 1 / 3600                          # Fuel Flow Rate
 
     return F, F_sp, I_sp, TSFC, mdot_c, p, ff
 

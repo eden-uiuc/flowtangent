@@ -51,8 +51,8 @@ def update_freestream(state: "rcf.State",
     Re = r * v_mag / m
 
     state.freestream.gamma                  = gamma
-    state.freestream.cp                     = Cp
-    state.freestream.velocity               = v_mag
+    state.freestream.Cp                     = Cp
+    state.freestream.speed                  = v_mag
     state.freestream.mach_number            = M
     state.freestream.reynolds_number        = Re
     state.freestream.dynamic_pressure       = q

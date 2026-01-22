@@ -40,7 +40,10 @@ class CSACruise(Cruise):
     altitude: float = None
     air_speed: float = None
 
-    def initialize_dynamics_and_controls(
+    active_controls: tuple[str, ...] = ('Throttle', 'Body Angle')
+    active_residuals: tuple[str, ...] = ('Force X', 'Force Z')
+
+    def initialize_dynamics(
             self,
             state: "rcf.State",
             system: "rcf.System",
@@ -59,28 +62,23 @@ class CSACruise(Cruise):
 
         v_x = np.cos(beta) * av
         v_y = np.sin(beta) * av
-        t_0 = state.frames.inertia.time[0, 0]
+        t_0 = state.frames.inertial.time[0, 0]
         t_f = t_0 + xf / av
 
         t_nondim = state.numerics.dimensionless.control_points
         time = t_nondim * (t_f - t_0) + t_0
 
-        state.freesteram.altitude[:, 0] = alt
+        state.freestream.altitude[:, 0] = alt
         state.frames.inertial.position_vector[:, 2] = -alt
         state.frames.inertial.velocity_vector[:, 0] = v_x
         state.frames.inertial.velocity_vector[:, 1] = v_y
-        state.frames.inertial.time[:, 0] = time
+        state.frames.inertial.time = time
 
         # Set active controls and dynamics
-        state.controls.throttle.active = True
-        state.controls.body_angle = True
-
-        state.controls.residuals.force_x.active = True
-        state.controls.residuals.force_z.active = True
-
         return state, system, settings
 
     def __post_init__(self):
         super(CSACruise, self).__post_init__()
-        self._initialize.append(ProcessStep(tag='Dynamics and Controls',
-                                            function=self.initialize_dynamics_and_controls))
+
+        self.initialize.append(ProcessStep(tag='Dynamics and Controls',
+                                           function=self.initialize_dynamics))

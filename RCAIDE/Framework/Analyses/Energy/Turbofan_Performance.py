@@ -10,7 +10,7 @@
 import chex
 
 import RCAIDE.Framework as rcf
-
+from RCAIDE.Framework import Process, ProcessStep
 
 from RCAIDE.Library.Methods.Energy.Converters.Nozzles import *
 from RCAIDE.Library.Methods.Energy.Converters.Turbines import *
@@ -31,16 +31,18 @@ class TurbofanPerformance(rcf.Process):
     tag: str = 'Turbofan Performance'
 
     def __post_init__(self):
-
-        self.steps = [
-            inlet_nozzle_performance,
-            fan_performance,
-            compressor_performance,
-            turbojet_combustor_performance,
-            turbine_performance,
-            core_nozzle_performance,
-            fan_nozzle_performance,
-            thrust_and_power
+        default_steps = [
+            ("Inlet Nozzle", inlet_nozzle_performance),
+            ("Fan", fan_performance),
+            ("Compressor", compressor_performance),
+            ("Combustor", turbojet_combustor_performance),
+            ("Turbine", turbine_performance),
+            ("Core Nozzle", core_nozzle_performance),
+            ("Fan Nozzle", fan_nozzle_performance),
+            ("Thrust", thrust_and_power)
         ]
+
+        for name, function in default_steps:
+            self.append(ProcessStep(tag=name, function=function))
 
 

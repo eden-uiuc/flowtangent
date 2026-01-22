@@ -168,7 +168,7 @@ def _conditions_getitem(self, item):
     if isinstance(item, slice | int):
         return self._get_subconditions()[item]
     elif isinstance(item, str):
-        return self.__dict__[item]
+        return self.__dict__[item.replace(' ', '_').lower()]
     else:
         raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
 
@@ -176,11 +176,19 @@ def _conditions_getitem(self, item):
 def _conditions_setattr(self, key, value):
         if not hasattr(self, key) and self._attributes_frozen:
             allowable = [f for f in self.__dataclass_fields__.keys() if f[0] is not "_"]
-            raise AttributeError(f"Cannot add new attribute {key!r} to {self.tag}. Allowable attributes:\n\t{'\n\t'.join(allowable)}")
+            raise AttributeError(f"Cannot add new attribute {key!r} to {self.tag}. Allowable attributes:\n\t" + '\n\t'.join(allowable))
         super(Conditions, self).__setattr__(key, value)
+
+
+def _conditions_iter(self):
+    for sc in self.subcomponents:
+        yield sc
+
 
 Conditions.__getitem__ = _conditions_getitem
 Conditions.__setattr__ = _conditions_setattr
+Conditions.__iter__ = _conditions_iter
+
 
 @chex.dataclass(kw_only=True)
 class _ArrayConditions(Conditions):

@@ -8,5 +8,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
  
-from .Base import BaseAerodynamics
-from .VLM import VLM
+from .TestAero import TestAero
+# from .VLM import VLM

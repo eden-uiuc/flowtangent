@@ -15,6 +15,7 @@ from .State import State
 from .Settings import Settings
 from .System import System, Aircraft
 
+from . import Methods
 from . import Missions
 from . import Core
 from . import Analyses

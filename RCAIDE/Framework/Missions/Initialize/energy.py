@@ -27,16 +27,21 @@ def initialize_energy(state: "rcf.State",
                       settings: "rcf.Settings",
                       ):
 
-    for l_idx, line in enumerate(system.energy.lines.subcomponents):
-        state.energy.lines[l_idx] = Line()
-        for p_idx, propulsor in enumerate(line.propulsors.subcomponents):
-            state.energy.lines[l_idx].propulsors[p_idx] = Converter()
-            state.energy.lines[l_idx].propulsors[p_idx].propulsors = Converter()
-            for converter in propulsor.converters.subcomponents:
-                state.energy.lines[l_idx].propulsors[p_idx].propulsors[converter.get_field_name()] = Converter()
-        for store in enumerate(line.stores.subcomponents):
-            state.energy.lines[l_idx].stores[store.get_field_name()] = Store()
+    state.energy.lines._attributes_frozen = False
 
+    for l_idx, line in enumerate(system.energy.lines):
+        state.energy.lines[l_idx] = Line(tag=line.tag)
+        for p_idx, propulsor in line.propulsors:
+            state.energy.lines[l_idx].propulsors[p_idx] = Converter()
+            state.energy.lines[l_idx].propulsors[p_idx].propulsors = Converter(tag=propulsor.tag)
+            for converter in propulsor.converters:
+                state.energy.lines[l_idx].propulsors[p_idx].propulsors[converter.get_field_name()] = Converter(tag=converter.tag)
+        for store in line.stores:
+            state.energy.lines[l_idx].stores._attributes_frozen = False
+            state.energy.lines[l_idx].stores[store.get_field_name()] = Store(tag=store.tag)
+            state.energy.lines[l_idx].stores._attributes_frozen = True
+
+    state.energy.lines._attributes_frozen = True
 
 
     def _recursive_initialize_energy(conditions: Conditions, initial_conditions: Conditions):

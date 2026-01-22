@@ -27,6 +27,6 @@ def update_moments(
 
         M = TW2I.apply(wind)
 
-        state.frames.inertial.total_moment = M + thrust
+        state.frames.inertial.total_moment_vector = M + thrust
         
         return state, system, settings

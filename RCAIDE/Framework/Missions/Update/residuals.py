@@ -25,7 +25,7 @@ def flight_dynamics_residuals(
     Calculates the residuals from the flight dynamics equations.
     """
 
-    active_residuals = get_active_residuals(state)
+    active_residuals = state.dynamics.get_active_residuals()
     force_residuals  = [res for res in active_residuals if res.type == 'force']
     moment_residuals = [res for res in active_residuals if res.type == 'moment']
 

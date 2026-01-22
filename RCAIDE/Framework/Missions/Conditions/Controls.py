@@ -172,7 +172,7 @@ class SurfaceControlVariable(ControlVariable):
 
 
 @chex.dataclass(kw_only=True)
-class EnergyControlVariable(Conditions):
+class EnergyControlVariable(ControlVariable):
     """
     Represents a control variable for propulsion systems in a vehicle or aircraft.
 
@@ -186,7 +186,7 @@ class EnergyControlVariable(Conditions):
     """
 
     #Attribute  Type            Default Value
-    tag:       str             = 'Propulsion Control Variable'
+    tag:       str             = 'Energy Control Variable'
 
     value:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
@@ -223,11 +223,6 @@ class ControlsConditions(Conditions):
     altitude : ControlVariable
         Control variable for altitude.
 
-    thrust : EnergyControlVariable
-        Control variable for thrust vector.
-    throttle : EnergyControlVariable
-        Control variable for throttle.
-
     elevator : SurfaceControlVariable
         Control variable for elevator surfaces.
     rudder : SurfaceControlVariable
@@ -242,14 +237,14 @@ class ControlsConditions(Conditions):
 
     tag:           str                      = 'Controls'
 
-    bank_angle:     DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Bank Angle'))
-    body_angle:     DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Body Angle'))
-    wind_angle:     DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Wind Angle'))
+    bank_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Bank Angle'))
+    body_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Body Angle'))
+    wind_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Wind Angle'))
 
-    elapsed_time:   DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Elapsed Time'))
-    velocity:       DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Velocity'))
-    acceleration:   DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Velocity'))
-    altitude:       DirectControlVariable   = field(default_factory=lambda: ControlVariable(tag='Altitude'))
+    elapsed_time:   DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Elapsed Time'))
+    velocity:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
+    acceleration:   DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
+    altitude:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Altitude'))
 
     def __post_init__(self):
 

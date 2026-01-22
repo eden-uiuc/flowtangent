@@ -198,7 +198,7 @@ def _component_getitem(self, item):
             return self.subcomponents[item]
         raise IndexError("Integer indexing is for subcomponents, but 'subcomponents' attribute not found.")
     elif isinstance(item, str):
-        return self.__dict__[item]
+        return self.__dict__[item.replace(' ', '_').lower()]
     else:
         raise TypeError(f"Component indices must be integers or strings, not {type(item).__name__}")
 
@@ -206,12 +206,18 @@ def _component_setattr(self, key, value):
         if not hasattr(self, key) and self._attributes_frozen:
             allowable = [f for f in self.__dataclass_fields__.keys() if f[0] is not "_"]
             raise AttributeError(f"Cannot add new attribute {key!r} to {self.tag}. "
-                                 f"Allowable attributes:\n\t{'\n\t'.join(allowable)}."
+                                 f"Allowable attributes:\n\t" + '\n\t'.join(allowable) +
                                  f"\nIf adding a subcomponent, use the 'add_subcomponent' method.")
+
         super(Component, self).__setattr__(key, value)
+
+def _component_iter(self):
+    for sc in self.subcomponents:
+        yield sc
 
 Component.__getitem__ = _component_getitem
 Component.__setattr__ = _component_setattr
+Component.__iter__ = _component_iter
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests
