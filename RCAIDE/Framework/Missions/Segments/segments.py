@@ -45,8 +45,10 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   Tuple[str] = field(default_factory=tuple)
-    active_residuals:  Tuple[str] = field(default_factory=tuple)
+    active_controls:   Tuple[str, ...] = field(default_factory=tuple)
+    active_residuals:  Tuple[str, ...] = field(default_factory=tuple)
+
+    controls_initial_guess: np.ndarray = None
 
     def _activate_control(self, control_name: str) -> None:
         control_name = control_name.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
@@ -76,8 +78,14 @@ class InitializeSegment(Process):
     def __call__(self):
         for ctrl_name in self.active_controls:
             self._activate_control(ctrl_name)
+        if self.controls_initial_guess:
+            self.state.unknowns = self.controls_initial_guess
+        else:
+            self.state.unknowns = np.zeros((self.state.numerics.number_of_control_points, len(self.active_controls)))
+
         for res_name in self.active_residuals:
             self._activate_residual(res_name)
+        self.state.residuals = np.zeros((self.state.numerics.number_of_control_points, len(self.active_residuals)))
 
         assert self.state.check_controls(verbose=False), (
             f"During initialization of {self.tag} the number of active controls"
@@ -232,6 +240,8 @@ class Segment(Process):
     active_controls:    Tuple[str, ...]   = None
     active_residuals:   Tuple[str, ...]   = None
 
+    controls_initial_guess: np.ndarray = None
+
     initialize:         InitializeSegment   = field(default_factory=InitializeSegment)
     iterate:            IterateSegment      = field(default_factory=IterateSegment)
     analyze:            AnalyzeSegment      = field(default_factory=AnalyzeSegment)
@@ -243,16 +253,18 @@ class Segment(Process):
 
     def __post_init__(self):
 
-        self.initialize.tag                 = f'Initialize {self.tag}'
-        self.initialize.active_controls     = self.active_controls
-        self.initialize.active_residuals    = self.active_residuals
+        self.initialize.tag                     = f'Initialize {self.tag}'
+        self.initialize.active_controls         = self.active_controls
+        self.initialize.active_residuals        = self.active_residuals
 
-        self.analyze.tag                    = f'Analyze {self.tag}'
+        self.initialize.controls_initial_guess  = self.controls_initial_guess
 
-        self.iterate.tag                    = f'Iterate {self.tag}'
-        self.iterate.analyze                = self.analyze
+        self.analyze.tag                        = f'Analyze {self.tag}'
 
-        self.finalize.tag                   = f'Finalize {self.tag}'
+        self.iterate.tag                        = f'Iterate {self.tag}'
+        self.iterate.analyze                    = self.analyze
+
+        self.finalize.tag                       = f'Finalize {self.tag}'
 
         self.steps = [
             self.initialize,

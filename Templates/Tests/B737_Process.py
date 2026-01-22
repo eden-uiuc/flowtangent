@@ -569,8 +569,6 @@ def mission_setup(settings: "rcf.Settings"):
         analysis = segment.analyze
 
         analysis['Aerodynamics']    = rcf.Analyses.Aerodynamics.TestAero(settings=settings)
-        # analysis['Energy']          = rcf.Analyses.Energy.TurbofanPerformance(settings=settings)
-        # analysis['Mass']            = rcf.Analyses.Mass.Transport(settings=settings)
 
     return mission
 

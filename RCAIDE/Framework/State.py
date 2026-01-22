@@ -95,13 +95,15 @@ class State(Conditions):
         """
 
         n_points = self.numerics.number_of_control_points
-        residual_array = np.empty((n_points, 1))
+        residual_list = []
 
         for name, residual in vars(self.dynamics).items():
             if hasattr(residual, 'active') and residual.active:
-                residual_array = np.hstack((residual_array, np.atleast_2d(residual.value).T))
+                residual_list.append(residual.value)
 
-        self.residuals = residual_array
+        if residual_list:
+            self.residuals = np.column_stack(residual_list)
+        else: self.residuals = np.empty(n_points, 0)
 
         return
 

@@ -109,11 +109,11 @@ class Conditions:
         self._number_of_rows = rows
 
         for k, v in vars(self).items():
-            if isinstance(v, Conditions) and k != 'initials':
+            if isinstance(v, Conditions) and k !=  'initials':
                 v.expand_rows(rows)
-            elif isinstance(v, np.ndarray) and len(v.shape) <= 2:  # Scalar-valued arrays
+            elif isinstance(v, np.ndarray) and len(v.shape) <= 2 and k not in ["unknowns", "residuals"]:  # Scalar-valued arrays
                 vars(self)[k] = np.resize(v, (self._number_of_rows, v.shape[1]))
-            elif isinstance(v, np.ndarray):  # Vector-valued arrays
+            elif isinstance(v, np.ndarray) and k not in ["unknowns", "residuals"]:  # Vector-valued arrays
                 new_shape = list(v.shape)
                 new_shape[0] = self._number_of_rows
                 vars(self)[k] = np.resize(v, tuple(new_shape))
