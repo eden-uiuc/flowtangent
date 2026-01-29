@@ -1,4 +1,4 @@
-# RCAIDE/Library/Methods/Aerodynamics/Test_Aero/aero_from_mass.py
+# RCAIDE/Library/Methods/Aerodynamics/Test_Aero/test_aero.py
 # (c) Copyright 2026 Aerospace Research Community LLC#
 # Created:  Jan 2026, J. Smart
 # Modified: 
@@ -49,8 +49,9 @@ def func_aero_from_mass(
 
 def aero_from_mass(
     state: rcf.State,
-    settings: rcf.Settings,
-    system: rcf.System):
+    system: rcf.System,
+    settings: rcf.Settings
+):
     """
     Framework version of aero_from_mass
     
@@ -79,3 +80,30 @@ def aero_from_mass(
     state.aerodynamics.coefficients.drag.total = C_D
 
     return state, settings, system
+
+
+def direct_aero(
+    state: rcf.State,
+    system: rcf.System,
+    settings: rcf.Settings,
+):
+
+    C_L = state.aerodynamics.coefficients.lift.total
+    C_D = state.aerodynamics.coefficients.drag.total
+
+    rho = 0.4
+    flight_speed = state.freestream.speed
+    S = system.areas.reference
+    qS = 0.5 * rho * flight_speed**2 * S
+
+    F_Z = qS * C_L - 9.81 * system.mass_properties.total
+    F_X = qS * (C_D + 0.06)
+
+    state.frames.inertial.total_force_vector[:, 2] = F_Z.flatten()
+    state.frames.inertial.total_force_vector[:, 0] = F_X.flatten()
+
+    return state, system, settings,
+
+
+
+

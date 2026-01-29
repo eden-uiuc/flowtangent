@@ -35,8 +35,13 @@ def update_orientations(state: "rcf.State",
     phi = body_inertial_rotations[:, 0, None]
 
     # Body Frame Transformation Matrices
-    TI2B = T.from_euler('zyx', body_inertial_rotations)
-    TB2I = TI2B.inv()
+
+    try:
+        TI2B = T.from_euler('zyx', body_inertial_rotations)
+        TB2I = TI2B.inv()
+    except Exception as e:
+        print(f"Error in calculating body frame rotations: {e}")
+
 
     # Velocity Transformation
     v_body = TI2B.apply(v_inertial)

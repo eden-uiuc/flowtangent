@@ -1,1 +1,1 @@
-from RCAIDE.Library.Methods.Aerodynamics.Test_Aero import aero_from_mass
+from RCAIDE.Library.Methods.Aerodynamics.Test_Aero.test_aero import aero_from_mass, direct_aero

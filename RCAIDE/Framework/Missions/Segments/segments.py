@@ -45,16 +45,19 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   Tuple[str, ...] = field(default_factory=tuple)
-    active_residuals:  Tuple[str, ...] = field(default_factory=tuple)
+    active_controls:   Tuple[str|ControlVariable, ...] = field(default_factory=tuple)
+    active_residuals:  Tuple[str|ControlVariable, ...] = field(default_factory=tuple)
 
     controls_initial_guess: np.ndarray = None
 
-    def _activate_control(self, control_name: str) -> None:
-        control_name = control_name.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
-        if control_name not in self.state.controls.keys():
-            self.state.controls.add_control_variable(ControlVariable(tag=control_name))
-        self.state.controls[control_name].active = True
+    def _activate_control(self, control: str | ControlVariable) -> None:
+        if isinstance(control, str):
+            control = control.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
+            if control not in self.state.controls.keys():
+                self.state.controls.add_control_variable(ControlVariable(tag=control))
+            self.state.controls[control].active = True
+        else:
+            self.state.controls.add_control_variable(control)
 
     def _activate_residual(self, residual_name: str) -> None:
         residual_name = residual_name.replace(' ', '_').lower()  # Normalize residual name to lowercase and replace spaces with underscores
@@ -78,10 +81,12 @@ class InitializeSegment(Process):
     def __call__(self):
         for ctrl_name in self.active_controls:
             self._activate_control(ctrl_name)
-        if self.controls_initial_guess:
+        if isinstance(self.controls_initial_guess, np.ndarray):
             self.state.unknowns = self.controls_initial_guess
+        elif isinstance(self.controls_initial_guess, tuple):
+            self.state.unknowns = np.concatenate([np.ones(self.state.numerics.number_of_control_points) * v for v in self.controls_initial_guess])
         else:
-            self.state.unknowns = np.zeros((self.state.numerics.number_of_control_points, len(self.active_controls)))
+            self.state.unknowns = np.zeros((self.state.numerics.number_of_control_points * len(self.active_controls)))
 
         for res_name in self.active_residuals:
             self._activate_residual(res_name)
@@ -101,12 +106,12 @@ class AnalyzeSegment(Process):
 
     tag: str = "Segment Analysis Specification"
 
-    gravity:                Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No gravity analysis set. Skipping...")
-    energy:                 Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No energy analysis set. Skipping...")
-    mass:                   Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No mass analysis set. Skipping...")
-    aerodynamics:           Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No aerodynamics analysis set. Skipping...")
-    stability:              Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No stability analysis set. Skipping...")
-    planetary_position:     Callable = lambda st, sy, se: skip(st, sy, se, warning=f"No planetary position analysis set. Skipping...")
+    gravity:                Callable = lambda st, sy, se: skip(st, sy, se)
+    energy:                 Callable = lambda st, sy, se: skip(st, sy, se)
+    mass:                   Callable = lambda st, sy, se: skip(st, sy, se)
+    aerodynamics:           Callable = lambda st, sy, se: skip(st, sy, se)
+    stability:              Callable = lambda st, sy, se: skip(st, sy, se)
+    planetary_position:     Callable = lambda st, sy, se: skip(st, sy, se)
 
     calculate_residuals:    Callable = flight_dynamics_residuals
 
@@ -171,7 +176,7 @@ class IterateSegment(Process):
         if self.update_kwargs:
             self.root_finder_kwargs = self.update_kwargs(self.root_finder_kwargs, self.state, self.system, self.settings)
 
-        return self.state.residuals
+        return self.state.residuals.ravel(order='F')
 
 
     def __call__(self):
@@ -206,15 +211,12 @@ class FinalizeSegment(Process):
             system: "rcf.System",
             settings: "rcf.Settings",
     ):
-        controls = state.controls
 
-        for name, control_var in vars(controls).items():
+        for name, control_var in vars(state.controls).items():
             if hasattr(control_var, 'active') and control_var.active:
                 control_var.active = False
 
-        residuals = state.controls.residuals
-
-        for name, residual_var in vars(residuals).items():
+        for name, residual_var in vars(state.dynamics).items():
             if hasattr(residual_var, 'active') and residual_var.active:
                 residual_var.active = False
 
@@ -240,7 +242,7 @@ class Segment(Process):
     active_controls:    Tuple[str, ...]   = None
     active_residuals:   Tuple[str, ...]   = None
 
-    controls_initial_guess: np.ndarray = None
+    controls_initial_guess: tuple | np.ndarray = None
 
     initialize:         InitializeSegment   = field(default_factory=InitializeSegment)
     iterate:            IterateSegment      = field(default_factory=IterateSegment)
@@ -271,6 +273,14 @@ class Segment(Process):
             self.iterate,
             self.finalize,
         ]
+
+    def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
+
+        for step in self.analyze.steps:
+            if isinstance(step, ProcessStep) and step.function is skip:
+                print(f"Skipping step {step.tag} due to missing analysis function.")
+
+        super(Segment, self).__call__(*args, **kwargs)
 
 
 #-----------------------------------------------------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import RCAIDE.Framework as rcf
 
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import Segment
+from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Cruise
@@ -33,15 +34,15 @@ class Cruise(Segment):
 
 
 @chex.dataclass(kw_only=True)
-class CSACruise(Cruise):
+class TestCSACruise(Cruise):
 
     tag: str = 'Constant Speed & Altitude Cruise'
 
     altitude: float = None
     air_speed: float = None
 
-    active_controls: tuple[str, ...] = ('Throttle', 'Body Angle')
-    active_residuals: tuple[str, ...] = ('Force X', 'Force Z')
+    active_controls: tuple[str|DirectControlVariable, ...] = None
+    active_residuals: tuple[str|DirectControlVariable, ...] = ('Force X', 'Force Z')
 
     def initialize_dynamics(
             self,
@@ -78,7 +79,22 @@ class CSACruise(Cruise):
         return state, system, settings
 
     def __post_init__(self):
-        super(CSACruise, self).__post_init__()
+
+        lift_control = DirectControlVariable(tag='Lift Coefficient',
+                                             path=("aerodynamics", "coefficients", "lift", "total"),
+                                             path_indices=(slice(None), 0),
+                                             active=True
+                                             )
+        drag_control = DirectControlVariable(tag='Drag Coefficient',
+                                             path=("aerodynamics", "coefficients", "drag", "total"),
+                                             path_indices=(slice(None), 0),
+                                             active=True
+                                             )
+
+        self.active_controls = lift_control, drag_control
+        self.controls_initial_guess = (1.0, 0.05)
 
         self.initialize.append(ProcessStep(tag='Dynamics and Controls',
                                            function=self.initialize_dynamics))
+
+        super(TestCSACruise, self).__post_init__()

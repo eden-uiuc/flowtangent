@@ -134,7 +134,7 @@ class DirectControlVariable(ControlVariable):
     # Attribute     Type                Default Value
     tag:            str                 = 'Direct Control Variable'
 
-    path:           tuple[str]          = None
+    path:           tuple[str, ...]     = None
     path_indices:   tuple               = None
 
 

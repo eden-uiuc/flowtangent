@@ -28,7 +28,7 @@ def chebyshev_matrices(n: int = 16,
                        spacing_function: Callable = lambda n: 0.5 * (1 - np.cos(np.pi * np.arange(n) / (n - 1)))
                        ):
     """
-    Calculate Chebyshev pseudospectral matrices for numerical differentiation and integration.
+    Calculate Chebyshev spectral matrices for numerical differentiation and integration.
 
     This function computes the Chebyshev collocation points and the corresponding
     differentiation and integration matrices used in spectral methods.
@@ -90,7 +90,7 @@ def chebyshev_matrices(n: int = 16,
     else:
         I = None
 
-    return np.atleast_2d(x), D, I
+    return np.atleast_2d(x).T, D, I
 
 
 @chex.dataclass(kw_only=True)
@@ -209,6 +209,9 @@ class Numerics(Conditions):
          self.dimensionless.integrate) = self.discretization_method()
 
         super(Numerics, self).__post_init__()
+
+    def expand_rows(self, rows):
+        pass  # Avoid resizing control points and differentiation arrays
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

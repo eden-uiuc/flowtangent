@@ -12,6 +12,7 @@ from dataclasses import field
 from typing import Callable, Iterable, Self, List
 
 # package imports
+import numpy as np
 import pandas as pd
 import chex
 
@@ -24,7 +25,7 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def skip(*args, warning: str = None):
+def skip(*args):
     """
     skip(*args, **kwargs)
 
@@ -45,9 +46,6 @@ def skip(*args, warning: str = None):
     Examples
     --------
     """
-
-    if warning:
-        print(f"Warning: {warning}")
 
     return args
 
@@ -163,7 +161,7 @@ class Process:
     steps:              List[Callable]  = field(default_factory=list)
     details:            pd.DataFrame    = None
 
-    step:               int             = 0
+    current_step:       int             = 0
     initial_step:       int             = 0
 
     initial_state:      "rcf.State"     = None
@@ -268,7 +266,9 @@ class Process:
         framework_args = (self.state.initials,
                           self.system,
                           self.settings,)
-    
+
+        self.current_step = self.initial_step
+
         for index, step in enumerate(self.steps[self.initial_step:]):
 
             step.state = framework_args[0]
@@ -280,6 +280,8 @@ class Process:
             self.steps[self.initial_step + index].last_result = framework_args
             if self.keep_details:
                 self.details.at[self.initial_step + index, 'Last Result'] = framework_args
+
+            self.current_step += 1
 
         return framework_args
 

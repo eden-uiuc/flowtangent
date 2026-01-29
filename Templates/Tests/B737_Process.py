@@ -555,7 +555,7 @@ def mission_setup(settings: "rcf.Settings"):
         tag='Boeing 737 Mission',
 
         steps=[
-            rcf.Missions.Segments.CSACruise(
+            rcf.Missions.Segments.TestCSACruise(
                 altitude=10000.0,
                 air_speed=230.0,
                 distance=(5500. * 1000.),
