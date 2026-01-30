@@ -16,9 +16,10 @@ def vehicle_setup():
 
     vehicle = rcf.Aircraft(tag='Boeing 737')
 
-    vehicle.reference_area                      = 124.862
+    vehicle.areas.reference                     = 124.862 # m^2
     vehicle.passengers                          = 170
 
+    vehicle.mass_properties.total               = 79015.8   # kg
     vehicle.mass_properties.max_takeoff         = 79015.8   # kg
     vehicle.mass_properties.takeoff             = 79015.8   # kg
     vehicle.mass_properties.operating_empty     = 62746.4   # kg

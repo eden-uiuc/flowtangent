@@ -16,6 +16,3 @@ from . import Nozzles
 from . import Turbines
 from . import Shaft_Offtake
 from . import Turbofans
-
-from . import DC_Motor
-from . import Engine

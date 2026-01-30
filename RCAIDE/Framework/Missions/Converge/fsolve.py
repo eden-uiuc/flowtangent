@@ -39,7 +39,8 @@ def fsolve_results_parser(
         else:
             print("Segment Converged.")
             print("Number of function evaluations:", infodict['nfev'])
-            state.unknowns.unpack_array(unknowns)
+            state.unknowns = unknowns
+            state.unpack_unknowns()
             state.numerics.converged = True
         
         return state, system, settings

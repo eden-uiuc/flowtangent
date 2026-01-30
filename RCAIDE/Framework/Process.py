@@ -100,6 +100,23 @@ class ProcessStep:
         """
         framework_args = (self.state, self.system, self.settings)
         return self.function(*framework_args)
+    
+    def __repr__(self):
+        try:
+            func_name = getattr(self.function, "__name__", None) or type(self.function).__name__
+            state_type = type(self.state).__name__ if self.state is not None else "None"
+            system_type = type(self.system).__name__ if self.system is not None else "None"
+            settings_type = type(self.settings).__name__ if self.settings is not None else "None"
+            last_present = self.last_result is not None
+            return (
+                f"<{self.__class__.__name__} "
+                f"tag={self.tag!r} func={func_name} "
+                f"last_result_present={last_present} "
+                f"state={state_type} system={system_type} settings={settings_type}>"
+            )
+        except Exception:
+            return object.__repr__(self)
+
 
 
 @chex.dataclass(kw_only=True)
@@ -756,6 +773,14 @@ class Process:
         self.details = new_details
 
         return None
+    
+    def __repr__(self):
+        """
+        Safe representation that summarizes steps
+        """
+        # We use type(self).__name__ instead of self.__class__.__name__ 
+        # to avoid potential overhead if __class__ is instrumented by chex/jax.
+        return f"<{type(self).__name__} tag='{self.tag}' step={self.current_step}/{len(self.steps)}>"
 
 
 if __name__ == "__main__":

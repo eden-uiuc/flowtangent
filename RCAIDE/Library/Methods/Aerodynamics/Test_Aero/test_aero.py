@@ -12,7 +12,6 @@ import numpy as np
 
 # RCAIDE Imports
 
-import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf
 
 
@@ -96,11 +95,11 @@ def direct_aero(
     S = system.areas.reference
     qS = 0.5 * rho * flight_speed**2 * S
 
-    F_Z = qS * C_L - 9.81 * system.mass_properties.total
+    F_Z = qS * C_L
     F_X = qS * (C_D + 0.06)
 
-    state.frames.inertial.total_force_vector[:, 2] = F_Z.flatten()
-    state.frames.inertial.total_force_vector[:, 0] = F_X.flatten()
+    state.frames.wind.total_force_vector[:, 2] = F_Z.flatten()
+    state.frames.wind.total_force_vector[:, 0] = F_X.flatten()
 
     return state, system, settings,
 

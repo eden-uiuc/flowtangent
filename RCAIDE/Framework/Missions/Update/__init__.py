@@ -9,3 +9,5 @@ from .orientations import update_orientations
 from .forces import update_forces
 from .moments import update_moments
 from .residuals import flight_dynamics_residuals
+from .mass import update_mass_and_weight
+from .gravity import update_gravity

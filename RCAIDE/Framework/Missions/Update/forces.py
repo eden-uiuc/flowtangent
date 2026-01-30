@@ -22,14 +22,14 @@ def update_forces(
         
         wind    = state.frames.wind.total_force_vector
         thrust  = state.frames.body.thrust_force_vector
-        gravity = state.frames.inertial.gravity_force_vector
+        Weight  = state.frames.inertial.gravity_force_vector
 
         TB2I = state.frames.body.transform_to_inertial
         TW2I = state.frames.wind.transform_to_inertial
 
-        F = TW2I.apply(wind)
-        T = TB2I.apply(thrust)
+        Wind = TW2I.apply(wind)
+        Thrust = TB2I.apply(thrust)
 
-        state.frames.inertial.total_force_vector = F + T + gravity
-        
+        state.frames.inertial.total_force_vector = Wind + Thrust + Weight
+
         return state, system, settings

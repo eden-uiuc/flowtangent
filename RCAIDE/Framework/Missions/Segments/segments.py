@@ -108,7 +108,6 @@ class AnalyzeSegment(Process):
 
     gravity:                Callable = lambda st, sy, se: skip(st, sy, se)
     energy:                 Callable = lambda st, sy, se: skip(st, sy, se)
-    mass:                   Callable = lambda st, sy, se: skip(st, sy, se)
     aerodynamics:           Callable = lambda st, sy, se: skip(st, sy, se)
     stability:              Callable = lambda st, sy, se: skip(st, sy, se)
     planetary_position:     Callable = lambda st, sy, se: skip(st, sy, se)
@@ -122,13 +121,13 @@ class AnalyzeSegment(Process):
             ("Acceleration",         update_acceleration),
             ("Angular Acceleration", update_angular_acceleration),
             ("Altitude",             update_altitude),
-            ("Gravity",              self.gravity),
+            ("Gravity",              update_gravity),
             ("Freestream",           update_freestream),
             ("Orientations",         update_orientations),
-            ("Energy",               self.gravity),
+            ("Energy",               self.energy),
             ("Aerodynamics",         self.aerodynamics),
             ("Stability",            self.stability),
-            ("Mass",                 self.mass),
+            ("Mass",                 update_mass_and_weight),
             ("Forces",               update_forces),
             ("Moments",              update_moments),
             ("Planetary Position",   self.planetary_position),
@@ -280,7 +279,7 @@ class Segment(Process):
             if isinstance(step, ProcessStep) and step.function is skip:
                 print(f"Skipping step {step.tag} due to missing analysis function.")
 
-        super(Segment, self).__call__(*args, **kwargs)
+        return super(Segment, self).__call__(*args, **kwargs)
 
 
 #-----------------------------------------------------------------------------------------------------------------------
