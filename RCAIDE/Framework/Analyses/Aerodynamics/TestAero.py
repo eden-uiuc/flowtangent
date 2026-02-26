@@ -7,21 +7,26 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
+import equinox as eqx
 
 import RCAIDE.Framework as rcf
 
-# ----------------------------------------------------------------------------------------------------------------------
-# Inverse_Range
-# ----------------------------------------------------------------------------------------------------------------------
+
+# 1. Define the builder function outside the class
+def _build_test_aero_steps():
+    """Builds and returns the default tuple of process steps."""
+    return (
+        rcf.ProcessStep(
+            tag="Direct Aero Calculation",
+            # Remember to wrap in Equinox if ProcessStep was converted!
+            function=rcf.Methods.Aerodynamics.Test_Aero.direct_aero 
+        ),
+    )
 
 
-@chex.dataclass(kw_only=True)
 class TestAero(rcf.Process):
+    # Shield the tag from the XLA compiler
+    tag: str = eqx.field(static=True, default="Test Aerodynamic Analysis")
 
-    tag = "Test Aerodynamic Analysis"
-
-    def __post_init__(self):
-        self.append(rcf.ProcessStep(tag="Direct Aero Calculation",
-                                          function=rcf.Methods.Aerodynamics.Test_Aero.direct_aero)
-                          )
+    # 2. Use the helper function as the default_factory!
+    steps: tuple = eqx.field(default_factory=_build_test_aero_steps)

@@ -7,13 +7,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
-import chex
-from dataclasses import field
+
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -42,21 +40,16 @@ def count_active(Conditions):
     return len(get_active(Conditions))
 
 
-@chex.dataclass(kw_only=True)
 class DynamicResidual(Conditions):
 
-    tag:    str     = 'Dynamic Residual'
-    type:   str     = None
-    active: bool    = False
-    index:  int     = None
+    tag:    str         = eqx.field(static=True, default='Dynamic Residual')
+    type:   str | None  = None
+    active: bool        = False
+    index:  int | None  = None
 
-    value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    def __eq__(self, other):
-        return self is other
+    value:  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
 class DynamicsConditions(Conditions):
     """
     Represents the dynamics variables for a simulation.
@@ -82,26 +75,22 @@ class DynamicsConditions(Conditions):
         Indicates if there's a moment acting around the z-axis.
     """
 
-    tag:        str             = 'Dynamics'
+    tag:        str             = eqx.field(static=True, default='Dynamics')
 
-    force_x:    DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='F_x', type='force', index=0))
-    force_y:    DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='F_y', type='force', index=1))
-    force_z:    DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='F_z', type='force', index=2))
-    moment_x:   DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='M_x', type='moment', index=0))
-    moment_y:   DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='M_y', type='moment', index=1))
-    moment_z:   DynamicResidual = field(default_factory=lambda: DynamicResidual(tag='M_z', type='moment', index=2))
+    force_x:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_x', type='force', index=0))
+    force_y:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_y', type='force', index=1))
+    force_z:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_z', type='force', index=2))
+    moment_x:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_x', type='moment', index=0))
+    moment_y:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_y', type='moment', index=1))
+    moment_z:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_z', type='moment', index=2))
 
     def get_active_residuals(self) -> list:
         return get_active(self)
 
     def count_active_residuals(self) -> int:
         return count_active(self)
-    
-    def __eq__(self, other):
-        return self is other
 
 
-@chex.dataclass(kw_only=True)
 class ControlVariable(Conditions):
     """
     Represents a control variable in a simulation or control system.
@@ -123,35 +112,27 @@ class ControlVariable(Conditions):
 
     """
 
-    # Attribute     Type                Default Value
-    tag:            str                 = 'Control Variable'
+    # Attribute     Type                        Default Value
+    tag:            str                         = eqx.field(static=True, default='Control Variable')
 
-    active:         bool                = False
-    initial_guess:  float | np.ndarray  = None
+    active:         bool                        = False
+    initial_guess:  float | jnp.ndarray | None  = None
 
-    value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    def __eq__(self, other):
-        return self is other
+    value:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
 
     def get_field_name(self):
         return self.tag.replace(' ', '_').lower()
 
 
-@chex.dataclass(kw_only=True)
 class DirectControlVariable(ControlVariable):
 
-    # Attribute     Type                Default Value
-    tag:            str                 = 'Direct Control Variable'
+    # Attribute     Type                    Default Value
+    tag:            str                     = eqx.field(static=True, default='Direct Control Variable')
 
-    path:           tuple[str, ...]     = None
-    path_indices:   tuple               = None
-
-    def __eq__(self, other):
-        return self is other
+    path:           tuple[str, ...] |None   = None
+    path_indices:   tuple | None            = None
 
 
-@chex.dataclass(kw_only=True)
 class SurfaceControlVariable(ControlVariable):
     """
     Represents a control variable for a surface in an aircraft or vehicle.
@@ -177,17 +158,13 @@ class SurfaceControlVariable(ControlVariable):
         An instance of the SurfaceControlVariable class with the specified attributes.
     """
 
-    #Attribute          Type                Default Value
-    tag:                str                 = 'Surface Control Variable'
-    surfaces:           list[Component]     = None
+    #Attribute          Type                    Default Value
+    tag:                str                     = eqx.field(static=True, default='Surface Control Variable')
+    surfaces:           tuple[Component] | None = None
 
-    stability:          StabilityConditions = field(default_factory=lambda: StabilityConditions())
-
-    def __eq__(self, other):
-        return self is other
+    stability:          StabilityConditions     = eqx.field(default_factory=StabilityConditions)
 
 
-@chex.dataclass(kw_only=True)
 class EnergyControlVariable(ControlVariable):
     """
     Represents a control variable for propulsion systems in a vehicle or aircraft.
@@ -202,168 +179,87 @@ class EnergyControlVariable(ControlVariable):
     """
 
     #Attribute  Type            Default Value
-    tag:       str             = 'Energy Control Variable'
+    tag:        str             = eqx.field(static=True, default='Energy Control Variable')
 
-    value:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
-
-    def __eq__(self, other):
-        return self is other
+    value:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
 
 
-@chex.dataclass(kw_only=True)
+def _default_bank_angle():
+    return DirectControlVariable(
+        tag='Bank Angle', 
+        path=('frames', 'body', 'inertial_rotations'), 
+        path_indices=(slice(None), 0)
+    )
+
+def _default_body_angle():
+    return DirectControlVariable(
+        tag='Body Angle', 
+        path=('frames', 'body', 'inertial_rotations'), 
+        path_indices=(slice(None), 1)
+    )
+
+def _default_velocity():
+    return DirectControlVariable(
+        tag='Velocity', 
+        path=('frames', 'inertial', 'velocity_vector'), 
+        path_indices=(slice(None), 0)
+    )
+
+def _default_altitude():
+    return DirectControlVariable(
+        tag='Altitude', 
+        path=('frames', 'inertial', 'position_vector'), 
+        path_indices=(slice(None), 2)
+    )
+
 class ControlsConditions(Conditions):
-    """
-    Represents the control conditions for an aircraft or vehicle simulation.
 
-    This class encapsulates various control variables and dynamics for a comprehensive
-    simulation environment. It includes controls for aircraft orientation, propulsion,
-    and surface controls.
+    tag:           str                      = eqx.field(static=True, default='Controls')
 
-    Attributes
-    ----------
-    name : str
-        The name of the control conditions, default is 'Controls'.
-    residuals : DynamicsConditions
-        Object representing the dynamic variables of the simulation.
+    bank_angle:     DirectControlVariable   = eqx.field(default_factory=_default_bank_angle)
+    body_angle:     DirectControlVariable   = eqx.field(default_factory=_default_body_angle)
+    wind_angle:     DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Wind Angle'))
 
-    body_angle : ControlVariable
-        Control variable for the body angle.
-    bank_angle : ControlVariable
-        Control variable for the bank angle.
-    wind_angle : ControlVariable
-        Control variable for the wind angle.
+    elapsed_time:   DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Elapsed Time'))
+    velocity:       DirectControlVariable   = eqx.field(default_factory=lambda: _default_velocity)
+    acceleration:   DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
+    altitude:       DirectControlVariable   = eqx.field(default_factory=lambda: _default_altitude)
 
-    elapsed_time : ControlVariable
-        Control variable for the elapsed time.
-    velocity : ControlVariable
-        Control variable for velocity.
-    acceleration : ControlVariable
-        Control variable for acceleration (Note: named 'Velocity' in initialization).
-    altitude : ControlVariable
-        Control variable for altitude.
+    custom_controls: tuple                  = eqx.field(default_factory=tuple)
 
-    elevator : SurfaceControlVariable
-        Control variable for elevator surfaces.
-    rudder : SurfaceControlVariable
-        Control variable for rudder surfaces.
-    flaps : SurfaceControlVariable
-        Control variable for flap surfaces.
-    slats : SurfaceControlVariable
-        Control variable for slat surfaces.
-    ailerons : SurfaceControlVariable
-        Control variable for aileron surfaces.
-    """
-
-    tag:           str                      = 'Controls'
-
-    bank_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Bank Angle'))
-    body_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Body Angle'))
-    wind_angle:     DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Wind Angle'))
-
-    elapsed_time:   DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Elapsed Time'))
-    velocity:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
-    acceleration:   DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
-    altitude:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Altitude'))
-
-    def __eq__(self, other):
-        return self is other
-
-    def __post_init__(self):
-
-        # Map body angle to the Y-axis of the body frame
-        self.body_angle.path = ('frames', 'body', 'inertial_rotations')
-        self.body_angle.path_indices = (slice(None), 1)
-
-        # Map bank angle to the X-axis of the body frame
-        self.bank_angle.path = ('frames', 'body', 'inertial_rotations')
-        self.bank_angle.path_indices = (slice(None), 0)
-
-        # Map velocity to the X-axis of the inertial frame
-        self.velocity.path = ('frames', 'inertial', 'velocity_vector')
-        self.velocity.path_indices = (slice(None), 0)
-
-        # Map altitude to the Z-axis of the inertial frame
-        self.altitude.path = ('frames', 'inertial', 'position_vector')
-        self.altitude.path_indices = (slice(None), 2)
 
     def add_control_variable(self, control_variable: ControlVariable) -> None:
-        if isinstance(control_variable, ControlVariable):
-            setattr(self, control_variable.get_field_name(), control_variable)
-        else:
-            raise TypeError(f'Attempted to add a control variable to {self.tag} '
-                            f"which was not a ControlVariable data structure.")
+        new_custom_controls = self.custom_controls + (control_variable,)
+        return eqx.tree_at(lambda c: c.custom_controls, self, new_custom_controls)
 
-    def get_active_controls(self) -> list:
-        return get_active(self)
+    def __getattr__(self, item: str):
+        if item.startswith("__") and item.endswith("__"):
+            raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
+
+        for ctrl in self.custom_controls:
+            # Assuming ControlVariable has a get_field_name() method
+            if ctrl.get_field_name() == item:
+                return ctrl
+
+        raise AttributeError(f"'{self.tag}' has no explicit or custom control named '{item}'")
+
+    def get_active_controls(self) -> tuple:
+        active_list = []
+
+        # 1. Check explicit controls
+        for field in self.__dataclass_fields__:
+            control_var = getattr(self, field)
+            # Ensure it's actually a control variable and is active
+            if hasattr(control_var, 'active') and getattr(control_var, 'active', False):
+                active_list.append(control_var)
+
+        # 2. Check custom controls
+        for control_var in self.custom_controls:
+            if hasattr(control_var, 'active') and getattr(control_var, 'active', False):
+                active_list.append(control_var)
+
+        # Return as an immutable tuple for JAX safety
+        return tuple(active_list)
 
     def count_active_controls(self) -> int:
-        return count_active(self)
-
-
-class TestDynamicsVariables(unittest.TestCase):
-    def test_default_values(self):
-        dv = DynamicsConditions()
-        self.assertEqual(dv.tag, 'Dynamics')
-        self.assertFalse(dv.force_x)
-        self.assertFalse(dv.force_y)
-        self.assertFalse(dv.force_z)
-        self.assertFalse(dv.moment_x)
-        self.assertFalse(dv.moment_y)
-        self.assertFalse(dv.moment_z)
-
-    def test_custom_values(self):
-        dv = DynamicsConditions(force_x=True, moment_z=True)
-        self.assertTrue(dv.force_x)
-        self.assertFalse(dv.force_y)
-        self.assertTrue(dv.moment_z)
-
-
-class TestControlVariable(unittest.TestCase):
-    def test_default_values(self):
-        cv = ControlVariable()
-        self.assertEqual(cv.tag, 'Control Variable')
-        self.assertFalse(cv.active)
-        self.assertIsNone(cv.initial_guess)
-        np.testing.assert_array_equal(cv.value, np.zeros((1, 1)))
-
-    def test_custom_values(self):
-        cv = ControlVariable(tag='Test', active=True, initial_guess=5.0)
-        self.assertEqual(cv.tag, 'Test')
-        self.assertTrue(cv.active)
-        self.assertEqual(cv.initial_guess, 5.0)
-
-
-class TestSurfaceControlVariable(unittest.TestCase):
-    def test_default_values(self):
-        scv = SurfaceControlVariable()
-        self.assertEqual(scv.tag, 'Surface Control Variable')
-        np.testing.assert_array_equal(scv.deflection, np.zeros((1, 1)))
-        self.assertIsInstance(scv.static_stability, StaticCoefficients)
-
-
-class TestPropulsionControlVariable(unittest.TestCase):
-    def test_default_values(self):
-        pcv = EnergyControlVariable()
-        self.assertEqual(pcv.tag, 'Propulsion Control Variable')
-        np.testing.assert_array_equal(pcv.value, np.zeros((1, 1)))
-
-
-class TestControlsConditions(unittest.TestCase):
-    def test_default_values(self):
-        cc = ControlsConditions()
-        self.assertEqual(cc.tag, 'Controls')
-        self.assertIsInstance(cc.residuals, DynamicsConditions)
-        self.assertIsInstance(cc.body_angle, ControlVariable)
-        self.assertIsInstance(cc.thrust, EnergyControlVariable)
-        self.assertIsInstance(cc.elevator, SurfaceControlVariable)
-
-    def test_custom_values(self):
-        cc = ControlsConditions(tag='Custom Controls')
-        self.assertEqual(cc.tag, 'Custom Controls')
-        self.assertEqual(cc.body_angle.tag, 'Body Angle')
-        self.assertEqual(cc.thrust.tag, 'Thrust')
-        self.assertEqual(cc.elevator.tag, 'Elevator Controls')
-
-
-if __name__ == '__main__':
-    unittest.main()
+        return len(self.get_active_controls())

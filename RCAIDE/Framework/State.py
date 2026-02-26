@@ -7,13 +7,15 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
+
 from functools import reduce
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import jax
+
+import equinox as eqx
+import numpy as np
+import jax.numpy as jnp
 
 import RCAIDE.Library.Components
 # RCAIDE imports
@@ -25,37 +27,26 @@ from RCAIDE.Framework.Missions.Conditions import (
 #  State
 # ----------------------------------------------------------------------------------------------------------------------
 
-def update_nested_dataclass(obj, path, new_value):
-        if len(path) == 1:
-            return obj.replace(**{path[0]: new_value})
-        
-        child_name = path[0]
-        child_obj = getattr(obj, child_name)
-
-        updated_child = update_nested_dataclass(child_obj, path[1:], new_value)
-
-        return obj.replace(**{child_name: updated_child})
-
-@chex.dataclass(kw_only=True)
 class State(Conditions):
 
     # Attribute         Type                        Default Value
-    tag:                str                         = 'State'
-    initials:           chex.dataclass              = None
-    numerics:           Numerics                    = field(default_factory=Numerics)
+    tag:                str                         = eqx.field(static=True, default='State')
+    
+    initials:           eqx.Module | None           = None
+    numerics:           Numerics                    = eqx.field(default_factory=Numerics)
 
-    frames:             FrameConditions             = field(default_factory=FrameConditions)
-    freestream:         FreestreamConditions        = field(default_factory=FreestreamConditions)
+    frames:             FrameConditions             = eqx.field(default_factory=FrameConditions)
+    freestream:         FreestreamConditions        = eqx.field(default_factory=FreestreamConditions)
 
-    mass:               MassConditions              = field(default_factory=MassConditions)
-    energy:             EnergyNetworkConditions     = field(default_factory=EnergyNetworkConditions)
-    aerodynamics:       AerodynamicsConditions      = field(default_factory=AerodynamicsConditions)
+    mass:               MassConditions              = eqx.field(default_factory=MassConditions)
+    energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
+    aerodynamics:       AerodynamicsConditions      = eqx.field(default_factory=AerodynamicsConditions)
 
-    controls:           ControlsConditions          = field(default_factory=ControlsConditions)
-    dynamics:           DynamicsConditions          = field(default_factory=DynamicsConditions)
+    controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
+    dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
 
-    unknowns:           np.ndarray                  = field(default_factory=lambda: np.zeros((1, 1)))
-    residuals:          np.ndarray                  = field(default_factory=lambda: np.zeros((1, 1)))
+    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
+    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
 
     def check_controls(self, verbose=True) -> bool:
         """
@@ -80,8 +71,17 @@ class State(Conditions):
 
         return valid_controls
     
-    def __post_init__(self):
-        self.expand_rows(self.numerics.number_of_control_points)
+    def expand_rows(self, n_control_points: int):
+
+        def _expand(leaf):
+            if isinstance(leaf, (jnp.ndarray, np.ndarray)):
+                if leaf.ndim == 1:
+                    return jnp.tile(leaf, (n_control_points, 1))
+                elif leaf.ndim == 2 and leaf.shape[0] == 1:
+                    return jnp.repeat(leaf, n_control_points, axis=0)
+            return leaf
+        
+        return jax.tree_util.tree_map(_expand, self)
     
     def unpack_unknowns(self, unknowns):
         """
@@ -94,15 +94,16 @@ class State(Conditions):
         current_state = self
 
         for control_var in self.controls.get_active_controls():
-            if hasattr(control_var, 'path') and getattr(control_var, 'active', False):
-                
-                values          = unknowns[control_idx : control_idx + n_points] # Extract control values from unknowns
-                current_array   = reduce(getattr, control_var.path, current_state)
-                new_array       = current_array.at[control_var.path_indices].set(values)
-                
-                current_state = update_nested_dataclass(current_state, control_var.path, new_array)
+    
+            values  = unknowns[control_idx : control_idx + n_points] # Extract control values from unknowns
+            where   = lambda s, p=control_var.path: reduce(getattr, p, s)
+            
+            current_array   = where(current_state)
+            new_array       = current_array.at[control_var.path_indices].set(values)
+            
+            current_state = eqx.tree_at(where, current_state, new_array)
 
-                control_idx += n_points
+            control_idx += n_points
         
         return current_state
 
@@ -114,17 +115,20 @@ class State(Conditions):
         n_points = self.numerics.number_of_control_points
         residual_list = []
 
-        for _, residual in vars(self.dynamics).items():
+        for field_name in self.dynamics.__dataclass_fields__:
+            residual = getattr(self.dynamics, field_name)
+            
             if getattr(residual, 'active', False):
                 residual_list.append(residual.value)
 
         if residual_list:
-            stacked_residuals = np.column_stack(residual_list)
+            stacked_residuals = jnp.concatenate(residual_list)
         else:
-            stacked_residuals = np.empty((n_points, 0))
+            stacked_residuals = jnp.empty((0,))
 
-        return
+        return eqx.tree_at(lambda s: s.residuals, self, stacked_residuals)
 
+    #TODO: Update this to use Equinox methods
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
         if verbose:
             print(f"Building controls from {system.tag}...")

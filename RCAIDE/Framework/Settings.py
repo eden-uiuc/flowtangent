@@ -8,12 +8,11 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-import chex
-from dataclasses import field
+import equinox as eqx
 from typing import Callable
 
 # package imports
-from scipy.optimize import fsolve
+from jaxopt import ScipyRootFinding
 
 # RCAIDE imports
 
@@ -22,19 +21,16 @@ from scipy.optimize import fsolve
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class AnalysisSettings:
+class AnalysisSettings(eqx.Module):
 
-    aerodynamics: chex.dataclass = None
+    aerodynamics: eqx.Module | None = None
 
 
-@chex.dataclass(kw_only=True)
-class Settings:
+class Settings(eqx.Module):
 
-    tag: str = 'Settings'
-
+    tag: str                    = eqx.field(static=True, default='Settings')
     # Mission Settings
-    root_finder: Callable = None
+    root_finder: Callable       = eqx.field(static=True, default=ScipyRootFinding)
 
-    analysis: AnalysisSettings = field(default_factory=lambda: AnalysisSettings())
+    analysis: AnalysisSettings  = eqx.field(default_factory=AnalysisSettings)
 

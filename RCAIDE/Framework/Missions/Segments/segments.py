@@ -219,19 +219,16 @@ class IterateSegment(Process):
             current_state, system, settings
         )
 
-        current_state.pack_residuals()
+        current_state = current_state.pack_residuals()
 
         if self.update_args:
             self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
         if self.update_kwargs:
             self.root_finder_kwargs = self.update_kwargs(self.root_finder_kwargs, self.state, self.system, self.settings)
 
-        return current_state.residuals.ravel(order='F')
+        return current_state.residuals
     
     def _get_pure_residuals(self, unknowns, state, system, settings):
-        """
-        Wraps the analysis step to calculate residuals for fsolve.
-        """
 
         current_state = state.unpack_unknowns(unknowns)
 
@@ -239,7 +236,7 @@ class IterateSegment(Process):
 
         current_state = current_state.pack_residuals()
 
-        return current_state.residuals.ravel(order='F')
+        return current_state.residuals
                 
         # Call your actual pure residual function
         return self._get_pure_residuals(unknowns, state, system, settings)

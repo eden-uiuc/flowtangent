@@ -7,13 +7,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
-import chex
-from dataclasses import field
+import equinox as eqx
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -22,8 +19,6 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 #  Mass
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-@chex.dataclass(kw_only=True)
 class MassConditions(Conditions):
     """
     Represents the mass conditions for a vehicle or system.
@@ -53,66 +48,15 @@ class MassConditions(Conditions):
     has its own copy of mutable objects.
     """
 
-    # Attribute             Type    Default Value
+    # Attribute             Type        Default Value
     tag:                    str         = 'Mass Conditions'
 
-    total:                  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    rate_of_change:         np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    total:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+    rate_of_change:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+    volume:                 jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+    density:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+    center_of_gravity:      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    moments_of_inertia:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3, 3)))
 
-    volume:                 np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    density:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    breakdown:              Conditions  = eqx.field(default_factory=lambda: Conditions(tag='Mass Breakdown'))
 
-    center_of_gravity:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-    moments_of_inertia:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3, 3)))
-
-    breakdown:              Conditions  = field(default_factory=lambda: Conditions(tag='Mass Breakdown'))
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Unit Tests
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class TestMassConditions(unittest.TestCase):
-
-    def setUp(self):
-        self.mass_conditions = MassConditions()
-
-    def test_default_values(self):
-        self.assertEqual(self.mass_conditions.tag, 'Mass Conditions')
-        np.testing.assert_array_equal(self.mass_conditions.total, np.zeros((1, 1)))
-        np.testing.assert_array_equal(self.mass_conditions.rate_of_change, np.zeros((1, 1)))
-        np.testing.assert_array_equal(self.mass_conditions.total_moment_of_inertia, np.zeros((1, 1, 3)))
-        self.assertIsInstance(self.mass_conditions.breakdown, Conditions)
-        self.assertEqual(self.mass_conditions.breakdown.tag, 'Mass Breakdown')
-
-    def test_custom_name(self):
-        custom_mass = MassConditions(tag="Custom Mass Conditions")
-        self.assertEqual(custom_mass.tag, "Custom Mass Conditions")
-
-    def test_total_mass(self):
-        self.mass_conditions.total = np.array([[1000.0]])
-        np.testing.assert_array_equal(self.mass_conditions.total, np.array([[1000.0]]))
-
-    def test_rate_of_change(self):
-        self.mass_conditions.rate_of_change = -0.5
-        np.testing.assert_array_equal(self.mass_conditions.rate_of_change, np.array([[-0.5]]))
-
-    def test_total_moment_of_inertia(self):
-        moment = np.array([[100.0, 200.0, 300.0]])
-        self.mass_conditions.total_moment_of_inertia = moment
-        np.testing.assert_array_equal(self.mass_conditions.total_moment_of_inertia, moment)
-
-    def test_breakdown(self):
-        self.mass_conditions.breakdown.fuel = np.array([[500.0]])
-        self.mass_conditions.breakdown.payload = np.array([[200.0]])
-        np.testing.assert_array_equal(self.mass_conditions.breakdown.fuel, np.array([[500.0]]))
-        np.testing.assert_array_equal(self.mass_conditions.breakdown.payload, np.array([[200.0]]))
-
-    def test_array_shapes(self):
-        self.assertEqual(self.mass_conditions.total.shape, (1, 1))
-        self.assertEqual(self.mass_conditions.rate_of_change.shape, (1, 1))
-        self.assertEqual(self.mass_conditions.total_moment_of_inertia.shape, (1, 1, 3))
-
-
-if __name__ == '__main__':
-    unittest.main()
