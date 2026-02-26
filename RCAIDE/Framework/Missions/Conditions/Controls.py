@@ -12,7 +12,8 @@ import chex
 from dataclasses import field
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -50,6 +51,9 @@ class DynamicResidual(Conditions):
     index:  int     = None
 
     value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -92,6 +96,9 @@ class DynamicsConditions(Conditions):
 
     def count_active_residuals(self) -> int:
         return count_active(self)
+    
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -124,6 +131,9 @@ class ControlVariable(Conditions):
 
     value:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
+    def __eq__(self, other):
+        return self is other
+
     def get_field_name(self):
         return self.tag.replace(' ', '_').lower()
 
@@ -136,6 +146,9 @@ class DirectControlVariable(ControlVariable):
 
     path:           tuple[str, ...]     = None
     path_indices:   tuple               = None
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -170,6 +183,9 @@ class SurfaceControlVariable(ControlVariable):
 
     stability:          StabilityConditions = field(default_factory=lambda: StabilityConditions())
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class EnergyControlVariable(ControlVariable):
@@ -189,6 +205,9 @@ class EnergyControlVariable(ControlVariable):
     tag:       str             = 'Energy Control Variable'
 
     value:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -245,6 +264,9 @@ class ControlsConditions(Conditions):
     velocity:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
     acceleration:   DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
     altitude:       DirectControlVariable   = field(default_factory=lambda: DirectControlVariable(tag='Altitude'))
+
+    def __eq__(self, other):
+        return self is other
 
     def __post_init__(self):
 

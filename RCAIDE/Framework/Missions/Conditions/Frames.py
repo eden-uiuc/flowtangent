@@ -11,8 +11,8 @@ import chex
 from dataclasses import field
 
 # package imports
-import numpy as np
-from scipy.spatial.transform import Rotation as SP_Rotation
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -45,10 +45,13 @@ class Frame(Conditions):
     # Attribute             Type            Default Value
     tag:                    str             = 'Frame'
 
-    transform_to_inertial:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
+    transform_to_inertial:  np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
     total_force_vector:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     total_moment_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -102,6 +105,9 @@ class InertialFrame(Frame):
     time:                           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     system_range:                   np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class BodyFrame(Frame):
@@ -132,6 +138,9 @@ class BodyFrame(Frame):
     inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
     thrust_force_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
     moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -166,11 +175,14 @@ class WindFrame(Frame):
     tag:               str             = 'Wind Frame'
 
     body_rotations:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-    transform_to_body:  SP_Rotation     = SP_Rotation.from_euler('zyx', [0., 0., 0.])
+    transform_to_body:  np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
 
     velocity_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     force_vector:       np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
     moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -205,7 +217,10 @@ class PlanetFrame(Frame):
     latitude:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     longitude:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
 
-    true_course:    SP_Rotation = SP_Rotation.from_euler('zyx', [0., 0., 0.])
+    true_course:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -241,3 +256,6 @@ class FrameConditions(Conditions):
     body:           BodyFrame       = field(default_factory=lambda: BodyFrame())
     wind:           WindFrame       = field(default_factory=lambda: WindFrame())
     planet:         PlanetFrame     = field(default_factory=lambda: PlanetFrame())
+
+    def __eq__(self, other):
+        return self is other

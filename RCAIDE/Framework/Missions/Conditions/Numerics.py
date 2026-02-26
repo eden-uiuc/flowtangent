@@ -13,7 +13,8 @@ import chex
 from dataclasses import field
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -25,7 +26,6 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 
 def chebyshev_matrices(n: int = 16,
                        calculate_integration: bool = True,
-                       spacing_function: Callable = lambda n: 0.5 * (1 - np.cos(np.pi * np.arange(n) / (n - 1)))
                        ):
     """
     Calculate Chebyshev spectral matrices for numerical differentiation and integration.
@@ -66,7 +66,7 @@ def chebyshev_matrices(n: int = 16,
 
     assert n > 0, "Attempted to calculate Chebyshev matrices with non-positive number of control points."
 
-    x = spacing_function(n)
+    x = 0.5 * (1 - np.cos(np.pi * np.arange(n) / (n - 1)))
 
     c = np.array([2.] + [1.] * (n - 2) + [2.])
     c *= (-1.) ** np.arange(n)
@@ -124,6 +124,9 @@ class NumericalTime(Conditions):
     control_points: np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     differentiate:  np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
     integrate:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -200,18 +203,29 @@ class Numerics(Conditions):
         -------
         None
         """
-        if not self.discretization_method:
-            self.discretization_method = lambda: chebyshev_matrices(n=self.number_of_control_points,
-                                                                    calculate_integration=self.calculate_integration)
+        # Guard against spurious initialization with invalid control points (e.g. during JAX tracing)
+        if self.number_of_control_points <= 0:
+            return
 
-        (self.dimensionless.control_points,
-         self.dimensionless.differentiate,
-         self.dimensionless.integrate) = self.discretization_method()
+        if self.discretization_method:
+            (self.dimensionless.control_points,
+             self.dimensionless.differentiate,
+             self.dimensionless.integrate) = self.discretization_method()
+        else:
+            (self.dimensionless.control_points,
+             self.dimensionless.differentiate,
+             self.dimensionless.integrate) = chebyshev_matrices(
+                 n=self.number_of_control_points,
+                 calculate_integration=self.calculate_integration
+            )
 
         super(Numerics, self).__post_init__()
 
     def expand_rows(self, rows):
         pass  # Avoid resizing control points and differentiation arrays
+
+    def __eq__(self, other):
+        return self is other
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Unit Tests

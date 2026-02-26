@@ -12,7 +12,8 @@ from dataclasses import field
 import unittest
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions
@@ -78,6 +79,9 @@ class Conditions:
         # self.expand_columns(self._number_of_columns)
         self._attributes_frozen = True
 
+    def __eq__(self, other):
+        return self is other
+
     def expand_rows(self, rows: int):
         """
         Expand or resize the number of rows in the Conditions object and its attributes.
@@ -104,7 +108,8 @@ class Conditions:
         - Nested Conditions objects are expanded recursively.
 
         """
-        max_rows = int(rows) + self.row_size_adjustment
+        adj = self.row_size_adjustment if self.row_size_adjustment is not None else 0
+        max_rows = int(rows) + adj
         rows = max(1, max_rows)
         self._number_of_rows = rows
 
@@ -112,11 +117,26 @@ class Conditions:
             if isinstance(v, Conditions) and k != 'initials':
                 v.expand_rows(rows)
             elif isinstance(v, np.ndarray) and len(v.shape) <= 2 and k not in ["unknowns", "residuals"]:  # Scalar-valued arrays
-                vars(self)[k] = np.resize(v, (self._number_of_rows, v.shape[1]))
+                if v.shape[0] == self._number_of_rows:
+                    pass
+                elif v.shape[0] == 1:
+                    if v.shape[1] == 1:
+                        vars(self)[k] = np.full((self._number_of_rows, 1), v[0, 0])
+                    else:
+                        vars(self)[k] = np.tile(v, (self._number_of_rows, 1))
+                else:
+                    vars(self)[k] = np.resize(v, (self._number_of_rows, v.shape[1]))
             elif isinstance(v, np.ndarray) and k not in ["unknowns", "residuals"]:  # Vector-valued arrays
                 new_shape = list(v.shape)
                 new_shape[0] = self._number_of_rows
-                vars(self)[k] = np.resize(v, tuple(new_shape))
+                if v.shape[0] == self._number_of_rows:
+                    pass
+                elif v.shape[0] == 1:
+                    tile_shape = [1] * len(v.shape)
+                    tile_shape[0] = self._number_of_rows
+                    vars(self)[k] = np.tile(v, tuple(tile_shape))
+                else:
+                    vars(self)[k] = np.resize(v, tuple(new_shape))
 
     def pack_array(self):
         """
@@ -186,7 +206,7 @@ def _conditions_iter(self):
 
 
 Conditions.__getitem__ = _conditions_getitem
-Conditions.__setattr__ = _conditions_setattr
+# Conditions.__setattr__ = _conditions_setattr
 Conditions.__iter__ = _conditions_iter
 
 

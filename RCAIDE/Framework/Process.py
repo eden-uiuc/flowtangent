@@ -7,14 +7,15 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import dataclasses
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Callable, Iterable, Self, List
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 import pandas as pd
 import chex
+import jax
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
@@ -50,7 +51,7 @@ def skip(*args):
     return args
 
 
-@chex.dataclass(kw_only=True)
+@dataclass(kw_only=True)
 class ProcessStep:
     """
     A class representing a single step in a process.
@@ -75,7 +76,7 @@ class ProcessStep:
     settings:       "rcf.Settings"  = None
 
 
-    def __call__(self):
+    def __call__(self, state, system, settings):
         """
         __call__(self)
     
@@ -98,8 +99,11 @@ class ProcessStep:
         Examples
         --------
         """
-        framework_args = (self.state, self.system, self.settings)
-        return self.function(*framework_args)
+        
+        return self.function(state, system, settings)
+
+    def __eq__(self, other):
+        return self is other
     
     def __repr__(self):
         try:
@@ -117,9 +121,33 @@ class ProcessStep:
         except Exception:
             return object.__repr__(self)
 
+def process_step_flatten(step):
+    children = (step.state, step.system, step.settings, step.last_result)
+    aux_data = (step.function, step.tag)
 
+    return (children, aux_data)
 
-@chex.dataclass(kw_only=True)
+def process_step_unflatten(aux_data, children):
+
+    state, system, settings, last_result = children
+    function, tag = aux_data
+
+    return ProcessStep(
+        function=function,
+        tag=tag,
+        state=state,
+        system=system,
+        settings=settings,
+        last_result=last_result
+    )
+
+jax.tree_util.register_pytree_node(
+    ProcessStep,
+    process_step_flatten,
+    process_step_unflatten
+)
+
+@dataclass(kw_only=True)
 class Process:
     """
     A class representing a process made up of multiple process steps.
@@ -175,7 +203,7 @@ class Process:
     tag:                str             = "Process"
     keep_details:       bool            = False
 
-    steps:              List[Callable]  = field(default_factory=list)
+    steps:              tuple           = field(default_factory=tuple)
     details:            pd.DataFrame    = None
 
     current_step:       int             = 0
@@ -190,6 +218,9 @@ class Process:
     system:             "rcf.System"    = None
 
     last_result:        object          = None
+
+    def __eq__(self, other):
+        return self is other
 
     def __getitem__(self, item):
         """
@@ -221,12 +252,11 @@ class Process:
             return self.steps[item]
 
     def __setitem__(self, key, value):
-        if isinstance(key, str):
-            self.steps[self._index_tag(key)] = value
-            self.update_details()
-        else:
-            self.steps[key] = value
-            self.update_details()
+        index = self._index_tag(key) if isinstance(key, str) else key
+        temp_steps = list(self.steps)
+        temp_steps[index] = value
+        self.steps = tuple(temp_steps)
+        self.update_details()
 
     def __delitem__(self, key):
         """
@@ -254,7 +284,7 @@ class Process:
         del self.steps[key]
         self.update_details()
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, state, system, settings):
         """
         Executes the process, passing the state, settings, and system to each process step.
     
@@ -278,33 +308,46 @@ class Process:
         - The return value of the last process step is returned as the result of the __call__ method.
         """
     
-        self.update_details()
-    
-        framework_args = (self.state.initials,
-                          self.system,
-                          self.settings,)
+        current_state = state
+        current_system = system
+        current_settings = settings
 
-        self.current_step = self.initial_step
+        for step in self.steps[self.initial_step:]:
+            current_state, current_system, current_settings = step(
+                current_state, current_system, current_settings
+            )
 
-        for index, step in enumerate(self.steps[self.initial_step:]):
-
-            step.state = framework_args[0]
-            step.system = framework_args[1]
-            step.settings = framework_args[2]
-
-            framework_args = step()
-
-            self.steps[self.initial_step + index].last_result = framework_args
-            if self.keep_details:
-                self.details.at[self.initial_step + index, 'Last Result'] = framework_args
-
-            self.current_step += 1
-
-        return framework_args
+        return current_state, current_system, current_settings
 
     def run(self, *args, **kwargs):
 
         return self(*args, **kwargs)
+
+    def evaluate_history(self, state, system, settings):
+
+        current_state = state
+        current_system = system
+        current_settings = settings
+
+        for index, step in enumerate(self.steps[self.initial_step:]):
+            # 1. Run the pure math
+            current_state, current_system, current_settings = step(
+                current_state, current_system, current_settings
+            )
+            
+            # 2. Mutate the stateful trackers safely outside the solver
+            actual_index = self.initial_step + index
+            
+            # Since step is now a dataclass, we must use object assignment or replace
+            # (Assuming you don't need 'step' itself to be functionally pure here)
+            self.steps[actual_index].last_result = (current_state, current_system, current_settings)
+            
+            if self.keep_details and self.details is not None:
+                self.details.at[actual_index, 'Last Result'] = (
+                    current_state.replace(), current_system.replace(), current_settings.replace()
+                )
+
+        return current_state, current_system, current_settings
 
     def append(self, step: ProcessStep | Self):
         """
@@ -324,7 +367,7 @@ class Process:
         --------
         """
     
-        self.steps.append(step)
+        self.steps = tuple(list(self.steps) + [step])
         self.update_details()
     
         return None
@@ -782,6 +825,41 @@ class Process:
         # to avoid potential overhead if __class__ is instrumented by chex/jax.
         return f"<{type(self).__name__} tag='{self.tag}' step={self.current_step}/{len(self.steps)}>"
 
+
+def process_flatten(process):
+    
+    children = (process.steps,)
+    
+
+    aux_data = (
+        process.tag, 
+        process.initial_step, 
+        process.keep_details, 
+        process.details
+    )
+    
+    return (children, aux_data)
+
+def process_unflatten(aux_data, children):
+    
+    steps, = children
+    tag, initial_step, keep_details, details = aux_data
+    
+    
+    return Process(
+        tag=tag,
+        steps=steps,
+        initial_step=initial_step,
+        keep_details=keep_details,
+        details=details
+    )
+
+# Register the Process class with JAX's PyTree system
+jax.tree_util.register_pytree_node(
+    Process,
+    process_flatten,
+    process_unflatten
+)
 
 if __name__ == "__main__":
 

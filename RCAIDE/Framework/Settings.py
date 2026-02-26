@@ -34,7 +34,7 @@ class Settings:
     tag: str = 'Settings'
 
     # Mission Settings
-    root_finder: Callable = fsolve
+    root_finder: Callable = None
 
     analysis: AnalysisSettings = field(default_factory=lambda: AnalysisSettings())
 

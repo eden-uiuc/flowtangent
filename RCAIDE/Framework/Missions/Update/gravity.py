@@ -10,8 +10,6 @@
 
 import RCAIDE.Framework as rcf
 
-import RNUMPY as rp
-
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version
@@ -28,7 +26,7 @@ def update_gravity(
     """
 
     # UPDATE ME
-    state.freestream.gravity[:,0] = -9.81
+    state.freestream.gravity = state.freestream.gravity.at[:,0].set(-9.81)
 
 
     return state, system, settings

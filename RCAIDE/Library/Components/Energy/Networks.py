@@ -45,9 +45,22 @@ class EnergyLine(rcl.Component):
             super(EnergyLine, self).add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
 
     def __post_init__(self):
+        # Guard against JAX reconstruction artifacts where tags might be malformed (e.g. booleans)
+        if not (isinstance(self.propulsors.tag, str) and 
+                isinstance(self.converters.tag, str) and 
+                isinstance(self.stores.tag, str)):
+            return
+
+        # If subcomponents are already populated, do not add them again.
+        if self.subcomponents:
+            return
+
         self.add_subcomponent(self.propulsors)
         self.add_subcomponent(self.converters)
         self.add_subcomponent(self.stores)
+
+    def __eq__(self, other):
+        return self is other
 
     @staticmethod
     def calculate_performance(state: "rcf.State",
@@ -68,7 +81,18 @@ class EnergyNetwork(rcl.Component):
     lines: rcl.Component = field(default_factory=lambda: rcl.Component(tag='Lines'))
 
     def __post_init__(self):
+        # Guard against JAX reconstruction artifacts
+        if not isinstance(self.lines.tag, str):
+            return
+
+        # If subcomponents are already populated, do not add them again.
+        if self.subcomponents:
+            return
+
         self.add_subcomponent(self.lines)
+
+    def __eq__(self, other):
+        return self is other
 
     @staticmethod
     def calculate_performance(state: "rcf.State",

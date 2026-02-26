@@ -9,13 +9,15 @@
 
 import unittest
 
+import jax
 import chex
 from dataclasses import field
 from warnings import warn
 from typing import TypeVar, List
 
 # package imports 
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Library.Attributes.Materials import Solid, Aluminum
@@ -35,6 +37,9 @@ class ComponentFineness:
     nose:           float   = 0.0
     tail:           float   = 0.0
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class ComponentDimensions:
@@ -51,6 +56,12 @@ class ComponentDimensions:
     front_projected:    float   = 0.0
     top_projected:      float   = 0.0
     side_projected:     float   = 0.0
+
+    def __eq__(self, other):
+        return self is other
+
+    def __repr__(self):
+        return f"Ref.: {self.reference}"
 
 
 @chex.dataclass(kw_only=True)
@@ -76,6 +87,12 @@ class ComponentAreas:
     wetted:             float   = 0.0
     exposed:            float   = 0.0
 
+    def __eq__(self, other):
+        return self is other
+
+    def __repr__(self):
+        return f"Ref.: {self.reference}"
+
 
 @chex.dataclass(kw_only=True)
 class MaterialProperties:
@@ -84,6 +101,9 @@ class MaterialProperties:
     tensile_stress_carrier:     Solid   = field(default_factory=Aluminum)
     torsional_stress_carrier:   Solid   = field(default_factory=Aluminum)
     shear_stress_carrier:       Solid   = field(default_factory=Aluminum)
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -101,12 +121,25 @@ class MassProperties:
     moments_of_inertia:                 np.ndarray  = field(default_factory=lambda: np.zeros((3, 3)))
     subcomponent_moments_of_inertia:    np.ndarray  = field(default_factory=lambda: np.zeros((3, 3)))
 
-    def __post_init__(self):
-        if not np.any(self.density):
-            try:
-                self.density = self.total / self.volume
-            except (ValueError, ZeroDivisionError) as e:
-                warn("Error in calculating component density. Check mass and volume specifications.")
+    # def __post_init__(self):
+    #     # Optimization: Skip this logic during JAX tracing to avoid graph explosion
+    #     if isinstance(self.density, jax.core.Tracer):
+    #         return
+
+    #     try:
+    #         if not np.any(self.density):
+    #             try:
+    #                 self.density = self.total / self.volume
+    #             except (ValueError, ZeroDivisionError) as e:
+    #                 warn("Error in calculating component density. Check mass and volume specifications.")
+    #     except Exception:
+    #         pass # Skip if other JAX issues prevent check
+
+    def __eq__(self, other):
+        return self is other
+
+    def __repr__(self):
+        return f"Total: {self.total}"
 
 
 @chex.dataclass(kw_only=True)
@@ -140,6 +173,13 @@ class Component:
 
     def __post_init__(self):
         self._attributes_frozen = True
+
+    def __eq__(self, other):
+        return self is other
+    
+    def __repr__(self):
+        repr_str = self.tag + " - Subcomponents: [" + ', '.join([sc.tag for sc in self.subcomponents])+"]"
+        return repr_str
 
     def get_field_name(self):
         return self.tag.replace(' ', '_').lower()
@@ -176,6 +216,10 @@ class Component:
                          ):
 
         if isinstance(subcomponent, Component):
+            # Guard against JAX reconstruction artifacts where tag is not a string
+            if not isinstance(subcomponent.tag, str):
+                return
+
             super(Component,self).__setattr__(subcomponent.get_field_name(), subcomponent)
             self.subcomponents.append(subcomponent)
         else:

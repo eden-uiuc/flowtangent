@@ -9,8 +9,8 @@
 # RCAIDE Imports
 
 import RCAIDE.Framework as rcf
-
-import RNUMPY as rp
+#import numpy as np
+import jax.numpy as np
 
 
 # -------------------------------------------------------------------------------
@@ -33,12 +33,12 @@ def update_mass_and_weight(
     g     = state.freestream.gravity
 
     # calculate
-    m = m0 + rp.dot(I, mdot )
+    m = m0 + np.dot(I, mdot )
     W = m*g
 
     # pack
-    state.mass.total[1:,0]                  = m[1:,0] # m0 is the initial, so don't change it
-    state.frames.inertial.gravity_force_vector[:,2] = W[:,0]
+    state.mass.total = state.mass.total.at[1:,0].set(m[1:,0]) # m0 is the initial, so don't change it
+    state.frames.inertial.gravity_force_vector = state.frames.inertial.gravity_force_vector.at[:,2].set(W[:,0])
 
 
     return state, system, settings

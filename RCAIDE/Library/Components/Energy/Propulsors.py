@@ -33,6 +33,9 @@ class DesignParameters:
 
     mass_flow_through_rate: float = 0.0
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class Propulsor(EnergyConverter):
@@ -41,6 +44,9 @@ class Propulsor(EnergyConverter):
                                                         lambda: rcl.Component(tag='Propulsor Converters'))
 
     design_thrust_parameters:   DesignParameters = field(default_factory=DesignParameters)
+
+    def __eq__(self, other):
+        return self is other
 
     def compute_thrust(self):
         raise NotImplementedError("Subclasses must implement this method")
@@ -57,6 +63,9 @@ class JetInstallationGeometry:
     xe: float = 1.
     ye: float = 1.
     Ce: float = 2.
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -76,7 +85,13 @@ class JetEngine(Propulsor):
 
     installation_geometry:  JetInstallationGeometry     = field(default_factory=JetInstallationGeometry)
 
+    def __eq__(self, other):
+        return self is other
+
     def __post_init__(self):
+
+        if self.converters.subcomponents:
+            return
 
         self.converters.add_subcomponent(FlowConverter(tag='Combustor'))
 
@@ -88,7 +103,13 @@ class TurbojetEngine(JetEngine):
 
     tag: str = 'Turbojet'
 
+    def __eq__(self, other):
+        return self is other
+
     def __post_init__(self):
+        if self.converters.subcomponents:
+            return
+
         super(TurbojetEngine, self).__post_init__()
 
         self.converters.add_subcomponent(FlowConverter(tag='Inlet Nozzle'))
@@ -114,7 +135,13 @@ class TurbofanEngine(TurbojetEngine):
     bypass_ratio = 1.0
     exa: float = 1.0        # Fan Face-to-Exit Distance
 
+    def __eq__(self, other):
+        return self is other
+
     def __post_init__(self):
+        if self.converters.subcomponents:
+            return
+
         super(TurbofanEngine, self).__post_init__()
 
         self.converters.add_subcomponent(FlowConverter(tag='Fan'))

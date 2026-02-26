@@ -12,7 +12,8 @@ from dataclasses import field
 from functools import reduce
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 import RCAIDE.Library.Components
 # RCAIDE imports
@@ -24,6 +25,16 @@ from RCAIDE.Framework.Missions.Conditions import (
 #  State
 # ----------------------------------------------------------------------------------------------------------------------
 
+def update_nested_dataclass(obj, path, new_value):
+        if len(path) == 1:
+            return obj.replace(**{path[0]: new_value})
+        
+        child_name = path[0]
+        child_obj = getattr(obj, child_name)
+
+        updated_child = update_nested_dataclass(child_obj, path[1:], new_value)
+
+        return obj.replace(**{child_name: updated_child})
 
 @chex.dataclass(kw_only=True)
 class State(Conditions):
@@ -68,26 +79,32 @@ class State(Conditions):
                 print(f"- {residual.tag}")
 
         return valid_controls
-
-
-
-    def unpack_unknowns(self):
+    
+    def __post_init__(self):
+        self.expand_rows(self.numerics.number_of_control_points)
+    
+    def unpack_unknowns(self, unknowns):
         """
         Finds the active control variables and assigns the unknowns to their locations in state.
         """
 
-        n_points    = self.numerics.number_of_control_points
+        n_points    = int(self.numerics.number_of_control_points)
         control_idx = 0
 
-        for name, control_var in vars(self.controls).items():
-            if hasattr(control_var, 'path'):
-                if hasattr(control_var, 'active') and control_var.active:
-                    values = self.unknowns[control_idx : control_idx + n_points]   # Extract control values from unknowns
-                    values = np.reshape(values, (-1, 1))                  # Reshape to column vector
-                    destination = reduce(getattr, control_var.path, self)          # Find destination within state
-                    destination[control_var.path_indices] = values.flatten()       # Assign to destination in state
-                    control_idx += n_points
-        return
+        current_state = self
+
+        for control_var in self.controls.get_active_controls():
+            if hasattr(control_var, 'path') and getattr(control_var, 'active', False):
+                
+                values          = unknowns[control_idx : control_idx + n_points] # Extract control values from unknowns
+                current_array   = reduce(getattr, control_var.path, current_state)
+                new_array       = current_array.at[control_var.path_indices].set(values)
+                
+                current_state = update_nested_dataclass(current_state, control_var.path, new_array)
+
+                control_idx += n_points
+        
+        return current_state
 
     def pack_residuals(self):
         """
@@ -97,13 +114,14 @@ class State(Conditions):
         n_points = self.numerics.number_of_control_points
         residual_list = []
 
-        for name, residual in vars(self.dynamics).items():
-            if hasattr(residual, 'active') and residual.active:
+        for _, residual in vars(self.dynamics).items():
+            if getattr(residual, 'active', False):
                 residual_list.append(residual.value)
 
         if residual_list:
-            self.residuals = np.column_stack(residual_list)
-        else: self.residuals = np.empty(n_points, 0)
+            stacked_residuals = np.column_stack(residual_list)
+        else:
+            stacked_residuals = np.empty((n_points, 0))
 
         return
 

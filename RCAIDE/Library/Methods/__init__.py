@@ -9,13 +9,13 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from . import Aerodynamics
-from . import Costs 
+# from . import Costs 
 from . import Energy
-from . import Geometry 
+# from . import Geometry 
 from . import Propulsors 
-from . import Performance
-from . import Utilities
-from . import Weights
+# from . import Performance
+# from . import Utilities
+# from . import Weights
 
 from .skip import skip
 

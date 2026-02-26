@@ -7,7 +7,8 @@
 # -------------------------------------------------------------------------------
 
 # Package Imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 from scipy.optimize import fsolve
 
 

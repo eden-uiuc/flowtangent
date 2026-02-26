@@ -13,7 +13,8 @@ from decimal import Decimal
 from pathlib import Path
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 from scipy import interpolate
 
 # RCAIDE imports
@@ -41,6 +42,9 @@ class Airfoil(rcl.Component):
 
     y_upper_surface: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))
     y_lower_surface: np.ndarray = field(default_factory=np.empty(shape=(0, 1)))
+
+    def __eq__(self, other):
+        return self is other
 
     @classmethod
     def NACA_4_Series(cls, series_number: str | int, n_pts: int = 201, edge_factor: float = 1.5):
@@ -102,7 +106,7 @@ class Airfoil(rcl.Component):
             def x2c_corrected(x, c):
 
                 idx = np.where(x < camber_location)[0]
-                c[idx] = camber / camber_location ** 2 * (2 * camber_location * x[idx] - x[idx] ** 2)
+                c = c.at[idx].set(camber / camber_location ** 2 * (2 * camber_location * x[idx] - x[idx] ** 2))
 
                 return c
 

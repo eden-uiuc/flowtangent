@@ -12,7 +12,8 @@ import chex
 from dataclasses import field
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions

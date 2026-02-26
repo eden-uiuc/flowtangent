@@ -20,6 +20,6 @@ def expand_state(state: "rcf.State",
                  settings: "rcf.Settings",
                  ):
 
-    state.expand_rows(rows=state.numerics.number_of_control_points)
+    state.expand_rows(rows=int(state.numerics.number_of_control_points))
 
     return state, system, settings

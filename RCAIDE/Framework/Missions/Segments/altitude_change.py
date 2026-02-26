@@ -8,7 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import chex
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 import RCAIDE.Framework as rcf
 

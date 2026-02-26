@@ -1,11 +1,16 @@
+import jax
+jax.config.update('jax_disable_jit', True)
+
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 
 from RCAIDE.Framework.System import VehicleEnvelope
 
-from copy import deepcopy
+#import numpy as np
+import jax.numpy as np
 
-import numpy as np
+import tracemalloc
+tracemalloc.start()
 
 
 def vehicle_setup():
@@ -398,18 +403,19 @@ def vehicle_setup():
     nacelle.flow_through = True
     nacelle.airfoil = rcl.Components.Airfoils.Airfoil.NACA_4_Series('2410')
 
-    nacelle.origin = np.array([[13.72, -4.86, -1.9]])
+    nacelle.origin              = np.array([[13.72, -4.86, -1.9]])
 
-    nacelle.lengths.total = 2.71
+    nacelle.lengths.total       = 2.71
 
     nacelle.diameters.maximum   = 2.05
     nacelle.diameters.inlet     = 1.90
 
-    nacelle.areas.wetted = 1.1 * np.pi * nacelle.diameters.maximum * nacelle.lengths.total
+    nacelle.areas.wetted        = 1.1 * np.pi * nacelle.diameters.maximum * nacelle.lengths.total
 
-    nacelle_2 = deepcopy(nacelle)
-    nacelle_2.name = 'Engine Nacelle 2'
-    nacelle_2.origin = np.array([[13.72, 4.86, -1.9]])
+    nacelle_2 = nacelle.replace(
+        tag="Engine Nacelle 2",
+        origin = np.array([[13.72, 4.86, -1.9]])
+    )
 
     vehicle.add_subcomponent(nacelle)
     vehicle.add_subcomponent(nacelle_2)
@@ -473,9 +479,10 @@ def vehicle_setup():
     tf.converters.fan_nozzle.pressure_ratio             = 0.99
     tf.converters.fan_nozzle.diameters.reference        = 1.659
 
-    tf2 = deepcopy(tf)
-    tf2.name    = 'Engine 2'
-    tf2.origin  = nacelle_2.origin
+    tf2 = tf.replace(
+        tag = "Engine 2",
+        origin = nacelle_2.origin
+    )
 
     vehicle.energy.lines[0].converters.add_subcomponent(tf)
     vehicle.energy.lines[0].converters.add_subcomponent(tf2)
@@ -498,54 +505,54 @@ def vehicle_setup():
 
     # Takeoff Configuration
 
-    takeoff_config = deepcopy(vehicle)
-    takeoff_config.tag = "Takeoff"
-    takeoff_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(20)
-    takeoff_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(25)
+    # takeoff_config = deepcopy(vehicle)
+    # takeoff_config.tag = "Takeoff"
+    # takeoff_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(20)
+    # takeoff_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(25)
 
-    for tf in takeoff_config.energy.lines[0].converters:
+    # for tf in takeoff_config.energy.lines[0].converters:
 
-        tf: rcl.Components.Energy.Propulsors.TurbofanEngine
-        tf.converters.fan.rotation_speed        = 2780.
-        tf.converters.fan_nozzle.noise_speed    = 315.
-        tf.converters.core_nozzle.noise_speed   = 415.
+    #     tf: rcl.Components.Energy.Propulsors.TurbofanEngine
+    #     tf.converters.fan.rotation_speed        = 2780.
+    #     tf.converters.fan_nozzle.noise_speed    = 315.
+    #     tf.converters.core_nozzle.noise_speed   = 415.
 
-    vehicle.configurations.add_subcomponent(takeoff_config)
+    # vehicle.configurations.add_subcomponent(takeoff_config)
 
-    # Cutback Configuration
+    # # Cutback Configuration
 
-    cutback_config = deepcopy(vehicle)
-    cutback_config.tag = "Cutback"
-    cutback_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(20)
-    cutback_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(20)
+    # cutback_config = deepcopy(vehicle)
+    # cutback_config.tag = "Cutback"
+    # cutback_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(20)
+    # cutback_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(20)
 
-    for tf in cutback_config.energy.lines[0].converters:
+    # for tf in cutback_config.energy.lines[0].converters:
 
-        tf: rcl.Components.Energy.Propulsors.TurbofanEngine
-        tf.converters.fan.rotation_speed        = 2780.
-        tf.converters.fan_nozzle.noise_speed    = 210.
-        tf.converters.core_nozzle.noise_speed   = 360.
+    #     tf: rcl.Components.Energy.Propulsors.TurbofanEngine
+    #     tf.converters.fan.rotation_speed        = 2780.
+    #     tf.converters.fan_nozzle.noise_speed    = 210.
+    #     tf.converters.core_nozzle.noise_speed   = 360.
 
-    vehicle.configurations.add_subcomponent(cutback_config)
+    # vehicle.configurations.add_subcomponent(cutback_config)
 
-    # Landing Configuration
+    # # Landing Configuration
 
-    landing_config = deepcopy(vehicle)
-    landing_config.tag = "Landing"
-    landing_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(30)
-    landing_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(25)
+    # landing_config = deepcopy(vehicle)
+    # landing_config.tag = "Landing"
+    # landing_config.wings.main_wing.control_surfaces.flap.deflection    = np.deg2rad(30)
+    # landing_config.wings.main_wing.control_surfaces.slat.deflection    = np.deg2rad(25)
 
-    landing_config.landing_gear.main_landing_gear.deployed = True
-    landing_config.landing_gear.main_landing_gear.deployed = True
+    # landing_config.landing_gear.main_landing_gear.deployed = True
+    # landing_config.landing_gear.main_landing_gear.deployed = True
 
-    for tf in landing_config.energy.lines[0].converters:
+    # for tf in landing_config.energy.lines[0].converters:
 
-        tf: rcl.Components.Energy.Converters.TurbofanEngine
-        tf.converters.fan.rotation_speed        = 2030.
-        tf.converters.fan_nozzle.noise_speed    = 109.3
-        tf.converters.core_nozzle.noise_speed   = 92.
+    #     tf: rcl.Components.Energy.Converters.TurbofanEngine
+    #     tf.converters.fan.rotation_speed        = 2030.
+    #     tf.converters.fan_nozzle.noise_speed    = 109.3
+    #     tf.converters.core_nozzle.noise_speed   = 92.
 
-    vehicle.configurations.add_subcomponent(landing_config)
+    # vehicle.configurations.add_subcomponent(landing_config)
 
     return vehicle
 
@@ -580,32 +587,32 @@ def state_setup():
 
     state.freestream.atmosphere = rcl.Atmospheres.USStandard1976()
 
-    state.initials = state
+    frozen_initials = state.replace(initials=None)
+    
+    state = state.replace(initials=frozen_initials)
 
     return state
 
 
-def mission_b737():
+def mission_b737(state, system, settings):
 
-    # Initialize State
-
-    state = state_setup()
-
-    # Initialize System from Vehicle Setup
-    system      = vehicle_setup()
-
-    # Initialize Settings
-    settings    = rcf.Settings()
 
     mission             = mission_setup(settings)
     mission.state       = state
     mission.system      = system
     mission.settings    = settings
 
-    final_state, final_system, final_settings = mission.run()
+    final_state, final_system, final_settings = mission.run(state, system, settings)
 
     return final_state, final_system, final_settings
 
 
 if __name__ == '__main__':
-    st, sy, se = mission_b737()
+  
+    state = state_setup()
+    system = vehicle_setup()
+    settings = rcf.Settings()
+
+    st, sy, se = mission_b737(state, system, settings)
+
+    print("Done!")

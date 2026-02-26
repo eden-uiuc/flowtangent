@@ -46,7 +46,7 @@ class Aircraft(System):
 
     tag:           str = 'Aircraft'
 
-    energy:         rcl.Component = field(default_factory=lambda: rcl.Components.Energy.Networks.EnergyNetwork())
+    energy:         rcl.Component = field(default_factory=lambda: rcl.Components.Energy.Networks.EnergyNetwork(tag="Energy"))
     wings:          rcl.Component = field(default_factory=lambda: rcl.Component(tag='Wings'))
     fuselages:      rcl.Component = field(default_factory=lambda: rcl.Component(tag='Fuselages'))
     nacelles:       rcl.Component = field(default_factory=lambda: rcl.Component(tag='Nacelles'))

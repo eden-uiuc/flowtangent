@@ -7,7 +7,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE Imports
 import RCAIDE.Framework as rcf
@@ -49,7 +50,7 @@ def initialize_energy(state: "rcf.State",
         for k, v in vars(conditions).items():
 
             if isinstance(v, np.ndarray):
-                v[:, 0] = vars(initial_conditions)[k][-1, 0]
+                v = v.at[:, 0].set(vars(initial_conditions)[k][-1, 0])
             elif isinstance(v, int) or isinstance(v, float):
                 v = vars(initial_conditions)[k]
             if isinstance(v, Conditions):

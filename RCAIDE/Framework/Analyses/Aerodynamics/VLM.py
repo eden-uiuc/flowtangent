@@ -12,7 +12,8 @@ from dataclasses import field
 from typing import Callable
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf

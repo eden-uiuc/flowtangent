@@ -10,7 +10,8 @@
 
 from RCAIDE.Framework.Core import Units
 
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

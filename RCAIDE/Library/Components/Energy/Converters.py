@@ -23,6 +23,9 @@ class EnergyConverter(rcl.Component):
 
     efficiency:             float = 1.0
 
+    def __eq__(self, other):
+        return self is other
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsor Subcomponents
@@ -43,6 +46,9 @@ class FlowConverter(EnergyConverter):
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class OfftakeShaft(EnergyConverter):
@@ -52,4 +58,7 @@ class OfftakeShaft(EnergyConverter):
     power_draw:             float = 0.0
     reference_temperature:  float = 298.15      # Kelvin
     reference_pressure:     float = 101325.0    # Pascal
+
+    def __eq__(self, other):
+        return self is other
 

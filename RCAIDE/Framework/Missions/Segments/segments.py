@@ -13,16 +13,21 @@ from dataclasses import field
 # package imports
 
 import jax
-import jax.numpy as jnp
-import scipy.optimize
-
 import chex
+import scipy
+
+first_structure = None
+first_treedef = None
+
+import optimistix as optx
+from jaxopt import ScipyRootFinding
 
 jax.config.update("jax_enable_x64", True)
 
 from jax import jit, grad
 
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 from scipy.optimize import minimize, NonlinearConstraint, fsolve
 
 # RCAIDE imports
@@ -50,18 +55,30 @@ class InitializeSegment(Process):
 
     controls_initial_guess: np.ndarray = None
 
-    def _activate_control(self, control: str | ControlVariable) -> None:
+    @staticmethod
+    def _activate_control(control: str | ControlVariable, state: "rcf.State") -> None:
+        
+        current_state = state
+        
         if isinstance(control, str):
             control = control.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
-            if control not in self.state.controls.keys():
-                self.state.controls.add_control_variable(ControlVariable(tag=control))
-            self.state.controls[control].active = True
+            if control not in vars(current_state.controls).keys():
+                current_state.controls.add_control_variable(ControlVariable(tag=control))
+            current_state.controls[control].active = True
         else:
-            self.state.controls.add_control_variable(control)
+            current_state.controls.add_control_variable(control)
+        
+        return current_state
 
-    def _activate_residual(self, residual_name: str) -> None:
+    @staticmethod
+    def _activate_residual(residual_name: str, state) -> None:
+        
+        current_state = state
+        
         residual_name = residual_name.replace(' ', '_').lower()  # Normalize residual name to lowercase and replace spaces with underscores
-        self.state.dynamics[residual_name].active = True
+        current_state.dynamics[residual_name].active = True
+
+        return current_state
 
     def __post_init__(self):
 
@@ -78,41 +95,39 @@ class InitializeSegment(Process):
         for name, function in default_steps:
             self.append(ProcessStep(tag=name, function=function))
 
-    def __call__(self):
+    def __call__(self, state, system, settings):
+        
+        current_state = state
+
         for ctrl_name in self.active_controls:
-            self._activate_control(ctrl_name)
+            current_state = self._activate_control(ctrl_name, current_state)
         if isinstance(self.controls_initial_guess, np.ndarray):
-            self.state.unknowns = self.controls_initial_guess
+            current_state.unknowns = self.controls_initial_guess
         elif isinstance(self.controls_initial_guess, tuple):
-            self.state.unknowns = np.concatenate([np.ones(self.state.numerics.number_of_control_points) * v for v in self.controls_initial_guess])
+            n_cp = int(current_state.numerics.number_of_control_points)
+            current_state.unknowns = np.concatenate([np.full((n_cp,), v) for v in self.controls_initial_guess])
         else:
-            self.state.unknowns = np.zeros((self.state.numerics.number_of_control_points * len(self.active_controls)))
+            current_state.unknowns = np.zeros((self.state.numerics.number_of_control_points * len(self.active_controls)))
 
         for res_name in self.active_residuals:
-            self._activate_residual(res_name)
-        self.state.residuals = np.zeros((self.state.numerics.number_of_control_points, len(self.active_residuals)))
+            current_state = self._activate_residual(res_name, current_state)
+        current_state.residuals = np.zeros((current_state.numerics.number_of_control_points, len(self.active_residuals)))
 
-        assert self.state.check_controls(verbose=False), (
+        assert current_state.check_controls(verbose=False), (
             f"During initialization of {self.tag} the number of active controls"
             "did not match the number of active residuals.\n"
             "Please run State.check_controls(verbose=True) to see details"
         )
 
-        return super(InitializeSegment, self).__call__()
+        current_state = current_state.unpack_unknowns(current_state.unknowns)
+
+        return super(InitializeSegment, self).__call__(current_state, system, settings)
 
 
 @chex.dataclass(kw_only=True)
 class AnalyzeSegment(Process):
 
     tag: str = "Segment Analysis Specification"
-
-    gravity:                Callable = lambda st, sy, se: skip(st, sy, se)
-    energy:                 Callable = lambda st, sy, se: skip(st, sy, se)
-    aerodynamics:           Callable = lambda st, sy, se: skip(st, sy, se)
-    stability:              Callable = lambda st, sy, se: skip(st, sy, se)
-    planetary_position:     Callable = lambda st, sy, se: skip(st, sy, se)
-
-    calculate_residuals:    Callable = flight_dynamics_residuals
 
     def __post_init__(self):
 
@@ -124,19 +139,58 @@ class AnalyzeSegment(Process):
             ("Gravity",              update_gravity),
             ("Freestream",           update_freestream),
             ("Orientations",         update_orientations),
-            ("Energy",               self.energy),
-            ("Aerodynamics",         self.aerodynamics),
-            ("Stability",            self.stability),
+            ("Energy",               skip),
+            ("Aerodynamics",         skip),
+            ("Stability",            skip),
             ("Mass",                 update_mass_and_weight),
             ("Forces",               update_forces),
             ("Moments",              update_moments),
-            ("Planetary Position",   self.planetary_position),
-            ("Calculate Residuals",  self.calculate_residuals)
+            ("Planetary Position",   skip),
+            ("Calculate Residuals",  flight_dynamics_residuals)
         ]
 
         for name, function in default_steps:
             self.append(ProcessStep(tag=name, function=function))
 
+def static_pure_residuals(unknowns, segment, state, system, settings):
+
+    return segment._get_pure_residuals(unknowns, state, system, settings)
+
+def find_circular_references(obj, path="root", visited=None):
+    if visited is None:
+        visited = set()
+        
+    # Skip basic types and arrays (they don't hold other objects)
+    if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
+        return
+    if type(obj).__name__ in ('ndarray', 'ArrayImpl', 'DynamicJaxprTracer'):
+        return
+
+    obj_id = id(obj)
+    
+    # If we've seen this exact object ID in this branch, we found the loop!
+    if obj_id in visited:
+        print(f"CIRCULARITY FOUND:")
+        print(f"Path: {path} loops back to an already visited {type(obj).__name__}")
+        return
+
+    # Add this object's ID to the visited set for this branch
+    visited.add(obj_id)
+
+    # Recursively check dictionaries
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            find_circular_references(v, f"{path}['{k}']", visited.copy())
+            
+    # Recursively check lists
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            find_circular_references(v, f"{path}[{i}]", visited.copy())
+            
+    # Recursively check custom objects and dataclasses
+    elif hasattr(obj, '__dict__'):
+        for k, v in vars(obj).items():
+            find_circular_references(v, f"{path}.{k}", visited.copy())
 
 @chex.dataclass(kw_only=True)
 class IterateSegment(Process):
@@ -146,7 +200,7 @@ class IterateSegment(Process):
     analyze:        Process = None
 
     # Root-finder arguments and parser
-    root_finder:            Callable    = fsolve
+    root_finder:            Callable    = ScipyRootFinding
     root_finder_args:       Tuple       = None
     root_finder_kwargs:     dict        = None
 
@@ -154,49 +208,101 @@ class IterateSegment(Process):
     update_kwargs:          Callable    = fsolve_update_kwargs
     results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = fsolve_results_parser
 
-    def _get_fsolve_residuals(self, unknowns):
+    def _get_fsolve_residuals(self, unknowns, state, system, settings):
         """
         Wraps the analysis step to calculate residuals for fsolve.
         """
 
-        self.state.unknowns = unknowns
-        self.state.unpack_unknowns()
+        current_state = state.unpack_unknowns(unknowns)
 
-        self.analyze.state          = self.state
-        self.analyze.system         = self.system
-        self.analyze.settings       = self.settings
+        current_state, current_system, current_settings = self.analyze(
+            current_state, system, settings
+        )
 
-        self.state, self.system, self.settings = self.analyze()
-
-        self.state.pack_residuals()
+        current_state.pack_residuals()
 
         if self.update_args:
             self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
         if self.update_kwargs:
             self.root_finder_kwargs = self.update_kwargs(self.root_finder_kwargs, self.state, self.system, self.settings)
 
-        return self.state.residuals.ravel(order='F')
+        return current_state.residuals.ravel(order='F')
+    
+    def _get_pure_residuals(self, unknowns, state, system, settings):
+        """
+        Wraps the analysis step to calculate residuals for fsolve.
+        """
+
+        current_state = state.unpack_unknowns(unknowns)
+
+        current_state, _, _ = self.analyze(current_state, system, settings)
+
+        current_state = current_state.pack_residuals()
+
+        return current_state.residuals.ravel(order='F')
+                
+        # Call your actual pure residual function
+        return self._get_pure_residuals(unknowns, state, system, settings)
+
+    def __call__(self, state, system, settings):
+    
+
+        if self.root_finder is fsolve:
+            if self.root_finder_kwargs is None:
+
+                self.root_finder_kwargs = {
+                    'func': self._get_fsolve_residuals,
+                    'x0': self.state.unknowns,
+                    'args': (state, system, settings),
+                    'xtol': self.state.numerics.solution_tolerance,
+                    'maxfev': self.state.numerics.max_evaluations,
+                    'epsfcn': self.state.numerics.step_size,
+                    'full_output': True
+                }
 
 
-    def __call__(self):
+            results = self.root_finder(**self.root_finder_kwargs)
 
-        if self.root_finder is fsolve and self.root_finder_kwargs is None:
+            self.state, self.system, self.settings = fsolve_results_parser(results, self.state, self.system, self.settings)
 
-            self.root_finder_kwargs = {
-                'func': self._get_fsolve_residuals,
-                'x0': self.state.unknowns,
-                # 'args': self.state.unknowns,
-                'xtol': self.state.numerics.solution_tolerance,
-                'maxfev': self.state.numerics.max_evaluations,
-                'epsfcn': self.state.numerics.step_size,
-                'full_output': True
-            }
 
-        results = self.root_finder(**self.root_finder_kwargs)
+        if self.root_finder is ScipyRootFinding:
 
-        self.state, self.system, self.settings = self.results_parser(results, self.state, self.system, self.settings)
+            self.update_kwargs = False
 
+            current_state = state
+            current_system = system
+            current_settings = settings
+
+            x0 = current_state.unknowns
+
+            combined_args = (self, current_state, current_system, current_settings)
+
+            root = ScipyRootFinding(
+                method='hybr',
+                optimality_fun=static_pure_residuals,
+                tol = current_state.numerics.solution_tolerance,
+                jit=False,  #TODO: Test JIT compilation
+            )
+
+            print("--- Hunting for cycles in State ---")
+            find_circular_references(current_state, path="state")
+
+            print("--- Hunting for cycles in System ---")
+            find_circular_references(current_system, path="system")
+
+            print("--- Hunting for cycles in Settings ---")
+            find_circular_references(current_settings, path="settings")
+
+            unknowns, _ = root.run(x0, combined_args)
+
+            self.state.unknowns = unknowns
+            self.state = self.state.unpack_unknowns(self.state.unknowns)
+
+            self.state, self.system, self.settings = self.analyze(self.state, self.system, self.settings)
+        
         return self.state, self.system, self.settings
+        
 
 
 @chex.dataclass(kw_only=True)
@@ -222,7 +328,7 @@ class FinalizeSegment(Process):
         return state, system, settings
 
     def __post_init__(self):
-        self.steps.append(
+        self.append(
             ProcessStep(tag='Reset Controls and Residuals',
                         function=self._reset_controls_and_residuals)
         )

@@ -22,6 +22,6 @@ class TestAero(rcf.Process):
     tag = "Test Aerodynamic Analysis"
 
     def __post_init__(self):
-        self.steps.append(rcf.ProcessStep(tag="Direct Aero Calculation",
+        self.append(rcf.ProcessStep(tag="Direct Aero Calculation",
                                           function=rcf.Methods.Aerodynamics.Test_Aero.direct_aero)
                           )

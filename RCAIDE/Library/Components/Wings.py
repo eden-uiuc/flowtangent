@@ -7,7 +7,8 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 import chex
 from dataclasses import field
@@ -247,7 +248,7 @@ class Wing(rcl.Component):
         AR = (span**2)/ref_area
 
         # Calculate the total span
-        lens = lengths_dim/np.cos(dihedrals[:-1])
+        lens = lengths_dim/np.cos(np.array(dihedrals)[:-1])
         total_len = np.sum(np.array(lens))*(1+sym)
 
         # Calculate the mean geometric chord
@@ -259,7 +260,7 @@ class Wing(rcl.Component):
         C = span_locs[:-1]
         integral = ((A+B*(span_locs[1:]-C))**3-(A+B*(span_locs[:-1]-C))**3)/(3*B)
         # For the cases when the wing doesn't taper in a spot
-        integral[np.isnan(integral)] = (A[np.isnan(integral)]**2)*(lengths_ndim[np.isnan(integral)])
+        integral = integral.at[np.isnan(integral)].set((A[np.isnan(integral)]**2)*(lengths_ndim[np.isnan(integral)]))
         MAC = (semispan*(1+sym)/ref_area)*np.sum(integral)
 
         # Calculate the taper ratio
@@ -283,7 +284,7 @@ class Wing(rcl.Component):
         # Calculate the aerodynamic center, but first the centroid
         dxs = np.cumsum(np.concatenate([np.array([0]),np.tan(le_sweeps[:-1])*lengths_dim[:-1]]))
         dys = np.cumsum(np.concatenate([np.array([0]),lengths_dim[:-1]]))
-        dzs = np.cumsum(np.concatenate([np.array([0]),np.tan(dihedrals[:-2])*lengths_dim[:-1]]))
+        dzs = np.cumsum(np.concatenate([np.array([0]),np.tan(np.array(dihedrals)[:-2])*lengths_dim[:-1]]))
 
         Cxys = []
         for i in range(len(lengths_dim)):
@@ -295,14 +296,14 @@ class Wing(rcl.Component):
                                           chords_dim[i],
                                           chords_dim[i+1]))
 
-        aerodynamic_center = (np.dot(np.transpose(Cxys),As)/(ref_area/(1+sym)))
+        aerodynamic_center = (np.dot(np.transpose(np.array(Cxys)),As)/(ref_area/(1+sym)))
 
         single_side_aerodynamic_center = (np.array(aerodynamic_center)*1.)
-        single_side_aerodynamic_center[0] = single_side_aerodynamic_center[0] - MAC*.25
+        single_side_aerodynamic_center = single_side_aerodynamic_center.at[0].set(single_side_aerodynamic_center[0] - MAC*.25)
         if sym== True:
-            aerodynamic_center[1] = 0
+            aerodynamic_center = aerodynamic_center.at[1].set(0)
 
-        aerodynamic_center[0] = single_side_aerodynamic_center[0]
+        aerodynamic_center = aerodynamic_center.at[0].set(single_side_aerodynamic_center[0])
 
         # Total length for supersonics
         total_length = np.tan(le_sweep_total)*semispan + chords[-1]*RC

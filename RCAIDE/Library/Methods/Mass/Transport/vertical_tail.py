@@ -8,7 +8,8 @@
 #  Imports
 # ---------------------------------------------------------------------- 
 
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 from RCAIDE.Framework.Core import Units
 

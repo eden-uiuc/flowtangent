@@ -10,7 +10,8 @@
 from typing import Tuple
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 
 # RCAIDE imports
@@ -26,7 +27,7 @@ def fsolve_results_parser(
         state: "rcf.State",
         system: "rcf.System",
         settings: "rcf.Settings",
-) -> ("rcf.State", "rcf.System", "rcf.Settings"):
+) -> tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
         unknowns:       np.ndarray      = fsolve_result[0]
         infodict:       dict            = fsolve_result[1]

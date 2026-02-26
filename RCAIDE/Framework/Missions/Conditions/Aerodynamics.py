@@ -12,7 +12,8 @@ from dataclasses import field
 import unittest
 
 # package imports
-import numpy as np
+#import numpy as np
+import jax.numpy as np
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -48,6 +49,9 @@ class AerodynamicAngles(Conditions):
     beta:               np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
     phi:                np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class LiftCoefficients(Conditions):
@@ -76,6 +80,9 @@ class LiftCoefficients(Conditions):
     inviscid:       Conditions      = field(default_factory=lambda: Conditions(tag='Inviscid Bodies'))
     compressible:   Conditions      = field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class InducedDrag(Conditions):
@@ -100,6 +107,9 @@ class InducedDrag(Conditions):
     total:              np.ndarray      = field(default_factory=lambda: np.zeros((1, 1)))
 
     inviscid_wings:     Conditions      = field(default_factory=lambda: Conditions(tag='Inviscid Wings'))
+
+    def __eq__(self, other):
+        return self is other
 
 
 
@@ -140,6 +150,9 @@ class DragCoefficients(Conditions):
 
     induced:            InducedDrag     = field(default_factory=lambda: InducedDrag())
 
+    def __eq__(self, other):
+        return self is other
+
 
 @chex.dataclass(kw_only=True)
 class AerodynamicCoefficients(Conditions):
@@ -163,6 +176,9 @@ class AerodynamicCoefficients(Conditions):
 
     lift:  LiftCoefficients  = field(default_factory=lambda: LiftCoefficients())
     drag:  DragCoefficients  = field(default_factory=lambda: DragCoefficients())
+
+    def __eq__(self, other):
+        return self is other
 
 
 @chex.dataclass(kw_only=True)
@@ -191,6 +207,9 @@ class AerodynamicsConditions(Conditions):
     angles:         AerodynamicAngles       = field(default_factory=lambda: AerodynamicAngles())
 
     coefficients:   AerodynamicCoefficients = field(default_factory=lambda: AerodynamicCoefficients())
+
+    def __eq__(self, other):
+        return self is other
 
 
 # ----------------------------------------------------------------------------------------------------------------------
