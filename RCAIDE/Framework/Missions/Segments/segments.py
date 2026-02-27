@@ -7,159 +7,168 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Callable, List, Any, Tuple
+from __future__ import annotations
+
+from typing import Callable, Any, Literal
 from dataclasses import field
 
 # package imports
 
 import jax
-import chex
-import scipy
+jax.config.update("jax_enable_x64", True)
 
 first_structure = None
 first_treedef = None
 
-import optimistix as optx
+import equinox as eqx
+import jax.numpy as jnp
+
 from jaxopt import ScipyRootFinding
-
-jax.config.update("jax_enable_x64", True)
-
-from jax import jit, grad
-
-#import numpy as np
-import jax.numpy as np
-from scipy.optimize import minimize, NonlinearConstraint, fsolve
+from scipy.optimize import minimize, fsolve
 
 # RCAIDE imports
 
-import RCAIDE.Framework as rcf
-from RCAIDE.Framework import Process, ProcessStep
+from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
-from RCAIDE.Framework.Missions.Converge   import fsolve_results_parser, fsolve_update_kwargs
-from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable
+from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
 # ----------------------------------------------------------------------------------------------------------------------
 
+def _activate_control(control: str | ControlVariable, state):
+    
+    if isinstance(control, str):
+        control_name = control.replace(' ', '_').lower()
+        
+        if control_name not in state.controls.__dataclass_fields__:
+            # 1. It's custom: Create it and use the functional tuple method we wrote!
+            new_ctrl = ControlVariable(tag=control, active=True)
+            new_controls = state.controls.add_control_variable(new_ctrl)
+        else:
+            # 2. It's explicit: Grab the existing one, activate it, and replace it!
+            existing_ctrl = getattr(state.controls, control_name)
+            active_ctrl = eqx.tree_at(lambda c: c.active, existing_ctrl, True)
+            
+            # Use getattr safely (without the None default) to map the path
+            new_controls = eqx.tree_at(lambda p: getattr(p, control_name), state.controls, active_ctrl)
+            
+    elif isinstance(control, ControlVariable):
+        active_ctrl = eqx.tree_at(lambda c: c.active, control, True)
+        new_controls = state.controls.add_control_variable(active_ctrl)
+        
+    return eqx.tree_at(lambda s: s.controls, state, new_controls)
 
-@chex.dataclass(kw_only=True)
+
+
+def _activate_residual(residual_name: ResidualNames, state):
+    
+    active_residual = DynamicResidual(tag=residual_name, active=True)
+    
+    # Safely inject it using getattr path tracing
+    new_dynamics = eqx.tree_at(
+        lambda d: getattr(d, residual_name), 
+        state.dynamics, 
+        active_residual
+    )
+    
+    return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics)
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Initialize Segment
+# ----------------------------------------------------------------------------------------------------------------------
+
+def _initialization_steps():
+    return (
+        ProcessStep(tag="Expand State",         function=expand_state),
+        ProcessStep(tag="Time",                 function=initialize_time),
+        ProcessStep(tag="Mass",                 function=initialize_mass),
+        ProcessStep(tag="Energy",               function=initialize_energy),
+        ProcessStep(tag="Inertial Position",    function=initialize_inertial_position),
+        ProcessStep(tag="Planetary Position",   function=initialize_planetary_position),
+    )
+
 class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   Tuple[str|ControlVariable, ...] = field(default_factory=tuple)
-    active_residuals:  Tuple[str|ControlVariable, ...] = field(default_factory=tuple)
+    active_controls:   tuple[str|ControlVariable, ...]  = eqx.field(static=True, default_factory=tuple)
+    active_residuals:  tuple[ResidualNames, ...]        = eqx.field(static=True, default_factory=tuple)
 
-    controls_initial_guess: np.ndarray = None
+    controls_initial_guess: tuple[jnp.ndarray|float,...] | None = None
 
-    @staticmethod
-    def _activate_control(control: str | ControlVariable, state: "rcf.State") -> None:
-        
-        current_state = state
-        
-        if isinstance(control, str):
-            control = control.replace(' ', '_').lower()  # Normalize control name to lowercase and replace spaces with underscores
-            if control not in vars(current_state.controls).keys():
-                current_state.controls.add_control_variable(ControlVariable(tag=control))
-            current_state.controls[control].active = True
-        else:
-            current_state.controls.add_control_variable(control)
-        
-        return current_state
-
-    @staticmethod
-    def _activate_residual(residual_name: str, state) -> None:
-        
-        current_state = state
-        
-        residual_name = residual_name.replace(' ', '_').lower()  # Normalize residual name to lowercase and replace spaces with underscores
-        current_state.dynamics[residual_name].active = True
-
-        return current_state
-
-    def __post_init__(self):
-
-        default_steps = [
-            # Step Name              Step Functions
-            ("Expand State",         expand_state),
-            ("Time",                 initialize_time),
-            ("Mass",                 initialize_mass),
-            ("Energy",               initialize_energy),
-            ("Inertial Position",    initialize_inertial_position),
-            ("Planetary Position",   initialize_planetary_position),
-        ]
-
-        for name, function in default_steps:
-            self.append(ProcessStep(tag=name, function=function))
+    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
+    
 
     def __call__(self, state, system, settings):
         
         current_state = state
 
-        for ctrl_name in self.active_controls:
-            current_state = self._activate_control(ctrl_name, current_state)
-        if isinstance(self.controls_initial_guess, np.ndarray):
-            current_state.unknowns = self.controls_initial_guess
-        elif isinstance(self.controls_initial_guess, tuple):
-            n_cp = int(current_state.numerics.number_of_control_points)
-            current_state.unknowns = np.concatenate([np.full((n_cp,), v) for v in self.controls_initial_guess])
-        else:
-            current_state.unknowns = np.zeros((self.state.numerics.number_of_control_points * len(self.active_controls)))
+        for ctrl in self.active_controls:
+            current_state = _activate_control(ctrl, current_state)
 
         for res_name in self.active_residuals:
-            current_state = self._activate_residual(res_name, current_state)
-        current_state.residuals = np.zeros((current_state.numerics.number_of_control_points, len(self.active_residuals)))
+            current_state = _activate_residual(res_name, current_state)
+        
+        n_cp = int(current_state.numerics.number_of_control_points)
+        
+        if self.controls_initial_guess is not None and len(self.controls_initial_guess) > 0:
+            new_unknowns = jnp.concatenate([jnp.full((n_cp,), v) for v in self.controls_initial_guess])
+        else:
+            new_unknowns = jnp.zeros((n_cp * len(self.active_controls)))
 
+        new_residuals = jnp.zeros((n_cp, len(self.active_residuals)))
+        
+        current_state = eqx.tree_at(
+            lambda s: (s.unknowns, s.residuals),
+            current_state,
+            (new_unknowns, new_residuals)
+        )
+
+        # 5. Validation
         assert current_state.check_controls(verbose=False), (
-            f"During initialization of {self.tag} the number of active controls"
+            f"During initialization of {self.tag} the number of active controls "
             "did not match the number of active residuals.\n"
-            "Please run State.check_controls(verbose=True) to see details"
         )
 
         current_state = current_state.unpack_unknowns(current_state.unknowns)
 
-        return super(InitializeSegment, self).__call__(current_state, system, settings)
+        # 6. Run the sub-steps
+        return super().__call__(current_state, system, settings)
 
 
-@chex.dataclass(kw_only=True)
+def _default_analyses():
+    return (
+        ProcessStep(tag="Time Differentials",   function=update_time_differentials),
+        ProcessStep(tag="Acceleration",         function=update_acceleration),
+        ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+        ProcessStep(tag="Altitude",             function=update_altitude),
+        ProcessStep(tag="Gravity",              function=update_gravity),
+        ProcessStep(tag="Freestream",           function=update_freestream),
+        ProcessStep(tag="Orientations",         function=update_orientations),
+        ProcessStep(tag="Energy",               function=skip),
+        ProcessStep(tag="Aerodynamics",         function=skip),
+        ProcessStep(tag="Stability",            function=skip),
+        ProcessStep(tag="Mass",                 function=update_mass_and_weight),
+        ProcessStep(tag="Forces",               function=update_forces),
+        ProcessStep(tag="Moments",              function=update_moments),
+        ProcessStep(tag="Planetary Position",   function=skip),
+        ProcessStep(tag="Calculate Residuals",  function=flight_dynamics_residuals)
+    )
+
 class AnalyzeSegment(Process):
 
-    tag: str = "Segment Analysis Specification"
+    tag: str = eqx.field(static=True, default="Segment Analysis Specification")
 
-    def __post_init__(self):
+    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_default_analyses)
 
-        default_steps = [
-            ("Time Differentials",   update_time_differentials),
-            ("Acceleration",         update_acceleration),
-            ("Angular Acceleration", update_angular_acceleration),
-            ("Altitude",             update_altitude),
-            ("Gravity",              update_gravity),
-            ("Freestream",           update_freestream),
-            ("Orientations",         update_orientations),
-            ("Energy",               skip),
-            ("Aerodynamics",         skip),
-            ("Stability",            skip),
-            ("Mass",                 update_mass_and_weight),
-            ("Forces",               update_forces),
-            ("Moments",              update_moments),
-            ("Planetary Position",   skip),
-            ("Calculate Residuals",  flight_dynamics_residuals)
-        ]
 
-        for name, function in default_steps:
-            self.append(ProcessStep(tag=name, function=function))
-
-def static_pure_residuals(unknowns, segment, state, system, settings):
-
-    return segment._get_pure_residuals(unknowns, state, system, settings)
-
-def find_circular_references(obj, path="root", visited=None):
+def find_circular_references(obj, path="root", visited=None): 
     if visited is None:
         visited = set()
-        
+    
     # Skip basic types and arrays (they don't hold other objects)
     if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
         return
@@ -172,7 +181,7 @@ def find_circular_references(obj, path="root", visited=None):
     if obj_id in visited:
         print(f"CIRCULARITY FOUND:")
         print(f"Path: {path} loops back to an already visited {type(obj).__name__}")
-        return
+        return True
 
     # Add this object's ID to the visited set for this branch
     visited.add(obj_id)
@@ -180,209 +189,232 @@ def find_circular_references(obj, path="root", visited=None):
     # Recursively check dictionaries
     if isinstance(obj, dict):
         for k, v in obj.items():
-            find_circular_references(v, f"{path}['{k}']", visited.copy())
+            if find_circular_references(v, f"{path}['{k}']", visited.copy()):
+                return True
             
     # Recursively check lists
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
-            find_circular_references(v, f"{path}[{i}]", visited.copy())
+            if find_circular_references(v, f"{path}[{i}]", visited.copy()):
+                return True
             
     # Recursively check custom objects and dataclasses
     elif hasattr(obj, '__dict__'):
         for k, v in vars(obj).items():
-            find_circular_references(v, f"{path}.{k}", visited.copy())
+            if find_circular_references(v, f"{path}.{k}", visited.copy()):
+                return True
+    
+    return False
 
-@chex.dataclass(kw_only=True)
+def fsolve_results_parser(
+        fsolve_result: tuple,
+        state: State,
+        system: System,
+        settings: Settings,
+) -> tuple[State, System, Settings]:
+
+        unknowns:       jnp.ndarray     = jnp.array(fsolve_result[0])
+        infodict:       dict            = fsolve_result[1]
+        ier:            int             = fsolve_result[2]
+        mesg:           str             = fsolve_result[3]
+
+        current_state = state
+
+        if ier != 1:
+            print("Segment Convergence Failed:", mesg)
+            unconverged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, False)
+            current_state = eqx.tree_at(lambda s: s.numerics, state, unconverged_numerics)
+        else:
+            print("Segment Converged.")
+            print("Number of function evaluations:", infodict['nfev'])
+            converged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, True)
+            current_state = eqx.tree_at(lambda s: s.numerics, state, converged_numerics)
+        
+        current_state = eqx.tree_at(lambda s: s.unknowns, current_state, unknowns)
+        current_state = current_state.unpack_unknowns()
+        
+        return current_state, system, settings
+
+RootFinders = Literal[fsolve, ScipyRootFinding]
+
 class IterateSegment(Process):
 
-    tag:            str     = 'Segment Convergence'
-
-    analyze:        Process = None
+    tag:            str     = eqx.field(static=True, default='Segment Convergence')
+    analyze:        Process = eqx.field(default_factory=AnalyzeSegment)
 
     # Root-finder arguments and parser
-    root_finder:            Callable    = ScipyRootFinding
-    root_finder_args:       Tuple       = None
-    root_finder_kwargs:     dict        = None
-
-    update_args:            Callable    = None
-    update_kwargs:          Callable    = fsolve_update_kwargs
-    results_parser:         Callable[[Any], Tuple["rcf.State", "rcf.System", "rcf.Settings"]] = fsolve_results_parser
-
-    def _get_fsolve_residuals(self, unknowns, state, system, settings):
-        """
-        Wraps the analysis step to calculate residuals for fsolve.
-        """
-
-        current_state = state.unpack_unknowns(unknowns)
-
-        current_state, current_system, current_settings = self.analyze(
-            current_state, system, settings
-        )
-
-        current_state = current_state.pack_residuals()
-
-        if self.update_args:
-            self.root_finder_args = self.update_args(self.root_finder_args, self.state, self.system, self.settings)
-        if self.update_kwargs:
-            self.root_finder_kwargs = self.update_kwargs(self.root_finder_kwargs, self.state, self.system, self.settings)
-
-        return current_state.residuals
+    root_finder:    RootFinders = eqx.field(static=True, default=ScipyRootFinding) # type: ignore
+    results_parser: Callable    = eqx.field(static=True, default=fsolve_results_parser) # type: ignore
     
-    def _get_pure_residuals(self, unknowns, state, system, settings):
+    def _get_residuals(self, unknowns, state, system, settings):
 
         current_state = state.unpack_unknowns(unknowns)
-
         current_state, _, _ = self.analyze(current_state, system, settings)
-
         current_state = current_state.pack_residuals()
 
         return current_state.residuals
-                
-        # Call your actual pure residual function
-        return self._get_pure_residuals(unknowns, state, system, settings)
 
     def __call__(self, state, system, settings):
-    
 
         if self.root_finder is fsolve:
-            if self.root_finder_kwargs is None:
+            
+            root_finder_kwargs = {
+                'func': self._get_residuals,
+                'x0': state.unknowns,
+                'args': (state, system, settings),
+                'xtol': state.numerics.solution_tolerance,
+                'maxfev': state.numerics.max_evaluations,
+                'epsfcn': state.numerics.step_size,
+                'full_output': True
+            }
 
-                self.root_finder_kwargs = {
-                    'func': self._get_fsolve_residuals,
-                    'x0': self.state.unknowns,
-                    'args': (state, system, settings),
-                    'xtol': self.state.numerics.solution_tolerance,
-                    'maxfev': self.state.numerics.max_evaluations,
-                    'epsfcn': self.state.numerics.step_size,
-                    'full_output': True
-                }
+            results = self.root_finder(**root_finder_kwargs)
 
+            return fsolve_results_parser(results, state, system, settings)
 
-            results = self.root_finder(**self.root_finder_kwargs)
+        elif self.root_finder is ScipyRootFinding:
 
-            self.state, self.system, self.settings = fsolve_results_parser(results, self.state, self.system, self.settings)
-
-
-        if self.root_finder is ScipyRootFinding:
-
-            self.update_kwargs = False
-
-            current_state = state
-            current_system = system
-            current_settings = settings
-
-            x0 = current_state.unknowns
-
-            combined_args = (self, current_state, current_system, current_settings)
+            x0 = state.unknowns
 
             root = ScipyRootFinding(
                 method='hybr',
-                optimality_fun=static_pure_residuals,
-                tol = current_state.numerics.solution_tolerance,
+                optimality_fun=self._get_residuals,
+                tol = state.numerics.solution_tolerance,
                 jit=False,  #TODO: Test JIT compilation
             )
 
-            print("--- Hunting for cycles in State ---")
-            find_circular_references(current_state, path="state")
+            if any([
+                find_circular_references(state, path="state"),
+                find_circular_references(system, path="system"),
+                find_circular_references(settings, path="settings")
+            ]):
+                raise RecursionError("Circularity found in mission data structures. Terminating mission.")
 
-            print("--- Hunting for cycles in System ---")
-            find_circular_references(current_system, path="system")
+            unknowns, _ = root.run(x0, state, system, settings)
 
-            print("--- Hunting for cycles in Settings ---")
-            find_circular_references(current_settings, path="settings")
+            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+            current_state = current_state.unpack_unknowns(unknowns)
 
-            unknowns, _ = root.run(x0, combined_args)
+            return self.analyze(current_state, system, settings)
 
-            self.state.unknowns = unknowns
-            self.state = self.state.unpack_unknowns(self.state.unknowns)
+        else:
+            return state, system, settings     
 
-            self.state, self.system, self.settings = self.analyze(self.state, self.system, self.settings)
-        
-        return self.state, self.system, self.settings
-        
-
-
-@chex.dataclass(kw_only=True)
-class FinalizeSegment(Process):
-
-    tag: str = 'Segment Finalization'
-
-    @staticmethod
-    def _reset_controls_and_residuals(
-            state: "rcf.State",
-            system: "rcf.System",
-            settings: "rcf.Settings",
+def _reset_controls_and_residuals(
+            state: State,
+            system: System,
+            settings: Settings,
     ):
+        current_state = state
 
-        for name, control_var in vars(state.controls).items():
-            if hasattr(control_var, 'active') and control_var.active:
-                control_var.active = False
+        def _turn_off_control(node):
+            if isinstance(node, ControlVariable):
+                return eqx.tree_at(lambda c: c.active, node, False)
+            return node        
 
-        for name, residual_var in vars(state.dynamics).items():
-            if hasattr(residual_var, 'active') and residual_var.active:
-                residual_var.active = False
-
-        return state, system, settings
-
-    def __post_init__(self):
-        self.append(
-            ProcessStep(tag='Reset Controls and Residuals',
-                        function=self._reset_controls_and_residuals)
+        def _turn_off_residual(node):
+            if isinstance(node, DynamicResidual):
+                return eqx.tree_at(lambda r: r.active, node, False)
+            return node
+        
+        new_controls = jax.tree_util.tree_map(
+            _turn_off_control, 
+            current_state.controls, 
+            is_leaf=lambda x: isinstance(x, ControlVariable)
         )
 
+        new_dynamics = jax.tree_util.tree_map(
+            _turn_off_residual, 
+            current_state.dynamics, 
+            is_leaf=lambda x: isinstance(x, DynamicResidual)
+        )
+
+        current_state = eqx.tree_at(
+            lambda s: (s.controls, s.dynamics), 
+            current_state, 
+            (new_controls, new_dynamics)
+        )
+        
+        return current_state, system, settings
+
+def _default_finalize():
+    return (
+        ProcessStep(tag="Deactivate Controls & Residuals", function=_reset_controls_and_residuals)
+    )
+
+class FinalizeSegment(Process):
+
+    tag: str = eqx.field(static=True, default='Segment Finalization')
+    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_default_finalize)
+    
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Converged Segments
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
 class Segment(Process):
 
-    tag: str = "Segment"
+    tag: str = eqx.field(static=True, default="Segment")
 
-    active_controls:    Tuple[str, ...]   = None
-    active_residuals:   Tuple[str, ...]   = None
-
-    controls_initial_guess: tuple | np.ndarray = None
-
-    initialize:         InitializeSegment   = field(default_factory=InitializeSegment)
-    iterate:            IterateSegment      = field(default_factory=IterateSegment)
-    analyze:            AnalyzeSegment      = field(default_factory=AnalyzeSegment)
-    finalize:           FinalizeSegment     = field(default_factory=FinalizeSegment)
+    # Pass-through configuration for InitializeSegment
+    active_controls:  tuple[str | ControlVariable, ...] = eqx.field(static=True, default_factory=tuple)
+    active_residuals: tuple[ResidualNames, ...]         = eqx.field(static=True, default_factory=tuple)
+    controls_initial_guess: tuple[jnp.ndarray|float, ...] | None = None
 
     # Global dynamics variables
     sideslip_angle:         float = 0.0
     temperature_deviation:  float = 0.0
 
+    # Start with an empty tuple. We will populate it securely in __post_init__
+    steps: tuple = eqx.field(default_factory=tuple)
+
     def __post_init__(self):
+        # Only build the default steps if the user didn't explicitly provide custom ones
+        if len(self.steps) == 0:
+            
+            # 1. Build the steps, passing the controls configuration directly into InitializeSegment!
+            init_step = InitializeSegment(
+                tag=f"Initialize {self.tag}",
+                active_controls=self.active_controls,
+                active_residuals=self.active_residuals,
+                controls_initial_guess=self.controls_initial_guess
+            )
+            iter_step = IterateSegment(tag=f"Iterate {self.tag}")
+            fin_step  = FinalizeSegment(tag=f"Finalize {self.tag}")
+            
+            # 2. Safely lock them into the frozen object
+            object.__setattr__(self, "steps", (init_step, iter_step, fin_step))
 
-        self.initialize.tag                     = f'Initialize {self.tag}'
-        self.initialize.active_controls         = self.active_controls
-        self.initialize.active_residuals        = self.active_residuals
+    # ----------------------------------------------------------------------------------
+    # Quality-of-Life Accessors (Replaces __getattr__)
+    # ----------------------------------------------------------------------------------
+    @property
+    def initialize(self) -> InitializeSegment:
+        return self.steps[0]
 
-        self.initialize.controls_initial_guess  = self.controls_initial_guess
+    @property
+    def iterate(self) -> IterateSegment:
+        return self.steps[1]
 
-        self.analyze.tag                        = f'Analyze {self.tag}'
+    @property
+    def finalize(self) -> FinalizeSegment:
+        return self.steps[2]
 
-        self.iterate.tag                        = f'Iterate {self.tag}'
-        self.iterate.analyze                    = self.analyze
+    @property
+    def analyze(self) -> AnalyzeSegment:
+        return self.steps[1].analyze
 
-        self.finalize.tag                       = f'Finalize {self.tag}'
-
-        self.steps = [
-            self.initialize,
-            self.iterate,
-            self.finalize,
-        ]
-
-    def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
-
+    # ----------------------------------------------------------------------------------
+    # Execution
+    # ----------------------------------------------------------------------------------
+    def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
+        
         for step in self.analyze.steps:
-            if isinstance(step, ProcessStep) and step.function is skip:
-                print(f"Skipping step {step.tag} due to missing analysis function.")
-
-        return super(Segment, self).__call__(*args, **kwargs)
+            if step.function is skip:
+                print(f"Warning: Skipping step '{step.tag}' due to missing analysis function.")
+        
+        return super().__call__(state, system, settings)
 
 
 #-----------------------------------------------------------------------------------------------------------------------

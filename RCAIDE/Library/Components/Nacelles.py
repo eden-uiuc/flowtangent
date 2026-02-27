@@ -7,40 +7,32 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
-
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component, ComponentDimensions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Nacelle
 # ----------------------------------------------------------------------------------------------------------------------
 
+class NacelleDiameters(ComponentDimensions):
 
-@chex.dataclass(kw_only=True)
-class Nacelle(rcl.Component):
+    inlet: float = 0.0
 
-    tag:                        str     = 'Nacelle'
+class Nacelle(Component):
 
-    flow_through:               bool    = False
-    has_pylon:                  bool    = True
-    fuselage_integrated:        bool    = False
+    tag:                        str     = eqx.field(static=True, default='Nacelle')
+    flow_through:               bool    = eqx.field(static=True, default=False)
+    has_pylon:                  bool    = eqx.field(static=True, default=True)
+    fuselage_integrated:        bool    = eqx.field(static=True, default=False)
 
-    aerodynamic_center:         np.ndarray              = field(default_factory=lambda: np.zeros(3))
-    orientation_euler_angles:   np.ndarray              = field(default_factory=lambda: np.zeros(3))
+    aerodynamic_center:         jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    orientation_euler_angles:   jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
-    airfoil:                    rcl.Component           = None
-    cowling_airfoil_angle:      float                   = 0.0
+    airfoil:                    Component | None    = None
+    cowling_airfoil_angle:      float               = 0.0
 
-    diameters:                  rcl.ComponentDimensions = field(default_factory=rcl.ComponentDimensions)
-
-    def __post_init__(self):
-
-        self.diameters.inlet = 0.0
+    diameters:                  NacelleDiamters = eqx.field(default_factory=NacelleDiamters) #type: ignore

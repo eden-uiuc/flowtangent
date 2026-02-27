@@ -8,39 +8,34 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import chex
-from dataclasses import field
+import equinox as eqx
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component, MassProperties
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Energy Store
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class EnergyStore(rcl.Component):
+class EnergyStore(Component):
 
-    name = 'Energy Store'
+    name: str = eqx.field(static=True, default='Energy Store')
 
     max_energy: float = 0.0
 
     specific_energy: float = 0.0
     specific_volume: float = 0.0
 
-    def __post_init__(self):
-        if self.mass_properties.total and not self.specific_energy:
-            self.specific_energy = self.max_energy / self.mass_properties.total
-        if self.mass_properties.volume and not self.specific_volume:
-            self.specific_volume = self.max_energy / self.mass_properties.volume
-
 # ----------------------------------------------------------------------------------------------------------------------
 # Fuel Tank
 # ----------------------------------------------------------------------------------------------------------------------
 
+class FuelTankMass(MassProperties):
 
-@chex.dataclass(kw_only=True)
+    full_fuel_mass: float = 0.0
+    full_fuel_volume: float = 0.0
+
 class FuelTank(EnergyStore):
 
     name = 'Fuel Tank'
@@ -48,18 +43,14 @@ class FuelTank(EnergyStore):
     fuel_selector_ratio: float = 1.0
     secondary_fuel_flow: float = 0.0
 
-    def __post_init__(self):
-
-        self.mass_properties.full_fuel_mass     = 0.0
-        self.mass_properties.full_fuel_volume   = 0.0
+    mass_properties: FuelTankMass = eqx.field(default_factory=FuelTankMass) #type: ignore
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Battery
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class BatteryRagoneParameters:
+class BatteryRagoneParameters(eqx.Module):
 
     const_1: float = 0.0
     const_2: float = 0.0
@@ -67,10 +58,9 @@ class BatteryRagoneParameters:
     i: float = 0.0
 
 
-@chex.dataclass(kw_only=True)
 class Battery(EnergyStore):
 
-    name = 'Battery'
+    tag: str = eqx.field(static=True, default='Battery')
 
     max_energy:     float = 0.0
     max_power:      float = 0.0
@@ -78,4 +68,4 @@ class Battery(EnergyStore):
 
     resistance:     float = 0.0
 
-    ragone: BatteryRagoneParameters = field(default_factory=BatteryRagoneParameters)
+    ragone: BatteryRagoneParameters = eqx.field(default_factory=BatteryRagoneParameters)

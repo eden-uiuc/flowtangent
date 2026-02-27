@@ -8,8 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import chex
-from dataclasses import field
+import equinox as eqx
 
 # RCAIDE imports
 import RCAIDE.Library as rcl
@@ -19,51 +18,57 @@ import RCAIDE.Library as rcl
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class MaxPropellantMassFractions:
+class MaxPropellantMassFractions(eqx.Module):
 
-    Air:    float = 0.0
-    O2:     float = 0.0
-
-
-@chex.dataclass(kw_only=True)
-class PropellantTemperatures:
-
-    flash:          float = 0.0
-    autoignition:   float = 0.0
-    freeze:         float = 0.0
-    boiling:        float = 0.0
+    Air:    float = eqx.field(static=True, default=0.0)
+    O2:     float = eqx.field(static=True, default=0.0)
 
 
-@chex.dataclass(kw_only=True)
-class Propellant:
+class PropellantTemperatures(eqx.Module):
 
-    tag: str = 'Propellant'
-
-    oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.Gas)
-
-    density:            float = 0.0
-    specific_energy:    float = 0.0
-    energy_density:     float = 0.0
-
-    max_mass_fraction:  MaxPropellantMassFractions  = field(default_factory=MaxPropellantMassFractions)
-    temperatures:       PropellantTemperatures      = field(default_factory=PropellantTemperatures)
+    flash:          float = eqx.field(static=True, default=0.0)
+    autoignition:   float = eqx.field(static=True, default=0.0)
+    freeze:         float = eqx.field(static=True, default=0.0)
+    boiling:        float = eqx.field(static=True, default=0.0)
 
 
-@chex.dataclass(kw_only=True)
+class Propellant(eqx.Module):
+
+    tag: str = eqx.field(static=True, default='Propellant')
+
+    oxidizer: rcl.Gases.Gas = eqx.field(default_factory=rcl.Gases.Gas)
+
+    density:            float = eqx.field(static=True, default=0.0)
+    specific_energy:    float = eqx.field(static=True, default=0.0)
+    energy_density:     float = eqx.field(static=True, default=0.0)
+
+    max_mass_fraction:  MaxPropellantMassFractions  = eqx.field(default_factory=MaxPropellantMassFractions)
+    temperatures:       PropellantTemperatures      = eqx.field(default_factory=PropellantTemperatures)
+
+
+def _JetAFractions():
+    return MaxPropellantMassFractions(
+        Air=0.0633,
+        O2=0.3022
+    )
+
+def _JetATemperatures():
+    return PropellantTemperatures(
+        flash=311.15,
+        autoignition=483.15,
+        freeze=233.15,
+        boiling=0.0
+    )
+
 class JetA(Propellant):
 
-    oxidizer: rcl.Gases.Gas = field(default_factory=rcl.Gases.O2)
+    oxidizer: rcl.Gases.Gas = eqx.field(default_factory=rcl.Gases.O2)
 
-    density         = 820.
-    specific_energy = 43.02e6
-    energy_density  = 35276.4e6
+    density         : float = eqx.field(static=True, default=820.)
+    specific_energy : float = eqx.field(static=True, default=43.02e6)
+    energy_density  : float = eqx.field(static=True, default=35276.4e6)
 
-    max_mass_fraction = MaxPropellantMassFractions(Air=0.0633,
-                                                   O2=0.3022)
+    max_mass_fraction   : MaxPropellantMassFractions = eqx.field(static=True, default_factory=_JetAFractions)
 
-    temperatures = PropellantTemperatures(flash=311.15,
-                                          autoignition=483.15,
-                                          freeze=233.15,
-                                          boiling=0.0)
+    temperatures        : PropellantTemperatures = eqx.field(static=True, default_factory=_JetATemperatures)
 

@@ -9,5 +9,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Materials
-from . import AC_Classes
+import Materials
+from .AC_Classes import AircraftClass, BusinessJet, MediumRange

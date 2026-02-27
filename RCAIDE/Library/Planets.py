@@ -7,26 +7,25 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
+# package imports
+import equinox as eqx
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Planets
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class Planet:
+class Planet(eqx.Module):
 
-    mass: float = 0.0
-    mean_radius: float = 0.0
+    mass:           float = eqx.field(static=True, default=0.0)
+    mean_radius:    float = eqx.field(static=True, default=0.0)
 
 
-@chex.dataclass(kw_only=True)
 class Earth(Planet):
 
-    mass: float = 5.972e24  # in kg
-    mean_radius: float = 6371e3  # in meters
-    sea_level_gravity: float = 9.80665  # in m/s^2
+    mass:               float = eqx.field(static=True, default=5.972e24)  # in kg
+    mean_radius:        float = eqx.field(static=True, default=6371e3)  # in meters
+    sea_level_gravity:  float = eqx.field(static=True, default=9.80665)  # in m/s^2
 
     def compute_gravity(self, altitude: float = 0.0) -> float:
 

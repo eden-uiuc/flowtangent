@@ -8,20 +8,20 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import chex
-from dataclasses import field
+import equinox as eqx
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
-from RCAIDE.Library.Components.Energy.Converters import *
+from RCAIDE.Library import Component
+from RCAIDE.Library.Propellants import Propellant, JetA
+from RCAIDE.Library.Gases import Gas, Air
+from RCAIDE.Library.Components.Energy.Converters import EnergyConverter, FlowConverter, OfftakeShaft
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class DesignParameters:
+class DesignParameters(eqx.Module):
 
     total_thrust:           float = 0.0
 
@@ -32,21 +32,14 @@ class DesignParameters:
     SLS_thrust:             float = 0.0
 
     mass_flow_through_rate: float = 0.0
-
-    def __eq__(self, other):
-        return self is other
+    fuel_air_ratio:         float = 0.0
 
 
-@chex.dataclass(kw_only=True)
 class Propulsor(EnergyConverter):
 
-    converters:                 rcl.Component   = field(default_factory=
-                                                        lambda: rcl.Component(tag='Propulsor Converters'))
+    converters:                 Component           = eqx.field(default_factory=lambda: Component(tag='Propulsor Converters'))
 
-    design_thrust_parameters:   DesignParameters = field(default_factory=DesignParameters)
-
-    def __eq__(self, other):
-        return self is other
+    design_thrust_parameters:   DesignParameters    = eqx.field(default_factory=DesignParameters)
 
     def compute_thrust(self):
         raise NotImplementedError("Subclasses must implement this method")
@@ -56,94 +49,70 @@ class Propulsor(EnergyConverter):
 # Jet Engines
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-@chex.dataclass(kw_only=True)
-class JetInstallationGeometry:
+class JetInstallationGeometry(eqx.Module):
 
     xe: float = 1.
     ye: float = 1.
     Ce: float = 2.
 
-    def __eq__(self, other):
-        return self is other
+def _JetConverters():
+    return Component(tag="Jet Converters").add_subcomponent(FlowConverter(tag="Combustor"))
 
-
-@chex.dataclass(kw_only=True)
 class JetEngine(Propulsor):
 
-    tag:                            str             = 'Jet'
-    plug_diameter:                  float           = 0.0
+    tag:                            str     = eqx.field(static=True, default='Jet')
+    plug_diameter:                  float   = 0.0
 
-    reference_temperature:          float           = 288.15      # Kelvin
-    reference_total_temperature:    float           = 298.15      # Kelvin
+    reference_temperature:          float   = 288.15      # Kelvin
+    reference_total_temperature:    float   = 298.15      # Kelvin
 
-    reference_pressure:             float           = 101325.0    # Pascal
-    reference_total_pressure:       float           = 101325.0    # Pascal
+    reference_pressure:             float   = 101325.0    # Pascal
+    reference_total_pressure:       float   = 101325.0    # Pascal
 
-    fuel:                   rcl.Propellants.Propellant  = field(default_factory=rcl.Propellants.JetA)
-    working_fluid:          rcl.Gases.Gas               = field(default_factory=rcl.Gases.Air)
+    fuel:                   Propellant      = eqx.field(default_factory=JetA)
+    working_fluid:          Gas             = eqx.field(default_factory=Air)
 
-    installation_geometry:  JetInstallationGeometry     = field(default_factory=JetInstallationGeometry)
+    converters:             Component       = eqx.field(default_factory=_JetConverters)
 
-    def __eq__(self, other):
-        return self is other
+    installation_geometry:  JetInstallationGeometry     = eqx.field(default_factory=JetInstallationGeometry)
 
-    def __post_init__(self):
+def _TurbojetConverters():
+    convs = Component(tag="Turbojet Converters")
+    convs = convs.add_subcomponent(FlowConverter(tag="Inlet Nozzle"))
+    
+    comps = Component(tag='Compressors')
+    comps.add_subcomponent(FlowConverter(tag='Low Pressure Compressor'))
+    comps.add_subcomponent(FlowConverter(tag='High Pressure Compressor'))
+    convs = convs.add_subcomponent(comps)
+    
+    turbs = Component(tag='Turbines')
+    turbs = turbs.add_subcomponent(FlowConverter(tag='High Pressure Turbine'))
+    turbs = turbs.add_subcomponent(FlowConverter(tag='Low Pressure Turbine'))
+    convs = convs.add_subcomponent(turbs)
 
-        if self.converters.subcomponents:
-            return
+    convs = convs.add_subcomponent(OfftakeShaft())
+    convs = convs.add_subcomponent(FlowConverter(tag='Core Nozzle'))
 
-        self.converters.add_subcomponent(FlowConverter(tag='Combustor'))
+    return convs
 
-        self.design_thrust_parameters.fuel_air_ratio = 0.0
-
-
-@chex.dataclass(kw_only=True)
 class TurbojetEngine(JetEngine):
 
-    tag: str = 'Turbojet'
+    tag: str = eqx.field(static=True, default='Turbojet')
 
-    def __eq__(self, other):
-        return self is other
+    converters: Component = eqx.field(default_factory=_TurbojetConverters)
 
-    def __post_init__(self):
-        if self.converters.subcomponents:
-            return
+def _TurbofanConverters():
+    convs = _TurbojetConverters()
+    convs = convs.insert_subcomponent(FlowConverter(tag="Fan"), 0)
+    convs = convs.insert_subcomponent(FlowConverter(tag="Fan Nozzle"), 0)
 
-        super(TurbojetEngine, self).__post_init__()
+    return convs
 
-        self.converters.add_subcomponent(FlowConverter(tag='Inlet Nozzle'))
-
-        self.converters.add_subcomponent(rcl.Component(tag='Compressors'))
-        self.converters.compressors.add_subcomponent(FlowConverter(tag='Low Pressure Compressor'))
-        self.converters.compressors.add_subcomponent(FlowConverter(tag='High Pressure Compressor'))
-
-        self.converters.add_subcomponent(rcl.Component(tag='Turbines'))
-        self.converters.turbines.add_subcomponent(FlowConverter(tag='High Pressure Turbine'))
-        self.converters.turbines.add_subcomponent(FlowConverter(tag='Low Pressure Turbine'))
-
-        self.converters.add_subcomponent(OfftakeShaft())
-
-        self.converters.add_subcomponent(FlowConverter(tag='Core Nozzle'))
-
-
-@chex.dataclass(kw_only=True)
 class TurbofanEngine(TurbojetEngine):
 
-    tag: str = 'Turbofan'
+    tag: str = eqx.field(static=True, default='Turbofan')
 
-    bypass_ratio = 1.0
+    bypass_ratio: float = 1.0
     exa: float = 1.0        # Fan Face-to-Exit Distance
 
-    def __eq__(self, other):
-        return self is other
-
-    def __post_init__(self):
-        if self.converters.subcomponents:
-            return
-
-        super(TurbofanEngine, self).__post_init__()
-
-        self.converters.add_subcomponent(FlowConverter(tag='Fan'))
-
-        self.converters.add_subcomponent(FlowConverter(tag='Fan Nozzle'))
+    converters: Component = eqx.field(default_factory=_TurbofanConverters)

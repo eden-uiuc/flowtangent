@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+from typing import Literal
 
 # package imports
 import equinox as eqx
@@ -49,6 +49,10 @@ class DynamicResidual(Conditions):
 
     value:  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
 
+ResidualNames = Literal[
+    "force_x", "force_y", "force_z",
+    "moment_x", "moment_y", "moment_z",
+]
 
 class DynamicsConditions(Conditions):
     """
@@ -77,12 +81,12 @@ class DynamicsConditions(Conditions):
 
     tag:        str             = eqx.field(static=True, default='Dynamics')
 
-    force_x:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_x', type='force', index=0))
-    force_y:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_y', type='force', index=1))
-    force_z:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='F_z', type='force', index=2))
-    moment_x:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_x', type='moment', index=0))
-    moment_y:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_y', type='moment', index=1))
-    moment_z:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='M_z', type='moment', index=2))
+    force_x:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='force_x', type='force', index=0))
+    force_y:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='force_y', type='force', index=1))
+    force_z:    DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='force_z', type='force', index=2))
+    moment_x:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='moment_x', type='moment', index=0))
+    moment_y:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='moment_y', type='moment', index=1))
+    moment_z:   DynamicResidual = eqx.field(default_factory=lambda: DynamicResidual(tag='moment_z', type='moment', index=2))
 
     def get_active_residuals(self) -> list:
         return get_active(self)
@@ -250,12 +254,12 @@ class ControlsConditions(Conditions):
         for field in self.__dataclass_fields__:
             control_var = getattr(self, field)
             # Ensure it's actually a control variable and is active
-            if hasattr(control_var, 'active') and getattr(control_var, 'active', False):
+            if getattr(control_var, 'active', False):
                 active_list.append(control_var)
 
         # 2. Check custom controls
         for control_var in self.custom_controls:
-            if hasattr(control_var, 'active') and getattr(control_var, 'active', False):
+            if getattr(control_var, 'active', False):
                 active_list.append(control_var)
 
         # Return as an immutable tuple for JAX safety

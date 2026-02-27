@@ -8,25 +8,24 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import chex
+import equinox as eqx
 
 # RCAIDE imports  
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Landing_Gear
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class LandingGear(rcl.Component):
+class LandingGear(Component):
 
-    tag: str = 'Landing Gear'
+    tag:                str     = eqx.field(static=True, default='Landing Gear')
 
-    deployed: bool = False
+    deployed:           bool    = False
 
-    number_of_units:    int = 1
-    number_of_wheels:   int = 0
+    number_of_units:    int     = eqx.field(static=True, default=1)
+    number_of_wheels:   int     = eqx.field(static=True, default=0)
 
-    strut_length:       float = 0.
-    tire_diameter:      float = 0.
+    strut_length:       float   = 0.
+    tire_diameter:      float   = 0.

@@ -8,30 +8,24 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import chex
+import equinox as eqx
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Converter
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class EnergyConverter(rcl.Component):
+class EnergyConverter(Component):
 
-    efficiency:             float = 1.0
-
-    def __eq__(self, other):
-        return self is other
-
+    efficiency:                 float = 1.0
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsor Subcomponents
 # ----------------------------------------------------------------------------------------------------------------------
 
-@chex.dataclass(kw_only=True)
 class FlowConverter(EnergyConverter):
 
     mechanical_efficiency:      float = 1.0
@@ -46,19 +40,12 @@ class FlowConverter(EnergyConverter):
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
 
-    def __eq__(self, other):
-        return self is other
 
-
-@chex.dataclass(kw_only=True)
 class OfftakeShaft(EnergyConverter):
 
-    tag: str = "Offtake Shaft"
+    tag: str = eqx.field(static=True, default="Offtake Shaft")
 
     power_draw:             float = 0.0
     reference_temperature:  float = 298.15      # Kelvin
     reference_pressure:     float = 101325.0    # Pascal
-
-    def __eq__(self, other):
-        return self is other
 

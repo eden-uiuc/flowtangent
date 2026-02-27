@@ -28,3 +28,5 @@ from .Fuselages import Fuselage
 from .Landing_Gear import LandingGear
 from .Wings import Wing
 from .Nacelles import Nacelle
+
+from RCAIDE.Library.Component import *

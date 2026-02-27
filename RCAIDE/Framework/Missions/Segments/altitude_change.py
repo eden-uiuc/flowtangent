@@ -7,10 +7,12 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-#import numpy as np
-import jax.numpy as np
+# package imports
+import equinox as eqx
+import jax.numpy as jnp
 
+
+# RCAIDE imports
 import RCAIDE.Framework as rcf
 
 from RCAIDE.Framework import ProcessStep
@@ -21,13 +23,12 @@ from RCAIDE.Framework.Missions.Initialize import initialize_altitude_differentia
 # Climb
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-@chex.dataclass(kw_only=True)
+@chex.dataclass
 class AltitudeChange(Segment):
 
-    tag: str = 'Altitude Change'
+    tag: str = eqx.field(static=True, default='Altitude Change')
 
-    altitude_start: float = None
+    altitude_start: float = 0.0
     altitude_end:   float = 0.0
 
     def __post_init__(self):
@@ -38,14 +39,13 @@ class AltitudeChange(Segment):
                         function=initialize_altitude_differential)
         )
 
-
-@chex.dataclass(kw_only=True)
+@chex.dataclass
 class CSRAltitudeChange(AltitudeChange):
 
-    tag: str = 'Constant Speed & Rate Altitude Change'
+    tag: str = eqx.field(static=True, default='Constant Speed & Rate Altitude Change')
 
     rate:           float = 0.0
-    air_speed:      float = None
+    air_speed:      float = 0.0
     true_course:    float = 0.0
 
     active_controls = ("body_angle", "throttle")
@@ -72,14 +72,14 @@ class CSRAltitudeChange(AltitudeChange):
         # If air speed and altitude are not provided, inherit from previous segment
 
         if not self.air_speed:
-            av = np.linalg.norm(state.frames.inertial.velocity_vector[-1])
+            av = jnp.linalg.norm(state.frames.inertial.velocity_vector[-1])
         if not self.altitude_start:
             alt0 = -1.0 * state.frames.inertial.position_vector[-1, 2]
 
         # Calculate velocity vector in inertial frame
-        v_xy    = np.sqrt(av ** 2 - rate ** 2)
-        v_x     = np.cos(beta) * v_xy
-        v_y     = np.sin(beta) * v_xy
+        v_xy    = jnp.sqrt(av ** 2 - rate ** 2)
+        v_x     = jnp.cos(beta) * v_xy
+        v_y     = jnp.sin(beta) * v_xy
 
         state.frames.inertial.velocity_vector[:, 0] = v_x
         state.frames.inertial.velocity_vector[:, 1] = v_y

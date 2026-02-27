@@ -7,18 +7,19 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
-from typing import Callable, Iterable, Self, List
+from __future__ import annotations
+
+from typing import Callable, Iterable, Self, Any
 
 # package imports
-#import numpy as np
-import jax.numpy as np
-import pandas as pd
-import chex
 import jax
+import jax.numpy as jnp
+import pandas as pd
+import equinox as eqx
+
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+from RCAIDE.Framework import State, System, Settings
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -27,534 +28,162 @@ import RCAIDE.Framework as rcf
 
 
 def skip(*args):
-    """
-    skip(*args, **kwargs)
-
-    Function to skip arguments and return them as is.
-
-    Parameters
-    ----------
-    *args : tuple
-        Positional arguments.
-    **kwargs : dict
-        Keyword arguments.
-
-    Returns
-    -------
-    tuple
-        The input arguments as a tuple.
-
-    Examples
-    --------
-    """
-
     return args
 
 
-@dataclass(kw_only=True)
-class ProcessStep:
-    """
-    A class representing a single step in a process.
+class ProcessStep(eqx.Module):
 
-    Attributes:
-    function    (Callable): The function to be executed in this step. Default is the `skip` function.
-    name        (str):      The name of the process step. Default is "Process Step".
-    last_result (object):   The result of the last execution of this step. Default is None.
-    state       (State):    The state object to be passed to the function. Default is an empty State object.
-    settings    (Settings): The settings object to be passed to the function. Default is an empty Settings object.
-    system      (System):   The system object to be passed to the function. Default is an empty System object.
+    function:       Callable           = eqx.field(static=True, default=skip)
+    tag:            str                = eqx.field(static=True, default="Process Step")
+    
+    initial_state:        "State | None"     = None
+    initial_system:       "System | None"    = None
+    initial_settings:     "Settings | None"  = None
 
-    Methods:
-    __call__():             Executes the function with the provided state, settings, and system objects.
-    """
-
-    function:       Callable        = skip
-    tag:            str             = "Process Step"
-    last_result:    object          = None
-    state:          "rcf.State"     = None
-    system:         "rcf.System"    = None
-    settings:       "rcf.Settings"  = None
+    final_state:          "State | None"     = None
+    final_system:         "System | None"    = None
+    final_settings:       "Settings | None"  = None
 
 
     def __call__(self, state, system, settings):
-        """
-        __call__(self)
-    
-        Executes the function associated with the process step.
-    
-        Parameters
-        ----------
-        None
-    
-        Returns
-        -------
-        object
-            The return value of the executed function.
-    
-        Notes
-        -----
-        The function is called with the current state, settings, and system objects as arguments.
-        The function's return value is stored as the last result of the process step.
-    
-        Examples
-        --------
-        """
         
         return self.function(state, system, settings)
-
-    def __eq__(self, other):
-        return self is other
     
     def __repr__(self):
-        try:
-            func_name = getattr(self.function, "__name__", None) or type(self.function).__name__
-            state_type = type(self.state).__name__ if self.state is not None else "None"
-            system_type = type(self.system).__name__ if self.system is not None else "None"
-            settings_type = type(self.settings).__name__ if self.settings is not None else "None"
-            last_present = self.last_result is not None
-            return (
-                f"<{self.__class__.__name__} "
-                f"tag={self.tag!r} func={func_name} "
-                f"last_result_present={last_present} "
-                f"state={state_type} system={system_type} settings={settings_type}>"
+        return self.tag
+    
+    def record_history(
+            self,
+            initial_state,
+            initial_system,
+            initial_settings,
+            final_state,
+            final_system,
+            final_settings,
+        ) -> ProcessStep:
+        
+        return eqx.tree_at(
+            lambda s: (
+                s.initial_state,
+                s.initial_system,
+                s.initial_settings,
+                s.final_state,
+                s.final_system,
+                s.final_settings,
+            ), self,
+            (
+                initial_state,
+                initial_system,
+                initial_settings,
+                final_state,
+                final_system,
+                final_settings,
             )
-        except Exception:
-            return object.__repr__(self)
+        )
 
-def process_step_flatten(step):
-    children = (step.state, step.system, step.settings, step.last_result)
-    aux_data = (step.function, step.tag)
+class Process(eqx.Module):
 
-    return (children, aux_data)
+    tag:                str                     = eqx.field(static=True, default="Process")
 
-def process_step_unflatten(aux_data, children):
+    steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
+    details:            pd.DataFrame | None     = eqx.field(static=True, default=None)
 
-    state, system, settings, last_result = children
-    function, tag = aux_data
+    initial_step:       int                     = eqx.field(static=True, default=0)
 
-    return ProcessStep(
-        function=function,
-        tag=tag,
-        state=state,
-        system=system,
-        settings=settings,
-        last_result=last_result
-    )
+    initial_state:      "State | None"          = None
+    initial_system:     "System | None"         = None
+    initial_settings:   "Settings | None"       = None
 
-jax.tree_util.register_pytree_node(
-    ProcessStep,
-    process_step_flatten,
-    process_step_unflatten
-)
+    final_state:        "State | None"          = None
+    final_system:       "System | None"         = None
+    final_settings:     "Settings | None"       = None
 
-@dataclass(kw_only=True)
-class Process:
-    """
-    A class representing a process made up of multiple process steps.
-
-    Attributes
-    __________
-    name    (str):                              The name of the process. Default is "Process".
-    steps   (List[ProcessStep | ProcessType]):  A list of process steps in the process. Default is an empty list.
-    details (pd.DataFrame):                     A pandas DataFrame to store process step details. Default is a DataFrame
-                                                created by _create_details().
-    
-    step            (int):  The current step in the process. Default is 0.
-    initial_step    (int):  The initial step in the process. Default is 0.
-    
-    initial_state       (State):    The initial state for the process. Default is an empty State object.
-    initial_settings    (Settings): The initial settings for the process. Default is an empty Settings object.
-    initial_system      (System):   The initial system for the process. Default is an empty System object.
-    
-    state       (State):    The current state during the process. Default is None.
-    settings    (Settings): The current settings during the process. Default is None.
-    system      (System):   The current system during the process. Default is None.
-
-    Methods
-    _______
-    __getitem__(self, item):    Returns the process step at the specified index.
-    __delitem__(self, key):     Deletes the process step at the specified index.
-    
-    __call__(self, *args, **kwargs):    Executes the process, passing the initial state, settings, and system to each process step.
-    
-    append(self, step: ProcessStep | Self): Appends a process step to the end of the process.
-    clear(self):                            Clears all process steps from the process.
-    copy(self):                             Returns a shallow copy of the process.
-    count(self, step: ProcessStep):         Returns the number of occurrences of the specified process step in the process.
-    extend(self, extension: Iterable):      Extends the process with the process steps from the specified iterable.
-    
-    _index_tag(self, tag: str):                               Returns the index of the process step with the specified name.
-    _index_function(self, function: Callable):                  Returns the index of the process step with the specified function.
-    index(self, value: str | Callable | ProcessStep | Self):    Returns the index of the process step with the specified value.
-    
-    insert(self, index: int, step: ProcessStep | Self): Inserts a process step at the specified index in the process.
-    pop(self, index: int):                              Removes and returns the process step at the specified index.
-    
-    _remove_name(self, tag: str):                              Removes the process step with the specified name.
-    _remove_function(self, function: Callable):                 Removes the process step with the specified function.
-    remove(self, value: str | Callable | ProcessStep | Self):   Removes the process step with the specified value.
-    
-    reverse(self):          Raises a NotImplementedError, as RCAIDE processes cannot be reversed.
-    sort(self):             Raises a NotImplementedError, as RCAIDE processes cannot be sorted.
-    
-    update_details(self):   Updates the details DataFrame with the current process steps.
-    """
-
-    tag:                str             = "Process"
-    keep_details:       bool            = False
-
-    steps:              tuple           = field(default_factory=tuple)
-    details:            pd.DataFrame    = None
-
-    current_step:       int             = 0
-    initial_step:       int             = 0
-
-    initial_state:      "rcf.State"     = None
-    initial_settings:   "rcf.Settings"  = None
-    initial_system:     "rcf.System"    = None
-
-    state:              "rcf.State"     = None
-    settings:           "rcf.Settings"  = None
-    system:             "rcf.System"    = None
-
-    last_result:        object          = None
-
-    def __eq__(self, other):
-        return self is other
 
     def __getitem__(self, item):
-        """
-        __getitem__(self, item)
-    
-        Returns the process step at the specified index.
-    
-        Parameters
-        ----------
-        item : int
-            The index of the process step to retrieve.
-    
-        Returns
-        -------
-        ProcessStep | ProcessType
-            The process step at the specified index.
-    
-        Raises
-        ------
-        IndexError
-            If the specified index is out of range.
-    
-        Examples
-        --------
-        """
         if isinstance(item, str):
             return self.steps[self._index_tag(item)]
         else:
             return self.steps[item]
 
-    def __setitem__(self, key, value):
-        index = self._index_tag(key) if isinstance(key, str) else key
-        temp_steps = list(self.steps)
-        temp_steps[index] = value
-        self.steps = tuple(temp_steps)
-        self.update_details()
+    def __getattr__(self, key):
+        tags = [step.tag.replace(' ','_').lower() for step in self.steps]
+        if key in tags:
+            return self.__getitem__(key)
+        else:
+            return getattr(self, key)
 
-    def __delitem__(self, key):
-        """
-        __delitem__(self, key)
-    
-        Removes and returns the process step at the specified index.
-    
-        Parameters
-        ----------
-        key : int
-            The index of the process step to remove.
-    
-        Returns
-        -------
-        None
-    
-        Raises
-        ------
-        IndexError
-            If the specified index is out of range.
-    
-        Examples
-        --------
-        """
-        del self.steps[key]
-        self.update_details()
-
-    def __call__(self, state, system, settings):
-        """
-        Executes the process, passing the state, settings, and system to each process step.
-    
-        Parameters
-        ----------
-        *args : tuple
-            Additional positional arguments to be passed to each process step.
-        **kwargs : dict
-            Additional keyword arguments to be passed to each process step.
-    
-        Returns
-        -------
-        object
-            The return value of the last process step.
-    
-        Notes
-        -----
-        - The function updates the details DataFrame before executing the process steps.
-        - The state, settings, and system are passed to each process step in the order they are defined in the steps list.
-        - The last result of each process step is stored in the corresponding ProcessStep object and in the details DataFrame.
-        - The return value of the last process step is returned as the result of the __call__ method.
-        """
-    
-        current_state = state
-        current_system = system
-        current_settings = settings
-
+    def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
         for step in self.steps[self.initial_step:]:
-            current_state, current_system, current_settings = step(
-                current_state, current_system, current_settings
+            state, system, settings = step(state, system, settings)
+
+        return state, system, settings
+
+    def run(self, state, system, settings):
+        return self(state, system, settings)
+
+    def run_with_history(self, state, system, settings):
+        
+        original_state = state
+        original_system = system
+        original_settings = settings
+
+        logged_steps = []
+
+        for step in self.steps:
+            # 1. Run the step
+            new_state, new_system, new_settings = step(state, system, settings)
+            
+            # 2. Record the pre-step (or post-step) conditions into the history
+            logged_step = step.record_history(
+                initial_state=state,
+                initial_system=system,
+                initial_settings=settings,
+                final_state=new_state,
+                final_system=new_system,
+                final_settings=new_settings,
             )
+            logged_steps.append(logged_step)
+            
+            # 3. Advance to next step
+            state, system, settings = new_state, new_system, new_settings
 
-        return current_state, current_system, current_settings
-
-    def run(self, *args, **kwargs):
-
-        return self(*args, **kwargs)
-
-    def evaluate_history(self, state, system, settings):
-
-        current_state = state
-        current_system = system
-        current_settings = settings
-
-        for index, step in enumerate(self.steps[self.initial_step:]):
-            # 1. Run the pure math
-            current_state, current_system, current_settings = step(
-                current_state, current_system, current_settings
+        # Return the final states AND the structurally new, logged Process
+        logged_process = eqx.tree_at(
+            lambda p: (
+                p.steps, 
+                p.initial_state, p.initial_system, p.initial_settings,
+                p.final_state, p.final_system, p.final_settings
+            ),
+            self,
+            (
+                tuple(logged_steps),
+                original_state, original_system, original_settings,
+                state, system, settings # The final ones
             )
-            
-            # 2. Mutate the stateful trackers safely outside the solver
-            actual_index = self.initial_step + index
-            
-            # Since step is now a dataclass, we must use object assignment or replace
-            # (Assuming you don't need 'step' itself to be functionally pure here)
-            self.steps[actual_index].last_result = (current_state, current_system, current_settings)
-            
-            if self.keep_details and self.details is not None:
-                self.details.at[actual_index, 'Last Result'] = (
-                    current_state.replace(), current_system.replace(), current_settings.replace()
-                )
-
-        return current_state, current_system, current_settings
+        )
+        
+        return state, system, settings, logged_process
 
     def append(self, step: ProcessStep | Self):
-        """
-        Append a process step to the end of the process.
-    
-        Parameters
-        ----------
-        step : Union['ProcessStep', 'Self']
-            The process step to be appended. It can be an instance of ProcessStep or a nested Process.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by appending the given step.
-    
-        Examples
-        --------
-        """
-    
-        self.steps = tuple(list(self.steps) + [step])
-        self.update_details()
-    
-        return None
-
-    def clear(self):
-        """
-        Clear all process steps from the process.
-    
-        Parameters
-        ----------
-        None
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by clearing all process steps.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
-        self.steps.clear()
-        self.update_details()
-    
-        return None
-
-    def copy(self):
-        """
-        Create a shallow copy of the process.
-    
-        Parameters
-        ----------
-        None
-    
-        Returns
-        -------
-        Process
-            A shallow copy of the process.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
-        return dataclasses.replace(self)
+        new_steps = self.steps + (step,)
+        return eqx.tree_at(lambda p: p.steps, self, new_steps)
 
     def count(self, step: ProcessStep):
-        """
-        Count the occurrences of a specific process step in the process.
-    
-        Parameters
-        ----------
-        step : ProcessStep
-            The process step to count occurrences of.
-    
-        Returns
-        -------
-        int
-            The number of occurrences of the specified process step in the process.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
         return self.steps.count(step)
 
-    def extend(self, extension: Iterable):
-        """
-        Extend the process with the process steps from the specified iterable.
-    
-        Parameters
-        ----------
-        extension : Iterable
-            An iterable containing process steps to be added to the process.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by extending it with the given iterable.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
-        self.steps.extend(extension)
-        self.update_details()
-    
-        return None
-
     def _index_tag(self, tag: str):
-        """
-        Find the index of the process step with the specified name.
-    
-        Parameters
-        ----------
-        name : str
-            The name of the process step to find the index of.
-    
-        Returns
-        -------
-        int
-            The index of the process step with the specified name. If the name is not found, it returns -1.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
         tags = [step.tag for step in self.steps]
         index = tags.index(tag)
     
         return index
 
     def _index_function(self, function: Callable):
-        """
-        Find the index of the process step with the specified function.
-    
-        Parameters
-        ----------
-        function : Callable
-            The function of the process step to find the index of.
-    
-        Returns
-        -------
-        int
-            The index of the process step with the specified function. If the function is not found, it returns -1.
-    
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-    
-        Examples
-        --------
-        """
-    
         functions = [step.function for step in self.steps]
         index = functions.index(function)
     
         return index
 
     def index(self, value: str | Callable | ProcessStep | Self):
-        """
-        Find the index of the process step with the specified value.
-    
-        Parameters
-        ----------
-        value : Union[str, Callable, 'ProcessStep', 'Self']
-            The value to find the index of. It can be a name (str), a function (Callable), a ProcessStep object, or a nested Process.
-    
-        Returns
-        -------
-        int
-            The index of the process step with the specified value. If the value is not found, it raises a ValueError.
-    
-        Raises
-        ------
-        ValueError
-            If the specified value is not found in the process steps.
-    
-        Examples
-        --------
-        """
-    
         if isinstance(value, str):
             return self._index_tag(value)
         elif isinstance(value, Callable):
@@ -564,302 +193,40 @@ class Process:
     
         else:
             raise ValueError("RCAIDE processes can only be indexed by name, function, or ProcessStep object.")
-
-    def insert(self, index: int, step: ProcessStep | Self):
-        """
-        Insert a process step at the specified index in the process.
     
-        Parameters
-        ----------
-        index : int
-            The index at which to insert the process step.
-        step : Union['ProcessStep', 'Self']
-            The process step to be inserted. It can be an instance of ProcessStep or a nested Process.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by inserting the given step at the specified index.
-    
-        Raises
-        ------
-        IndexError
-            If the specified index is out of range.
-    
-        Examples
-        --------
-        """
-    
-        self.steps.insert(index, step)
-        self.update_details()
-    
-        return None
+    def insert(self, step: ProcessStep, index: int):
+        new_steps = self.steps[:index] + (step,) + self.steps[index:]
+        return eqx.tree_at(lambda c: c.steps, self, new_steps)
 
     def pop(self, index: int):
-        """
-        Remove and return the process step at the specified index.
-    
-        Parameters
-        ----------
-        index : int
-            The index of the process step to remove.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by removing the process step at the specified index.
-    
-        Raises
-        ------
-        IndexError
-            If the specified index is out of range.
-    
-        Examples
-        --------
-        """
-    
-        self.steps.pop(index)
-        self.update_details()
-    
-        return None
+        new_steps = self.steps[:index] + self.steps[index + 1:]
+        return eqx.tree_at(lambda p: p.steps, self, new_steps)
 
     def _remove_tag(self, tag: str):
-        """
-        Remove the process step with the specified name.
-
-        Parameters
-        ----------
-        name : str
-            The name of the process step to remove.
-
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by removing the process step with the specified name.
-
-        Raises
-        ------
-        ValueError
-            If the specified name is not found in the process steps.
-
-        Examples
-        --------
-        """
-
-        self.steps.pop(self._index_tag(tag))
-        self.update_details()
-
-        return None
+        return self.pop(self._index_tag(tag))
 
     def _remove_function(self, function: Callable):
-        """
-        Remove the process step with the specified function.
-    
-        Parameters
-        ----------
-        function : Callable
-            The function of the process step to remove.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by removing the process step with the specified function.
-    
-        Raises
-        ------
-        ValueError
-            If the specified function is not found in the process steps.
-    
-        Examples
-        --------
-        """
-    
-        self.steps.pop(self._index_function(function))
-        self.update_details()
-    
-        return None
+        return self.pop(self._index_function(function))
 
-    def remove(self, value: str | Callable | ProcessStep | Self):
-        """
-        Remove the process step with the specified value.
-    
-        Parameters
-        ----------
-        value : Union[str, Callable, 'ProcessStep', 'Self']
-            The value to find and remove the process step. It can be a name (str), a function (Callable), a ProcessStep object, or a nested Process.
-    
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by removing the process step with the specified value.
-    
-        Raises
-        ------
-        ValueError
-            If the specified value is not found in the process steps.
-    
-        Examples
-        --------
-        """
-    
-        if isinstance(value, str):
-            self._remove_name(value)
-            self.update_details()
-        elif isinstance(value, Callable):
-            self._remove_function(value)
-            self.update_details()
-        else:
-            self.steps.remove(value)
-            self.update_details()
+    def remove(self, value: str | Callable | ProcessStep | Self):    
+        idx_to_remove = self.index(value) 
+        return self.pop(idx_to_remove)
 
-    def reverse(self):
-        """
-        Raises an exception indicating that RCAIDE processes cannot be reversed.
-    
-        Parameters
-        ----------
-        None
-    
-        Returns
-        -------
-        None
-    
-        Raises
-        ------
-        NotImplementedError
-            If the method is called.
-    
-        Examples
-        --------
-        """
-    
-        raise NotImplementedError("RCAIDE processes cannot be reversed.")
-
-    def sort(self):
-        """
-        Raises an exception indicating that RCAIDE processes cannot be sorted.
-    
-        Parameters
-        ----------
-        None
-    
-        Returns
-        -------
-        None
-    
-        Raises
-        ------
-        NotImplementedError
-            If the method is called.
-    
-        Examples
-        --------
-        """
-    
-        raise NotImplementedError("RCAIDE processes cannot be sorted.")
-
-    def update_details(self):
-        """
-        Update the details DataFrame with the current process steps.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        None
-            The function does not return any value. It modifies the process by updating the details DataFrame.
-
-        Raises
-        ------
-        None
-            The function does not raise any exceptions.
-
-        Examples
-        --------
-        """
-
-        if not self.keep_details:
-            return None
-
-        if not self.details:
-
-            self.details = pd.DataFrame(
-                columns=['Name',
-                 'Function',
-                 'Last Result']
-            )
-
-        if any(not isinstance(s, ProcessStep) for s in self.steps):
-            if not all(isinstance(s, Callable) for s in self.steps):
-                raise ValueError("All process steps must be ProcessSteps, or callable functions/objects.")
-            else:
-                for i, step in enumerate(self.steps):
-                    if not (isinstance(step, ProcessStep) or isinstance(step, Process)):
-                        self.steps[i] = ProcessStep(function=step,
-                                                    tag=step.__name__)
-
-        new_details_list = [[step.tag,
-                             step.function.__name__,
-                             step.last_result]
-                            if isinstance(step, ProcessStep)
-                            else [step.tag,
-                                  step.__class__.__name__,
-                                  step.last_result]
-                             for step in self.steps]
-
-        new_details = pd.DataFrame(new_details_list,
-                                   columns=self.details.columns,
-                                   index=[*range(len(self.steps))])
-
-        self.details = new_details
-
-        return None
-    
     def __repr__(self):
-        """
-        Safe representation that summarizes steps
-        """
-        # We use type(self).__name__ instead of self.__class__.__name__ 
-        # to avoid potential overhead if __class__ is instrumented by chex/jax.
-        return f"<{type(self).__name__} tag='{self.tag}' step={self.current_step}/{len(self.steps)}>"
 
+        if not self.steps:
+            return f"{self.tag} (Empty Process)"
 
-def process_flatten(process):
-    
-    children = (process.steps,)
-    
+        step_tags = [step.tag for step in self.steps]
+        step_func_names = [step.function.__name__ for step in self.steps]
 
-    aux_data = (
-        process.tag, 
-        process.initial_step, 
-        process.keep_details, 
-        process.details
-    )
-    
-    return (children, aux_data)
+        max_tag_length = max([len(tag) for tag in step_tags])
 
-def process_unflatten(aux_data, children):
-    
-    steps, = children
-    tag, initial_step, keep_details, details = aux_data
-    
-    
-    return Process(
-        tag=tag,
-        steps=steps,
-        initial_step=initial_step,
-        keep_details=keep_details,
-        details=details
-    )
+        process_str = self.tag
+        for idx in range(len(step_tags)):
+            process_str += f"{step_tags[idx]:<{max_tag_length}}" + f": {step_func_names[idx]}"
 
-# Register the Process class with JAX's PyTree system
-jax.tree_util.register_pytree_node(
-    Process,
-    process_flatten,
-    process_unflatten
-)
+        return process_str
 
 if __name__ == "__main__":
 

@@ -8,8 +8,9 @@
 #  Imports
 # ---------------------------------------------------------------------- 
 
-#import numpy as np
-import jax.numpy as np
+# package imports
+import jax
+import jax.numpy as jnp
 from RCAIDE.Framework.Core import Units
 
 import RCAIDE.Framework as rcf
@@ -19,8 +20,8 @@ import RCAIDE.Library as rcl
 # Functional/Library Version
 # -----------------------------------------------------------------------
 
-def func_operating_systems(fixed_masses : np.ndarray,
-                           per_seat_masses : np.ndarray,
+def func_operating_systems(fixed_masses : jnp.ndarray,
+                           per_seat_masses : jnp.ndarray,
                            number_of_seats : int,
                            reference_area : float,
                            tail_area : float,
@@ -29,8 +30,8 @@ def func_operating_systems(fixed_masses : np.ndarray,
                            *args, **kwargs):
 
     # Total Operating System Mass
-    total_opsys_mass = (np.sum(fixed_masses)
-                        + np.sum(per_seat_masses) * number_of_seats)
+    total_opsys_mass = (jnp.sum(fixed_masses)
+                        + jnp.sum(per_seat_masses) * number_of_seats)
 
     # Flight Control System Mass
 
@@ -54,7 +55,7 @@ def func_operating_systems(fixed_masses : np.ndarray,
 # -----------------------------------------------------------------------
 
 def operating_systems(state: "rcf.State",
-                      system: "rcf.System",
+                      system: "rcf.Aircraft",
                       settings: "rcf.Settings",):
 
     fixed_masses = []
@@ -65,13 +66,8 @@ def operating_systems(state: "rcf.State",
 
     adjustment = 1.0 - settings.mass_reduction_factors.systems
 
-    for key, value in system.aircraft_type.__dict__.items():
-        if key[-4:] == 'mass' and value.metadata['fixed']:
-            fixed_masses.append(value)
-            fixed_mass_names.append(key)
-        elif key[-4:] =='mass' and value.metadata['per_seat']:
-            per_seat_masses.append(value)
-            per_seat_mass_names.append(key)
+    fixed_array     = jnp.array(jax.tree_util.tree_leaves(system.ac_class.fixed_masses))
+    per_seat_array  = jnp.array(jax.tree_util.tree_leaves(system.ac_class.per_seat_masses))
 
     s_tail = 0.
     for wing in system.wings:
@@ -83,8 +79,8 @@ def operating_systems(state: "rcf.State",
             if isinstance(wing, Main_Wing):
                 s_tail += wing.areas.reference * 0.01
 
-    results = func_operating_systems(np.asarray(fixed_masses),
-                                     np.asarray(per_seat_masses),
+    results = func_operating_systems(fixed_array,
+                                     per_seat_array,
                                      system.number_of_passengers,
                                      system.reference_area,
                                      s_tail)

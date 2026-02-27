@@ -7,22 +7,20 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-#import numpy as np
-import jax.numpy as np
+# package import
+import equinox as eqx
+import jax.numpy as jnp
 
-import RCAIDE.Framework as rcf
+from RCAIDE.Framework import State, System, Settings
 
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
+from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DirectControlVariable, ResidualNames
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Cruise
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-@chex.dataclass(kw_only=True)
 class Cruise(Segment):
 
     tag: str = 'Cruise'
@@ -30,72 +28,98 @@ class Cruise(Segment):
     distance: float = 0.0
     true_course: float = 0.0
 
-    def __post_init__(self):
-        super(Cruise, self).__post_init__()
+# ----------------------------------------------------------------------------------------------------------------------
+#  Test CSA Cruise
+# ----------------------------------------------------------------------------------------------------------------------
 
+def _test_cruise_controls():
+    return (
+        DirectControlVariable(
+            tag='Lift Coefficient',
+            path=("aerodynamics", "coefficients", "lift", "total"),
+            path_indices=(slice(None), 0),
+            active=True
+        ),
+        DirectControlVariable(
+            tag='Drag Coefficient',
+            path=("aerodynamics", "coefficients", "drag", "total"),
+            path_indices=(slice(None), 0),
+            active=True
+        )
+    )
 
-@chex.dataclass(kw_only=True)
-class TestCSACruise(Cruise):
-
-    tag: str = 'Constant Speed & Altitude Cruise'
-
-    altitude: float = None
-    air_speed: float = None
-
-    active_controls: tuple[str|DirectControlVariable, ...] = None
-    active_residuals: tuple[str|DirectControlVariable, ...] = ('Force X', 'Force Z')
-
-    def initialize_dynamics(
-            self,
-            state: "rcf.State",
-            system: "rcf.System",
-            settings: "rcf.Settings",
+def _build_dynamics(
+        altitude: float,
+        distance: float,
+        air_speed: float,
+        sideslip: float,
     ):
+    
+    def initialize_dynamics(state: "State", system: "System", settings: "Settings"):
+        alt = altitude
+        xf = distance
+        av = air_speed
+        beta = sideslip
 
-        alt = self.altitude
-        xf = self.distance
-        av = self.air_speed
-        beta = self.sideslip_angle
-
-        if not self.air_speed:
-            av = np.linalg.norm(state.frames.inertial.velocity_vector[-1])
-        if not self.altitude:
+        if not av:
+            av = jnp.linalg.norm(state.frames.inertial.velocity_vector[-1])
+        if not alt:
             alt = -1.0 * state.frames.inertial.position_vector[-1, 2]
 
-        v_x = np.cos(beta) * av
-        v_y = np.sin(beta) * av
+        v_x = jnp.cos(beta) * av
+        v_y = jnp.sin(beta) * av
+        
         t_0 = state.frames.inertial.time[0, 0]
         t_f = t_0 + xf / av
 
         t_nondim = state.numerics.dimensionless.control_points
         time = t_nondim * (t_f - t_0) + t_0
 
-        state.freestream.altitude = state.freestream.altitude.at[:, 0].set(alt)
-        state.frames.inertial.position_vector = state.frames.inertial.position_vector.at[:, 2].set(-alt)
-        state.frames.inertial.velocity_vector = state.frames.inertial.velocity_vector.at[:, 0].set(v_x)
-        state.frames.inertial.velocity_vector = state.frames.inertial.velocity_vector.at[:, 1].set(v_y)
-        state.frames.inertial.time = time
+        new_vel = state.frames.inertial.velocity_vector.at[:, 0].set(v_x).at[:, 1].set(v_y)
+        new_pos = state.frames.inertial.position_vector.at[:, 2].set(-alt)
+        new_alt = state.freestream.altitude.at[:, 0].set(alt)
 
-        # Set active controls and dynamics
-        return state, system, settings
+        new_state = eqx.tree_at(
+            lambda s: (
+                s.freestream.altitude,
+                s.frames.inertial.position_vector,
+                s.frames.inertial.velocity_vector,
+                s.frames.inertial.time
+            ),
+            state,
+            (new_alt, new_pos, new_vel, time)
+        )
+
+        return new_state, system, settings
+    
+    return initialize_dynamics
+        
+
+class TestCSACruise(Cruise):
+
+    tag: str = 'Constant Speed & Altitude Cruise'
+
+    altitude:   float = 1.0
+    air_speed:  float = 1.0
+
+    active_controls:  tuple[str | ControlVariable, ...]             = eqx.field(default_factory=_test_cruise_controls)
+    active_residuals: tuple[ResidualNames, ...]                     = eqx.field(static=True, default=('force_x', 'force_z'))
+    controls_initial_guess : tuple[jnp.ndarray|float, ...] | None   = eqx.field(static=True, default=(1.0, 0.05))
 
     def __post_init__(self):
 
-        lift_control = DirectControlVariable(tag='Lift Coefficient',
-                                             path=("aerodynamics", "coefficients", "lift", "total"),
-                                             path_indices=(slice(None), 0),
-                                             active=True
-                                             )
-        drag_control = DirectControlVariable(tag='Drag Coefficient',
-                                             path=("aerodynamics", "coefficients", "drag", "total"),
-                                             path_indices=(slice(None), 0),
-                                             active=True
-                                             )
+        super().__post_init__()
 
-        self.active_controls = lift_control, drag_control
-        self.controls_initial_guess = (1.0, 0.05)
+        # 2. Build the pure, detached physics function
+        initialize_dynamics = _build_dynamics(
+            self.altitude, self.distance, self.air_speed, self.sideslip_angle
+        )
 
-        self.initialize.append(ProcessStep(tag='Dynamics and Controls',
-                                           function=self.initialize_dynamics))
+        # 3. Functionally append to the InitializeSegment
+        new_init = self.initialize.append(
+            ProcessStep(tag='Dynamics and Controls', function=initialize_dynamics)
+        )
 
-        super(TestCSACruise, self).__post_init__()
+        # 4. Overwrite the underlying tuple, NOT the `@property`
+        new_steps = (new_init, self.iterate, self.finalize)
+        object.__setattr__(self, "steps", new_steps)

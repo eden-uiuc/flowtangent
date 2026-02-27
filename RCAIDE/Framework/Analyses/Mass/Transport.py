@@ -1,94 +1,27 @@
-import chex
-from dataclasses import make_dataclass
+import equinox as eqx
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Library.Methods.Mass import Transport as Mass
 
 from RCAIDE.Framework.Methods.Mass.Energy import Jet_Mass_from_SLS
 
 
+def _build_transport_steps() -> tuple[ProcessStep, ...]:
+    """Builds the static pipeline of turbofan cycle analysis steps."""
+    return (
+        ProcessStep(tag='Propulsion Mass', function=Jet_Mass_from_SLS),
+        ProcessStep(tag='Passenger & Payload Mass', function=Mass.passenger_payload),
+        ProcessStep(tag='Operating System Mass', function=Mass.operating_systems),
+        ProcessStep(tag='Main Wing Mass', function=Mass.segmented_main_wing),
+        ProcessStep(tag='Horizontal Tail Mass', function=Mass.horizontal_tail),
+        ProcessStep(tag='Vertical Tail Mass', function=Mass.vertical_tail),
+        ProcessStep(tag='Fuselage Mass', function=Mass.fuselage),
+        ProcessStep(tag='Landing Gear', function=Mass.landing_gear),
+    )
 
-
-@chex.dataclass(kw_only=True)
 class Transport(Process):
-    """
-    Transport Mass Analysis Class
 
-    This class is used to perform mass analysis for a transport aircraft. It inherits from the `Process` class.
+    tag: str = eqx.field(static=True, default="Transport Mass Analysis")
+    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_build_transport_steps)
 
-    Attributes
-    ----------
-    main_wing_mass_reduction_factor : float
-        The mass reduction factor for the main wing.
-    fuselage_mass_reduction_factor : float
-        The mass reduction factor for the fuselage.
-    empennage_mass_reduction_factor : float
-        The mass reduction factor for the empennage.
-    systems_mass_reduction_factor : float
-        The mass reduction factor for the systems.
-    rudder_sizing_fraction : float
-        The rudder area as a fraction of the main wing area.
 
-    Methods
-    -------
-    __post_init__():
-        Initializes the settings for the mass analysis.
-
-        If the appropriate datastructures aren't already in settings, creates them.
-        Maps analysis settings into settings datastructure for later retrieval.
-        Adds default process steps for mass calculations.
-    """
-
-    # Make settings analysis class attributes so that users can see what settings can/must be set when initializing
-    # an instance of this analysis, and so that they appear in the docstring of the analysis
-
-    # Mass Reduction Factors
-    main_wing_mass_reduction_factor: float = 0.
-    fuselage_mass_reduction_factor: float = 0.
-    empennage_mass_reduction_factor: float = 0.
-    systems_mass_reduction_factor: float = 0.
-
-    # Rudder Sizing Fraction
-    rudder_sizing_fraction: float = 0.25
-
-    def __post_init__(self):
-        # If the appropriate datastructures aren't already in settings, create them:
-        if 'mass_reduction_factors' not in vars(self.settings).keys():
-            self.settings.mass_reduction_factors = make_dataclass(cls_name='MassReductionFactors',
-                                                                  fields=[
-                                                                      ('main_wing', float),
-                                                                      ('fuselage', float),
-                                                                      ('empennage', float),
-                                                                      ('systems', float)
-                                                                  ])
-        if 'sizing' not in vars(self.settings).keys():
-            self.settings.sizing = make_dataclass(cls_name='Sizing',
-                                                  fields=[
-                                                      ('rudder_fraction', float)
-                                                  ])
-
-        # Map analysis settings into settings datastructure for later retrieval
-        self.settings.mass_reduction_factors.main_wing    = self.main_wing_mass_reduction_factor
-        self.settings.mass_reduction_factors.fuselage     = self.fuselage_mass_reduction_factor
-        self.settings.mass_reduction_factors.empennage    = self.empennage_mass_reduction_factor
-        self.settings.mass_reduction_factors.systems      = self.systems_mass_reduction_factor
-
-        self.settings.sizing.rudder_fraction              = self.rudder_sizing_fraction
-
-        ###---Default Process Steps---###
-
-        self.append(ProcessStep(tag='Propulsion Mass',
-                                function=Jet_Mass_from_SLS)),
-        self.append(ProcessStep(tag='Passenger & Payload Mass',
-                                function=Mass.passenger_payload))
-        self.append(ProcessStep(tag='Operating System Mass',
-                                function=Mass.operating_systems))
-        self.append(ProcessStep(tag='Main Wing Mass',
-                                function=Mass.segmented_main_wing))
-        self.append(ProcessStep(tag='Horizontal Tail Mass',
-                                function=Mass.horizontal_tail))
-        self.append(ProcessStep(tag='Vertical Tail Mass',
-                                function=Mass.vertical_tail))
-        self.append(ProcessStep(tag='Fuselage Mass',
-                                function=Mass.fuselage))
-        self.append(ProcessStep(tag='Landing Gear',
-                                function=Mass.landing_gear))
+        

@@ -37,7 +37,7 @@ class ComponentFineness(eqx.Module):
 class ComponentDimensions(eqx.Module):
 
     # Attribute         Type    Default Value
-    ordinal_direction:  bool    = False
+    ordinal_direction:  bool    = eqx.field(static=True, default=False)
 
     reference:          float   = 0.0
     total:              float   = 0.0
@@ -114,8 +114,8 @@ class Component(eqx.Module):
     tag:                    str                   = 'Component'
     is_control_component:   bool                  = False
 
-    segments:               tuple[Component]      = eqx.field(default_factory=tuple)
-    subcomponents:          tuple[Component]      = eqx.field(default_factory=tuple)
+    segments:               tuple[Component, ...] = eqx.field(default_factory=tuple)
+    subcomponents:          tuple[Component, ...] = eqx.field(default_factory=tuple)
     origin:                 jnp.ndarray           = eqx.field(default_factory=lambda: jnp.zeros(3))
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
@@ -170,8 +170,12 @@ class Component(eqx.Module):
         # Functionally replace and return the new Component
         return eqx.tree_at(lambda c: c.segments, self, new_segments)
     
+    def insert_segment(self, segment: "Component", index: int):
+        new_segments = self.segments[:index] + (segment,) + self.segments[index:]
+        
+        return eqx.tree_at(lambda c: c.segments, self, new_segments)
+
     def replace_segment(self, segment: "Component", index: int):
-        # Note the index + 1 on the right side to drop the old segment!
         new_segments = self.segments[:index] + (segment,) + self.segments[index + 1:]
         
         return eqx.tree_at(lambda c: c.segments, self, new_segments)
@@ -182,3 +186,13 @@ class Component(eqx.Module):
         new_self = eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
     
         return new_self
+    
+    def insert_subcomponent(self, subcomponent: "Component", index: int):
+        new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index:]
+        
+        return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
+
+    def replace_subcomponent(self, subcomponent: "Component", index: int):
+        new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index + 1:]
+        
+        return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)

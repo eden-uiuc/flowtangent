@@ -7,15 +7,13 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Tuple
-
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+from RCAIDE.Framework import State, System, Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 # fsolve Convergence
@@ -23,37 +21,30 @@ import RCAIDE.Framework as rcf
 
 
 def fsolve_results_parser(
-        fsolve_result: Tuple,
-        state: "rcf.State",
-        system: "rcf.System",
-        settings: "rcf.Settings",
-) -> tuple["rcf.State", "rcf.System", "rcf.Settings"]:
+        fsolve_result: tuple,
+        state: State,
+        system: System,
+        settings: Settings,
+) -> tuple[State, System, Settings]:
 
-        unknowns:       np.ndarray      = fsolve_result[0]
+        unknowns:       jnp.ndarray     = jnp.array(fsolve_result[0])
         infodict:       dict            = fsolve_result[1]
         ier:            int             = fsolve_result[2]
         mesg:           str             = fsolve_result[3]
 
+        current_state = state
+
         if ier != 1:
             print("Segment Convergence Failed:", mesg)
-            state.numerics.converged = False
+            unconverged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, False)
+            current_state = eqx.tree_at(lambda s: s.numerics, state, unconverged_numerics)
         else:
             print("Segment Converged.")
             print("Number of function evaluations:", infodict['nfev'])
-            state.unknowns = unknowns
-            state.unpack_unknowns()
-            state.numerics.converged = True
+            converged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, True)
+            current_state = eqx.tree_at(lambda s: s.numerics, state, converged_numerics)
+        
+        current_state = eqx.tree_at(lambda s: s.unknowns, current_state, unknowns)
+        current_state = current_state.unpack_unknowns()
         
         return state, system, settings
-
-def fsolve_update_kwargs(
-        fsolve_kwargs: dict,
-        state: "rcf.State",
-        system: "rcf.System",
-        settings: "rcf.Settings",
-):
-
-        fsolve_kwargs['x0'] = state.unknowns
-        fsolve_kwargs['args'] = (state, system, settings)
-
-        return fsolve_kwargs

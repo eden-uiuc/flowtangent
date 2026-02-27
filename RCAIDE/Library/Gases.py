@@ -7,12 +7,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 
@@ -21,31 +18,26 @@ import jax.numpy as np
 #  Gases
 # ----------------------------------------------------------------------------------------------------------------------
 
-@chex.dataclass(kw_only=True)
-class GasComposition:
+class GasComposition(eqx.Module):
 
-    elements: list = field(default_factory=list)
-    mass_fractions: list = field(default_factory=list)
+    elements: tuple[str]            = eqx.field(default_factory=tuple)
+    mass_fractions: tuple[float]    = eqx.field(default_factory=tuple)
 
 
-@chex.dataclass(kw_only=True)
-class Gas:
+class Gas(eqx.Module):
 
-    tag:                   str     = 'Gas'
+    tag:                    str     = eqx.field(static=True, default='Gas')
+    molecular_mass:         float   = eqx.field(static=True, default=0.0)
+    molar_mass:             float   = eqx.field(static=True, default=0.0)
+    R:                      float   = eqx.field(static=True, default=8.314462)  # ideal gas constant (J/(mol·K))
+    R_specific:             float   = eqx.field(static=True, default=0.0)
+    specific_heat_capacity: float   = eqx.field(static=True, default=0.0)
 
-    molecular_mass:         float   = 0.0
-    molar_mass:             float   = 0.0
+    gamma_coefficients:     tuple = eqx.field(default_factory=tuple)
+    cp_coefficients:        tuple = eqx.field(default_factory=tuple)
+    thermal_coefficients:   tuple = eqx.field(default_factory=tuple)
 
-    R:                      float   = 8.314462  # ideal gas constant (J/(mol·K))
-    R_specific:             float   = 0.0
-
-    specific_heat_capacity: float   = 0.0
-
-    gamma_coefficients:     list = field(default_factory=list)
-    cp_coefficients:        list = field(default_factory=list)
-    thermal_coefficients:   list = field(default_factory=list)
-
-    composition:            GasComposition = field(default_factory=GasComposition)
+    composition:            GasComposition = eqx.field(default_factory=GasComposition)
 
     def __post_init__(self):
         self.molar_mass = self.R / self.R_specific
@@ -54,17 +46,17 @@ class Gas:
         return p / (self.R_specific * T)
 
     def compute_gamma(self, T=298.15):
-        return np.polyval(self.gamma_coefficients, T)
+        return jnp.polyval(jnp.array(self.gamma_coefficients), T)
 
     def compute_cp(self, T=298.):
-        return np.polyval(self.cp_coefficients, T)
+        return jnp.polyval(jnp.array(self.cp_coefficients), T)
 
     def compute_thermal_conductivity(self, T=298.):
-        return np.polyval(self.thermal_coefficients, T)
+        return jnp.polyval(jnp.array(self.thermal_coefficients), T)
 
     def compute_speed_of_sound(self, T=298.):
         g = self.compute_gamma(T)
-        return np.sqrt(g * self.R_specific * T)
+        return jnp.sqrt(g * self.R_specific * T)
 
     def compute_absolute_viscosity(self, T=298.):
         raise NotImplementedError('Compute absolute viscosity not implemented for this gas')
@@ -72,47 +64,42 @@ class Gas:
     def compute_prandtl_number(self, T=298.):
         return self.compute_absolute_viscosity(T) * self.specific_heat_capacity / self.compute_thermal_conductivity(T)
 
+def _air_composition():
+    return GasComposition(
+        elements = ("O2", "Ar", "CO2", "N2"),
+        mass_fractions=(0.20946, 0.00934, 0.00036, 0.78084)
+    )
 
-@chex.dataclass(kw_only=True)
 class Air(Gas):
 
-    name                    = 'Air'
+    name                   : str = eqx.field(static=True, default='Air')
+    molecular_mass         : float = eqx.field(static=True, default=28.96442)
+    R_specific             : float = eqx.field(static=True, default=287.0528742)
+    specific_heat_capacity : float = eqx.field(static=True, default=1006.)
+    cp_coefficients        : tuple[float] = eqx.field(static=True, default=(-7.357e-7, 0.001307, -0.5558, 1074.0))
+    gamma_coefficients     : tuple[float] = eqx.field(static=True, default=(1.629e-10, -3.588e-7, 0.0001418, 1.386))
+    thermal_coefficients   : tuple[float] = eqx.field(static=True, default=(1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4))
 
-    molecular_mass          = 28.96442
-
-    R_specific              = 287.0528742
-
-    specific_heat_capacity  = 1006.
-
-    cp_coefficients         = [-7.357e-7, 0.001307, -0.5558, 1074.0]
-    gamma_coefficients      = [1.629e-10, -3.588e-7, 0.0001418, 1.386]
-    thermal_coefficients    = [1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4]
-
-    def __post_init__(self):
-
-        self.composition.O2         = 0.20946
-        self.composition.Ar         = 0.00934
-        self.composition.CO2        = 0.00036
-        self.composition.N2         = 0.78084
+    composition:            GasComposition  = eqx.field(static=True, default_factory=_air_composition)
 
     def compute_absolute_viscosity(self, T=298.):
         return 1.458e-6 * (T ** 1.5) / (T + 110.4)
 
+def _steam_composition():
+    return GasComposition(
+        elements = ('H20',),
+        mass_fractions=(1.0,)
+    )
 
-@chex.dataclass(kw_only=True)
 class Steam(Gas):
 
-    name            = 'Steam'
+    name                : str            = eqx.field(static=True, default='Steam')
+    molecular_mass      : float          = eqx.field(static=True, default=18.0)
+    R_specific          : float          = eqx.field(static=True, default=461.889)
+    gamma_coefficients  : tuple[float]   = eqx.field(static=True, default=(1.33))
+    cp_coefficients     : tuple[float]   = eqx.field(static=True, default=(5e-9, 1e-4, .9202, 1524.7))
 
-    molecular_mass  = 18.0
-    R_specific      = 461.889
-
-    gamma_coefficients = [1.33]
-    cp_coefficients    = [5e-9, 1e-4, .9202, 1524.7]
-
-    def __post_init__(self):
-
-        self.composition.H2O       = 1.0
+    composition         : GasComposition = eqx.field(static=True, default_factory=_steam_composition)
 
     def compute_absolute_viscosity(self, T=298.):
 
@@ -121,20 +108,20 @@ class Steam(Gas):
     def compute_thermal_conductivity(self, T=298.):
         raise NotImplementedError('Compute thermal conductivity not implemented steam.')
 
+def _C02_composition():
+    return GasComposition(
+        elements = ('CO2',),
+        mass_fractions=(1.0,)
+    )
 
-@chex.dataclass(kw_only=True)
 class CO2(Gas):
 
-    name            = 'Carbon Dioxide'
+    name                    : str   = eqx.field(static=True, default='Carbon Dioxide')
+    molecular_mass          : float = eqx.field(static=True, default=44.01)
+    R_specific              : float = eqx.field(static=True, default=188.9)
+    specific_heat_capacity  : float = eqx.field(static=True, default=839.)
 
-    molecular_mass  = 44.01
-    R_specific      = 188.9
-
-    specific_heat_capacity = 839.
-
-    def __post_init__(self):
-
-        self.composition.CO2       = 1.0
+    composition              : GasComposition = eqx.field(static=True, default_factory=_C02_composition)
 
     def compute_gamma(self, T=298.15):
         raise NotImplementedError('Compute gamma not implemented for carbon dioxide.')
@@ -154,20 +141,12 @@ class CO2(Gas):
     def compute_prandtl_number(self, T=298.):
         raise NotImplementedError('Compute Prandtl number not implemented for carbon dioxide.')
 
-
-@chex.dataclass(kw_only=True)
 class O2(Gas):
 
-    name            = 'Oxygen'
-
-    molecular_mass  = 32.00
-    R_specific      = 259.84
-
-    specific_heat_capacity = 918.
-
-    def __post_init__(self):
-
-        self.composition.O2       = 1.0
+    name                    : str   = eqx.field(static=True, default='Oxygen')
+    molecular_mass          : float = eqx.field(static=True, default=32.00)
+    R_specific              : float = eqx.field(static=True, default=259.84)
+    specific_heat_capacity  : float = eqx.field(static=True, default=918.)
 
 
 

@@ -7,100 +7,73 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 # package imports
-import chex
-from dataclasses import field
+import equinox as eqx
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component
+from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
+from RCAIDE.Library.Components.Energy.Converters import EnergyConverter
+from RCAIDE.Library.Components.Energy.Stores import EnergyStore
 
+from RCAIDE.Framework import State, System, Settings
 # ----------------------------------------------------------------------------------------------------------------------
 #  Network
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class EnergyLine(rcl.Component):
+class EnergyLine(Component):
 
-    propulsors:     rcl.Component = field(default_factory=lambda: rcl.Component(tag='Propulsors'))
-    converters:     rcl.Component = field(default_factory=lambda: rcl.Component(tag='Converters'))
-    stores:         rcl.Component = field(default_factory=lambda: rcl.Component(tag='Stores'))
+    propulsors:     Component = eqx.field(default_factory=lambda: Component(tag='Propulsors'))
+    converters:     Component = eqx.field(default_factory=lambda: Component(tag='Converters'))
+    stores:         Component = eqx.field(default_factory=lambda: Component(tag='Stores'))
 
     def add_subcomponent(
             self,
-            subcomponent: rcl.Component,
-            sum_mass=False,
-            sum_center_of_gravity=False,
-            sum_moments_of_inertia=False
+            subcomponent: Component,
     ):
 
-        if isinstance(subcomponent, rcl.Components.Energy.Propulsors.Propulsor):
-            self.propulsors.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
-        elif isinstance(subcomponent, rcl.Components.Energy.Converters.EnergyConverter):
-            self.converters.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
-        elif isinstance(subcomponent, rcl.Components.Energy.Stores.EnergyStore):
-            self.stores.add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+        if isinstance(subcomponent, Propulsor):
+            new_props = self.propulsors.add_subcomponent(subcomponent)
+            return eqx.tree_at(lambda e: e.propulsors, self, new_props)
+        elif isinstance(subcomponent, EnergyConverter):
+            new_convs = self.converters.add_subcomponent(subcomponent)
+            return eqx.tree_at(lambda e: e.converters, self, new_convs)
+        elif isinstance(subcomponent, EnergyStore):
+            new_stores = self.stores.add_subcomponent(subcomponent)
+            return eqx.tree_at(lambda e: e.stores, self, new_stores)
         else:
-            super(EnergyLine, self).add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
-
-    def __post_init__(self):
-        # Guard against JAX reconstruction artifacts where tags might be malformed (e.g. booleans)
-        if not (isinstance(self.propulsors.tag, str) and 
-                isinstance(self.converters.tag, str) and 
-                isinstance(self.stores.tag, str)):
-            return
-
-        # If subcomponents are already populated, do not add them again.
-        if self.subcomponents:
-            return
-
-        self.add_subcomponent(self.propulsors)
-        self.add_subcomponent(self.converters)
-        self.add_subcomponent(self.stores)
-
-    def __eq__(self, other):
-        return self is other
+            return super(EnergyLine, self).add_subcomponent(subcomponent)
 
     @staticmethod
-    def calculate_performance(state: "rcf.State",
-                              system: "rcf.System",
-                              settings: "rcf.Settings"
-                              ):
+    def calculate_performance(
+        state: State,
+        system: System,
+        settings: Settings
+    ):
 
         raise NotImplementedError('Subclasses must implement this method')
 
 
-@chex.dataclass(kw_only=True)
-class EnergyNetwork(rcl.Component):
+class EnergyNetwork(Component):
 
     tag: str = 'Energy Network'
 
     efficiency: float = 1.0
 
-    lines: rcl.Component = field(default_factory=lambda: rcl.Component(tag='Lines'))
+    lines: Component = eqx.field(default_factory=lambda: Component(tag='Lines'))
 
-    def __post_init__(self):
-        # Guard against JAX reconstruction artifacts
-        if not isinstance(self.lines.tag, str):
-            return
-
-        # If subcomponents are already populated, do not add them again.
-        if self.subcomponents:
-            return
-
-        self.add_subcomponent(self.lines)
-
-    def __eq__(self, other):
-        return self is other
 
     @staticmethod
-    def calculate_performance(state: "rcf.State",
-                              system: "rcf.System",
-                              settings: "rcf.Settings"
+    def calculate_performance(state: State,
+                              system: System,
+                              settings: Settings
                               ):
 
-        for line in system.energy.lines:
+        for line in system.energy.lines.subcomponents: #type: ignore
+            line: EnergyLine
             state, system, settings = line.calculate_performance(state, system, settings)
 
         return state, system, settings

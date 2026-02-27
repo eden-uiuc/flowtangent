@@ -7,13 +7,10 @@
 #  Import
 # ----------------------------------------------------------------------------------------------------------------------
 
-import unittest
-import chex
-from dataclasses import field
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -23,7 +20,6 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
 class StaticCoefficients(Conditions):
     """
     Static stability coefficients for an aircraft.
@@ -35,23 +31,23 @@ class StaticCoefficients(Conditions):
     ----------
     name : str
         The name of the coefficient set.
-    lift : np.ndarray
+    lift : jnp.ndarray
         The lift coefficient. Shape: (1, 1)
-    drag : np.ndarray
+    drag : jnp.ndarray
         The drag coefficient. Shape: (1, 1)
-    X : np.ndarray
+    X : jnp.ndarray
         The X-axis force coefficient. Shape: (1, 1)
-    Y : np.ndarray
+    Y : jnp.ndarray
         The Y-axis force coefficient. Shape: (1, 1)
-    Z : np.ndarray
+    Z : jnp.ndarray
         The Z-axis force coefficient. Shape: (1, 1)
-    L : np.ndarray
+    L : jnp.ndarray
         The rolling moment coefficient. Shape: (1, 1)
-    M : np.ndarray
+    M : jnp.ndarray
         The pitching moment coefficient. Shape: (1, 1)
-    N : np.ndarray
+    N : jnp.ndarray
         The yawing moment coefficient. Shape: (1, 1)
-    e : np.ndarray
+    e : jnp.ndarray
         The Oswald efficiency factor. Shape: (1, 1)
 
     Notes
@@ -61,23 +57,23 @@ class StaticCoefficients(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = 'Static Stability Coefficients'
+    tag:            str         = eqx.field(static=True, default='Static Stability Coefficients')
 
-    lift:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    drag:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    lift:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    drag:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    X:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    Y:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    Z:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    X:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    Y:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    Z:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    L:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    M:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    N:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    L:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    M:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    N:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    e:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    e:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
-@chex.dataclass(kw_only=True)
+
 class StaticForces(Conditions):
     """
     Static forces acting on an aircraft.
@@ -89,15 +85,15 @@ class StaticForces(Conditions):
     ----------
     name : str
         The name of the static forces set. Default is 'Static Stability Forces'.
-    lift : np.ndarray
+    lift : jnp.ndarray
         The lift force. Shape: (1, 1)
-    drag : np.ndarray
+    drag : jnp.ndarray
         The drag force. Shape: (1, 1)
-    X : np.ndarray
+    X : jnp.ndarray
         The force in the X-direction. Shape: (1, 1)
-    Y : np.ndarray
+    Y : jnp.ndarray
         The force in the Y-direction. Shape: (1, 1)
-    Z : np.ndarray
+    Z : jnp.ndarray
         The force in the Z-direction. Shape: (1, 1)
 
     Notes
@@ -107,17 +103,17 @@ class StaticForces(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Static Stability Forces'
+    tag:           str         = eqx.field(static=True, default='Static Stability Forces')
 
-    lift:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    drag:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    lift:           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    drag:           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    X:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    Y:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    Z:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    X:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    Y:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    Z:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
-@chex.dataclass(kw_only=True)
+
 class StaticMoments(Conditions):
     """
     Represents the static moments acting on an aircraft.
@@ -129,11 +125,11 @@ class StaticMoments(Conditions):
     ----------
     name : str
         The name of the static moments set. Default is 'Static Stability Moments'.
-    L : np.ndarray
+    L : jnp.ndarray
         The rolling moment. Shape: (1, 1)
-    M : np.ndarray
+    M : jnp.ndarray
         The pitching moment. Shape: (1, 1)
-    N : np.ndarray
+    N : jnp.ndarray
         The yawing moment. Shape: (1, 1)
 
     Notes
@@ -143,14 +139,14 @@ class StaticMoments(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = 'Static Stability Moments'
+    tag:            str         = eqx.field(static=True, default='Static Stability Moments')
 
-    L:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    M:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    N:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    L:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    M:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    N:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
-@chex.dataclass(kw_only=True)
+
 class CoefficientDerivatives(Conditions):
     """
     Represents the coefficient derivatives for static stability analysis of an aircraft.
@@ -164,34 +160,34 @@ class CoefficientDerivatives(Conditions):
     name : str
         The name of the coefficient derivatives set. Default is 'Coefficient Static Stability Derivatives'.
     
-    alpha : np.ndarray
+    alpha : jnp.ndarray
         Derivative with respect to angle of attack. Shape: (1, 1)
-    beta : np.ndarray
+    beta : jnp.ndarray
         Derivative with respect to sideslip angle. Shape: (1, 1)
     
-    delta_a : np.ndarray
+    delta_a : jnp.ndarray
         Derivative with respect to aileron deflection. Shape: (1, 1)
-    delta_e : np.ndarray
+    delta_e : jnp.ndarray
         Derivative with respect to elevator deflection. Shape: (1, 1)
-    delta_r : np.ndarray
+    delta_r : jnp.ndarray
         Derivative with respect to rudder deflection. Shape: (1, 1)
-    delta_f : np.ndarray
+    delta_f : jnp.ndarray
         Derivative with respect to flap deflection. Shape: (1, 1)
-    delta_s : np.ndarray
+    delta_s : jnp.ndarray
         Derivative with respect to spoiler deflection. Shape: (1, 1)
     
-    u : np.ndarray
+    u : jnp.ndarray
         Derivative with respect to forward velocity. Shape: (1, 1)
-    v : np.ndarray
+    v : jnp.ndarray
         Derivative with respect to lateral velocity. Shape: (1, 1)
-    w : np.ndarray
+    w : jnp.ndarray
         Derivative with respect to vertical velocity. Shape: (1, 1)
     
-    p : np.ndarray
+    p : jnp.ndarray
         Derivative with respect to roll rate. Shape: (1, 1)
-    q : np.ndarray
+    q : jnp.ndarray
         Derivative with respect to pitch rate. Shape: (1, 1)
-    r : np.ndarray
+    r : jnp.ndarray
         Derivative with respect to yaw rate. Shape: (1, 1)
 
     Notes:
@@ -201,33 +197,33 @@ class CoefficientDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = 'Coefficient Static Stability Derivatives'
+    tag:            str         = eqx.field(static=True, default='Coefficient Static Stability Derivatives')
 
     # Throttle Derivative
-    throttle:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    throttle:       jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
     # Stability Axis Derivatives
-    alpha:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    beta:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    beta:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    alpha:          jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    delta_a:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    delta_e:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    delta_r:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    delta_f:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    delta_s:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    delta_a:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_e:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_r:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_f:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_s:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
     # Body Axis Derivatives
 
-    u:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    v:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    w:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    u:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    v:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    w:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    p:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    q:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    r:              np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
+    p:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    q:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    r:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
-@chex.dataclass(kw_only=True)
+
 class StaticDerivatives(Conditions):
     """
     Represents the static stability coefficient derivatives for an aircraft.
@@ -262,249 +258,65 @@ class StaticDerivatives(Conditions):
     allowing for detailed representation of stability characteristics in various axes and conditions.
     """
 
-    # Attribute     Type        Default Value
-    tag:            str         = 'Static Stability Coefficients Derivatives'
+    # Attribute     Type            Default Value
+    tag:            str             = eqx.field(static=True, default='Static Stability Coefficients Derivatives')
 
-    Clift:  CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
-    Cdrag:  CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='Drag Coefficient Static Stability Derivatives'))
+    Clift:  CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
+    Cdrag:  CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='Drag Coefficient Static Stability Derivatives'))
 
-    CX:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='X Coefficient Static Stability Derivatives'))
-    CY:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='Y Coefficient Static Stability Derivatives'))
-    CZ:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='Z Coefficient Static Stability Derivatives'))
+    CX:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='X Coefficient Static Stability Derivatives'))
+    CY:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='Y Coefficient Static Stability Derivatives'))
+    CZ:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='Z Coefficient Static Stability Derivatives'))
 
-    CL:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='L Coefficient Static Stability Derivatives'))
-    CM:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='M Coefficient Static Stability Derivatives'))
-    CN:     CoefficientDerivatives = field(default_factory=lambda:
-                                           CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
+    CL:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='L Coefficient Static Stability Derivatives'))
+    CM:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='M Coefficient Static Stability Derivatives'))
+    CN:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+                                            CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
 
 
-@chex.dataclass(kw_only=True)
+
 class StaticStability(Conditions):
-    """
-    Represents the static stability characteristics of an aircraft.
 
-    This class encapsulates various components and parameters related to static stability analysis,
-    including forces, moments, coefficients, derivatives, and stability metrics.
-
-    Attributes:
-    ----------
-    name : str
-        The name identifier for this static stability instance. Defaults to 'Static Stability'.
-    forces : StaticForces
-        An object representing the static forces acting on the aircraft.
-    moments : StaticMoments
-        An object representing the static moments acting on the aircraft.
-    coefficients : StaticCoefficients
-        An object containing the static stability coefficients.
-    derivatives : StaticDerivatives
-        An object containing the static stability derivatives.
-    static_margin : np.ndarray
-        The static margin of the aircraft. Shape: (1, 1)
-    neutral_point : np.ndarray
-        The neutral point of the aircraft. Shape: (1, 1)
-    spiral_criteria : np.ndarray
-        The spiral stability criteria. Shape: (1, 1)
-    pitch_rate : np.ndarray
-        The pitch rate of the aircraft. Shape: (1, 1)
-    roll_rate : np.ndarray
-        The roll rate of the aircraft. Shape: (1, 1)
-    yaw_rate : np.ndarray
-        The yaw rate of the aircraft. Shape: (1, 1)
-
-    Notes:
-    -----
-    All numpy array attributes are initialized as 1x1 arrays with zero values.
-    These can be updated with actual values during stability analysis.
-    """
-
-    tag:                str                 = 'Static Stability'
+    tag:                str                 = eqx.field(static=True, default='Static Stability')
     
-    forces:             StaticForces        = field(default_factory=lambda: StaticForces())
-    moments:            StaticMoments       = field(default_factory=lambda: StaticMoments())
+    forces:             StaticForces        = eqx.field(default_factory=StaticForces)
+    moments:            StaticMoments       = eqx.field(default_factory=StaticMoments)
     
-    coefficients:       StaticCoefficients  = field(default_factory=lambda: StaticCoefficients())
-    derivatives:        StaticDerivatives   = field(default_factory=lambda: StaticDerivatives())
+    coefficients:       StaticCoefficients  = eqx.field(default_factory=StaticCoefficients)
+    derivatives:        StaticDerivatives   = eqx.field(default_factory=StaticDerivatives)
     
-    static_margin:      np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
-    neutral_point:      np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
-    spiral_criteria:    np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
+    static_margin:      jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    neutral_point:      jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    spiral_criteria:    jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
     
-    pitch_rate:         np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
-    roll_rate:          np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
-    yaw_rate:           np.ndarray          = field(default_factory=lambda: np.zeros((1, 1)))
+    pitch_rate:         jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    roll_rate:          jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    yaw_rate:           jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
-@chex.dataclass(kw_only=True)
+
 class DynamicStability(Conditions):
-    """
-    Represents the dynamic stability characteristics of an aircraft.
-
-    This class encapsulates the longitudinal and lateral dynamic modes of an aircraft,
-    which are crucial for analyzing its dynamic stability behavior.
-
-    Attributes:
-    ----------
-    name : str
-        The name identifier for this dynamic stability instance. Defaults to 'Dynamic Stability'.
-    LongModes : Conditions
-        An object representing the longitudinal modes of the aircraft's dynamic stability.
-        Initialized with a name 'Longitudinal Modes'.
-    LatModes : Conditions
-        An object representing the lateral modes of the aircraft's dynamic stability.
-        Initialized with a name 'Lateral Modes'.
-
-    Notes:
-    -----
-    This class inherits from the Conditions base class and uses the dataclass decorator
-    with kw_only=True, meaning all attributes must be specified as keyword arguments when instantiating.
-    """
 
     #Attribute      Type        Default Value
-    tag:            str         = 'Dynamic Stability'
+    tag:            str         = eqx.field(static=True, default='Dynamic Stability')
 
-    LongModes:      Conditions  = field(default_factory=lambda: Conditions(tag='Longitudinal Modes'))
-    LatModes:       Conditions  = field(default_factory=lambda: Conditions(tag='Lateral Modes'))
+    LongModes:      Conditions  = eqx.field(default_factory=lambda: Conditions(tag='Longitudinal Modes'))
+    LatModes:       Conditions  = eqx.field(default_factory=lambda: Conditions(tag='Lateral Modes'))
 
 
 
-@chex.dataclass(kw_only=True)
+
 class StabilityConditions(Conditions):
-    """
-    Represents the overall stability conditions of an aircraft, including both static and dynamic stability.
-
-    This class encapsulates both static and dynamic stability characteristics of an aircraft,
-    providing a comprehensive view of its stability properties.
-
-    Attributes:
-    ----------
-    name : str
-        The name identifier for this stability conditions instance. Defaults to 'Stability'.
-    static : StaticStability
-        An instance of StaticStability representing the static stability characteristics of the aircraft.
-    dynamic : DynamicStability
-        An instance of DynamicStability representing the dynamic stability characteristics of the aircraft.
-
-    Notes:
-    -----
-    This class inherits from the Conditions base class and uses the dataclass decorator
-    with kw_only=True, meaning all attributes must be specified as keyword arguments when instantiating.
-    """
 
     # Attribute     Type                Default Value
-    tag:            str                 = 'Stability'
+    tag:            str                 = eqx.field(static=True, default='Stability')
 
-    static:         StaticStability     = field(default_factory=lambda: StaticStability())
-    dynamic:        DynamicStability    = field(default_factory=lambda: DynamicStability())
-
-
-class TestStaticCoefficients(unittest.TestCase):
-    def test_default_values(self):
-        sc = StaticCoefficients()
-        self.assertEqual(sc.tag, 'Static Stability Coefficients')
-        np.testing.assert_array_equal(sc.lift, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.drag, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.X, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.Y, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.Z, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.L, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.M, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.N, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sc.e, np.zeros((1, 1)))
-
-
-class TestStaticForces(unittest.TestCase):
-    def test_default_values(self):
-        sf = StaticForces()
-        self.assertEqual(sf.tag, 'Static Stability Forces')
-        np.testing.assert_array_equal(sf.lift, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sf.drag, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sf.X, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sf.Y, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sf.Z, np.zeros((1, 1)))
-
-
-class TestStaticMoments(unittest.TestCase):
-    def test_default_values(self):
-        sm = StaticMoments()
-        self.assertEqual(sm.tag, 'Static Stability Moments')
-        np.testing.assert_array_equal(sm.L, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sm.M, np.zeros((1, 1)))
-        np.testing.assert_array_equal(sm.N, np.zeros((1, 1)))
-
-
-class TestCoefficientDerivatives(unittest.TestCase):
-    def test_default_values(self):
-        cd = CoefficientDerivatives()
-        self.assertEqual(cd.tag, 'Coefficient Static Stability Derivatives')
-        np.testing.assert_array_equal(cd.alpha, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.beta, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.delta_a, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.delta_e, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.delta_r, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.delta_f, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.delta_s, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.u, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.v, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.w, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.p, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.q, np.zeros((1, 1)))
-        np.testing.assert_array_equal(cd.r, np.zeros((1, 1)))
-
-
-class TestStaticDerivatives(unittest.TestCase):
-    def test_default_values(self):
-        sd = StaticDerivatives()
-        self.assertEqual(sd.tag, 'Static Stability Coefficients Derivatives')
-        self.assertIsInstance(sd.Clift, CoefficientDerivatives)
-        self.assertIsInstance(sd.Cdrag, CoefficientDerivatives)
-        self.assertIsInstance(sd.CX, CoefficientDerivatives)
-        self.assertIsInstance(sd.CY, CoefficientDerivatives)
-        self.assertIsInstance(sd.CZ, CoefficientDerivatives)
-        self.assertIsInstance(sd.CL, CoefficientDerivatives)
-        self.assertIsInstance(sd.CM, CoefficientDerivatives)
-        self.assertIsInstance(sd.CN, CoefficientDerivatives)
-
-
-class TestStaticStability(unittest.TestCase):
-    def test_default_values(self):
-        ss = StaticStability()
-        self.assertEqual(ss.tag, 'Static Stability')
-        self.assertIsInstance(ss.forces, StaticForces)
-        self.assertIsInstance(ss.moments, StaticMoments)
-        self.assertIsInstance(ss.coefficients, StaticCoefficients)
-        self.assertIsInstance(ss.derivatives, StaticDerivatives)
-        np.testing.assert_array_equal(ss.static_margin, np.zeros((1, 1)))
-        np.testing.assert_array_equal(ss.neutral_point, np.zeros((1, 1)))
-        np.testing.assert_array_equal(ss.spiral_criteria, np.zeros((1, 1)))
-        np.testing.assert_array_equal(ss.pitch_rate, np.zeros((1, 1)))
-        np.testing.assert_array_equal(ss.roll_rate, np.zeros((1, 1)))
-        np.testing.assert_array_equal(ss.yaw_rate, np.zeros((1, 1)))
-
-
-class TestDynamicStability(unittest.TestCase):
-    def test_default_values(self):
-        ds = DynamicStability()
-        self.assertEqual(ds.tag, 'Dynamic Stability')
-        self.assertIsInstance(ds.LongModes, Conditions)
-        self.assertIsInstance(ds.LatModes, Conditions)
-        self.assertEqual(ds.LongModes.tag, 'Longitudinal Modes')
-        self.assertEqual(ds.LatModes.tag, 'Lateral Modes')
-
-
-class TestStabilityConditions(unittest.TestCase):
-    def test_default_values(self):
-        sc = StabilityConditions()
-        self.assertEqual(sc.tag, 'Stability')
-        self.assertIsInstance(sc.static, StaticStability)
-        self.assertIsInstance(sc.dynamic, DynamicStability)
-
-
-if __name__ == '__main__':
-    unittest.main()
+    static:         StaticStability     = eqx.field(default_factory=StaticStability)
+    dynamic:        DynamicStability    = eqx.field(default_factory=DynamicStability)

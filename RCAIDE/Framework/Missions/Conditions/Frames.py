@@ -7,12 +7,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
+
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
@@ -21,241 +20,76 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 #  Frames
 # ----------------------------------------------------------------------------------------------------------------------
 
-@chex.dataclass(kw_only=True)
 class Frame(Conditions):
-    """
-        A base class representing a reference frame for engineering simulations.
-
-        This class inherits from Conditions and provides attributes for frame
-        identification, transformation to inertial frame, and total force and
-        moment vectors.
-
-        Attributes
-        ----------
-        name : str
-            The name of the frame.
-        transform_to_inertial : scipy.spatial.transform.Rotation
-            The rotation that transforms from this frame to the inertial frame.
-        total_force_vector : np.ndarray
-            The total force vector acting on the system in this frame.
-        total_moment_vector : np.ndarray
-            The total moment vector acting on the frame.
-        """
-
-    # Attribute             Type            Default Value
-    tag:                    str             = 'Frame'
-
-    transform_to_inertial:  np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-
-    total_force_vector:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-    total_moment_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-
-    def __eq__(self, other):
-        return self is other
-
-
-@chex.dataclass(kw_only=True)
-class InertialFrame(Frame):
-    """
-    A class representing an inertial reference frame for engineering simulations.
-
-    This class inherits from Frame and provides additional attributes specific
-    to an inertial frame, such as position, velocity, acceleration, and more.
-
-    Attributes
-    ----------
-    name : str
-        The name of the frame. Default is 'Inertial Frame'.
-
-    position_vector : np.ndarray
-        The position vector in the inertial frame. Shape (1, 3).
-
-    velocity_vector : np.ndarray
-        The velocity vector in the inertial frame. Shape (1, 3).
-    acceleration_vector : np.ndarray
-        The acceleration vector in the inertial frame. Shape (1, 3).
-
-    angular_velocity_vector : np.ndarray
-        The angular velocity vector in the inertial frame. Shape (1, 3).
-    angular_acceleration_vector : np.ndarray
-        The angular acceleration vector in the inertial frame. Shape (1, 3).
-
-    gravity_force_vector : np.ndarray
-        The gravity force vector in the inertial frame. Shape (1, 3).
-    time : np.ndarray
-        The time array. Shape (1, 1).
-
-    system_range : np.ndarray
-        The range of the system in the inertial frame. Shape (1, 1).
-    """
-
-    # Attribute                     Type        Default Value
-    tag:                            str         = 'Inertial Frame'
-
-    position_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    velocity_vector:                np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-    acceleration_vector:            np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    angular_velocity_vector:        np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-    angular_acceleration_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    gravity_force_vector:           np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    time:                           np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    system_range:                   np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    def __eq__(self, other):
-        return self is other
-
-
-@chex.dataclass(kw_only=True)
-class BodyFrame(Frame):
-    """
-    A class representing a body-fixed reference frame for engineering simulations.
-
-    This class inherits from Frame and provides additional attributes specific
-    to a body frame, such as inertial rotations, thrust force vector, and moment vector.
-
-    Attributes
-    ----------
-    name : str
-        The name of the frame. Default is 'Body Frame'.
-
-    inertial_rotations : np.ndarray
-        The rotations of the body frame relative to the inertial frame. Shape (1, 3).
-
-    thrust_force_vector : np.ndarray
-        The thrust force vector in the body frame. Shape (1, 3).
-
-    moment_vector : np.ndarray
-        The moment vector in the body frame. Shape (1, 3).
-    """
 
     # Attribute             Type        Default Value
-    tag:                    str         = 'Body Frame'
+    tag:                    str         = eqx.field(static=True, default='Frame')
+    
+    transform_to_inertial:  jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
-    inertial_rotations:     np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-    thrust_force_vector:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-    moment_vector:          np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    def __eq__(self, other):
-        return self is other
+    total_force_vector:     jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    total_moment_vector:    jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
 
-@chex.dataclass(kw_only=True)
+class InertialFrame(Frame):
+
+    # Attribute                     Type        Default Value
+    tag:                            str         = eqx.field(static=True, default='Inertial Frame')
+
+    position_vector:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+
+    velocity_vector:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    acceleration_vector:            jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+
+    angular_velocity_vector:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    angular_acceleration_vector:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+
+    gravity_force_vector:           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+
+    time:                           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+    system_range:                   jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
+
+
+class BodyFrame(Frame):
+
+    # Attribute             Type        Default Value
+    tag:                    str         = eqx.field(static=True, default='Body Frame')
+
+    inertial_rotations:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    thrust_force_vector:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    moment_vector:          jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+
 class WindFrame(Frame):
-    """
-    A class representing a wind reference frame for engineering simulations.
-
-    This class inherits from Frame and provides additional attributes specific
-    to a wind frame, such as body rotations, transformation to body frame,
-    velocity vector, force vector, and moment vector.
-
-    Attributes
-    ----------
-    name : str
-        The name of the frame. Default is 'Wind Frame'.
-
-    body_rotations : np.ndarray
-        The rotations of the wind frame relative to the body frame. Shape (1, 3).
-
-    transform_to_body : scipy.spatial.transform.Rotation
-        The rotation that transforms from the wind frame to the body frame.
-
-    velocity_vector : np.ndarray
-        The velocity vector in the wind frame. Shape (1, 3).
-    force_vector : np.ndarray
-        The force vector in the wind frame. Shape (1, 3).
-    moment_vector : np.ndarray
-        The moment vector in the wind frame. Shape (1, 3).
-    """
 
     # Attribute         Type            Default Value
-    tag:               str             = 'Wind Frame'
+    tag:                str             = eqx.field(static=True, default='Wind Frame')
 
-    body_rotations:     np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-    transform_to_body:  np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
+    body_rotations:     jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    transform_to_body:  jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
-    velocity_vector:    np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-    force_vector:       np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-    moment_vector:      np.ndarray      = field(default_factory=lambda: np.zeros((1, 3)))
-
-    def __eq__(self, other):
-        return self is other
+    velocity_vector:    jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    force_vector:       jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    moment_vector:      jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
 
-@chex.dataclass(kw_only=True)
 class PlanetFrame(Frame):
-    """
-    A class representing a planet-fixed reference frame for engineering simulations.
 
-    This class inherits from Frame and provides additional attributes specific
-    to a planet frame, such as start time, latitude, longitude, and true course.
+    # Attribute     Type            Default Value
+    tag:            str             = eqx.field(static=True, default='Planet Frame')
+    start_time:     float | None    = None
 
-    Attributes
-    ----------
-    name : str
-        The name of the frame. Default is 'Planet Frame'.
+    latitude:       jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
+    longitude:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
 
-    start_time : float
-        The start time of the simulation in the planet frame.
-
-    latitude : np.ndarray
-        The latitude of the system.
-    longitude : np.ndarray
-        The longitude of the system.
-
-    true_course : scipy.spatial.transform.Rotation
-        The rotation representing the true course in the planet frame.
-    """
-
-    # Attribute     Type        Default Value
-    tag:            str         = 'Planet Frame'
-    start_time:     float       = None
-
-    latitude:       np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-    longitude:      np.ndarray  = field(default_factory=lambda: np.zeros((1, 1)))
-
-    true_course:    np.ndarray  = field(default_factory=lambda: np.zeros((1, 3)))
-
-    def __eq__(self, other):
-        return self is other
+    true_course:    jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
 
-@chex.dataclass(kw_only=True)
 class FrameConditions(Conditions):
-    """
-    A class representing a collection of reference frames for dynamic simulations.
-
-    This class inherits from Conditions and provides attributes for different
-    types of reference frames used in engineering simulations.
-
-    Attributes
-    ----------
-    name : str
-        The name of the frame collection. Default is 'Dynamic Frames'.
-
-    inertial : InertialFrame
-        An instance of the InertialFrame class.
-
-    body : BodyFrame
-        An instance of the BodyFrame class.
-
-    wind : WindFrame
-        An instance of the WindFrame class.
-
-    planet : PlanetFrame
-        An instance of the PlanetFrame class.
-    """
 
     # Attribute     Type            Default Value
     tag:            str             = 'Dynamic Frames'
 
-    inertial:       InertialFrame   = field(default_factory=lambda: InertialFrame())
-    body:           BodyFrame       = field(default_factory=lambda: BodyFrame())
-    wind:           WindFrame       = field(default_factory=lambda: WindFrame())
-    planet:         PlanetFrame     = field(default_factory=lambda: PlanetFrame())
-
-    def __eq__(self, other):
-        return self is other
+    inertial:       InertialFrame   = eqx.field(default_factory=InertialFrame)
+    body:           BodyFrame       = eqx.field(default_factory=BodyFrame)
+    wind:           WindFrame       = eqx.field(default_factory=WindFrame)
+    planet:         PlanetFrame     = eqx.field(default_factory=PlanetFrame)

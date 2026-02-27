@@ -13,58 +13,85 @@ from __future__ import annotations
 import equinox as eqx
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
+from RCAIDE.Library import Component, MassProperties
+from RCAIDE.Library.Attributes import AircraftClass, MediumRange
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+from RCAIDE.Library.Components import Wing, Fuselage, Nacelle, LandingGear
+
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
 # ----------------------------------------------------------------------------------------------------------------------
 
 class VehicleEnvelope(eqx.Module):
-    # Attribute                 Type        Default Value
-    ultimate_load:             float        = 0.0
-    limit_load_factor:         float        = 0.0
+    # Attribute             Type        Default Value
+    ultimate_load_factor:   float        = 0.0
+    limit_load_factor:      float        = 0.0
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  System
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class System(rcl.Component):
+class System(Component):
 
     tag: str = eqx.field(static=True, default='System')
 
-    configurations: rcl.Component = eqx.field(default_factory=lambda: rcl.Component(tag='Configurations'))
+    configurations: Component = eqx.field(default_factory=lambda: Component(tag='Configurations'))
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Aircraft
+# ----------------------------------------------------------------------------------------------------------------------
+
+class AircraftMassProperties(MassProperties):
+
+    max_takeoff         :float = 0.
+    takeoff             :float = 0.
+    operating_empty     :float = 0.
+    max_zero_fuel       :float = 0.
+    cargo               :float = 0.
 
 class Aircraft(System):
 
-    tag:           str = 'Aircraft'
+    tag:                str = 'Aircraft'
+    
+    ac_class:           AircraftClass = eqx.field(static=True, default_factory=MediumRange)
+    envelope:           VehicleEnvelope = eqx.field(static=True, default_factory=VehicleEnvelope)
+    mass_properties:    AircraftMassProperties = eqx.field(default_factory=AircraftMassProperties) #type: ignore
 
-    energy:         rcl.Component = eqx.field(default_factory=lambda: rcl.Components.Energy.Networks.EnergyNetwork(tag="Energy"))
-    wings:          rcl.Component = eqx.field(default_factory=lambda: rcl.Component(tag='Wings'))
-    fuselages:      rcl.Component = eqx.field(default_factory=lambda: rcl.Component(tag='Fuselages'))
-    nacelles:       rcl.Component = eqx.field(default_factory=lambda: rcl.Component(tag='Nacelles'))
-    landing_gear:   rcl.Component = eqx.field(default_factory=lambda: rcl.Component(tag='Landing Gear'))
+    passengers:         int     = eqx.field(static=True, default=0)
+    
+    design_mach_number: float   = eqx.field(static=True, default=0.)
+    design_range:       float   = eqx.field(static=True, default=0.)
+    design_cruise_alt:  float   = eqx.field(static=True, default=0.)
+
+    energy:         EnergyNetwork = eqx.field(default_factory=lambda: EnergyNetwork(tag="Energy"))
+    
+    wings:          Component = eqx.field(default_factory=lambda: Component(tag='Wings'))
+    fuselages:      Component = eqx.field(default_factory=lambda: Component(tag='Fuselages'))
+    nacelles:       Component = eqx.field(default_factory=lambda: Component(tag='Nacelles'))
+    landing_gear:   Component = eqx.field(default_factory=lambda: Component(tag='Landing Gear'))
 
     def add_subcomponent(
             self,
-            subcomponent: rcl.Component,
-):
+            subcomponent: Component,
+    ):
 
-        if isinstance(subcomponent, rcl.Components.Wings.Wing):
+        if isinstance(subcomponent, Wing):
             new_wings = self.wings.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda a: a.wings, self, new_wings)
-        elif isinstance(subcomponent, rcl.Components.Fuselages.Fuselage):
+        elif isinstance(subcomponent, Fuselage):
             new_fuses = self.fuselages.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda a: a.fuselages, self, new_fuses)
-        elif isinstance(subcomponent, rcl.Components.Nacelles.Nacelle):
+        elif isinstance(subcomponent, Nacelle):
             new_nacs = self.nacelles.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda a: a.nacelles, self, new_nacs)
-        elif isinstance(subcomponent, rcl.Components.Landing_Gear.LandingGear):
+        elif isinstance(subcomponent, LandingGear):
             new_LGs = self.landing_gear.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda a: a.landing_gear, self, new_LGs)
         else:
-            return super().add_subcomponent(subcomponent)
+            return super(Aircraft, self).add_subcomponent(subcomponent)
 
     def get_all_components(self):
         return self.subcomponents + (

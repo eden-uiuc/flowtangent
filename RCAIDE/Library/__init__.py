@@ -8,20 +8,19 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from . import Units
+
+from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness, MassProperties, MaterialProperties
+
 from . import Attributes
-
-from .Component import Component, ComponentDimensions, ComponentAreas, ComponentFineness
-
-from .import Gases
-
+from . import Gases
 from . import Propellants
-
 from . import Planets
-
 from . import Atmospheres
-
 from . import Components
 from . import Methods
+
+
 
 
 

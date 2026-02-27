@@ -20,16 +20,35 @@ from jaxopt import ScipyRootFinding
 #  Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Analysis Settings
+# ----------------------------------------------------------------------------------------------------------------------
+
+# Mass Analysis
+
+class ReductionFactors(eqx.Module):
+
+    main_wing:  float = 0.0
+    fuselage:   float = 0.0
+    empennage:  float = 0.0
+    systems:    float = 0.0
+
+class SizingFractions(eqx.Module):
+    rudder_sizing: float = 0.25
+
+class MassAnalysisSettings(eqx.Module):
+
+    reduction_factors: ReductionFactors = eqx.field(default_factory=ReductionFactors)
 
 class AnalysisSettings(eqx.Module):
 
     aerodynamics: eqx.Module | None = None
+    mass: MassAnalysisSettings = eqx.field(default_factory=MassAnalysisSettings)
 
 
 class Settings(eqx.Module):
 
     tag: str                    = eqx.field(static=True, default='Settings')
-    # Mission Settings
     root_finder: Callable       = eqx.field(static=True, default=ScipyRootFinding)
 
     analysis: AnalysisSettings  = eqx.field(default_factory=AnalysisSettings)

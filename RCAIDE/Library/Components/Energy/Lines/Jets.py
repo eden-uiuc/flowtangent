@@ -7,42 +7,30 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
+from __future__ import annotations
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
-import RCAIDE.Library as rcl
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
+from RCAIDE.Library.Methods.Energy.Converters.Turbofans import thrust_and_power
+
+from RCAIDE.Framework import State, Aircraft, Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class JetEnergyLine(EnergyLine):
-
-    name = 'Jet Network'
-
-
-@chex.dataclass(kw_only=True)
-class TurbojetEnergyLine(EnergyLine):
-
-    name = 'Turbojet Network'
-
-
-@chex.dataclass(kw_only=True)
 class TurbofanEnergyLine(EnergyLine):
 
-    name = 'Turbofan Network'
+    name = 'Turbofan Energy Line'
 
     @staticmethod
-    def calculate_performance(state: "rcf.State",
-                              system: "rcf.System",
-                              settings: "rcf.Settings"
-                              ):
+    def calculate_performance(state: State,     #type: ignore
+                              system: Aircraft,
+                              settings: Settings
+                              ): 
 
-        state, system, settings = rcl.Methods.Energy.Converters.Turbofans.thrust_and_power(state, system, settings)
+        state, system, settings = thrust_and_power(state, system, settings)
 
         return state, system, settings
 
