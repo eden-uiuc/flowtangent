@@ -101,7 +101,7 @@ class EnergyLineConditions(Conditions):
 class EnergyNetworkConditions(Conditions):
 
     # Attribute             Type        Default Value
-    tag:                    str         = 'Energy Network'
+    tag:                    str         = eqx.field(static=True, default='Energy Network')
 
     total_energy:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
     total_efficiency:       jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))

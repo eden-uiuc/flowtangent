@@ -27,17 +27,17 @@ class Airfoil(Component):
 
     tag:                str = eqx.field(static=True, default="Airfoil")
 
-    thickness_to_chord: float = eqx.field(static=True, default=0.0)
-    max_thickness:      float = eqx.field(static=True, default=0.0)
-    camber:             float = eqx.field(static=True, default=0.0)
+    thickness_to_chord: float = 0.0
+    max_thickness:      float = 0.0
+    camber:             float = 0.0
 
-    coordinates:        jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty((0, 2)))
-    x_coordinates:      jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty((0)))
-    y_coordinates:      jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty((0)))
-    x_upper_surface:    jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    x_lower_surface:    jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    y_upper_surface:    jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    y_lower_surface:    jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    coordinates:        jnp.ndarray = eqx.field(default_factory=jnp.empty((0, 2)))
+    x_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
+    y_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
+    x_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    x_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    y_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    y_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
 
     @classmethod
     def NACA_4_Series(cls, series_number: str | int, n_pts: int = 201, edge_factor: float = 1.5):
@@ -275,17 +275,17 @@ class Airfoil(Component):
         y_data   = y_data - y_delta
 
         if (x_data[arg_min] == 0) and (y_data[arg_min]  == 0):
-            x_data[arg_min]  = 0
-            y_data[arg_min]  = 0
+            x_data = x_data.at[arg_min].set(0)
+            y_data = y_data.at[arg_min].set(0)
 
         # make sure points start and end at x = 1.0
-        x_data[0]  = 1.0
-        x_data[-1] = 1.0
+        x_data = x_data.at[0].set(1.0)
+        x_data = x_data.at[-1].set(1.0)
 
         # make sure a small gap at trailing edge
         if (y_data[0] == y_data[-1]):
-            y_data[0]          = y_data[0]  - 1E-4
-            y_data[-1]         = y_data[-1] + 1E-4
+            y_data = y_data.at[0].set(y_data[0]  - 1E-4)
+            y_data = y_data.at[-1].set(y_data[-1] + 1E-4)
 
         half_npoints = n_pts//2
 

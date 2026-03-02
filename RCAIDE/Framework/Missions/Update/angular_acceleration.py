@@ -8,8 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
@@ -27,8 +27,6 @@ def update_angular_acceleration(state: "rcf.State",
     w = state.frames.inertial.angular_velocity_vector
     D = state.numerics.time.differentiate
 
-    aa = np.dot(D, w)
-
-    state.frames.inertial.angular_acceleration_vector = aa
+    state = eqx.tree_at(lambda s:s.frames.inertial.angular_acceleration_vector, state, jnp.dot(D, w))
                    
     return state, system, settings

@@ -7,7 +7,7 @@
 #  Imports
 # ---------------------------------------------------------------------- 
 
-from Legacy.trunk.S.Core import Units
+from RCAIDE.Library import Units
 
 import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf

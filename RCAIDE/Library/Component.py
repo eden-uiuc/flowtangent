@@ -111,8 +111,8 @@ class MassProperties(eqx.Module):
 class Component(eqx.Module):
 
 
-    tag:                    str                   = 'Component'
-    is_control_component:   bool                  = False
+    tag:                    str                   = eqx.field(static=True, default='Component')
+    is_control_component:   bool                  = eqx.field(static=True, default=False)
 
     segments:               tuple[Component, ...] = eqx.field(default_factory=tuple)
     subcomponents:          tuple[Component, ...] = eqx.field(default_factory=tuple)
@@ -157,7 +157,15 @@ class Component(eqx.Module):
         return iter(self.subcomponents)
 
     def get_field_name(self):
-        return self.tag.replace(' ', '_').lower()
+        actual_tag = self.tag
+        
+        if not isinstance(actual_tag, str):
+            if hasattr(actual_tag, 'value'):
+                actual_tag = actual_tag.value
+            else:
+                raise AttributeError(f"Unable to resolve field name for {self}.")
+        
+        return actual_tag.replace(' ', '_').lower()
 
     def add_segment(self, segment: "Component", index: int | None = None):
         if index is None:

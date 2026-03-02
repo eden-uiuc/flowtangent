@@ -6,13 +6,15 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
-
+from __future__ import annotations
 # package imports
-#import numpy as np
 import jax.numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+        import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # shaft_offtake

@@ -6,6 +6,9 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
+# package imports
+import equinox as eqx
+
 # RCAIDE Imports
 import RCAIDE.Framework as rcf
 
@@ -14,22 +17,35 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+import equinox as eqx
+
 def initialize_inertial_position(state: "rcf.State",
                                  system: "rcf.System",
                                  settings: "rcf.Settings",
                                  ):
 
-    p_initial               = state.initials.frames.inertial.position_vector
-    p_current               = state.frames.inertial.position_vector
-    p_initial               = p_initial.at[-1, None, -1].set(-state.initials.freestream.altitude[-1, 0])
-    delta_p                 = p_initial[-1, None, :] - p_current[0, None, :]
+    # 1. Extract current arrays
+    p_initial = state.initials.frames.inertial.position_vector
+    p_current = state.frames.inertial.position_vector
+    
+    # Calculate deltas (Your JAX .at syntax here was already perfect!)
+    p_initial = p_initial.at[-1, None, -1].set(-state.initials.freestream.altitude[-1, 0])
+    delta_p = p_initial[-1, None, :] - p_current[0, None, :]
 
-    R_initial               = state.initials.frames.inertial.system_range
-    R_current               = state.frames.inertial.system_range
-    delta_R                 = R_initial[-1, None, :] - R_current[0, None, :]
+    R_initial = state.initials.frames.inertial.system_range
+    R_current = state.frames.inertial.system_range
+    delta_R = R_initial[-1, None, :] - R_current[0, None, :]
 
-    state.frames.inertial.position_vector   += delta_p
-    state.frames.inertial.system_range      += delta_R
+    # 2. Calculate the new values pure-functionally (No += mutation)
+    new_position_vector = p_current + delta_p
+    new_system_range = R_current + delta_R
+
+    # 3. Inject the updated arrays back into the PyTree
+    state = eqx.tree_at(
+        lambda s: (s.frames.inertial.position_vector, s.frames.inertial.system_range),
+        state,
+        (new_position_vector, new_system_range)
+    )
 
     return state, system, settings
 

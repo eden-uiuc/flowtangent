@@ -12,7 +12,9 @@
 import jax.numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbofan Moment

@@ -9,11 +9,17 @@
 
 from __future__ import annotations
 
+# package import
+import equinox as eqx
+
 # RCAIDE imports
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 from RCAIDE.Library.Methods.Energy.Converters.Turbofans import thrust_and_power
 
-from RCAIDE.Framework import State, Aircraft, Settings
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, Aircraft, Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
@@ -22,7 +28,7 @@ from RCAIDE.Framework import State, Aircraft, Settings
 
 class TurbofanEnergyLine(EnergyLine):
 
-    name = 'Turbofan Energy Line'
+    tag: str = eqx.field(static=True, default='Turbofan Energy Line')
 
     @staticmethod
     def calculate_performance(state: State,     #type: ignore

@@ -45,8 +45,8 @@ class State(Conditions):
     controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
     dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
 
-    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
-    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
+    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
 
     def check_controls(self, verbose=True) -> bool:
         """
@@ -71,41 +71,35 @@ class State(Conditions):
 
         return valid_controls
     
-    def expand_rows(self, n_control_points: int):
-
-        def _expand(leaf):
-            if isinstance(leaf, (jnp.ndarray, np.ndarray)):
-                if leaf.ndim == 1:
-                    return jnp.tile(leaf, (n_control_points, 1))
-                elif leaf.ndim == 2 and leaf.shape[0] == 1:
-                    return jnp.repeat(leaf, n_control_points, axis=0)
-            return leaf
-        
-        return jax.tree_util.tree_map(_expand, self)
-    
     def unpack_unknowns(self, unknowns):
-        """
-        Finds the active control variables and assigns the unknowns to their locations in state.
-        """
+        n_points = int(self.numerics.number_of_control_points) 
+        
+        # 1. Grab the perfectly static routing table
+        routing_table = self.controls.active_routing_table
 
-        n_points    = int(self.numerics.number_of_control_points)
+        # 2. Extract all targets in one shot
+        def get_all_targets(s):
+            targets = []
+            for path, _ in routing_table:
+                targets.append(reduce(getattr, path, s))
+            return tuple(targets)
+
+        current_targets = get_all_targets(self)
+        new_arrays = []
         control_idx = 0
 
-        current_state = self
-
-        for control_var in self.controls.get_active_controls():
-    
-            values  = unknowns[control_idx : control_idx + n_points] # Extract control values from unknowns
-            where   = lambda s, p=control_var.path: reduce(getattr, p, s)
+        # 3. Slice and set
+        for i, (path, path_indices) in enumerate(routing_table):
+            values = unknowns[control_idx : control_idx + n_points]
             
-            current_array   = where(current_state)
-            new_array       = current_array.at[control_var.path_indices].set(values)
+            current_array = current_targets[i]
+            new_array = current_array.at[path_indices].set(values)
             
-            current_state = eqx.tree_at(where, current_state, new_array)
-
+            new_arrays.append(new_array)
             control_idx += n_points
-        
-        return current_state
+
+        # 4. Swap all arrays in a single JAX graph node
+        return eqx.tree_at(get_all_targets, self, tuple(new_arrays))
 
     def pack_residuals(self):
         """
@@ -115,11 +109,7 @@ class State(Conditions):
         n_points = self.numerics.number_of_control_points
         residual_list = []
 
-        for field_name in self.dynamics.__dataclass_fields__:
-            residual = getattr(self.dynamics, field_name)
-            
-            if getattr(residual, 'active', False):
-                residual_list.append(residual.value)
+        residual_list = [res.value for res in self.dynamics.get_active_residuals()]
 
         if residual_list:
             stacked_residuals = jnp.concatenate(residual_list)

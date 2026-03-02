@@ -7,11 +7,14 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from typing import TYPE_CHECKING
+
 # package import
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Framework import State, System, Settings
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import Segment

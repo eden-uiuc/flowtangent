@@ -6,6 +6,9 @@
 #  Imports
 # -------------------------------------------------------------------------------
 
+# package imports
+import equinox as eqx
+
 # RCAIDE Imports
 
 import RCAIDE.Framework as rcf
@@ -25,8 +28,8 @@ def update_gravity(
     Updates the current gravity as applied to the system
     """
 
-    # UPDATE ME
-    state.freestream.gravity = state.freestream.gravity.at[:,0].set(-9.81)
+    
+    state = eqx.tree_at(lambda s:s.freestream.gravity, state, state.freestream.gravity.at[:,0].set(-9.81))
 
 
     return state, system, settings

@@ -8,7 +8,7 @@
 
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
-from RCAIDE.Framework.Core import Units
+from RCAIDE.Library import Units
 
 #import numpy as np
 import jax.numpy as np

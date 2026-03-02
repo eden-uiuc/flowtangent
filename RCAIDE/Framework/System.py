@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 # package imports
 import equinox as eqx
@@ -17,8 +18,6 @@ from RCAIDE.Library import Component, MassProperties
 from RCAIDE.Library.Attributes import AircraftClass, MediumRange
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components import Wing, Fuselage, Nacelle, LandingGear
-
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
@@ -54,7 +53,7 @@ class AircraftMassProperties(MassProperties):
 
 class Aircraft(System):
 
-    tag:                str = 'Aircraft'
+    tag:                str = eqx.field(static=True, default='Aircraft')
     
     ac_class:           AircraftClass = eqx.field(static=True, default_factory=MediumRange)
     envelope:           VehicleEnvelope = eqx.field(static=True, default_factory=VehicleEnvelope)

@@ -7,6 +7,11 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
+# package imports
+import equinox as eqx
+import jax.numpy as jnp
+
+# RCAIDE imports
 import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -27,9 +32,9 @@ def update_forces(
         TB2I = state.frames.body.transform_to_inertial
         TW2I = state.frames.wind.transform_to_inertial
 
-        Wind = TW2I.apply(wind)
-        Thrust = TB2I.apply(thrust)
+        w_inertial = jnp.einsum('nij,nj->ni', TW2I, wind)
+        t_inertial = jnp.einsum('nij,nj->ni', TB2I, thrust)
 
-        state.frames.inertial.total_force_vector = Wind + Thrust + Weight
+        state = eqx.tree_at(lambda s: s.frames.inertial.total_force_vector, state, Weight + w_inertial + t_inertial)
 
         return state, system, settings

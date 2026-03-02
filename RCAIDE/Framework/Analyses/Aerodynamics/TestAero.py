@@ -9,24 +9,21 @@
 
 import equinox as eqx
 
-import RCAIDE.Framework as rcf
+from RCAIDE.Framework import Process, ProcessStep
+from RCAIDE.Framework.Methods.Aerodynamics.Test_Aero import direct_aero
 
 
 # 1. Define the builder function outside the class
 def _build_test_aero_steps():
     """Builds and returns the default tuple of process steps."""
     return (
-        rcf.ProcessStep(
+        ProcessStep(
             tag="Direct Aero Calculation",
-            # Remember to wrap in Equinox if ProcessStep was converted!
-            function=rcf.Methods.Aerodynamics.Test_Aero.direct_aero 
+            function=direct_aero 
         ),
     )
 
 
-class TestAero(rcf.Process):
-    # Shield the tag from the XLA compiler
-    tag: str = eqx.field(static=True, default="Test Aerodynamic Analysis")
-
-    # 2. Use the helper function as the default_factory!
+class TestAero(Process):
+    tag: str = eqx.field(static=True, default="Aerodynamics")
     steps: tuple = eqx.field(default_factory=_build_test_aero_steps)

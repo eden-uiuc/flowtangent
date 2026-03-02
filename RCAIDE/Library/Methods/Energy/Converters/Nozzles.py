@@ -7,12 +7,15 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 # package imports
-#import numpy as np
 import jax.numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+if TYPE_CHECKING:
+    import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compression Nozzle Functional Methods

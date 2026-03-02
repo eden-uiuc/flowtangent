@@ -7,12 +7,15 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, Aircraft, Settings
+
 # package imports
-#import numpy as np
 import jax.numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
 
 from RCAIDE.Library.Methods.Energy.Converters import fM, Rayleigh
 
@@ -41,9 +44,9 @@ def func_combustor_performance(
 
 
 def turbojet_combustor_performance(
-    state: "rcf.State",
-    system: "rcf.Aircraft",
-    settings: "rcf.Settings"
+    state: State,
+    system: Aircraft,
+    settings: Settings
 ):
 
     for l_idx, line in enumerate(system.energy.lines):
@@ -127,9 +130,9 @@ def func_rayleigh_line_flow(
 
 
 def rayleigh_line_flow(
-    state: "rcf.State",
-    system: "rcf.Aircraft",
-    settings: "rcf.Settings"
+    state: State,
+    system: Aircraft,
+    settings: Settings
 ):
 
     for l_idx, line in system.energy.lines:

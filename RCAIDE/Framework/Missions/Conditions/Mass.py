@@ -49,7 +49,7 @@ class MassConditions(Conditions):
     """
 
     # Attribute             Type        Default Value
-    tag:                    str         = 'Mass Conditions'
+    tag:                    str         = eqx.field(static=True, default='Mass Conditions')
 
     total:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))
     rate_of_change:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0)))

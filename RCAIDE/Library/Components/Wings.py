@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 from RCAIDE.Library import Component, ComponentDimensions
-from RCAIDE.Library.Components import Airfoil
+from RCAIDE.Library.Components.Airfoils import Airfoil
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ class Wing(Component):
     thickness_to_chord:         float   = 0.0
     exposed_root_chord_offset:  float   = 0.0
 
-    single_side_aerodynamic_center: jnp.ndarray = eqx.field(default_factory=jnp.empty((0,3)))
+    single_side_aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0,3)))
 
     transition_x_upper: float = 0.0
     transition_x_lower: float = 0.0

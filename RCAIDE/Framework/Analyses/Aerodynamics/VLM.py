@@ -17,7 +17,7 @@ import jax.numpy as np
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
-from RCAIDE.Framework.Core import Units
+from RCAIDE.Library import Units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM

@@ -7,6 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # RCAIDE Imports
+import equinox as eqx
 import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -27,6 +28,10 @@ def initialize_mass(state: "rcf.State",
 
     m_current = state.mass.total[0, 0]
 
-    state.mass.total += (m_initial - m_current)
+    state = eqx.tree_at(
+        lambda s:s.mass.total,
+        state,
+        state.mass.total + (m_initial - m_current)
+    )
 
     return state, system, settings

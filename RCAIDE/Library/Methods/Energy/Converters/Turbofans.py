@@ -12,8 +12,10 @@
 import jax.numpy as np
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
-import RCAIDE.Library as rcl
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import RCAIDE.Framework as rcf
+    import RCAIDE.Library as rcl
 
 
 # ----------------------------------------------------------------------------------------------------------------------

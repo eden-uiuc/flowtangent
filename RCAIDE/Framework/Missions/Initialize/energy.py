@@ -7,8 +7,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE Imports
 import RCAIDE.Framework as rcf
@@ -22,40 +22,56 @@ from RCAIDE.Framework.Missions.Conditions.Energy import EnergyConverterCondition
 # Initialize Energy
 # ----------------------------------------------------------------------------------------------------------------------
 
+def _build_converter_tree(system_converter) -> "Converter":
+    """Recursively builds the state Conditions tree to mirror the system structure."""
+    
+    # 1. Base Case: Create the state object for the current level
+    # (Assuming 'Converter' is the correct state class here based on your snippet)
+    state_node = Converter(tag=system_converter.tag)
+    
+    # 2. Recursive Step: Does this system component have sub-converters?
+    if hasattr(system_converter, 'converters') and system_converter.converters:
+        for sub_sys_conv in system_converter.converters:
+            
+            # Recurse down to build the child's entire tree
+            built_child_state = _build_converter_tree(sub_sys_conv)
+            
+            # Attach the fully built child to the current node
+            state_node = state_node.add_subcondition(built_child_state)
+            
+    return state_node
+
 
 def initialize_energy(state: "rcf.State",
                       system: "rcf.Aircraft",
                       settings: "rcf.Settings",
                       ):
 
-    state.energy.lines._attributes_frozen = False
-
     for l_idx, line in enumerate(system.energy.lines):
-        state.energy.lines[l_idx] = Line(tag=line.tag)
-        for p_idx, propulsor in line.propulsors:
-            state.energy.lines[l_idx].propulsors[p_idx] = Converter()
-            state.energy.lines[l_idx].propulsors[p_idx].propulsors = Converter(tag=propulsor.tag)
-            for converter in propulsor.converters:
-                state.energy.lines[l_idx].propulsors[p_idx].propulsors[converter.get_field_name()] = Converter(tag=converter.tag)
+        
+        state = eqx.tree_at(lambda s: s.energy.lines, state, state.energy.lines.add_subcondition(Line(tag=line.tag)))
+        
+        # Grab the current, empty state container for this line's converters
+        line_converters_state = state.energy.lines[l_idx].converters
+        
+        # Build each root converter's tree and attach it
+        for root_sys_converter in line.converters:
+            
+
+            fully_built_root_state = _build_converter_tree(root_sys_converter)
+            
+            # Add the finished tree to the line's state container
+            line_converters_state = line_converters_state.add_subcondition(fully_built_root_state)
+
+        state = eqx.tree_at(
+            lambda s: s.energy.lines[l_idx].converters, 
+            state, 
+            line_converters_state
+        )
+
         for store in line.stores:
-            state.energy.lines[l_idx].stores._attributes_frozen = False
-            state.energy.lines[l_idx].stores[store.get_field_name()] = Store(tag=store.tag)
-            state.energy.lines[l_idx].stores._attributes_frozen = True
-
-    state.energy.lines._attributes_frozen = True
-
-
-    def _recursive_initialize_energy(conditions: Conditions, initial_conditions: Conditions):
-
-        for k, v in vars(conditions).items():
-
-            if isinstance(v, np.ndarray):
-                v = v.at[:, 0].set(vars(initial_conditions)[k][-1, 0])
-            elif isinstance(v, int) or isinstance(v, float):
-                v = vars(initial_conditions)[k]
-            if isinstance(v, Conditions):
-                _recursive_initialize_energy(v, vars(initial_conditions)[k])
-
-    _recursive_initialize_energy(state.energy, state.initials.energy)
+            state = eqx.tree_at(lambda s: s.energy.lines[l_idx].stores, state, state.energy.lines[l_idx].stores.add_subcondition(Store(tag=store.tag)))
+        
+        state = eqx.tree_at(lambda s: s.energy.lines[l_idx], state, state.energy.lines[l_idx].expand_rows(state.numerics.number_of_control_points))
 
     return state, system, settings

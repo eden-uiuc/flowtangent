@@ -7,8 +7,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+if TYPE_CHECKING:
+    import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compressor

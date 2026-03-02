@@ -45,11 +45,24 @@ class AnalysisSettings(eqx.Module):
     aerodynamics: eqx.Module | None = None
     mass: MassAnalysisSettings = eqx.field(default_factory=MassAnalysisSettings)
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Mission Settings
+# ----------------------------------------------------------------------------------------------------------------------
+
+class MissionSettings(eqx.Module):
+
+    verbose:    bool = eqx.field(static=True, default=False)
+    debugging:  bool = eqx.field(static=True, default=False)
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Full Settings
+# ----------------------------------------------------------------------------------------------------------------------
 
 class Settings(eqx.Module):
 
-    tag: str                    = eqx.field(static=True, default='Settings')
-    root_finder: Callable       = eqx.field(static=True, default=ScipyRootFinding)
+    tag: str                            = eqx.field(static=True, default='Settings')
+    root_finder:    Callable            = eqx.field(static=True, default=ScipyRootFinding)
 
-    analysis: AnalysisSettings  = eqx.field(default_factory=AnalysisSettings)
+    analysis:       AnalysisSettings    = eqx.field(default_factory=AnalysisSettings)
+    mission:        MissionSettings     = eqx.field(default_factory=MissionSettings)
 

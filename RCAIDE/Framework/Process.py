@@ -9,17 +9,14 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable, Self, Any
+from typing import Callable, Self, TYPE_CHECKING
 
 # package imports
-import jax
-import jax.numpy as jnp
-import pandas as pd
 import equinox as eqx
 
-
 # RCAIDE imports
-from RCAIDE.Framework import State, System, Settings
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -36,13 +33,13 @@ class ProcessStep(eqx.Module):
     function:       Callable           = eqx.field(static=True, default=skip)
     tag:            str                = eqx.field(static=True, default="Process Step")
     
-    initial_state:        "State | None"     = None
-    initial_system:       "System | None"    = None
-    initial_settings:     "Settings | None"  = None
+    initial_state:        State | None     = None
+    initial_system:       System | None    = None
+    initial_settings:     Settings | None  = None
 
-    final_state:          "State | None"     = None
-    final_system:         "System | None"    = None
-    final_settings:       "Settings | None"  = None
+    final_state:          State | None     = None
+    final_system:         System | None    = None
+    final_settings:       Settings | None  = None
 
 
     def __call__(self, state, system, settings):
@@ -86,7 +83,6 @@ class Process(eqx.Module):
     tag:                str                     = eqx.field(static=True, default="Process")
 
     steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
-    details:            pd.DataFrame | None     = eqx.field(static=True, default=None)
 
     initial_step:       int                     = eqx.field(static=True, default=0)
 
@@ -105,12 +101,27 @@ class Process(eqx.Module):
         else:
             return self.steps[item]
 
-    def __getattr__(self, key):
-        tags = [step.tag.replace(' ','_').lower() for step in self.steps]
-        if key in tags:
-            return self.__getitem__(key)
-        else:
-            return getattr(self, key)
+    def __getattr__(self, key: str):
+        if key.startswith("__") and key.endswith("__"):
+            raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{key}'")
+
+        try:
+            steps = object.__getattribute__(self, "steps")
+        except AttributeError:
+            raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{key}'")
+
+        #  Search the steps using tracer-safe logic
+        for step in steps:
+            step_tag = step.tag
+            if not isinstance(step_tag, str) and hasattr(step_tag, 'value'):
+                step_tag = step_tag.value
+            
+            if isinstance(step_tag, str):
+                formatted_tag = step_tag.replace(' ', '_').lower()
+                if key == formatted_tag:
+                    return step
+
+        raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
     def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
         for step in self.steps[self.initial_step:]:
@@ -173,6 +184,10 @@ class Process(eqx.Module):
 
     def _index_tag(self, tag: str):
         tags = [step.tag for step in self.steps]
+        if tag not in tags:
+            tags = [t.replace(" ", "_").lower() for t in tags]
+        if tag not in tags:
+            raise AttributeError(f"Unable to locate step {tag} in steps of Process {self.tag}.")
         index = tags.index(tag)
     
         return index
@@ -214,17 +229,38 @@ class Process(eqx.Module):
 
     def __repr__(self):
 
-        if not self.steps:
+        return self.tag
+    
+    @property
+    def details(self) -> str:
+        steps = getattr(self, "steps", None)
+        if not steps:
             return f"{self.tag} (Empty Process)"
 
-        step_tags = [step.tag for step in self.steps]
-        step_func_names = [step.function.__name__ for step in self.steps]
+        step_tags = []
+        step_func_names = []
 
-        max_tag_length = max([len(tag) for tag in step_tags])
+        for step in steps:
+            # Handle tracer proxies safely
+            tag = step.tag
+            if not isinstance(tag, str) and hasattr(tag, 'value'):
+                tag = tag.value
+            step_tags.append(str(tag))
+
+            # Safely get the name whether it's a function or a class instance
+            if isinstance(step, ProcessStep):
+                func = step.function
+                name = getattr(func, '__name__', func.__class__.__name__)
+                step_func_names.append(name)
+            elif isinstance(step, Process):
+                step_func_names.append(f"<Process>: {len(step.steps)} Step(s)")
+
+        # Handle edge case where process has steps but they have empty tags
+        max_tag_length = max([len(t) for t in step_tags]) if step_tags else 0
 
         process_str = self.tag
         for idx in range(len(step_tags)):
-            process_str += f"{step_tags[idx]:<{max_tag_length}}" + f": {step_func_names[idx]}"
+            process_str += f"\n\t{idx+1:>2}) {step_tags[idx]:<{max_tag_length}} : {step_func_names[idx]}"
 
         return process_str
 

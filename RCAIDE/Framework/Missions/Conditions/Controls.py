@@ -43,11 +43,11 @@ def count_active(Conditions):
 class DynamicResidual(Conditions):
 
     tag:    str         = eqx.field(static=True, default='Dynamic Residual')
-    type:   str | None  = None
-    active: bool        = False
-    index:  int | None  = None
+    type:   str | None  = eqx.field(static=True, default=None)
+    active: bool        = eqx.field(static=True, default=False)
+    index:  int | None  = eqx.field(static=True, default=None)
 
-    value:  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
+    value:  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
 
 ResidualNames = Literal[
     "force_x", "force_y", "force_z",
@@ -122,7 +122,7 @@ class ControlVariable(Conditions):
     active:         bool                        = False
     initial_guess:  float | jnp.ndarray | None  = None
 
-    value:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
+    value:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
 
     def get_field_name(self):
         return self.tag.replace(' ', '_').lower()
@@ -133,8 +133,8 @@ class DirectControlVariable(ControlVariable):
     # Attribute     Type                    Default Value
     tag:            str                     = eqx.field(static=True, default='Direct Control Variable')
 
-    path:           tuple[str, ...] |None   = None
-    path_indices:   tuple | None            = None
+    path:           tuple[str, ...] |None   = eqx.field(static=True, default_factory=tuple)
+    path_indices:   tuple | None            = eqx.field(static=True, default_factory=tuple)
 
 
 class SurfaceControlVariable(ControlVariable):
@@ -185,7 +185,7 @@ class EnergyControlVariable(ControlVariable):
     #Attribute  Type            Default Value
     tag:        str             = eqx.field(static=True, default='Energy Control Variable')
 
-    value:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.zeros((1, 1)))
+    value:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
 def _default_bank_angle():
@@ -225,11 +225,12 @@ class ControlsConditions(Conditions):
     wind_angle:     DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Wind Angle'))
 
     elapsed_time:   DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Elapsed Time'))
-    velocity:       DirectControlVariable   = eqx.field(default_factory=lambda: _default_velocity)
+    velocity:       DirectControlVariable   = eqx.field(default_factory=_default_velocity)
     acceleration:   DirectControlVariable   = eqx.field(default_factory=lambda: DirectControlVariable(tag='Velocity'))
-    altitude:       DirectControlVariable   = eqx.field(default_factory=lambda: _default_altitude)
+    altitude:       DirectControlVariable   = eqx.field(default_factory=_default_altitude)
 
-    custom_controls: tuple                  = eqx.field(default_factory=tuple)
+    custom_controls:        tuple = eqx.field(default_factory=tuple)
+    active_routing_table:   tuple = eqx.field(static=True, default=())
 
 
     def add_control_variable(self, control_variable: ControlVariable) -> None:

@@ -11,7 +11,7 @@
 # package imports
 import jax
 import jax.numpy as jnp
-from RCAIDE.Framework.Core import Units
+from RCAIDE.Library import Units
 
 import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl

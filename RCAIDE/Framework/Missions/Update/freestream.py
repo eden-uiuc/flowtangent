@@ -8,8 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
@@ -31,12 +31,12 @@ def update_freestream(state: "rcf.State",
     P = state.freestream.pressure
     T = state.freestream.temperature
 
-    gamma   = np.polyval(np.array(state.freestream.atmosphere.fluid.gamma_coefficients), T)
-    Cp      = np.polyval(np.array(state.freestream.atmosphere.fluid.cp_coefficients), T)
+    gamma   = jnp.polyval(jnp.array(state.freestream.atmosphere.fluid.gamma_coefficients), T)
+    Cp      = jnp.polyval(jnp.array(state.freestream.atmosphere.fluid.cp_coefficients), T)
 
     # Speed
-    v_mag_sq = np.sum(v ** 2, axis=1)[:, None]
-    v_mag    = np.sqrt(v_mag_sq)
+    v_mag_sq = jnp.sum(v ** 2, axis=1)[:, None]
+    v_mag    = jnp.sqrt(v_mag_sq)
 
     # Dynamic Pressure
     q = 0.5 * r * v_mag_sq
@@ -51,13 +51,25 @@ def update_freestream(state: "rcf.State",
     # Reynolds Number (per meter)
     Re = r * v_mag / m
 
-    state.freestream.gamma                  = gamma
-    state.freestream.Cp                     = Cp
-    state.freestream.speed                  = v_mag
-    state.freestream.mach_number            = M
-    state.freestream.reynolds_number        = Re
-    state.freestream.dynamic_pressure       = q
-    state.freestream.stagnation_pressure    = P_t
-    state.freestream.stagnation_temperature = T_t
+    state = eqx.tree_at(lambda s:(
+        s.freestream.gamma,
+        s.freestream.Cp,
+        s.freestream.speed,
+        s.freestream.mach_number,
+        s.freestream.reynolds_number,
+        s.freestream.dynamic_pressure,
+        s.freestream.stagnation_pressure,
+        s.freestream.stagnation_temperature,
+        ), state, (
+        gamma,
+        Cp,
+        v_mag,
+        M,
+        Re,
+        q,
+        P_t,
+        T_t,
+        )
+    )
                    
     return state, system, settings

@@ -1,5 +1,16 @@
+# ----------------------------------------------------------------------------------------------------------------------
+# Imports
+# ----------------------------------------------------------------------------------------------------------------------
+
+import time
+import dataclasses as dc
+from functools import reduce
+
 import jax
-jax.config.update('jax_disable_jit', True)
+from jax import value_and_grad, jit
+
+import equinox as eqx
+import jax.numpy as jnp
 
 from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
@@ -8,7 +19,7 @@ from RCAIDE.Framework.Analyses.Aerodynamics import TestAero
 
 
 from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data, MassProperties
-from RCAIDE.Library.Components.Wings import *
+from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Library.Components.Fuselages import *
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
 from RCAIDE.Library.Components.Nacelles import Nacelle, NacelleDiameters
@@ -17,12 +28,9 @@ from RCAIDE.Library.Components.Energy.Stores import FuelTank, FuelTankMass
 from RCAIDE.Library.Components.Energy.Lines.Jets import TurbofanEnergyLine
 
 from RCAIDE.Library.Atmospheres import USStandard1976
-
-import equinox as eqx
-import jax.numpy as jnp
-
-import tracemalloc
-tracemalloc.start()
+# ----------------------------------------------------------------------------------------------------------------------
+# Boeing 737 New Process
+# ----------------------------------------------------------------------------------------------------------------------
 
 def vehicle_setup():
 
@@ -503,7 +511,7 @@ def vehicle_setup():
         areas           = n_areas
     )
 
-    nacelle_2 = eqx.tree_at(lambda n: (n.tag, n.origin), nacelle, ("Engine Nacelle 2", jnp.array([[13.72, 4.86, -1.9]])))
+    nacelle_2 = dc.replace(nacelle, tag="Engine Nacelle 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
 
     vehicle = vehicle.add_subcomponent(nacelle)
     vehicle = vehicle.add_subcomponent(nacelle_2)
@@ -512,9 +520,13 @@ def vehicle_setup():
     # Turbofan Engines
     # ------------------------------------------------------------------------------------------------------------------
 
+    # Energy Line ------------------------------------------------------------------------------------------------------
+
     lines = vehicle.energy.lines
     lines = lines.add_subcomponent(TurbofanEnergyLine())
     vehicle = eqx.tree_at(lambda v:v.energy.lines, vehicle, lines)
+
+    # Engine -----------------------------------------------------------------------------------------------------------
 
     tf_lengths = ComponentDimensions(
         total = 2.71
@@ -536,65 +548,37 @@ def vehicle_setup():
 
     # Converters -------------------------------------------------------------------------------------------------------
     
-    cons = tf.converters
+    cons        = tf.converters
 
-    # Inlet Nozzle
+    # Direct Replacement
     cons = eqx.tree_at(
-        lambda c: (c.inlet_nozzle.polytropic_efficiency, c.inlet_nozzle.pressure_ratio),
-        cons, (0.98, 0.98)
-    )
-    
-    # Fan
-    cons = eqx.tree_at(
-        lambda c: (c.fan.polytropic_efficiency, c.fan.pressure_ratio),
-        cons, (0.93, 1.7)
-    )
+        lambda c: (
+                c.inlet_nozzle.polytropic_efficiency, c.inlet_nozzle.pressure_ratio,
+                c.fan.polytropic_efficiency, c.fan.pressure_ratio,
+                c.compressors.low_pressure_compressor.polytropic_efficiency, c.compressors.low_pressure_compressor.pressure_ratio,
+                c.compressors.high_pressure_compressor.polytropic_efficiency, c.compressors.high_pressure_compressor.pressure_ratio,
+                c.turbines.high_pressure_turbine.polytropic_efficiency, c.turbines.high_pressure_turbine.mechanical_efficiency,
+                c.turbines.low_pressure_turbine.polytropic_efficiency, c.turbines.low_pressure_turbine.mechanical_efficiency,
+                c.core_nozzle.polytropic_efficiency, c.core_nozzle.pressure_ratio, c.core_nozzle.diameters.reference,
+                c.fan_nozzle.polytropic_efficiency, c.fan_nozzle.pressure_ratio, c.fan_nozzle.diameters.reference,
+            ),
+            cons,
+            (
+                0.98, 0.98,
+                0.93, 1.7,
+                0.91, 1.14,
+                0.91, 13.415,
+                0.93, 0.91,
+                0.99, 0.93,
+                0.95, 0.99, 0.92,
+                0.95, 0.99, 1.659
+             )
+        )
 
-    # Low Pressure Compressor
-    cons = eqx.tree_at(
-        lambda c: (c.compressors[0].polytropic_efficiency, c.compressors[0].pressure_ratio),
-        cons, (0.91, 1.14)
-    )
+    # Engine & Line Rebuild --------------------------------------------------------------------------------------------
 
-    # High Pressure Compressor
-    cons = eqx.tree_at(
-        lambda c: (c.compressors[1].polytropic_efficiency, c.compressors[1].pressure_ratio),
-        cons, (0.91, 13.415)
-    )
-
-    # Combustor
-    cons = eqx.tree_at(
-        lambda c: (c.combustor.efficiency, c.combustor.pressure_ratio),
-        cons, (0.99, 0.95)
-    )
-
-    # High Pressure Turbine
-    cons = eqx.tree_at(
-        lambda c: (c.turbines[0].mechanical_efficiency, c.turbines[0].polytropic_efficiency),
-        cons, (0.91, 0.93)
-    )
-
-    # Low Pressure Turbine
-    cons = eqx.tree_at(
-        lambda c: (c.turbines[1].mechanical_efficiency, c.turbines[1].polytropic_efficiency),
-        cons, (0.99, 0.93)
-    )
-
-    # Core Nozzle
-    cons = eqx.tree_at(
-        lambda c: (c.core_nozzle.polytropic_efficiency, c.core_nozzle.pressure_ratio, c.diameters.reference),
-        cons, (0.95, 0.99, 0.92)
-    )
-
-    # Fan Nozzle
-    cons = eqx.tree_at(
-        lambda c: (c.fan_nozzle.polytropic_efficiency, c.fan_nozzle.pressure_ratio, c.diameters.reference),
-        cons, (0.95, 0.99, 1.659)
-    )
-
-    tf = eqx.tree_at(lambda t: t.converters, tf, cons)    
-
-    tf2 = tf.tree_at(lambda t: (t.tag, t.origin), tf, ("Engine 2", jnp.array([[13.72, 4.86, -1.9]])))
+    tf = dc.replace(tf, converters=cons)
+    tf2 = dc.replace(tf, tag="Engine 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
 
     line_cons = vehicle.energy.lines[0].converters
     line_cons = line_cons.add_subcomponent(tf)
@@ -678,17 +662,20 @@ def vehicle_setup():
     return vehicle
 
 
-def mission_setup(settings: "Settings"):
+def mission_setup(state, system, settings: "Settings"):
 
     mission = Process(
         tag='Boeing 737 Mission',
-        steps=(TestCSACruise(altitude=10000.0, air_speed=230.0, distance=5500. * 1000.),) #type: ignore
+        steps=(TestCSACruise(altitude=10000.0, air_speed=230.0, distance=5500. * 1000.),), #type: ignore
+        initial_state=state,
+        initial_system=system,
+        initial_settings=settings
     )
 
     final_segments = []
     for segment in mission.steps:
-
-        seg_w_analyis = eqx.tree_at(lambda s:s.analyze.aerodynamics, segment, TestAero())
+        aero_analysis = TestAero()
+        seg_w_analyis = eqx.tree_at(lambda s:s.analyze.aerodynamics, segment, aero_analysis)
         final_segments.append(seg_w_analyis)
 
     return eqx.tree_at(lambda m:m.steps, mission, tuple(final_segments))
@@ -698,11 +685,11 @@ def state_setup():
 
     state = State()
 
-    state.freestream.atmosphere = USStandard1976()
+    state = eqx.tree_at(lambda s: s.freestream.atmosphere, state, USStandard1976(), is_leaf=lambda x: x is None)
 
-    frozen_initials = eqx.tree_at(lambda s: s.initials, state, None)
+    frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
     
-    state = eqx.tree_at(lambda s: s.initials, state, frozen_initials)
+    state = eqx.tree_at(lambda s: s.initials, state, frozen_initials, is_leaf=lambda x: x is None)
 
     return state
 
@@ -710,10 +697,7 @@ def state_setup():
 def mission_b737(state, system, settings):
 
 
-    mission = mission_setup(settings)
-    mission = eqx.tree_at(lambda m: m.initial_state   , mission, state)
-    mission = eqx.tree_at(lambda m: m.initial_system  , mission, system)
-    mission = eqx.tree_at(lambda m: m.initial_settings, mission, settings)
+    mission = mission_setup(state, system, settings)
 
     final_state, final_system, final_settings = mission.run(state, system, settings)
 
@@ -721,11 +705,55 @@ def mission_b737(state, system, settings):
 
 
 if __name__ == '__main__':
-  
+
     state = state_setup()
     system = vehicle_setup()
     settings = Settings()
 
-    st, sy, se = mission_b737(state, system, settings)
+    def CL_M(total_mass, state, system, settings):
+        # Setup Phase (Pure Python, executes every time)
 
-    print("Done!")
+        # Update the mass dynamically
+        system = eqx.tree_at(lambda s: s.mass_properties.total, system, total_mass)
+
+        # Execution Phase (JIT compiled solver)
+        final_state, _, _ = mission_b737(state, system, settings)
+        
+        return final_state.aerodynamics.coefficients.lift.total[0][0]
+    
+    # Create our value-and-gradient function
+    dCL_M = value_and_grad(CL_M)
+    
+    # ---------------------------------------------------------
+    # 1. THE COMPILATION RUN (The "Cold Start")
+    # ---------------------------------------------------------
+    print("Initiating XLA Compilation and First Run...")
+    t0 = time.perf_counter()
+    
+    val, grad = dCL_M(79015.8, state, system, settings)
+    
+    val.block_until_ready()
+    grad.block_until_ready()
+    
+    t1 = time.perf_counter()
+    print(f"Compilation + First Execution: {t1 - t0:.4f} seconds")
+    print(f"Initial Lift: {val:.4f}")# | dCL/dMass: {grad:.8f}\n")
+
+    # ---------------------------------------------------------
+    # 2. THE EXECUTION BENCHMARK (The "Hot Runs")
+    # ---------------------------------------------------------
+    print("Benchmarking Compiled Execution Graph...")
+    iterations = 10
+    
+    t2 = time.perf_counter()
+    
+    for _ in range(iterations):
+        val, grad = dCL_M(79015.8, state, system, settings)
+        val.block_until_ready()
+        grad.block_until_ready()
+        
+    t3 = time.perf_counter()
+    
+    avg_time = (t3 - t2) / iterations
+    print(f"Average Total Time (Setup + Execution): {avg_time:.6f} seconds per run")
+    print(f"Equivalent to {1 / avg_time:.2f} full mission evaluations per second!")

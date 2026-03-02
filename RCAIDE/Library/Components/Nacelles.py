@@ -35,4 +35,4 @@ class Nacelle(Component):
     airfoil:                    Component | None    = None
     cowling_airfoil_angle:      float               = 0.0
 
-    diameters:                  NacelleDiamters = eqx.field(default_factory=NacelleDiamters) #type: ignore
+    diameters:                  NacelleDiameters = eqx.field(default_factory=NacelleDiameters) #type: ignore

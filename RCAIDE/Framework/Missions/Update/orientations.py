@@ -8,11 +8,9 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-#import numpy as np
+import equinox as eqx
 import jax.numpy as jnp
 from jax import vmap
-
-from jax.scipy.spatial.transform import Rotation as T
 
 # RCAIDE imports
 import RCAIDE.Framework as rcf
@@ -87,14 +85,24 @@ def update_orientations(state: "rcf.State",
     TW2I = jnp.matmul(TW2B, TB2I)
 
     # ---Pack Results---
-
-    state.aerodynamics.angles.alpha = state.aerodynamics.angles.alpha.at[:, 0].set(alpha)
-    state.aerodynamics.angles.beta = state.aerodynamics.angles.beta.at[:, 0].set(beta)
-    state.aerodynamics.angles.phi = phi
-
-    state.frames.body.transform_to_inertial = TB2I
-    state.frames.wind.transform_to_inertial = TW2I
-
-    state.frames.wind.body_rotations = wind_body_rotations
+    state = eqx.tree_at(
+            lambda s: (
+                s.aerodynamics.angles.alpha,
+                s.aerodynamics.angles.beta,
+                s.aerodynamics.angles.phi,
+                s.frames.body.transform_to_inertial,
+                s.frames.wind.transform_to_inertial,
+                s.frames.wind.body_rotations,
+            ),
+            state, 
+            (
+                state.aerodynamics.angles.alpha.at[:, 0].set(alpha),
+                state.aerodynamics.angles.beta.at[:, 0].set(beta),
+                phi,
+                TB2I,
+                TW2I,
+                wind_body_rotations
+            )
+        )
                    
     return state, system, settings

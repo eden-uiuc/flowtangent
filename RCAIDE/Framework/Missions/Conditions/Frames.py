@@ -76,7 +76,7 @@ class PlanetFrame(Frame):
 
     # Attribute     Type            Default Value
     tag:            str             = eqx.field(static=True, default='Planet Frame')
-    start_time:     float | None    = None
+    start_time:     jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
 
     latitude:       jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
     longitude:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
@@ -87,7 +87,7 @@ class PlanetFrame(Frame):
 class FrameConditions(Conditions):
 
     # Attribute     Type            Default Value
-    tag:            str             = 'Dynamic Frames'
+    tag:            str             = eqx.field(static=True, default='Dynamic Frames')
 
     inertial:       InertialFrame   = eqx.field(default_factory=InertialFrame)
     body:           BodyFrame       = eqx.field(default_factory=BodyFrame)

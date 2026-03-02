@@ -49,10 +49,10 @@ def _USStandardBreaks():
         density     = jnp.array([1.47808e0, 1.2250e0, 3.63918e-1, 8.80349e-2, 1.32250e-2, 1.42753e-3, 8.61606e-4, 6.42099e-5, 6.95792e-6])  # kg/m^3
     )
 
-class USStandard1976(eqx.Module):
+class USStandard1976(Atmosphere):
 
     tag:    str                     = eqx.field(static=True, default="US Standard Atmosphere, 1976")
-    breaks: AtmosphericBreakpoints  = eqx.field(static=True, default_factory=_USStandardBreaks)
+    breaks: AtmosphericBreakpoints  = eqx.field(default_factory=_USStandardBreaks)
 
 def _ConstantTempBreaks(self):
     return AtmosphericBreakpoints(
@@ -62,7 +62,7 @@ def _ConstantTempBreaks(self):
         density     = jnp.array([1.545586,  1.2256523, 0.273764,	0.0662256, 0.0105000, 1.3415E-03, 8.0971E-04, 4.78579E-05, 4.51674E-06]) #kg/m^3
     )
 
-class ConstantTemperature(eqx.Module):
+class ConstantTemperature(Atmosphere):
 
     tag:    str                     = eqx.field(static=True, default="Constant Temprerature Atmosphere")
-    breaks: AtmosphericBreakpoints  = eqx.field(static=True, default_factory=_USStandardBreaks)
+    breaks: AtmosphericBreakpoints  = eqx.field(default_factory=_USStandardBreaks)

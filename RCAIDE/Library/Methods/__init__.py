@@ -17,5 +17,3 @@ from . import Propulsors
 # from . import Utilities
 # from . import Weights
 
-from .skip import skip
-

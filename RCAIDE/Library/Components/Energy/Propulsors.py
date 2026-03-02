@@ -7,6 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import dataclasses as dc
+
 # package imports
 import equinox as eqx
 
@@ -81,9 +83,11 @@ def _TurbojetConverters():
     convs = convs.add_subcomponent(FlowConverter(tag="Inlet Nozzle"))
     
     comps = Component(tag='Compressors')
-    comps.add_subcomponent(FlowConverter(tag='Low Pressure Compressor'))
-    comps.add_subcomponent(FlowConverter(tag='High Pressure Compressor'))
+    comps = comps.add_subcomponent(FlowConverter(tag='Low Pressure Compressor'))
+    comps = comps.add_subcomponent(FlowConverter(tag='High Pressure Compressor'))
     convs = convs.add_subcomponent(comps)
+
+    convs = convs.add_subcomponent(FlowConverter(tag="Combustor"))
     
     turbs = Component(tag='Turbines')
     turbs = turbs.add_subcomponent(FlowConverter(tag='High Pressure Turbine'))
@@ -103,6 +107,7 @@ class TurbojetEngine(JetEngine):
 
 def _TurbofanConverters():
     convs = _TurbojetConverters()
+    convs = dc.replace(convs, tag="Turbofan Converters")
     convs = convs.insert_subcomponent(FlowConverter(tag="Fan"), 0)
     convs = convs.insert_subcomponent(FlowConverter(tag="Fan Nozzle"), 0)
 

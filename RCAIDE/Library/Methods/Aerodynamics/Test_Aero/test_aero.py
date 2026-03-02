@@ -6,9 +6,8 @@
 #  Imports
 # -------------------------------------------------------------------------------
 
-# Package Imports
-
-#import numpy as np
+# package imports
+import equinox as eqx
 import jax.numpy as np
 
 # RCAIDE Imports
@@ -99,8 +98,8 @@ def direct_aero(
     F_Z = qS * C_L
     F_X = qS * (C_D + 0.06)
 
-    state.frames.wind.total_force_vector = state.frames.wind.total_force_vector.at[:, 2].set(F_Z.flatten())
-    state.frames.wind.total_force_vector = state.frames.wind.total_force_vector.at[:, 0].set(F_X.flatten())
+    state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, state.frames.wind.total_force_vector.at[:, 2].set(F_Z.flatten()))
+    state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, state.frames.wind.total_force_vector.at[:, 0].set(F_X.flatten()))
 
     return state, system, settings,
 

@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, Any, Literal
-from dataclasses import field
+from typing import Callable, Literal, TYPE_CHECKING
+from dataclasses import replace
 
 # package imports
 
@@ -28,11 +28,14 @@ from scipy.optimize import minimize, fsolve
 
 # RCAIDE imports
 
-from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
+from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import skip
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
 from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
+
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, Settings, System
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
@@ -65,7 +68,8 @@ def _activate_control(control: str | ControlVariable, state):
 
 def _activate_residual(residual_name: ResidualNames, state):
     
-    active_residual = DynamicResidual(tag=residual_name, active=True)
+    current_residual = getattr(state.dynamics, residual_name)
+    active_residual = replace(current_residual, active=True)
     
     # Safely inject it using getattr path tracing
     new_dynamics = eqx.tree_at(
@@ -74,7 +78,7 @@ def _activate_residual(residual_name: ResidualNames, state):
         active_residual
     )
     
-    return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics)
+    return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics).expand_rows(state.numerics.number_of_control_points)
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Segment
@@ -82,7 +86,6 @@ def _activate_residual(residual_name: ResidualNames, state):
 
 def _initialization_steps():
     return (
-        ProcessStep(tag="Expand State",         function=expand_state),
         ProcessStep(tag="Time",                 function=initialize_time),
         ProcessStep(tag="Mass",                 function=initialize_mass),
         ProcessStep(tag="Energy",               function=initialize_energy),
@@ -94,8 +97,8 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   tuple[str|ControlVariable, ...]  = eqx.field(static=True, default_factory=tuple)
-    active_residuals:  tuple[ResidualNames, ...]        = eqx.field(static=True, default_factory=tuple)
+    active_controls:   tuple[str|ControlVariable, ...]  = eqx.field(default_factory=tuple)
+    active_residuals:  tuple[ResidualNames, ...]        = eqx.field(default_factory=tuple)
 
     controls_initial_guess: tuple[jnp.ndarray|float,...] | None = None
 
@@ -103,11 +106,17 @@ class InitializeSegment(Process):
     
 
     def __call__(self, state, system, settings):
-        
-        current_state = state
+
+        current_state = state.expand_rows(state.numerics.number_of_control_points)
 
         for ctrl in self.active_controls:
             current_state = _activate_control(ctrl, current_state)
+
+        # Set up static routing for active controls
+        active_controls = current_state.controls.get_active_controls()
+        routing_table = tuple((ctrl.path, ctrl.path_indices) for ctrl in active_controls)
+        new_controls = replace(current_state.controls, active_routing_table=routing_table)
+        current_state = eqx.tree_at(lambda s: s.controls, current_state, new_controls)
 
         for res_name in self.active_residuals:
             current_state = _activate_residual(res_name, current_state)
@@ -136,7 +145,9 @@ class InitializeSegment(Process):
         current_state = current_state.unpack_unknowns(current_state.unknowns)
 
         # 6. Run the sub-steps
-        return super().__call__(current_state, system, settings)
+        current_state, system, settings = super().__call__(current_state, system, settings)
+
+        return current_state, system, settings
 
 
 def _default_analyses():
@@ -231,7 +242,7 @@ def fsolve_results_parser(
             current_state = eqx.tree_at(lambda s: s.numerics, state, converged_numerics)
         
         current_state = eqx.tree_at(lambda s: s.unknowns, current_state, unknowns)
-        current_state = current_state.unpack_unknowns()
+        current_state = current_state.unpack_unknowns(unknowns)
         
         return current_state, system, settings
 
@@ -243,7 +254,7 @@ class IterateSegment(Process):
     analyze:        Process = eqx.field(default_factory=AnalyzeSegment)
 
     # Root-finder arguments and parser
-    root_finder:    RootFinders = eqx.field(static=True, default=ScipyRootFinding) # type: ignore
+    root_finder:    RootFinders = eqx.field(static=True, default=fsolve) # type: ignore
     results_parser: Callable    = eqx.field(static=True, default=fsolve_results_parser) # type: ignore
     
     def _get_residuals(self, unknowns, state, system, settings):
@@ -280,15 +291,15 @@ class IterateSegment(Process):
                 method='hybr',
                 optimality_fun=self._get_residuals,
                 tol = state.numerics.solution_tolerance,
-                jit=False,  #TODO: Test JIT compilation
+                jit=True
             )
-
-            if any([
-                find_circular_references(state, path="state"),
-                find_circular_references(system, path="system"),
-                find_circular_references(settings, path="settings")
-            ]):
-                raise RecursionError("Circularity found in mission data structures. Terminating mission.")
+            if settings.mission.debugging:
+                if any([
+                    find_circular_references(state, path="state"),
+                    find_circular_references(system, path="system"),
+                    find_circular_references(settings, path="settings")
+                ]):
+                    raise RecursionError("Circularity found in mission data structures. Terminating mission.")
 
             unknowns, _ = root.run(x0, state, system, settings)
 
@@ -314,7 +325,7 @@ def _reset_controls_and_residuals(
 
         def _turn_off_residual(node):
             if isinstance(node, DynamicResidual):
-                return eqx.tree_at(lambda r: r.active, node, False)
+                return replace(node, active=False)
             return node
         
         new_controls = jax.tree_util.tree_map(
@@ -339,7 +350,7 @@ def _reset_controls_and_residuals(
 
 def _default_finalize():
     return (
-        ProcessStep(tag="Deactivate Controls & Residuals", function=_reset_controls_and_residuals)
+        ProcessStep(tag="Deactivate Controls & Residuals", function=_reset_controls_and_residuals),
     )
 
 class FinalizeSegment(Process):
@@ -358,9 +369,9 @@ class Segment(Process):
     tag: str = eqx.field(static=True, default="Segment")
 
     # Pass-through configuration for InitializeSegment
-    active_controls:  tuple[str | ControlVariable, ...] = eqx.field(static=True, default_factory=tuple)
-    active_residuals: tuple[ResidualNames, ...]         = eqx.field(static=True, default_factory=tuple)
-    controls_initial_guess: tuple[jnp.ndarray|float, ...] | None = None
+    active_controls:  tuple[str | ControlVariable, ...]     = eqx.field(default_factory=tuple)
+    active_residuals: tuple[ResidualNames, ...]             = eqx.field(default_factory=tuple)
+    controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
 
     # Global dynamics variables
     sideslip_angle:         float = 0.0
@@ -410,9 +421,10 @@ class Segment(Process):
     # ----------------------------------------------------------------------------------
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
         
-        for step in self.analyze.steps:
-            if step.function is skip:
-                print(f"Warning: Skipping step '{step.tag}' due to missing analysis function.")
+        if settings.mission.verbose:
+            for step in self.analyze.steps:
+                if isinstance(step, ProcessStep) and step.function is skip:
+                    print(f"Warning: Skipping step '{step.tag}' due to missing analysis function.")
         
         return super().__call__(state, system, settings)
 
@@ -422,125 +434,125 @@ class Segment(Process):
 #-----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class OptimalSegment(Process):
+# @chex.dataclass(kw_only=True)
+# class OptimalSegment(Process):
 
-    tag:                    str    = 'Optimize Segment'
-    optimization_method:    str    = 'SLSQP'
-    display_optimization:   bool   = False
+#     tag:                    str    = 'Optimize Segment'
+#     optimization_method:    str    = 'SLSQP'
+#     display_optimization:   bool   = False
 
-    initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
-    analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
+#     initialize:             InitializeSegment   = field(default_factory=InitializeSegment)
+#     analyze:                AnalyzeSegment      = field(default_factory=AnalyzeSegment)
 
-    calculate_objective:    Callable    = None
-    bounds:                 List[Any]   = None
-    constraints:            dict        = None
+#     calculate_objective:    Callable    = None
+#     bounds:                 List[Any]   = None
+#     constraints:            dict        = None
 
-    function: Callable = scipy.optimize.minimize
+#     function: Callable = scipy.optimize.minimize
 
-    def _results_parser(self, res):
+#     def _results_parser(self, res):
 
-        self.state.unknowns.unpack_array(res.x)
-        self.state.objective.unpack_array(res.fun)
+#         self.state.unknowns.unpack_array(res.x)
+#         self.state.objective.unpack_array(res.fun)
 
-        self.last_result = res
+#         self.last_result = res
 
-        return self.state, self.settings, self.system
+#         return self.state, self.settings, self.system
 
-    def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
+#     def __call__(self, *args, **kwargs) -> Tuple["rcf.State", "rcf.System", "rcf.Settings"]:
 
-        # Fix Bounds
-        NCP = self.state.numerics.number_of_control_points
-        new_bounds = []
-        for b in self.bounds:
-            new_bounds.extend([b for _ in range(NCP)])
-        self.bounds = new_bounds
+#         # Fix Bounds
+#         NCP = self.state.numerics.number_of_control_points
+#         new_bounds = []
+#         for b in self.bounds:
+#             new_bounds.extend([b for _ in range(NCP)])
+#         self.bounds = new_bounds
 
-        # self.state, self.system, self.settings = args[0]
-        self.state.initials = self.state
-        self.update_details()
+#         # self.state, self.system, self.settings = args[0]
+#         self.state.initials = self.state
+#         self.update_details()
 
-        self.initialize.state = self.state
-        self.initialize.system = self.system
-        self.initialize.settings = self.settings
+#         self.initialize.state = self.state
+#         self.initialize.system = self.system
+#         self.initialize.settings = self.settings
 
-        self.state, self.system, self.settings = self.initialize((self.state, self.system, self.settings))
+#         self.state, self.system, self.settings = self.initialize((self.state, self.system, self.settings))
 
-        def _obj(U):
-            self.state.unknowns.unpack_array(U)
-            self.analyze.state = self.state
-            self.analyze.system = self.system
-            self.analyze.settings = self.settings
-            self.state, self.system, self.settings = self.analyze()
-            return self.calculate_objective(self.state, self.system, self.settings)
+#         def _obj(U):
+#             self.state.unknowns.unpack_array(U)
+#             self.analyze.state = self.state
+#             self.analyze.system = self.system
+#             self.analyze.settings = self.settings
+#             self.state, self.system, self.settings = self.analyze()
+#             return self.calculate_objective(self.state, self.system, self.settings)
 
-        _obj_fcn    = jit(_obj)
-        _obj_grad   = jit(grad(_obj_fcn))
+#         _obj_fcn    = jit(_obj)
+#         _obj_grad   = jit(grad(_obj_fcn))
 
-        res = minimize(
-            fun=_obj_fcn,
-            jac=_obj_grad,
-            x0=self.state.unknowns.pack_array(),
-            method=self.optimization_method,
-            bounds=self.bounds,
-            constraints=self.constraints,
-            options={'disp': self.display_optimization,
-                     'maxiter': self.state.numerics.max_evaluations},
-            tol=self.state.numerics.solution_tolerance,
-        )
+#         res = minimize(
+#             fun=_obj_fcn,
+#             jac=_obj_grad,
+#             x0=self.state.unknowns.pack_array(),
+#             method=self.optimization_method,
+#             bounds=self.bounds,
+#             constraints=self.constraints,
+#             options={'disp': self.display_optimization,
+#                      'maxiter': self.state.numerics.max_evaluations},
+#             tol=self.state.numerics.solution_tolerance,
+#         )
 
-        self.state, self.system, self.settings = self._results_parser(res)
+#         self.state, self.system, self.settings = self._results_parser(res)
 
-        self.state, self.system, self.settings = self.finalize(self.state, self.system, self.settings)
+#         self.state, self.system, self.settings = self.finalize(self.state, self.system, self.settings)
 
-        return self.state, self.system, self.settings
-
-
-#-----------------------------------------------------------------------------------------------------------------------
-# Energy Optimal Segments
-
-def energy_use(
-        state: "rcf.State",
-        system: "rcf.System",
-        settings: "rcf.Settings"
-):
-
-    energy_start    = state.energy.total_energy[0]
-    energy_end      = state.energy.total_energy[-1]
-    energy_used     = energy_end - energy_start
-
-    return energy_used[0]
+#         return self.state, self.system, self.settings
 
 
-@chex.dataclass(kw_only=True)
-class EnergyOptimalCruise(OptimalSegment):
+# #-----------------------------------------------------------------------------------------------------------------------
+# # Energy Optimal Segments
 
-    tag: str = 'Energy Optimal Cruise'
+# def energy_use(
+#         state: "rcf.State",
+#         system: "rcf.System",
+#         settings: "rcf.Settings"
+# ):
 
-    altitude: float = 0.0
-    distance: float = 0.0
+#     energy_start    = state.energy.total_energy[0]
+#     energy_end      = state.energy.total_energy[-1]
+#     energy_used     = energy_end - energy_start
 
-    calculate_objective: Callable = energy_use
-
-    def __post_init__(self):
-        distance_check = lambda x: self.state.frames.inertial.position_vector[-1, 0]
-        self.bounds = [(-np.pi/12, np.pi/12), (0., 1.)]
-        self.constraints = [NonlinearConstraint(distance_check, lb=self.distance, ub=self.distance)]
+#     return energy_used[0]
 
 
-@chex.dataclass(kw_only=True)
-class EnergyOptimalAltitudeChange(OptimalSegment):
+# @chex.dataclass(kw_only=True)
+# class EnergyOptimalCruise(OptimalSegment):
 
-    tag: str = 'Energy Optimal Altitude Change'
+#     tag: str = 'Energy Optimal Cruise'
 
-    altitude_start: float = 0.0
-    altitude_end:   float = 0.0
+#     altitude: float = 0.0
+#     distance: float = 0.0
 
-    calculate_objective: Callable = energy_use
+#     calculate_objective: Callable = energy_use
 
-    def __post_init__(self):
-        start_check = lambda x: self.state.frames.inertial.position_vector[0, 2]
-        end_check = lambda x: self.state.frames.inertial.position_vector[-1, 2]
-        self.bounds = [(-np.pi/4, np.pi/4), (0., 1.)]
-        self.constraints = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
-                            NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]
+#     def __post_init__(self):
+#         distance_check = lambda x: self.state.frames.inertial.position_vector[-1, 0]
+#         self.bounds = [(-np.pi/12, np.pi/12), (0., 1.)]
+#         self.constraints = [NonlinearConstraint(distance_check, lb=self.distance, ub=self.distance)]
+
+
+# @chex.dataclass(kw_only=True)
+# class EnergyOptimalAltitudeChange(OptimalSegment):
+
+#     tag: str = 'Energy Optimal Altitude Change'
+
+#     altitude_start: float = 0.0
+#     altitude_end:   float = 0.0
+
+#     calculate_objective: Callable = energy_use
+
+#     def __post_init__(self):
+#         start_check = lambda x: self.state.frames.inertial.position_vector[0, 2]
+#         end_check = lambda x: self.state.frames.inertial.position_vector[-1, 2]
+#         self.bounds = [(-np.pi/4, np.pi/4), (0., 1.)]
+#         self.constraints = [NonlinearConstraint(start_check, lb=self.altitude_start, ub=self.altitude_start),
+#                             NonlinearConstraint(end_check, lb=self.altitude_end, ub=self.altitude_end)]

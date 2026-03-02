@@ -7,8 +7,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE Imports
 import RCAIDE.Framework as rcf
@@ -25,7 +25,7 @@ def initialize_time(state: "rcf.State",
 
     t_initial = state.initials.frames.inertial.time
     if t_initial is None:
-        t_initial = np.atleast_2d(state.frames.planet.start_time)
+        t_initial = jnp.atleast_2d(state.frames.planet.start_time)
 
     t_current = state.frames.inertial.time
 
@@ -34,8 +34,11 @@ def initialize_time(state: "rcf.State",
     delta_t     = t_initial[last_idx, 0] - t_current[0, 0]
     offset_time = t_current + delta_t
 
-    state.frames.planet.start_time  = t_initial
-    state.frames.inertial.time      = offset_time
+    state = eqx.tree_at(
+        lambda s: (s.frames.planet.start_time, s.frames.inertial.time),
+        state,
+        (t_initial, offset_time)
+    )
 
     return state, system, settings
 

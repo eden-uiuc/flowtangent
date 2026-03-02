@@ -22,7 +22,7 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 class AerodynamicAngles(Conditions):
 
     # Attribute         Type        Default Value
-    tag:                str         = 'Aerodynamic Angles'
+    tag:                str         = eqx.field(static=True, default='Aerodynamic Angles')
 
     alpha:              jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
     beta:               jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
@@ -33,7 +33,7 @@ class AerodynamicAngles(Conditions):
 class LiftCoefficients(Conditions):
 
     # Attribute     Type            Default Value
-    tag:            str             = 'Lift Coefficients'
+    tag:            str             = eqx.field(static=True, default='Lift Coefficients')
 
     total:          jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
@@ -44,7 +44,7 @@ class LiftCoefficients(Conditions):
 class InducedDrag(Conditions):
 
     # Attribute         Type            Default Value
-    tag:                str             = 'Induced Drag'
+    tag:                str             = eqx.field(static=True, default='Induced Drag')
 
     total:              jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
@@ -55,7 +55,7 @@ class InducedDrag(Conditions):
 class DragCoefficients(Conditions):
 
     # Attribute         Type            Default Value
-    tag:                str             = 'Drag Coefficients'
+    tag:                str             = eqx.field(static=True, default='Drag Coefficients')
 
     total:              jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
 
@@ -70,7 +70,7 @@ class DragCoefficients(Conditions):
 class AerodynamicCoefficients(Conditions):
 
     # Attribute         Type                Default Value
-    tag:                str                 = 'Aerodynamic Coefficients'
+    tag:                str                 = eqx.field(static=True, default='Aerodynamic Coefficients')
 
     lift:               LiftCoefficients    = eqx.field(default_factory=LiftCoefficients)
     drag:               DragCoefficients    = eqx.field(default_factory=DragCoefficients)
@@ -78,7 +78,7 @@ class AerodynamicCoefficients(Conditions):
 class AerodynamicsConditions(Conditions):
 
     # Attribute     Type                    Default Value
-    tag:            str                     = 'Aerodynamics'
+    tag:            str                     = eqx.field(static=True, default='Aerodynamics')
 
     angles:         AerodynamicAngles       = eqx.field(default_factory=AerodynamicAngles)
 

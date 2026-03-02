@@ -10,7 +10,10 @@
 
 
 # package imports
+import jax
+import numpy as np
 import equinox as eqx
+import jax.numpy as jnp
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions
@@ -21,49 +24,58 @@ class Conditions(eqx.Module):
 
     tag: str = eqx.field(static=True, default='Conditions')
 
-    def _get_subconditions(self):
-        subcons = []
-        for field_name in self.__dataclass_fields__:
-            val = getattr(self, field_name)
-            if isinstance(val, Conditions):
-                subcons.append(val)
-        return tuple(subcons)
+    subconditions: tuple = eqx.field(default_factory=tuple)
 
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
-            return self._get_subconditions()[item]
+            return self.subconditions[item]
         elif isinstance(item, str):
             attr_name = item.replace(' ', '_').lower()
             return getattr(self, attr_name)
         else:
             raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
-    
-    def __setitem__(self, key, value):
-        if isinstance(key, int):
-            subconkeys = [k for k in vars(self) if isinstance(getattr(self, k), Conditions)]
-            if key < len(subconkeys):
-                setattr(self, subconkeys.index(key), value)
-            else:
-                setattr(self, str(key), value)
-        else:
-            setattr(self, key, value)
+
     
     def __iter__(self):
-        return iter(self._get_subconditions())
+        return iter(self.subconditions)
 
-    def set_condition(self, key, value):
-        if isinstance(key, int):
-            subconkeys = [
-                k for k in self.__dataclass_fields__
-                if isinstance(getattr(self, k), Conditions)
-            ]
-            if key < len(subconkeys):
-                attr_name = subconkeys[key]
-            else:
-                attr_name = str(key)
-        elif isinstance(key, str):
-            attr_name = key.replace(' ', '_').lower()
-        else:
-            raise TypeError(f"Conditions must be set using, integers or strings, not {type(key).__name__}")
+    def expand_rows(self, n: int):
+
+        def _expand(leaf):
+            if isinstance(leaf, (jnp.ndarray, np.ndarray)):
+                
+                # 1. Intercept the empty placeholders we created to avoid 'None'
+                if leaf.size == 0:
+                    if leaf.ndim == 1:
+                        # jnp.empty(0) -> shape (n, 1)
+                        return jnp.zeros((n, 1), dtype=leaf.dtype)
+                    elif leaf.ndim == 2:
+                        # jnp.empty((0, 3)) -> shape (n, 3)
+                        return jnp.zeros((n, leaf.shape[1]), dtype=leaf.dtype)
+                
+                # 2. Standard expansion for actual data
+                if leaf.ndim == 1:
+                    return jnp.tile(leaf, (n, 1))
+                elif leaf.ndim == 2 and leaf.shape[0] == 1:
+                    return jnp.repeat(leaf, n, axis=0)
+                    
+            return leaf
         
-        return eqx.tree_at(lambda c: getattr(c, attr_name), self, value)
+        return jax.tree_util.tree_map(_expand, self)
+    
+    def add_subcondition(self, subcondition: "Conditions"):
+
+        new_subconditions = self.subconditions + (subcondition,)
+        new_self = eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
+    
+        return new_self
+    
+    def insert_subcondition(self, subcondition: "Conditions", index: int):
+        new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index:]
+        
+        return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
+
+    def replace_subcondition(self, subcondition: "Conditions", index: int):
+        new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1:]
+        
+        return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)

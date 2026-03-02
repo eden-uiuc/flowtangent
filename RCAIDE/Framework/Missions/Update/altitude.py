@@ -7,6 +7,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+# package imports
+import equinox as eqx
+
 # RCAIDE imports
 import RCAIDE.Framework as rcf
 
@@ -20,6 +23,6 @@ def update_altitude(state: "rcf.State",
                     settings: "rcf.Settings",
                     ):
 
-    state.freestream.altitude = state.frames.inertial.position_vector[:, 2]
+    state = eqx.tree_at(lambda s:s.freestream.altitude, state, state.frames.inertial.position_vector[:, 2])
                    
     return state, system, settings

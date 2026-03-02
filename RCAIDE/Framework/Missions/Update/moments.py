@@ -7,6 +7,11 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
+# package imports
+import equinox as eqx
+import jax.numpy as jnp
+
+# RCAIDE Imports
 import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,8 +30,8 @@ def update_moments(
 
         TW2I    = state.frames.wind.transform_to_inertial
 
-        M = TW2I.apply(wind)
+        M = jnp.einsum('nij,nj->ni', TW2I, wind)
 
-        state.frames.inertial.total_moment_vector = M + thrust
+        state = eqx.tree_at(lambda s: s.frames.inertial.total_moment_vector, state, M + thrust)
         
         return state, system, settings

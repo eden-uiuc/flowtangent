@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
 # package imports
 import equinox as eqx
@@ -18,7 +19,8 @@ from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 from RCAIDE.Library.Components.Energy.Converters import EnergyConverter
 from RCAIDE.Library.Components.Energy.Stores import EnergyStore
 
-from RCAIDE.Framework import State, System, Settings
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 # ----------------------------------------------------------------------------------------------------------------------
 #  Network
 # ----------------------------------------------------------------------------------------------------------------------
@@ -59,7 +61,7 @@ class EnergyLine(Component):
 
 class EnergyNetwork(Component):
 
-    tag: str = 'Energy Network'
+    tag: str = eqx.field(static=True, default='Energy Network')
 
     efficiency: float = 1.0
 
