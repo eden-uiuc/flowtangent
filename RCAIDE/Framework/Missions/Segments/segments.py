@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import timeit
+
 from typing import Callable, Literal, TYPE_CHECKING
 from dataclasses import replace
 
@@ -23,7 +25,7 @@ first_treedef = None
 import equinox as eqx
 import jax.numpy as jnp
 
-from jaxopt import ScipyRootFinding
+from jaxopt import ScipyRootFinding, Broyden, Bisection, GaussNewton
 from scipy.optimize import minimize, fsolve
 
 # RCAIDE imports
@@ -246,7 +248,7 @@ def fsolve_results_parser(
         
         return current_state, system, settings
 
-RootFinders = Literal[fsolve, ScipyRootFinding]
+RootFinders = Literal[fsolve, ScipyRootFinding, Broyden, Bisection, GaussNewton]
 
 class IterateSegment(Process):
 
@@ -254,7 +256,7 @@ class IterateSegment(Process):
     analyze:        Process = eqx.field(default_factory=AnalyzeSegment)
 
     # Root-finder arguments and parser
-    root_finder:    RootFinders = eqx.field(static=True, default=fsolve) # type: ignore
+    root_finder:    RootFinders = eqx.field(static=True, default=GaussNewton) # type: ignore
     results_parser: Callable    = eqx.field(static=True, default=fsolve_results_parser) # type: ignore
     
     def _get_residuals(self, unknowns, state, system, settings):
@@ -264,6 +266,27 @@ class IterateSegment(Process):
         current_state = current_state.pack_residuals()
 
         return current_state.residuals
+
+    @eqx.filter_jit
+    def _run_broyden_solver(self, x0, state, system, settings):
+        root = Broyden(
+            fun=self._get_residuals,
+            tol=state.numerics.solution_tolerance,
+            maxiter=state.numerics.max_evaluations,
+        )
+
+        return root.run(x0, state, system, settings)
+    
+    @eqx.filter_jit
+    def _run_gauss_newton_solver(self, x0, state, system, settings):
+        # Note the argument is `residual_fun` for the minimizer
+        root = GaussNewton(
+            residual_fun=self._get_residuals,
+            tol=state.numerics.solution_tolerance,
+            maxiter=state.numerics.max_evaluations
+        )
+        
+        return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
 
@@ -283,7 +306,7 @@ class IterateSegment(Process):
 
             return fsolve_results_parser(results, state, system, settings)
 
-        elif self.root_finder is ScipyRootFinding:
+        elif self.root_finder in (ScipyRootFinding, Bisection):
 
             x0 = state.unknowns
 
@@ -301,13 +324,67 @@ class IterateSegment(Process):
                 ]):
                     raise RecursionError("Circularity found in mission data structures. Terminating mission.")
 
+            t0 = timeit.default_timer()
+
             unknowns, _ = root.run(x0, state, system, settings)
+
+            unknowns.block_until_ready()
+
+            t1 = timeit.default_timer()
+
+            print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
 
             current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
             current_state = current_state.unpack_unknowns(unknowns)
 
             return self.analyze(current_state, system, settings)
 
+        elif self.root_finder is Broyden:
+            x0 = state.unknowns
+
+            # 2. Start the clock
+            t0 = timeit.default_timer()
+
+            # 3. Fire the compiled GPU kernel
+            # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
+            unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
+            
+            # 4. Wait for the final answer to come back across the PCIe bus
+            unknowns.block_until_ready()
+
+            # 5. Stop the clock
+            t1 = timeit.default_timer()
+            print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
+
+            # 6. Unpack and continue
+            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+            current_state = current_state.unpack_unknowns(unknowns)
+
+            return self.analyze(current_state, system, settings)
+        
+        elif self.root_finder is GaussNewton:
+            x0 = state.unknowns
+
+            # 2. Start the clock
+            t0 = timeit.default_timer()
+
+            # 3. Fire the compiled GPU kernel
+            # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
+            unknowns, _ = self._run_gauss_newton_solver(x0, state, system, settings)
+            
+            # 4. Wait for the final answer to come back across the PCIe bus
+            unknowns.block_until_ready()
+
+            # 5. Stop the clock
+            t1 = timeit.default_timer()
+            print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
+
+            # 6. Unpack and continue
+            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+            current_state = current_state.unpack_unknowns(unknowns)
+
+            return self.analyze(current_state, system, settings)
+        
         else:
             return state, system, settings     
 

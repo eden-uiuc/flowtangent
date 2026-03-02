@@ -77,7 +77,7 @@ class Numerics(Conditions):
 
     solver_jacobian:            str | None          = eqx.field(static=True, default=None)
     solution_tolerance:         float               = eqx.field(static=True, default=1e-8)
-    max_evaluations:            int                 = eqx.field(static=True, default=int(1e4))
+    max_evaluations:            int                 = eqx.field(static=True, default=int(500))
     step_size:                  float | None        = eqx.field(static=True, default=None)
     
     converged:                  bool                = False

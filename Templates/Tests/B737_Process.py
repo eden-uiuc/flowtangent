@@ -730,10 +730,10 @@ if __name__ == '__main__':
     print("Initiating XLA Compilation and First Run...")
     t0 = time.perf_counter()
     
-    val, grad = dCL_M(79015.8, state, system, settings)
+    val = CL_M(79015.8, state, system, settings)
     
     val.block_until_ready()
-    grad.block_until_ready()
+    # grad.block_until_ready()
     
     t1 = time.perf_counter()
     print(f"Compilation + First Execution: {t1 - t0:.4f} seconds")
@@ -748,9 +748,9 @@ if __name__ == '__main__':
     t2 = time.perf_counter()
     
     for _ in range(iterations):
-        val, grad = dCL_M(79015.8, state, system, settings)
+        val = CL_M(79015.8, state, system, settings)
         val.block_until_ready()
-        grad.block_until_ready()
+        # grad.block_until_ready()
         
     t3 = time.perf_counter()
     
