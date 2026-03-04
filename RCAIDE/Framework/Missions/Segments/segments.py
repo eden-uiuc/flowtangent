@@ -26,9 +26,13 @@ import equinox as eqx
 import jax.numpy as jnp
 
 from jaxopt import ScipyRootFinding, Broyden, Bisection, GaussNewton
-from scipy.optimize import minimize, fsolve
+from scipy.optimize import fsolve
 
 # RCAIDE imports
+
+from .Profiles import *
+
+from RCAIDE.Library import Units
 
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import skip
@@ -82,6 +86,7 @@ def _activate_residual(residual_name: ResidualNames, state):
     
     return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics).expand_rows(state.numerics.number_of_control_points)
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Segment
 # ----------------------------------------------------------------------------------------------------------------------
@@ -102,7 +107,7 @@ class InitializeSegment(Process):
     active_controls:   tuple[str|ControlVariable, ...]  = eqx.field(default_factory=tuple)
     active_residuals:  tuple[ResidualNames, ...]        = eqx.field(default_factory=tuple)
 
-    controls_initial_guess: tuple[jnp.ndarray|float,...] | None = None
+    controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
     steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
     
@@ -151,6 +156,9 @@ class InitializeSegment(Process):
 
         return current_state, system, settings
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Analyze Segment
+# ----------------------------------------------------------------------------------------------------------------------
 
 def _default_analyses():
     return (
@@ -218,6 +226,10 @@ def find_circular_references(obj, path="root", visited=None):
                 return True
     
     return False
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Iterate Segment
+# ----------------------------------------------------------------------------------------------------------------------
 
 def fsolve_results_parser(
         fsolve_result: tuple,
@@ -388,6 +400,11 @@ class IterateSegment(Process):
         else:
             return state, system, settings     
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Finalize Segment
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 def _reset_controls_and_residuals(
             state: State,
             system: System,
@@ -450,6 +467,11 @@ class Segment(Process):
     active_residuals: tuple[ResidualNames, ...]             = eqx.field(default_factory=tuple)
     controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
 
+    position_profile:   PositionProfile = eqx.field(default_factory=ConstantAltitude)
+    speed_profile:      SpeedProfile    = eqx.field(default_factory=ConstantSpeed)
+    velocity_profile:   VelocityProfile = eqx.field(default_factory=ConstantAltitudeChangeRate)
+    duration_profile:   DurationProfile = eqx.field(default_factory=FixedDistance)
+
     # Global dynamics variables
     sideslip_angle:         float = 0.0
     temperature_deviation:  float = 0.0
@@ -468,6 +490,12 @@ class Segment(Process):
                 active_residuals=self.active_residuals,
                 controls_initial_guess=self.controls_initial_guess
             )
+            
+            # Add profile initialization
+            init_step = eqx.tree_at(
+                lambda i:i.steps, init_step, 
+                init_step.steps + (self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
+            
             iter_step = IterateSegment(tag=f"Iterate {self.tag}")
             fin_step  = FinalizeSegment(tag=f"Finalize {self.tag}")
             

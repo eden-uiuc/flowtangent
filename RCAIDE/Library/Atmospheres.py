@@ -7,6 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from typing import Literal
+
 # package imports
 import equinox as eqx
 import jax.numpy as jnp
@@ -39,6 +41,19 @@ class Atmosphere(eqx.Module):
 
     def __repr__(self):
         return self.tag
+    
+    def _compute_property(self, altitude, property: Literal["temperature", "pressure", "density"]):
+        return jnp.interp(altitude, self.breaks.altitude, getattr(self.breaks, property))
+    
+    def compute_temperature(self, altitude:jnp.ndarray):
+        return self._compute_property(altitude, "temperature")
+    
+    def compute_pressure(self, altitude:jnp.ndarray):
+        return self._compute_property(altitude, "pressure")
+    
+    def compute_density(self, altitude:jnp.ndarray):
+        return self._compute_property(altitude, "density")
+
 
 
 def _USStandardBreaks():

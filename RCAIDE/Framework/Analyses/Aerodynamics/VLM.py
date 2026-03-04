@@ -1,31 +1,32 @@
 # RCAIDE/Framework/Analyses/Aerodynamics/VLM.py
-# (c) Copyright 2025 Aerospace Research Community LLC
+# (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: May 2025, RCAIDE Team
+# Modified: Mar 2026, J. Smart
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import chex
-from dataclasses import field
-from typing import Callable
+
+
+from typing import Callable, Optional
 
 # package imports
-#import numpy as np
-import jax.numpy as np
+import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
-import RCAIDE.Framework as rcf
+from RCAIDE.Framework import Process, ProcessStep
+from RCAIDE.Framework.Methods.Aerodynamics.VLM import *
 from RCAIDE.Library import Units
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  VLM
+#  VLM Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@chex.dataclass(kw_only=True)
-class SupersonicSettings:
+class SupersonicSettings(eqx.Module):
 
     peak_mach_number                        = 1.04
     begin_drag_rise_mach_number             = 0.95
@@ -34,12 +35,11 @@ class SupersonicSettings:
     volume_wave_drag_scaling                = 3.2
     fuselage_parasite_drag_begin_blend_mach = 0.91
     fuselage_parasite_drag_end_blend_mach   = 0.99
-    cross_sectional_area_calculation_type   = 'Fixed'
-    wave_drag_type                          = 'Raymer'
+    cross_sectional_area_calculation_type:  str = eqx.field(static=True, default='Fixed')
+    wave_drag_type:                         str = eqx.field(static=True, default='Raymer')
 
 
-@chex.dataclass(kw_only=True)
-class CorrectionFactors:
+class CorrectionFactors(eqx.Module):
 
     fuselage_lift: float = 1.14
     trim_drag: float = 1.0
@@ -49,136 +49,211 @@ class CorrectionFactors:
     CL_max: float = 1.0
 
 
-@chex.dataclass(kw_only=True)
-class EfficiencyFactors:
+class EfficiencyFactors(eqx.Module):
 
-    span: float = None
-    oswald: float = None
+    span: float = 1.0
+    oswald: float = 1.0
 
 
-@chex.dataclass(kw_only=True)
-class ParasiteDragFormFactors:
+class ParasiteDragFormFactors(eqx.Module):
 
     wing: float = 1.1
     fuselage: float = 2.3
 
 
-@chex.dataclass(kw_only=True)
-class Training:
+class Training(eqx.Module):
 
-    angle_of_attack:        np.ndarray  = None
-    Mach:                   np.ndarray  = None
+    angle_of_attack:        jnp.ndarray  = eqx.field(default_factory=jnp.linspace(-5. * Units.deg, 15.* Units.deg, 40))
+    Mach:                   jnp.ndarray  = eqx.field(default_factory=jnp.linspace(0., 0.85, 20))
 
-    sideslip_angle:         np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
-    aileron_deflection:     np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
-    elevator_deflection:    np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
-    rudder_deflection:      np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
-    flap_deflection:        np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
-    slat_deflection:        np.ndarray  = field(default_factory=lambda: np.array([30, 10.0, 1E-12]) * Units.deg)
+    sideslip_angle:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    aileron_deflection:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    elevator_deflection:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    rudder_deflection:      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    flap_deflection:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    slat_deflection:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
 
-    u:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
-    v:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
-    w:                      np.ndarray  = field(default_factory=lambda: np.array([0.2, 0.1, 1E-12]))
+    u:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
+    v:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
+    w:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
 
-    pitch_rate:             np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
-    roll_rate:              np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
-    yaw_rate:               np.ndarray  = field(default_factory=lambda:np.array([0.3, 0.15, 0.0])  * Units.rad / Units.sec)
-
-
-@chex.dataclass(kw_only=True)
-class Vortices:
-
-    spanwise:   int = 15
-    chordwise:  int = 5
+    pitch_rate:             jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
+    roll_rate:              jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
+    yaw_rate:               jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
 
 
-@chex.dataclass(kw_only=True)
-class VLMSettings:
+class VLMVortices(eqx.Module):
+    # General Settings
+    spanwise_cosine_spacing: bool = True
+    model_fuselage: bool = False
+    floating_point_precision: str = "float64"
+    verbose: bool = False
+    
+    # Discretization Inputs (Optional, so the user can choose which to define)
+    number_of_spanwise_vortices: Optional[int] = None
+    number_of_chordwise_vortices: Optional[int] = None
+    
+    wing_spanwise_vortices: Optional[int] = None
+    wing_chordwise_vortices: Optional[int] = None
+    fuselage_spanwise_vortices: Optional[int] = None
+    fuselage_chordwise_vortices: Optional[int] = None
 
-    discretize_control_surfaces:    bool    = True
+    def __post_init__(self):
+        """Validates discretization inputs and resolves global vs separate routing."""
+        
+        # 1. Unpack for readability
+        n_sw_global = self.number_of_spanwise_vortices
+        n_cw_global = self.number_of_chordwise_vortices
+        n_sw_wing   = self.wing_spanwise_vortices
+        n_cw_wing   = self.wing_chordwise_vortices
+        n_sw_fuse   = self.fuselage_spanwise_vortices
+        n_cw_fuse   = self.fuselage_chordwise_vortices
 
-    model_fuselage:                 bool    = False
-    trim_aircraft:                  bool    = False
+        # 2. Run the validation checks
+        invalid_global_n   = bool(n_sw_global) != bool(n_cw_global) 
+        invalid_wing_n     = bool(n_sw_wing)   != bool(n_cw_wing)
+        invalid_fuse_n     = bool(n_sw_fuse)   != bool(n_cw_fuse)
+        invalid_separate_n = bool(n_sw_wing)   != bool(n_sw_fuse)
 
-    recalculate_total_wetted_area:  bool    = False
-    model_propeller_wake:           bool    = False
+        if invalid_global_n:
+            raise ValueError('If using global surface discretization, both n_sw and n_cw must be defined')
+        elif invalid_wing_n or invalid_fuse_n:
+            raise ValueError('If using separate surface discretization, all n_sw and n_cw values must be defined')
+        elif invalid_separate_n:
+            raise ValueError('If using separate surface discretization, both wing and fuselage discretization must be defined')
 
-    CL_max:                         float   = np.inf
+        # 3. Check for conflicting inputs
+        global_n_defined   = bool(n_sw_global) 
+        separate_n_defined = bool(n_sw_wing)
+
+        if global_n_defined == separate_n_defined:
+            raise ValueError('Specify either global or separate discretization, not both')
+
+        # 4. Route global settings to specific components using the bypass
+        if global_n_defined:
+            object.__setattr__(self, 'wing_spanwise_vortices', n_sw_global)
+            object.__setattr__(self, 'wing_chordwise_vortices', n_cw_global)
+            object.__setattr__(self, 'fuselage_spanwise_vortices', n_sw_global)
+            object.__setattr__(self, 'fuselage_chordwise_vortices', n_cw_global)
+
+class VLMTopology(eqx.Module):
+    """ Static topological mapping for the VLM mesh. Gradients do NOT flow here. """
+    
+    # Global Counters
+    total_panels: int = eqx.field(static=True)
+    total_wings: int = eqx.field(static=True)
+    
+    # 1D Integer/Boolean Arrays (Length = total_panels)
+    surface_ID: jnp.ndarray       # Maps panel 'i' to wing 'j'
+    is_leading_edge: jnp.ndarray  # True if panel 'i' is at the leading edge
+    is_trailing_edge: jnp.ndarray # True if panel 'i' is at the trailing edge
+    
+    # Slicing Helpers 
+    surface_breaks: jnp.ndarray   # The starting panel index for each wing
+
+    @classmethod
+    def build_from_records(cls, vlm_records_list, settings):
+        """ 
+        Pure Python builder. Runs ONCE during initialization to map the grid. 
+        """
+        surface_id_list = []
+        is_le_list = []
+        is_te_list = []
+        surface_breaks_list = []
+        
+        total_panels = 0
+        
+        # We iterate over the 1D list of VLM records we just built!
+        for current_surface_id, record in enumerate(vlm_records_list):
+            
+            # Record the panel index where this wing starts
+            surface_breaks_list.append(total_panels)
+            
+            # --- Discretization Logic ---
+            # NOTE: If we are using span_breaks to distribute panels proportionally, 
+            # that calculation goes here! For now, we use the global settings.
+            n_sw = settings.wing_spanwise_vortices
+            n_cw = settings.wing_chordwise_vortices
+            n_panels = n_sw * n_cw
+            
+            # Map every panel in this grid to the current wing/surface ID
+            surface_id_list.extend([current_surface_id] * n_panels)
+            
+            # Build Leading Edge boolean mask
+            # The first row of panels (n_sw) is the leading edge
+            wing_le = [True] * n_sw + [False] * (n_panels - n_sw)
+            is_le_list.extend(wing_le)
+            
+            # Build Trailing Edge boolean mask
+            # The last row of panels (n_sw) is the trailing edge
+            wing_te = [False] * (n_panels - n_sw) + [True] * n_sw
+            is_te_list.extend(wing_te)
+            
+            total_panels += n_panels
+
+        # Pack everything into immutable JAX arrays exactly ONCE
+        return cls(
+            total_panels=total_panels,
+            total_wings=len(vlm_records_list),
+            surface_ID=jnp.array(surface_id_list, dtype=jnp.int32),
+            is_leading_edge=jnp.array(is_le_list, dtype=bool),
+            is_trailing_edge=jnp.array(is_te_list, dtype=bool),
+            surface_breaks=jnp.array(surface_breaks_list, dtype=jnp.int32)
+        )
+
+class VLMSettings(eqx.Module):
+
+    
+
+    model_fuselage:                 bool    = eqx.field(static=True, default=False)
+    trim_aircraft:                  bool    = eqx.field(static=True, default=False)
+
+    discretize_control_surfaces:    bool    = eqx.field(static=True, default=True)
+    recalculate_total_wetted_area:  bool    = eqx.field(static=True, default=False)
+    model_propeller_wake:           bool    = eqx.field(static=True, default=False)
+
+    CL_max:                         float   = jnp.inf
     CD_increment:                   float   = 0.0
     spoiler_drag_increment:         float   = 0.0
 
-    supersonic:     SupersonicSettings      = field(default_factory=SupersonicSettings)
-    correction:     CorrectionFactors       = field(default_factory=CorrectionFactors)
-    efficiency:     EfficiencyFactors       = field(default_factory=EfficiencyFactors)
-    parasite_drag:  ParasiteDragFormFactors = field(default_factory=ParasiteDragFormFactors)
-    training:       Training                = field(default_factory=Training)
-    vortices:       Vortices                = field(default_factory=Vortices)
+    supersonic:     SupersonicSettings      = eqx.field(default_factory=SupersonicSettings)
+    correction:     CorrectionFactors       = eqx.field(default_factory=CorrectionFactors)
+    efficiency:     EfficiencyFactors       = eqx.field(default_factory=EfficiencyFactors)
+    parasite_drag:  ParasiteDragFormFactors = eqx.field(default_factory=ParasiteDragFormFactors)
+    training:       Training                = eqx.field(default_factory=Training)
+    
+    topology:       VLMTopology             = eqx.field(default_factory=VLMTopology)
+    vortices:       VLMVortices                = eqx.field(default_factory=VLMVortices)
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  VLM Initialization
+# ----------------------------------------------------------------------------------------------------------------------
+def _default_VLM_init_steps():
+    return(
+        ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
+        ProcessStep(make_VLM_wings, "Discretize VLM Wings"),
+        ProcessStep(generate_wing_vortex_distribution, "Generate Wing Vortices"),
+        
+    )
+
+class InitializeVLM(Process):
+    
+    tag: str = eqx.field(static=True, default="Initialize Aerodynamics Analysis")
 
 
-@chex.dataclass(kw_only=True)
-class VLM(rcf.Process):
+# ----------------------------------------------------------------------------------------------------------------------
+#  VLM Process
+# ----------------------------------------------------------------------------------------------------------------------
 
-    def __post_init__(self):
+def _default_VLM_steps():
+    return(
+        ProcessStep(check_freestream, "Check Freestream"),
+        ProcessStep(update_wing_geometry, "Update Wing Geometry"), # Updates System for shape optimization
+    )
 
-        if not isinstance(self.settings.analysis.aerodynamics, VLMSettings):
-            self.settings.analysis.aerodynamics = VLMSettings()
+class VLM(Process):
 
-        self.steps = [
-            check_settings,
-            inviscid_wings,
-            fuselage_correction,
-            wing_parasite_drag,
-            fuselage_parasite_drag,
-            nacelle_parasite_drag,
-            pylon_parasite_drag,
-            total_parasite_drag,
-            induced_drag,
-            compressibility_drag,
-            miscellaneous_drag,
-            spoiler_drag,
-            total_drag,
-        ]
+    tag: str = eqx.field(static=True, default="Aerodynamics")
 
-
-@chex.dataclass(kw_only=True)
-class VLMSurrogate(VLM):
-
-    subsonic:   Callable = None
-    transonic:  Callable = None
-    supersonic: Callable = None
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.steps[1] = surrogate_inviscid_wings
-
-    def train_surrogate(self):
-
-        settings = self.settings.analysis.aerodynamics.training
-
-        Mach        = settings.Mach
-        alpha       = settings.angle_of_attack
-        beta        = settings.sideslip_angle
-
-        u           = settings.u
-        v           = settings.v
-        w           = settings.w
-
-        pitch_rate  = settings.pitch_rate
-        roll_rate   = settings.roll_rate
-        yaw_rate    = settings.yaw_rate
-
-        self.system: rcf.Aircraft
-
-        for wing in self.system.wings:
-            for control_surface in wing.control_surfaces:
-                control_surface.deflection = 0.
-
-        # --------------------------------------------------------------------------------------------------------------
-        # AoA Training
-        # --------------------------------------------------------------------------------------------------------------
-
-        self.state.initials = rcf.State()
-        self.state.initials.freestream.mach_number  = np.atleast_2d(np.repeat(Mach, len(alpha))).T
-        self.state.aerodynamics.angles.alpha        = np.atleast_2d(np.tile(alpha, len(Mach)).T.flatten()).T
-
+    steps : tuple = eqx.field(default_factory=_default_VLM_steps)
 

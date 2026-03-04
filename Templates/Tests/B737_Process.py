@@ -14,11 +14,13 @@ import jax.numpy as jnp
 
 from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
-from RCAIDE.Framework.Missions.Segments import TestCSACruise
+from RCAIDE.Framework.Missions.Segments import Segment, TestCSACruise
+from RCAIDE.Framework.Missions.Segments.Profiles import ConstantSpeed, ConstantAltitude, FixedDistance
+from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
 from RCAIDE.Framework.Analyses.Aerodynamics import TestAero
 
-
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data, MassProperties
+from RCAIDE.Library import Units
+from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Library.Components.Fuselages import *
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
@@ -664,9 +666,35 @@ def vehicle_setup():
 
 def mission_setup(state, system, settings: "Settings"):
 
+    controls = (
+        DirectControlVariable(
+            tag='Lift Coefficient',
+            path=("aerodynamics", "coefficients", "lift", "total"),
+            path_indices=(slice(None), 0),
+            active=True
+        ),
+        DirectControlVariable(
+            tag='Drag Coefficient',
+            path=("aerodynamics", "coefficients", "drag", "total"),
+            path_indices=(slice(None), 0),
+            active=True
+        ))
+
+    cruise_segment = Segment(
+        tag="Cruise Segment",
+        position_profile=ConstantAltitude(altitude=10000.0 * Units.m),
+        speed_profile=ConstantSpeed(speed=230 * Units.m/Units.s),
+        duration_profile=FixedDistance(distance=5500. * Units.km),
+        active_controls=controls,
+        active_residuals=("force_x", "force_z"),
+        controls_initial_guess=(1.0, 0.05)
+    )
+
+    # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
+
     mission = Process(
         tag='Boeing 737 Mission',
-        steps=(TestCSACruise(altitude=10000.0, air_speed=230.0, distance=5500. * 1000.),), #type: ignore
+        steps=(cruise_segment,), #type: ignore
         initial_state=state,
         initial_system=system,
         initial_settings=settings
@@ -710,50 +738,55 @@ if __name__ == '__main__':
     system = vehicle_setup()
     settings = Settings()
 
-    def CL_M(total_mass, state, system, settings):
-        # Setup Phase (Pure Python, executes every time)
-
-        # Update the mass dynamically
-        system = eqx.tree_at(lambda s: s.mass_properties.total, system, total_mass)
-
-        # Execution Phase (JIT compiled solver)
-        final_state, _, _ = mission_b737(state, system, settings)
+    final_state, _, _ = mission_b737(state, system, settings)
         
-        return final_state.aerodynamics.coefficients.lift.total[0][0]
-    
-    # Create our value-and-gradient function
-    dCL_M = value_and_grad(CL_M)
-    
-    # ---------------------------------------------------------
-    # 1. THE COMPILATION RUN (The "Cold Start")
-    # ---------------------------------------------------------
-    print("Initiating XLA Compilation and First Run...")
-    t0 = time.perf_counter()
-    
-    val = CL_M(79015.8, state, system, settings)
-    
-    val.block_until_ready()
-    # grad.block_until_ready()
-    
-    t1 = time.perf_counter()
-    print(f"Compilation + First Execution: {t1 - t0:.4f} seconds")
-    print(f"Initial Lift: {val:.4f}")# | dCL/dMass: {grad:.8f}\n")
+    print(f"C_L: {final_state.aerodynamics.coefficients.lift.total[0][0]:.3f}")
+    print(f"C_D: {final_state.aerodynamics.coefficients.drag.total[0][0]:.3f}")
 
-    # ---------------------------------------------------------
-    # 2. THE EXECUTION BENCHMARK (The "Hot Runs")
-    # ---------------------------------------------------------
-    print("Benchmarking Compiled Execution Graph...")
-    iterations = 10
-    
-    t2 = time.perf_counter()
-    
-    for _ in range(iterations):
-        val = CL_M(79015.8, state, system, settings)
-        val.block_until_ready()
-        # grad.block_until_ready()
+    # def CL_M(total_mass, state, system, settings):
+    #     # Setup Phase (Pure Python, executes every time)
+
+    #     # Update the mass dynamically
+    #     system = eqx.tree_at(lambda s: s.mass_properties.total, system, total_mass)
+
+    #     # Execution Phase (JIT compiled solver)
+    #     final_state, _, _ = mission_b737(state, system, settings)
         
-    t3 = time.perf_counter()
+    #     return final_state.aerodynamics.coefficients.lift.total[0][0]
     
-    avg_time = (t3 - t2) / iterations
-    print(f"Average Total Time (Setup + Execution): {avg_time:.6f} seconds per run")
-    print(f"Equivalent to {1 / avg_time:.2f} full mission evaluations per second!")
+    # # Create our value-and-gradient function
+    # dCL_M = value_and_grad(CL_M)
+    
+    # # ---------------------------------------------------------
+    # # 1. THE COMPILATION RUN (The "Cold Start")
+    # # ---------------------------------------------------------
+    # print("Initiating XLA Compilation and First Run...")
+    # t0 = time.perf_counter()
+    
+    # val = CL_M(79015.8, state, system, settings)
+    
+    # val.block_until_ready()
+    # # grad.block_until_ready()
+    
+    # t1 = time.perf_counter()
+    # print(f"Compilation + First Execution: {t1 - t0:.4f} seconds")
+    # print(f"Initial Lift: {val:.4f}")# | dCL/dMass: {grad:.8f}\n")
+
+    # # ---------------------------------------------------------
+    # # 2. THE EXECUTION BENCHMARK (The "Hot Runs")
+    # # ---------------------------------------------------------
+    # print("Benchmarking Compiled Execution Graph...")
+    # iterations = 10
+    
+    # t2 = time.perf_counter()
+    
+    # for _ in range(iterations):
+    #     val = CL_M(79015.8, state, system, settings)
+    #     val.block_until_ready()
+    #     # grad.block_until_ready()
+        
+    # t3 = time.perf_counter()
+    
+    # avg_time = (t3 - t2) / iterations
+    # print(f"Average Total Time (Setup + Execution): {avg_time:.6f} seconds per run")
+    # print(f"Equivalent to {1 / avg_time:.2f} full mission evaluations per second!")

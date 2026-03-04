@@ -38,6 +38,7 @@ class WingSegment(Component):
 
     tag: str = eqx.field(static=True, default='Wing Segment')
     airfoil: Airfoil | None = None
+    control_surfaces: tuple = eqx.field(default_factory=tuple)
 
     # Specialty Attributes
 
@@ -48,6 +49,7 @@ class WingSegment(Component):
     dihedral_outboard: float = 0.0
 
     sweeps: WingSweeps = eqx.field(default_factory=WingSweeps)
+    chords: WingChords = eqx.field(default_factory=WingChords)
 
 
 class WingControlSurface(Component):
@@ -328,12 +330,3 @@ class Wing(Component):
                 setattr(self.control_surfaces, subcomponent.get_field_name(), subcomponent)
 
             super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
-
-
-
-
-
-
-
-
-

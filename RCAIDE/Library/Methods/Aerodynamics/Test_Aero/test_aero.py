@@ -5,6 +5,7 @@
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------
+from typing import TYPE_CHECKING
 
 # package imports
 import equinox as eqx
@@ -12,7 +13,11 @@ import jax.numpy as np
 
 # RCAIDE Imports
 
-import RCAIDE.Framework as rcf
+# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
+if TYPE_CHECKING:
+    from RCAIDE.Framework.State import State
+    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Settings import Settings
 
 
 # -------------------------------------------------------------------------------
@@ -46,45 +51,10 @@ def func_aero_from_mass(
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
 
-def aero_from_mass(
-    state: rcf.State,
-    system: rcf.System,
-    settings: rcf.Settings
-):
-    """
-    Framework version of aero_from_mass
-    
-    See Also
-    --------
-    func_aero_from_mass: 
-        Functional implementation which this method calls.
-    """
-
-    air_density     = state.freestream.density
-    flight_speed    = state.freestream.speed
-
-    projected_wing_area = system.main_wing.areas.projected
-    wing_aspect_ratio   = system.main_wing.aspect_ratio
-    total_mass          = system.mass_properties.total
-
-    C_L, C_D = func_aero_from_mass(
-        air_density,
-        flight_speed,
-        projected_wing_area,
-        wing_aspect_ratio,
-        total_mass,
-    )
-
-    state.aerodynamics.coefficients.lift.total  = C_L
-    state.aerodynamics.coefficients.drag.total = C_D
-
-    return state, settings, system
-
-
 def direct_aero(
-    state: rcf.State,
-    system: rcf.System,
-    settings: rcf.Settings,
+    state: "State",
+    system: "System",
+    settings: "Settings",
 ):
 
     C_L = state.aerodynamics.coefficients.lift.total

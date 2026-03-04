@@ -153,8 +153,17 @@ class Component(eqx.Module):
 
         raise AttributeError(f"'{self.tag}' has no attribute or subcomponent named '{item}'")
 
+    def __len__(self):
+        return len(self.subcomponents)
+
     def __iter__(self):
         return iter(self.subcomponents)
+    
+    def __contains__(self, item):
+        if isinstance(item, str):
+            return any(sc.get_field_name() == item for sc in self.subcomponents)
+        
+        return item in self.subcomponents
 
     def get_field_name(self):
         actual_tag = self.tag

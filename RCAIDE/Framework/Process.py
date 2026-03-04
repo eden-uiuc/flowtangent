@@ -30,7 +30,7 @@ def skip(*args):
 
 class ProcessStep(eqx.Module):
 
-    function:       Callable           = eqx.field(static=True, default=skip)
+    function:       Callable | str     = eqx.field(static=True, default=skip)
     tag:            str                = eqx.field(static=True, default="Process Step")
     
     initial_state:        State | None     = None
@@ -44,7 +44,9 @@ class ProcessStep(eqx.Module):
 
     def __call__(self, state, system, settings):
         
-        return self.function(state, system, settings)
+        # Default calling behavior, assumes function is callable.
+        # String overwrite only for steps with __call__ override
+        return self.function(state, system, settings) #type: ignore
     
     def __repr__(self):
         return self.tag

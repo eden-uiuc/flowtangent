@@ -8,9 +8,11 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 # package imports
+import jax
+import jax.numpy as jnp
 import equinox as eqx
 
 # RCAIDE imports
@@ -18,6 +20,8 @@ from RCAIDE.Library import Component, MassProperties
 from RCAIDE.Library.Attributes import AircraftClass, MediumRange
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components import Wing, Fuselage, Nacelle, LandingGear
+
+from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
@@ -42,6 +46,13 @@ class System(Component):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Aircraft
 # ----------------------------------------------------------------------------------------------------------------------
+
+class AircraftReferenceGeometry(eqx.Module):
+    
+    mean_aerodynamic_chord: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    projected_span: jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    aerodynamic_center: jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    center_of_gravity: jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
 class AircraftMassProperties(MassProperties):
 
@@ -71,6 +82,9 @@ class Aircraft(System):
     fuselages:      Component = eqx.field(default_factory=lambda: Component(tag='Fuselages'))
     nacelles:       Component = eqx.field(default_factory=lambda: Component(tag='Nacelles'))
     landing_gear:   Component = eqx.field(default_factory=lambda: Component(tag='Landing Gear'))
+
+    reference_geomety:  AircraftReferenceGeometry = eqx.field(default_factory=AircraftReferenceGeometry)
+    analysis_data:      dict = eqx.field(default_factory=dict)
 
     def add_subcomponent(
             self,

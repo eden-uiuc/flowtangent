@@ -78,10 +78,7 @@ class FreestreamConditions(Conditions):
     atmosphere:             eqx.Module | None   = None
 
     speed:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-
-    u:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    v:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    w:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    velocity_vector:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
     altitude:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
 

@@ -1,0 +1,545 @@
+# RCAIDE/Framework/Methods/Aerodynamics/make_VLM_Wings.py
+# (c) Copyright 2026 Aerospace Research Community LLC
+#
+# Created:  Jun 2021, A. Blaufox
+# Modified: Mar 2026, J. Smart
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Imports
+# ----------------------------------------------------------------------------------------------------------------------
+
+from typing import TYPE_CHECKING, Optional
+
+from dataclasses import dataclass
+
+# package imports
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+
+from jax import vmap
+
+# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
+if TYPE_CHECKING:
+    from RCAIDE.Framework.State import State
+    from RCAIDE.Framework.System import System, Aircraft
+    from RCAIDE.Framework.Settings import Settings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMSettings
+
+# package imports 
+from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords
+# from RCAIDE.Library.Components.Wings import All_Moving_Surface
+
+# ----------------------------------------------------------------------------------------------------------------------
+# VLM-Specific Data Structures
+# ----------------------------------------------------------------------------------------------------------------------
+
+class ControlSurfaceMetadata(eqx.Module):
+    parent_wing_index: int = eqx.field(static=True)
+    seg_a_index: int = eqx.field(static=True)
+    seg_b_index: int = eqx.field(static=True)
+    span_fraction_start: float = eqx.field(static=True)
+    span_fraction_end: float = eqx.field(static=True)
+    chord_fraction: float = eqx.field(static=True)
+    is_slat: bool = eqx.field(static=True)
+
+class VLMWingRecord(eqx.Module):
+    """ A fully differentiable container for the VLM solver. """
+    wing: eqx.Module  # The differentiable geometry!
+    
+    # Static VLM routing flags
+    is_a_control_surface: bool = eqx.field(static=True, default=False)
+    is_slat: bool = eqx.field(static=True, default=False)
+    cs_ID: int = eqx.field(static=True, default=-1)
+    
+    # Optional metadata (Only populated if this is a control surface)
+    cs_meta: Optional[ControlSurfaceMetadata] = eqx.field(static=True, default=None)
+    
+    # We will put the span_breaks in here next!
+    strip_eta_starts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    strip_eta_ends: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    strip_le_cs_ids: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    strip_te_cs_ids: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    strip_le_cuts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    strip_te_cuts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+
+class Interval(eqx.Module):
+    """ Represents a spanwise strip of the wing between two breaks. """
+    eta_start: jnp.ndarray
+    eta_end: jnp.ndarray
+    le_cs_id: int = -1  # -1 means no slat
+    te_cs_id: int = -1  # -1 means no flap/aileron
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Helper Functions
+# ----------------------------------------------------------------------------------------------------------------------
+
+def convert_to_segmented_wing(wing):
+    """ Returns a tuple of (root_segment, tip_segment) for unsegmented wings. """
+    
+    # If it already has segments, just return them as-is
+    if hasattr(wing, 'segments') and len(wing.segments) > 0:
+        return wing.segments
+  
+
+    # 1. Build Root Segment
+    root_sweeps = WingSweeps(
+        quarter_chord=wing.sweeps.quarter_chord,
+        leading_edge=wing.sweeps.leading_edge
+    )
+
+    root_segment = WingSegment(
+        tag='root_segment',
+        percent_span_location=0.0,
+        twist=wing.twists.root,
+        root_chord_percent=1.0,
+        dihedral_outboard=wing.dihedral,
+        sweeps=root_sweeps,
+        thickness_to_chord=wing.thickness_to_chord,
+        # We handle the 'chord' non-standard attribute later, or add it if your new Segment supports it
+    )
+    if hasattr(wing, 'airfoil') and wing.airfoil is not None:
+        root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, wing.airfoil)
+
+    # 2. Build Tip Segment
+    taper = wing.taper if wing.taper != 0 else wing.chords.tip / wing.chords.root
+    tip_chord = wing.chords.tip if wing.chords.tip != 0 else wing.chords.root * taper
+
+    tip_chords = WingChords(
+        tip=tip_chord
+    )
+
+    tip_sweeps = WingSweeps(
+        quarter_chord=0.0,
+        leading_edge=1e-8,
+    )
+
+    tip_segment = WingSegment(
+        tag='tip_segment',
+        percent_span_location=1.0,
+        twist=wing.twists.tip,
+        root_chord_percent=taper,
+        dihedral_outboard=0.0,
+        sweeps=tip_sweeps,
+        chords=tip_chords,
+        thickness_to_chord=wing.thickness_to_chord,
+    )
+    
+    if hasattr(wing, 'airfoil') and wing.airfoil is not None:
+        tip_segment = eqx.tree_at(lambda s: s.airfoil, tip_segment, wing.airfoil)
+
+    return (root_segment, tip_segment)
+
+def populate_control_sections(wing):
+    """
+    Evaluates wing control surfaces and maps them to specific wing segments based 
+    on spanwise boundaries. Slices control surfaces that span multiple segments.
+    """
+    # If the wing has no control surfaces, just return it as-is
+    if not hasattr(wing, 'control_surfaces') or not wing.control_surfaces:
+        return wing
+
+    new_segments = []
+    
+    # Iterate through the frozen segments
+    for i, seg in enumerate(wing.segments):
+        if i == 0:
+            # The root segment (index 0) cannot have control surfaces.
+            # We safely clear any existing ones.
+            new_seg = eqx.tree_at(lambda s: s.control_surfaces, seg, [])
+            new_segments.append(new_seg)
+            continue
+
+        prev_seg = wing.segments[i-1]
+        seg_start = prev_seg.percent_span_location
+        seg_end = seg.percent_span_location
+
+        seg_cs_list = []
+        
+        # Check every control surface against this segment's bounds
+        for cs in wing.control_surfaces:
+            cs_start = cs.span_fraction_start
+            cs_end = cs.span_fraction_end
+
+            # 1D Intersection Check: Overlap occurs if start is before seg_end AND end is after seg_start
+            if cs_start < seg_end and cs_end > seg_start:
+                
+                # Elegantly replaces the 8-case if/else block!
+                new_start = max(cs_start, seg_start)
+                new_end = min(cs_end, seg_end)
+                
+                # Calculate the proportional span of the sliced control surface
+                span_ratio = (new_end - new_start) / (cs_end - cs_start) if (cs_end - cs_start) > 0 else 0.0
+                new_span = cs.span * span_ratio
+                
+                # Create a new, frozen control surface with the updated bounds
+                new_cs = eqx.tree_at(
+                    lambda c: (c.span_fraction_start, c.span_fraction_end, c.span),
+                    cs,
+                    (new_start, new_end, new_span)
+                )
+                seg_cs_list.append(new_cs)
+                
+        # Attach the valid control surfaces to this segment
+        new_seg = eqx.tree_at(lambda s: s.control_surfaces, seg, seg_cs_list)
+        new_segments.append(new_seg)
+
+    # Return a new frozen wing with the updated tuple of segments
+    return eqx.tree_at(lambda w: w.segments, wing, tuple(new_segments))
+
+def convert_sweep_segments(old_sweep, root_chord_percent_a, root_chord_percent_b, 
+                           wing_root_chord, wingspan, old_ref=0.0, new_ref=0.25):
+    """ Differentiable pure math for sweep conversion. """
+    
+    # If references are the same, return early (using jnp.where is safer for JIT, 
+    # but since refs are usually static floats, a standard if-statement is fine here)
+    if old_ref == new_ref:
+        return old_sweep
+
+    root_chord = root_chord_percent_a * wing_root_chord
+    tip_chord  = root_chord_percent_b * wing_root_chord
+    taper      = tip_chord / root_chord
+    
+    chord_mean_geo = 0.5 * (root_chord + tip_chord)
+    ar = wingspan / chord_mean_geo  
+
+    # Convert to Leading Edge sweep
+    if old_ref == 0.0:
+        sweep_LE = old_sweep
+    else:
+        sweep_LE = jnp.arctan(jnp.tan(old_sweep) + 4 * old_ref * (1 - taper) / (ar * (1 + taper)))
+
+    # Convert from LE sweep to the desired reference
+    new_sweep = jnp.arctan(jnp.tan(sweep_LE) - 4 * new_ref * (1 - taper) / (ar * (1 + taper)))
+
+    return new_sweep
+
+def calculate_segment_offsets(wing):
+    """ 
+    Calculates the cumulative X and Y/Z offsets for wing segments.
+    Returns a new Wing PyTree with updated segment attributes. 
+    """
+    wingspan = wing.spans.projected if wing.symmetric else wing.spans.projected * 2
+    wing_halfspan = wing.spans.projected * 0.5 if wing.symmetric else wing.spans.projected
+
+    new_segments = []
+    current_x_offset = 0.0
+    current_dih_offset = 0.0
+
+    for i, seg in enumerate(wing.segments):
+        # Base case: Root segment has no offsets
+        if i == 0:
+            new_seg = eqx.tree_at(
+                lambda s: (s.chord, s.x_offset, s.dih_offset),
+                seg,
+                (seg.root_chord_percent * wing.chords.root, 0.0, 0.0)
+            )
+            new_segments.append(new_seg)
+            continue
+
+        prev_seg = wing.segments[i-1]
+
+        # 1. Sweep Conversion (Calculate LE sweep for the previous segment)
+        # We assume `sweeps.leading_edge` initializes to 0.0 if not defined
+        le_sweep = prev_seg.sweeps.leading_edge
+        if le_sweep == 0.0 or le_sweep is None:
+            le_sweep = convert_sweep_segments(
+                prev_seg.sweeps.quarter_chord,
+                prev_seg.root_chord_percent,
+                seg.root_chord_percent,
+                wing.chords.root,
+                wingspan,
+                old_ref=0.25, 
+                new_ref=0.0
+            )
+            
+            # Update the previous segment in our new list with the calculated LE sweep
+            new_segments[i-1] = eqx.tree_at(lambda s: s.sweeps.leading_edge, new_segments[i-1], le_sweep)
+
+        # 2. Cumulative Offsets
+        section_span = (seg.percent_span_location - prev_seg.percent_span_location) * wing_halfspan
+        current_x_offset = current_x_offset + section_span * jnp.tan(le_sweep)
+        current_dih_offset = current_dih_offset + section_span * jnp.tan(prev_seg.dihedral_outboard)
+
+        # 3. Update current segment
+        new_seg = eqx.tree_at(
+            lambda s: (s.chord, s.x_offset, s.dih_offset),
+            seg,
+            (seg.root_chord_percent * wing.chords.root, current_x_offset, current_dih_offset)
+        )
+        new_segments.append(new_seg)
+
+    # Standard VLM cap: force the absolute tip segment's LE sweep to ~0 to prevent singularities
+    new_segments[-1] = eqx.tree_at(lambda s: s.sweeps.leading_edge, new_segments[-1], 1e-8)
+
+    # Pack the tuple back into the Wing PyTree
+    return eqx.tree_at(lambda w: w.segments, wing, tuple(new_segments))
+
+def setup_cs_skeleton(cs, parent_wing_idx, seg_a_idx, seg_b_idx, parent_wing, cs_ID):
+    """ Builds the empty skeleton and metadata record in pure Python. """
+    
+    is_slat = "slat" in cs.tag.lower()
+    
+    # 1. Build the metadata map
+    cs_meta = ControlSurfaceMetadata(
+        parent_wing_index=parent_wing_idx,
+        seg_a_index=seg_a_idx,
+        seg_b_index=seg_b_idx,
+        span_fraction_start=cs.span_fraction_start,
+        span_fraction_end=cs.span_fraction_end,
+        chord_fraction=cs.chord_fraction,
+        is_slat=is_slat
+    )
+    
+    # 2. Spawn the Skeleton Wing (Floats don't matter here, they get overwritten in JAX!)
+    skeleton_wing = Wing(
+        tag=f"{parent_wing.tag}__cs_id_{cs_ID}",
+        symmetric=parent_wing.symmetric,
+        vertical=parent_wing.vertical,
+
+    )
+    
+    # Pack it into your VLMWingRecord
+    return VLMWingRecord(
+        wing=skeleton_wing,
+        is_a_control_surface=True,
+        cs_ID=cs_ID,
+        cs_meta=cs_meta # Attach the metadata!
+    )
+
+@jax.jit
+def calculate_cs_geometry(skeleton_wing, parent_wing, cs_meta: ControlSurfaceMetadata):
+    """ 
+    Takes the traced parent wing, calculates the CS geometry, 
+    and injects it into the skeleton. 
+    """
+    # 1. Unpack the exact segments this CS sits between
+    # (Because the indices are static, JAX can trace this perfectly)
+    seg_a = parent_wing.segments[cs_meta.seg_a_index]
+    seg_b = parent_wing.segments[cs_meta.seg_b_index]
+    
+    span_a = seg_a.percent_span_location
+    span_b = seg_b.percent_span_location
+    
+    cs_start = cs_meta.span_fraction_start
+    cs_end = cs_meta.span_fraction_end
+    
+    # 2. Differentiable Interpolations
+    # We use jnp.interp to safely interpolate along the segment bounds
+    xp = jnp.array([span_a, span_b])
+    
+    twist_root = jnp.interp(cs_start, xp, jnp.array([seg_a.twist, seg_b.twist]))
+    twist_tip  = jnp.interp(cs_end, xp, jnp.array([seg_a.twist, seg_b.twist]))
+    
+    local_chord_root = jnp.interp(cs_start, xp, jnp.array([seg_a.chord, seg_b.chord]))
+    local_chord_tip  = jnp.interp(cs_end, xp, jnp.array([seg_a.chord, seg_b.chord]))
+    
+    cs_root_chord = local_chord_root * cs_meta.chord_fraction
+    cs_tip_chord  = local_chord_tip * cs_meta.chord_fraction
+    
+    # Safe division for taper
+    taper = jnp.where(cs_root_chord != 0.0, cs_tip_chord / cs_root_chord, 0.0)
+    
+    # 3. Origin Offsets
+    wing_halfspan = jnp.where(parent_wing.symmetric, parent_wing.spans.projected * 0.5, parent_wing.spans.projected)
+    
+    # jax.lax.cond is safer than 'if' inside JIT for booleans that might become dynamic later, 
+    # but since is_slat is static, a standard Python if/else works here too.
+    le_te_offset = jnp.where(cs_meta.is_slat, 0.0, (1.0 - cs_meta.chord_fraction) * local_chord_root)
+    
+    x_off = jnp.interp(cs_start, xp, jnp.array([seg_a.x_offset, seg_b.x_offset]))
+    y_off = cs_start * wing_halfspan
+    z_off = jnp.interp(cs_start, xp, jnp.array([seg_a.dih_offset, seg_b.dih_offset]))
+    
+    new_origin = parent_wing.origin + jnp.array([[x_off + le_te_offset, y_off, z_off]])
+    
+    # 4. Inject back into the skeleton using eqx.tree_at!
+    updated_cs_wing = eqx.tree_at(
+        lambda w: (w.chords.root, w.chords.tip, w.twists.root, w.twists.tip, w.taper, w.origin),
+        skeleton_wing,
+        (cs_root_chord, cs_tip_chord, twist_root, twist_tip, taper, new_origin)
+    )
+    
+    return updated_cs_wing
+
+def generate_topological_span_breaks(wing):
+    """
+    Finds every unique spanwise slicing plane (from segments and control surfaces)
+    and builds non-overlapping spanwise intervals.
+    """
+    # 1. Collect all raw span fractions where a break occurs
+    raw_breaks = []
+    
+    # Add segment boundaries
+    for seg in wing.segments:
+        raw_breaks.append(seg.percent_span_location)
+        
+    # Add control surface boundaries
+    if hasattr(wing, 'control_surfaces'):
+        for cs in wing.control_surfaces:
+            raw_breaks.append(cs.span_fraction_start)
+            raw_breaks.append(cs.span_fraction_end)
+            
+    # 2. Sort and deduplicate (merge coincident breaks using a tight tolerance)
+    raw_breaks = jnp.array(raw_breaks)
+    raw_breaks = jnp.sort(raw_breaks)
+    
+    unique_breaks = [raw_breaks[0]]
+    for val in raw_breaks[1:]:
+        if val - unique_breaks[-1] > 1e-6: # 1e-6 tolerance for floating point overlaps
+            unique_breaks.append(val)
+            
+    # 3. Build the intervals and map the Control Surface IDs!
+    intervals = []
+    for i in range(len(unique_breaks) - 1):
+        eta_start = unique_breaks[i]
+        eta_end = unique_breaks[i+1]
+        midpoint = (eta_start + eta_end) / 2.0  # Use midpoint to check who lives here
+        
+        le_id = -1
+        te_id = -1
+        
+        # Check which control surfaces overlap this interval's midpoint
+        if hasattr(wing, 'control_surfaces'):
+            for cs_idx, cs in enumerate(wing.control_surfaces):
+                if cs.span_fraction_start < midpoint < cs.span_fraction_end:
+                    if "slat" in cs.tag.lower():
+                        le_id = cs_idx
+                    else:
+                        te_id = cs_idx
+                        
+        intervals.append(Interval(eta_start, eta_end, le_id, te_id))
+        
+    return intervals
+
+def make_VLM_wings(state: "State", system: "Aircraft", settings: "Settings"):
+    # unpack inputs
+    vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
+    discretize_cs = vlm_settings.discretize_control_surfaces
+        
+    # Reformat original wings to have at least 2 segments and additional values for processing later
+    vlm_records = []
+    updated_system = system
+    
+    for wing_idx, wing in enumerate(system.wings): #type: ignore
+        wing: Wing
+        if len(wing.segments) == 0:
+            # convert to preferred format for the panelization loop
+            new_segments = convert_to_segmented_wing(wing)
+            wing = eqx.tree_at(lambda w: w.segments, wing, new_segments)
+        else:
+            # TODO: Add support for All_Moving_Surface class
+            # if issubclass(wing.__class__, All_Moving_Surface): # these cases unsupported due to the way the panelization loop is structured at the moment
+            #     if not (wing.hinge_vector == jnp.array([0.,0.,0.])).all() and wing.use_constant_hinge_fraction: #type: ignore
+            #         raise ValueError("A hinge_vector is specified, but the surface is set to use a constant hinge fraction")
+            #     if len(wing.control_surfaces.subcomponents) > 0:
+            #         raise ValueError('Input: control surfaces are not supported on all-moving surfaces at this time')
+            for segment in wing.segments:
+                if len(segment.control_surfaces) > 0:
+                    raise ValueError(f"Found control surfaces on segment '{segment.tag}' of wing '{wing.tag}'. \
+                                     Control surfaces must be attributes of the wing itself.")
+        
+        valid_cs = [cs for cs in wing.control_surfaces if "slat" not in cs.tag.lower()]
+        wing = eqx.tree_at(lambda w: w.control_surfaces, wing, valid_cs)
+
+        wing = populate_control_sections(wing) if discretize_cs else wing
+        
+        wing = calculate_segment_offsets(wing)
+
+        intervals = generate_topological_span_breaks(wing)
+
+        le_cuts = []
+        te_cuts = []
+        for i in intervals:
+            # Default is no cut (0.0 to 1.0)
+            le_c = 0.0
+            te_c = 1.0
+            if i.le_cs_id != -1:
+                le_c = wing.control_surfaces[i.le_cs_id].root_chord_percent
+            if i.te_cs_id != -1:
+                te_c = 1.0 - wing.control_surfaces[i.te_cs_id].root_chord_percent
+            le_cuts.append(le_c)
+            te_cuts.append(te_c)
+
+        main_record = VLMWingRecord(
+            wing=wing,
+            strip_eta_starts=jnp.array([i.eta_start for i in intervals]),
+            strip_eta_ends=jnp.array([i.eta_end for i in intervals]),
+            strip_le_cs_ids=jnp.array([i.le_cs_id for i in intervals]),
+            strip_te_cs_ids=jnp.array([i.te_cs_id for i in intervals]),
+            strip_le_cuts=jnp.array(le_cuts),
+            strip_te_cuts=jnp.array(te_cuts)
+        )
+        vlm_records.append(main_record)
+
+        cs_ID = 0
+        for seg_idx, seg in enumerate(wing.segments):
+            if len(seg.control_surfaces) > 0:
+                for cs in seg.control_surfaces:
+                    seg_a_idx = seg_idx - 1
+                    seg_b_idx = seg_idx
+
+                    cs_record = setup_cs_skeleton(
+                        cs, 
+                        parent_wing_idx=wing_idx, 
+                        seg_a_idx=seg_a_idx, 
+                        seg_b_idx=seg_b_idx, 
+                        parent_wing=wing, 
+                        cs_ID=cs_ID
+                    )
+                    
+                    vlm_records.append(cs_record)
+                    cs_ID += 1
+        
+        from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
+        topology = VLMTopology.build_from_records(vlm_records, vlm_settings)
+        
+        updated_system  = eqx.tree_at(lambda s: (s.analysis_data['vlm_wings'], s.analysis_data['vlm_topology']), updated_system, (vlm_records, topology))
+
+    return state, updated_system, settings
+
+def update_wing_geometry(state: "State", system: "System", settings: "Settings"):
+    old_vlm_records = system.analysis_data["vlm_wings"]
+    ready_vlm_records = []
+    
+    updated_main_wings = []
+    main_wing_counter = 0
+
+    for record in old_vlm_records:
+        if not record.is_a_control_surface:
+            # 1. Pull the raw, differentiable wing from the global system
+            fresh_wing = system.wings[main_wing_counter]
+            
+            # 2. THE BRIDGE: Format it for the VLM dynamically so JAX can trace it!
+            if len(fresh_wing.segments) == 0:
+                new_segments = convert_to_segmented_wing(fresh_wing)
+                fresh_wing = eqx.tree_at(lambda w: w.segments, fresh_wing, new_segments)
+            
+            # 3. Calculate offsets using the bridged geometry
+            updated_wing = calculate_segment_offsets(fresh_wing)
+            
+            updated_main_wings.append(updated_wing)
+            ready_record = eqx.tree_at(lambda r: r.wing, record, updated_wing)
+            ready_vlm_records.append(ready_record)
+            
+            main_wing_counter += 1
+            
+        else:
+            # --- CONTROL SURFACES ---
+            parent_idx = record.cs_meta.parent_wing_index
+            parent_wing = updated_main_wings[parent_idx] #type: ignore
+            
+            updated_cs_wing = calculate_cs_geometry(record.wing, parent_wing, record.cs_meta)
+            
+            ready_record = eqx.tree_at(lambda r: r.wing, record, updated_cs_wing)
+            ready_vlm_records.append(ready_record)
+
+    # Pack the updated records back into the solver dictionary ONLY.
+    # We DO NOT overwrite system.wings, preserving the pristine global vehicle!
+    new_analysis_data = {
+        "vlm_wings": tuple(ready_vlm_records),
+        "vlm_topology": system.analysis_data["vlm_topology"]
+    }
+    current_system = eqx.tree_at(lambda s: s.analysis_data, system, new_analysis_data)
+
+    return state, current_system, settings

@@ -2,20 +2,19 @@
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
 # Created: Jul 2024, RCAIDE Team
+# Modified: Mar 2026, J.Smart
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 from functools import reduce
 
 # package imports
 import jax
-
-import equinox as eqx
-import numpy as np
 import jax.numpy as jnp
+import equinox as eqx
+
 
 import RCAIDE.Library.Components
 # RCAIDE imports
