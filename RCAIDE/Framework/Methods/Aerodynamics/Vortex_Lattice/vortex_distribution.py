@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 #  Data Structures
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class VortexDistribution(eqx.Module):
     """ 
     Differentiable float arrays containing the physical 3D mesh for the VLM.
@@ -44,15 +45,16 @@ class VortexDistribution(eqx.Module):
     panel_corner_b1: jnp.ndarray  # Top Right
     panel_corner_b2: jnp.ndarray  # Bottom Right
     
-    # --- Solver Metadata (total_panels) ---
+    # --- Solver Metadata ---
     is_leading_edge: jnp.ndarray
     is_trailing_edge: jnp.ndarray
     surface_id: jnp.ndarray
-    n_strips: int = eqx.field(static=True, default = 0)
+    total_strips: int = 0
 
 # ---------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------
+
 @jax.jit
 def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
     
@@ -74,15 +76,15 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
 
     all_surface_ids = []
 
-    
     for id_index, record in enumerate(vlm_wings):
         
         current_id = id_index + 1
         
         wing = record.wing
         
-        n_sw = vlm_vortex_settings.wing_spanwise_vortices
-        n_cw = vlm_vortex_settings.wing_chordwise_vortices
+        n_sw = record.n_sw
+        n_cw = record.n_cw
+        n_af_pts = record.n_af_pts
         
         # Determine spanwise spacing (Uniform or Cosine)
         span = jnp.where(wing.symmetric, wing.spans.projected / 2.0, wing.spans.projected)
@@ -91,14 +93,24 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         seg_y = seg_etas * span
         
         seg_chords = jnp.array([seg.chords.root for seg in wing.segments])
-
-        seg_camber_xs = jnp.array([seg.airfoil.x_lower_surface for seg in wing.segments])
-        seg_camber_zs = jnp.array([seg.airfoil.camber for seg in wing.segments])
-
         seg_twists = jnp.array([seg.twist for seg in wing.segments])
+
+        camber_xs = []
+        camber_zs = []
+
+        for seg in wing.segments:
+            if hasattr(seg, 'airfoil') and seg.airfoil is not None:
+                camber_xs.append(seg.airfoil.x_lower_surface)
+                camber_zs.append(seg.airfoil.camber)
+            else:
+                camber_xs.append(jnp.linspace(0., 1., n_af_pts))
+                camber_zs.append(jnp.zeros((n_af_pts)))
+
+        seg_camber_xs = jnp.array(camber_xs)
+        seg_camber_zs = jnp.array(camber_zs)
+
         seg_x_off = record.segment_x_offsets
         seg_z_off = record.segment_z_offsets
-
 
         if vlm_vortex_settings.spanwise_cosine_spacing:
             # Cosine spacing: clusters panels near the tips and roots
@@ -199,7 +211,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
 
             # Control Surface Rescaling (Evaluated at JAX Trace time)
             if record.is_a_control_surface:
-                cf = record.chord_fraction
+                cf = record.cs_meta.chord_fraction
                 if not record.is_slat:
                     # Shift the window to the trailing edge
                     camber_x_a = camber_x_a - (1.0 - cf)

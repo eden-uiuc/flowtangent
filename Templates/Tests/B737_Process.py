@@ -664,7 +664,7 @@ def vehicle_setup():
     return vehicle
 
 
-def mission_setup(state, system, settings: "Settings"):
+def mission_setup(state: "State", system: "System", settings: "Settings"):
 
     controls = (
         DirectControlVariable(
@@ -677,15 +677,7 @@ def mission_setup(state, system, settings: "Settings"):
             path=("frames", "body", "thrust_force_vector",),
             active=True
         ))
-    
-    aero_vortices = VLMVortices(
-        number_of_chordwise_vortices=2,
-        number_of_spanwise_vortices=5
-    )
-    
-    aero_settings = VLMSettings(
-        vortices=aero_vortices
-    )
+    aero_settings = VLMSettings()
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
@@ -712,11 +704,11 @@ def mission_setup(state, system, settings: "Settings"):
     final_segments = []
     for segment in mission.steps:
         aero_analysis = VLM()
-        seg_w_analyis = eqx.tree_at(lambda s:s.analyze.aerodynamics, segment, aero_analysis)
+        seg_w_analysis = eqx.tree_at(lambda s: s.analyze.aerodynamics, segment, aero_analysis)
         
         aero_init = InitializeVLM()
         updated_init_steps = segment.initialize.steps + (aero_init,)
-        final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analyis, updated_init_steps)
+        final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analysis, updated_init_steps)
         
         final_segments.append(final_seg)
 

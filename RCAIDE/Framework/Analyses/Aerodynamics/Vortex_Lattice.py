@@ -82,6 +82,7 @@ class Training(eqx.Module):
     roll_rate:              jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
     yaw_rate:               jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
 
+
 class VLMVortices(eqx.Module):
     # General Settings
     spanwise_cosine_spacing: bool   = eqx.field(static=True, default=True)
@@ -90,51 +91,45 @@ class VLMVortices(eqx.Module):
     verbose: bool                   = eqx.field(static=True, default=False)
     
     # Discretization Inputs (Optional, so the user can choose which to define)
-    number_of_spanwise_vortices:    int = eqx.field(static=True, default=10)
-    number_of_chordwise_vortices:   int = eqx.field(static=True, default=10)
+    number_of_spanwise_vortices:    int = eqx.field(static=True, default=5)
+    number_of_chordwise_vortices:   int = eqx.field(static=True, default=2)
     
-    wing_spanwise_vortices:         Optional[int] = None
-    wing_chordwise_vortices:        Optional[int] = None
-    fuselage_spanwise_vortices:     Optional[int] = None
-    fuselage_chordwise_vortices:    Optional[int] = None
+    wing_spanwise_vortices:         Optional[int] = eqx.field(static=True, default=None)
+    wing_chordwise_vortices:        Optional[int] = eqx.field(static=True, default=None)
+    fuselage_spanwise_vortices:     Optional[int] = eqx.field(static=True, default=None)
+    fuselage_chordwise_vortices:    Optional[int] = eqx.field(static=True, default=None)
 
     def __post_init__(self):
         """Validates discretization inputs and resolves global vs separate routing."""
-        
-        # 1. Unpack for readability
-        n_sw_global = self.number_of_spanwise_vortices
-        n_cw_global = self.number_of_chordwise_vortices
-        n_sw_wing   = self.wing_spanwise_vortices
-        n_cw_wing   = self.wing_chordwise_vortices
-        n_sw_fuse   = self.fuselage_spanwise_vortices
-        n_cw_fuse   = self.fuselage_chordwise_vortices
 
-        # 2. Run the validation checks
-        invalid_global_n   = bool(n_sw_global) != bool(n_cw_global) 
-        invalid_wing_n     = bool(n_sw_wing)   != bool(n_cw_wing)
-        invalid_fuse_n     = bool(n_sw_fuse)   != bool(n_cw_fuse)
-        invalid_separate_n = bool(n_sw_wing)   != bool(n_sw_fuse)
+        # Check if the user explicitly provided separate definitions
+        separate_provided = any([
+            self.wing_spanwise_vortices is not None,
+            self.wing_chordwise_vortices is not None,
+            self.fuselage_spanwise_vortices is not None,
+            self.fuselage_chordwise_vortices is not None
+        ])
 
-        if invalid_global_n:
-            raise ValueError('If using global surface discretization, both n_sw and n_cw must be defined')
-        elif invalid_wing_n or invalid_fuse_n:
-            raise ValueError('If using separate surface discretization, all n_sw and n_cw values must be defined')
-        elif invalid_separate_n:
-            raise ValueError('If using separate surface discretization, both wing and fuselage discretization must be defined')
+        if separate_provided:
+            # 1. Validate that ALL separate variables were provided
+            missing_separate = any(x is None for x in [
+                self.wing_spanwise_vortices, self.wing_chordwise_vortices,
+                self.fuselage_spanwise_vortices, self.fuselage_chordwise_vortices
+            ])
+            if missing_separate:
+                raise ValueError('If using separate surface discretization, all n_sw and n_cw values must be defined.')
 
-        # 3. Check for conflicting inputs
-        global_n_defined   = bool(n_sw_global) 
-        separate_n_defined = bool(n_sw_wing)
+        else:
+            # 2. User didn't provide separate settings, so we fallback to the global defaults
+            if not self.number_of_spanwise_vortices or not self.number_of_chordwise_vortices:
+                raise ValueError('If using global surface discretization, both n_sw and n_cw must be defined.')
 
-        if global_n_defined == separate_n_defined:
-            raise ValueError('Specify either global or separate discretization, not both')
+            # Route the global settings to the specific component fields
+            object.__setattr__(self, 'wing_spanwise_vortices', self.number_of_spanwise_vortices)
+            object.__setattr__(self, 'wing_chordwise_vortices', self.number_of_chordwise_vortices)
+            object.__setattr__(self, 'fuselage_spanwise_vortices', self.number_of_spanwise_vortices)
+            object.__setattr__(self, 'fuselage_chordwise_vortices', self.number_of_chordwise_vortices)
 
-        # 4. Route global settings to specific components using the bypass
-        if global_n_defined:
-            object.__setattr__(self, 'wing_spanwise_vortices', n_sw_global)
-            object.__setattr__(self, 'wing_chordwise_vortices', n_cw_global)
-            object.__setattr__(self, 'fuselage_spanwise_vortices', n_sw_global)
-            object.__setattr__(self, 'fuselage_chordwise_vortices', n_cw_global)
 
 class VLMTopology(eqx.Module):
     """ Static topological mapping for the VLM mesh. Gradients do NOT flow here. """
@@ -233,6 +228,7 @@ def _default_VLM_init_steps():
         ProcessStep(discretize_wings, "Discretize VLM Wings"),
         ProcessStep(generate_full_vortex_distribution, "Generate Wing Vortices"),
     )
+
 
 class InitializeVLM(Process):
     
