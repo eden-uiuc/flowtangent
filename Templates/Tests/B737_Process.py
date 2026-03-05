@@ -14,10 +14,10 @@ import jax.numpy as jnp
 
 from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
-from RCAIDE.Framework.Missions.Segments import Segment, TestCSACruise
+from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Segments.Profiles import ConstantSpeed, ConstantAltitude, FixedDistance
 from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics import TestAero
+from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VLM, VLMSettings, VLMVortices, InitializeVLM
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data
@@ -143,7 +143,7 @@ def vehicle_setup():
         span_fraction_start    = 0.2,
         span_fraction_end      = 0.963,
         deflection             = 0.0,
-        chord_fraction         = 0.075,
+        root_chord_percent     = 0.075,
         hinge_fraction         = 1.0,
     )
 
@@ -153,7 +153,7 @@ def vehicle_setup():
         span_fraction_end      = 0.7,
         deflection             = 0.0,
         configuration_type     = 'double_slotted',
-        chord_fraction         = 0.30,
+        root_chord_percent     = 0.30,
     )
 
     aileron = WingControlSurface(
@@ -161,7 +161,7 @@ def vehicle_setup():
         span_fraction_start = 0.7,
         span_fraction_end   = 0.963,
         deflection          = 0.0,
-        chord_fraction      = 0.16,
+        root_chord_percent  = 0.16,
         sign_duplicate      = -1.0,
     )
 
@@ -245,7 +245,7 @@ def vehicle_setup():
         span_fraction_start   = 0.09,
         span_fraction_end     = 0.92,
         deflection            = 0.0,
-        chord_fraction        = 0.3,
+        root_chord_percent        = 0.3,
 
     )
     
@@ -668,17 +668,26 @@ def mission_setup(state, system, settings: "Settings"):
 
     controls = (
         DirectControlVariable(
-            tag='Lift Coefficient',
-            path=("aerodynamics", "coefficients", "lift", "total"),
-            path_indices=(slice(None), 0),
+            tag='angle_of_attack',
+            path=("aerodynamics", "angles", "alpha"),
             active=True
         ),
         DirectControlVariable(
-            tag='Drag Coefficient',
-            path=("aerodynamics", "coefficients", "drag", "total"),
-            path_indices=(slice(None), 0),
+            tag='Thrust',
+            path=("frames", "body", "thrust_force_vector",),
             active=True
         ))
+    
+    aero_vortices = VLMVortices(
+        number_of_chordwise_vortices=2,
+        number_of_spanwise_vortices=5
+    )
+    
+    aero_settings = VLMSettings(
+        vortices=aero_vortices
+    )
+
+    updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
     cruise_segment = Segment(
         tag="Cruise Segment",
@@ -702,11 +711,16 @@ def mission_setup(state, system, settings: "Settings"):
 
     final_segments = []
     for segment in mission.steps:
-        aero_analysis = TestAero()
+        aero_analysis = VLM()
         seg_w_analyis = eqx.tree_at(lambda s:s.analyze.aerodynamics, segment, aero_analysis)
-        final_segments.append(seg_w_analyis)
+        
+        aero_init = InitializeVLM()
+        updated_init_steps = segment.initialize.steps + (aero_init,)
+        final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analyis, updated_init_steps)
+        
+        final_segments.append(final_seg)
 
-    return eqx.tree_at(lambda m:m.steps, mission, tuple(final_segments))
+    return eqx.tree_at(lambda m:m.steps, mission, tuple(final_segments)), updated_settings
 
 
 def state_setup():
@@ -725,9 +739,9 @@ def state_setup():
 def mission_b737(state, system, settings):
 
 
-    mission = mission_setup(state, system, settings)
+    mission, updated_settings = mission_setup(state, system, settings)
 
-    final_state, final_system, final_settings = mission.run(state, system, settings)
+    final_state, final_system, final_settings = mission.run(state, system, updated_settings)
 
     return final_state, final_system, final_settings
 
@@ -740,8 +754,8 @@ if __name__ == '__main__':
 
     final_state, _, _ = mission_b737(state, system, settings)
         
-    print(f"C_L: {final_state.aerodynamics.coefficients.lift.total[0][0]:.3f}")
-    print(f"C_D: {final_state.aerodynamics.coefficients.drag.total[0][0]:.3f}")
+    print(f"AoA: {final_state.aerodynamics.angles.alpha}")
+    print(f"Thrust: {final_state.frames.body.thrust_force_vector[:, 0]}")
 
     # def CL_M(total_mass, state, system, settings):
     #     # Setup Phase (Pure Python, executes every time)

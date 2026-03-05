@@ -60,6 +60,7 @@ class AltitudeChange(ProcessStep):
 PositionProfile = ConstantAltitude | AltitudeChange
 
 # Speed Profiles
+# TODO: Add sideslip calculation and/or depricate in favor of full 6-DOF
 
 class ConstantSpeed(ProcessStep):
 

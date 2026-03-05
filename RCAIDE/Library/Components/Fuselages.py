@@ -26,7 +26,6 @@ class FuselageHeights(ComponentDimensions):
     at_wing_root_quarter_chord: float       = 0.0
     at_vertical_root_quarter_chord: float   = 0.0
 
-
 class FuselageLengths(ComponentDimensions):
 
     nose: float                 = 0.0
@@ -35,7 +34,6 @@ class FuselageLengths(ComponentDimensions):
     fore_space: float           = 0.0
     aft_space: float            = 0.0
     ordinal_direction: bool     = eqx.field(static=True, default=True)
-
 
 class FuselageSegment(Component):
 

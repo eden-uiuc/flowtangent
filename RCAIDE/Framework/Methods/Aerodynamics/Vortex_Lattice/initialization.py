@@ -15,10 +15,9 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.System import System, Aircraft, AircraftReferenceGeometry
     from RCAIDE.Framework.Settings import Settings
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
@@ -27,13 +26,13 @@ from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
 # ---------------------------------------------------------
 # Geometry Initialization
 # ---------------------------------------------------------
-def initialize_VLM_geometry(state: "State", system: "System", settings: "Settings"):
+def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Parses the vehicle geometry to find the primary reference parameters 
     and packs them into JAX arrays for the VLM solver.
     """
     
-    # 1. Standard Python Control Flow (Safe outside of @jax.jit)
+    # Standard Python Control Flow (Safe outside of @jax.jit)
     wings = system.wings
     
     if hasattr(wings, 'main_wing'):
@@ -72,13 +71,30 @@ def initialize_VLM_geometry(state: "State", system: "System", settings: "Setting
     # 3. Pack into strict JAX arrays
     # We use jnp.atleast_1d and explicit array shapes to match your jnp.empty structures
     new_ref_geom = system.reference_geometry.__class__(
-        mean_aerodynamic_chord = jnp.atleast_1d(c_bar),
-        projected_span         = jnp.atleast_1d(b_ref),
-        aerodynamic_center     = jnp.array([[x_mac, 0.0, z_mac]]),
-        center_of_gravity      = jnp.array([[x_m,   0.0, z_m]])
+        mean_aerodynamic_chord = jnp.atleast_1d(c_bar), #type: ignore
+        projected_span         = jnp.atleast_1d(b_ref), #type: ignore
+        aerodynamic_center     = jnp.array([[x_mac, 0.0, z_mac]]), #type: ignore
+        center_of_gravity      = jnp.array([[x_m,   0.0, z_m]]) #type: ignore
     )
 
-    # 4. Inject back into the System PyTree
-    system = eqx.tree_at(lambda s: s.reference_geometry, system, new_ref_geom)
-
-    return state, system, settings
+    # Add analysis data keys
+    initial_analysis_data = {
+            "vlm_wings": tuple(),
+            "vlm_topology": None,
+            "vortex_distribution": None,
+            "induced_wake": None,
+            "boundary_conditions": None,
+            "relative_velocity": None,
+            "AICs": None,
+            "singularities": None,
+            "vortex_strengths": None,
+            "pressure_coefficients": None,
+            "VORLAX_EW_Matrix": None,
+        }
+        
+    updated_system = eqx.tree_at(
+        lambda s: (s.reference_geometry, s.analysis_data), 
+        system, 
+        (new_ref_geom, initial_analysis_data)
+    )
+    return state, updated_system, settings

@@ -8,8 +8,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-
 from typing import Callable, Optional
 
 # package imports
@@ -17,9 +15,16 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Framework import Process, ProcessStep
-from RCAIDE.Framework.Methods.Aerodynamics.VLM import *
 from RCAIDE.Library import Units
+
+from RCAIDE.Framework import Process, ProcessStep
+
+from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice import (check_freestream,
+                                                                  compute_coefficients, compute_induced_velocity, 
+                                                                  compute_panel_pressures, compute_vlm_rhs, 
+                                                                  compute_vortex_strength, update_wing_geometry,
+                                                                  initialize_VLM_geometry, discretize_wings,
+                                                                  generate_full_vortex_distribution)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings
@@ -38,7 +43,6 @@ class SupersonicSettings(eqx.Module):
     cross_sectional_area_calculation_type:  str = eqx.field(static=True, default='Fixed')
     wave_drag_type:                         str = eqx.field(static=True, default='Raymer')
 
-
 class CorrectionFactors(eqx.Module):
 
     fuselage_lift: float = 1.14
@@ -48,23 +52,20 @@ class CorrectionFactors(eqx.Module):
     lift_to_drag: float = 0.0
     CL_max: float = 1.0
 
-
 class EfficiencyFactors(eqx.Module):
 
     span: float = 1.0
     oswald: float = 1.0
-
 
 class ParasiteDragFormFactors(eqx.Module):
 
     wing: float = 1.1
     fuselage: float = 2.3
 
-
 class Training(eqx.Module):
 
-    angle_of_attack:        jnp.ndarray  = eqx.field(default_factory=jnp.linspace(-5. * Units.deg, 15.* Units.deg, 40))
-    Mach:                   jnp.ndarray  = eqx.field(default_factory=jnp.linspace(0., 0.85, 20))
+    angle_of_attack:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(-5. * Units.deg, 15.* Units.deg, 40))
+    Mach:                   jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0., 0.85, 20))
 
     sideslip_angle:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
     aileron_deflection:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
@@ -81,22 +82,21 @@ class Training(eqx.Module):
     roll_rate:              jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
     yaw_rate:               jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
 
-
 class VLMVortices(eqx.Module):
     # General Settings
-    spanwise_cosine_spacing: bool = True
-    model_fuselage: bool = False
-    floating_point_precision: str = "float64"
-    verbose: bool = False
+    spanwise_cosine_spacing: bool   = eqx.field(static=True, default=True)
+    model_fuselage: bool            = eqx.field(static=True, default=False)
+    floating_point_precision: str   = eqx.field(static=True, default="float64")
+    verbose: bool                   = eqx.field(static=True, default=False)
     
     # Discretization Inputs (Optional, so the user can choose which to define)
-    number_of_spanwise_vortices: Optional[int] = None
-    number_of_chordwise_vortices: Optional[int] = None
+    number_of_spanwise_vortices:    int = eqx.field(static=True, default=10)
+    number_of_chordwise_vortices:   int = eqx.field(static=True, default=10)
     
-    wing_spanwise_vortices: Optional[int] = None
-    wing_chordwise_vortices: Optional[int] = None
-    fuselage_spanwise_vortices: Optional[int] = None
-    fuselage_chordwise_vortices: Optional[int] = None
+    wing_spanwise_vortices:         Optional[int] = None
+    wing_chordwise_vortices:        Optional[int] = None
+    fuselage_spanwise_vortices:     Optional[int] = None
+    fuselage_chordwise_vortices:    Optional[int] = None
 
     def __post_init__(self):
         """Validates discretization inputs and resolves global vs separate routing."""
@@ -140,16 +140,16 @@ class VLMTopology(eqx.Module):
     """ Static topological mapping for the VLM mesh. Gradients do NOT flow here. """
     
     # Global Counters
-    total_panels: int = eqx.field(static=True)
-    total_wings: int = eqx.field(static=True)
+    total_panels: int = eqx.field(static=True, default=100)
+    total_wings: int = eqx.field(static=True, default=1)
     
     # 1D Integer/Boolean Arrays (Length = total_panels)
-    surface_ID: jnp.ndarray       # Maps panel 'i' to wing 'j'
-    is_leading_edge: jnp.ndarray  # True if panel 'i' is at the leading edge
-    is_trailing_edge: jnp.ndarray # True if panel 'i' is at the trailing edge
+    surface_ID: jnp.ndarray       = eqx.field(default_factory = lambda: jnp.empty(0))# Maps panel 'i' to wing 'j'
+    is_leading_edge: jnp.ndarray  = eqx.field(default_factory = lambda: jnp.empty(0))# True if panel 'i' is at the leading edge
+    is_trailing_edge: jnp.ndarray = eqx.field(default_factory = lambda: jnp.empty(0))# True if panel 'i' is at the trailing edge
     
     # Slicing Helpers 
-    surface_breaks: jnp.ndarray   # The starting panel index for each wing
+    surface_breaks: jnp.ndarray = eqx.field(default_factory = lambda: jnp.empty(0))   # The starting panel index for each wing
 
     @classmethod
     def build_from_records(cls, vlm_records_list, settings):
@@ -172,8 +172,8 @@ class VLMTopology(eqx.Module):
             # --- Discretization Logic ---
             # NOTE: If we are using span_breaks to distribute panels proportionally, 
             # that calculation goes here! For now, we use the global settings.
-            n_sw = settings.wing_spanwise_vortices
-            n_cw = settings.wing_chordwise_vortices
+            n_sw = settings.vortices.wing_spanwise_vortices
+            n_cw = settings.vortices.wing_chordwise_vortices
             n_panels = n_sw * n_cw
             
             # Map every panel in this grid to the current wing/surface ID
@@ -201,9 +201,7 @@ class VLMTopology(eqx.Module):
             surface_breaks=jnp.array(surface_breaks_list, dtype=jnp.int32)
         )
 
-class VLMSettings(eqx.Module):
-
-    
+class VLMSettings(eqx.Module): 
 
     model_fuselage:                 bool    = eqx.field(static=True, default=False)
     trim_aircraft:                  bool    = eqx.field(static=True, default=False)
@@ -211,6 +209,7 @@ class VLMSettings(eqx.Module):
     discretize_control_surfaces:    bool    = eqx.field(static=True, default=True)
     recalculate_total_wetted_area:  bool    = eqx.field(static=True, default=False)
     model_propeller_wake:           bool    = eqx.field(static=True, default=False)
+    VORLAX_empirical_corrections:   bool    = eqx.field(static=True, default=False)
 
     CL_max:                         float   = jnp.inf
     CD_increment:                   float   = 0.0
@@ -223,7 +222,7 @@ class VLMSettings(eqx.Module):
     training:       Training                = eqx.field(default_factory=Training)
     
     topology:       VLMTopology             = eqx.field(default_factory=VLMTopology)
-    vortices:       VLMVortices                = eqx.field(default_factory=VLMVortices)
+    vortices:       VLMVortices             = eqx.field(default_factory=VLMVortices)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
@@ -231,14 +230,14 @@ class VLMSettings(eqx.Module):
 def _default_VLM_init_steps():
     return(
         ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
-        ProcessStep(make_VLM_wings, "Discretize VLM Wings"),
-        ProcessStep(generate_wing_vortex_distribution, "Generate Wing Vortices"),
-        
+        ProcessStep(discretize_wings, "Discretize VLM Wings"),
+        ProcessStep(generate_full_vortex_distribution, "Generate Wing Vortices"),
     )
 
 class InitializeVLM(Process):
     
     tag: str = eqx.field(static=True, default="Initialize Aerodynamics Analysis")
+    steps: tuple = eqx.field(default_factory=_default_VLM_init_steps)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -249,6 +248,11 @@ def _default_VLM_steps():
     return(
         ProcessStep(check_freestream, "Check Freestream"),
         ProcessStep(update_wing_geometry, "Update Wing Geometry"), # Updates System for shape optimization
+        ProcessStep(compute_vlm_rhs, "Calculate Boundary Conditions"),
+        ProcessStep(compute_induced_velocity, "Calculate AICs"),
+        ProcessStep(compute_vortex_strength, "Compute Vortex Strength"),
+        ProcessStep(compute_panel_pressures, "Compute Pressure Coefficients"),
+        ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients")
     )
 
 class VLM(Process):

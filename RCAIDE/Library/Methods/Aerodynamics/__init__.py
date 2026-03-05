@@ -1,0 +1,2 @@
+from .Test_Aero.test_aero import direct_aero
+from .Vortex_Lattice.check_freestream import check_freestream_stateful as check_freestream

@@ -21,8 +21,6 @@ from RCAIDE.Library.Attributes import AircraftClass, MediumRange
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components import Wing, Fuselage, Nacelle, LandingGear
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
-
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
 # ----------------------------------------------------------------------------------------------------------------------
@@ -83,7 +81,7 @@ class Aircraft(System):
     nacelles:       Component = eqx.field(default_factory=lambda: Component(tag='Nacelles'))
     landing_gear:   Component = eqx.field(default_factory=lambda: Component(tag='Landing Gear'))
 
-    reference_geomety:  AircraftReferenceGeometry = eqx.field(default_factory=AircraftReferenceGeometry)
+    reference_geometry:  AircraftReferenceGeometry = eqx.field(default_factory=AircraftReferenceGeometry)
     analysis_data:      dict = eqx.field(default_factory=dict)
 
     def add_subcomponent(

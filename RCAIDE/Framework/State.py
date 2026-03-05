@@ -7,7 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-
+from typing import TYPE_CHECKING
 from functools import reduce
 
 # package imports
@@ -15,12 +15,15 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
+if TYPE_CHECKING:
+    from RCAIDE.Framework import System
+    from RCAIDE.Library import Component
 
 import RCAIDE.Library.Components
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import (
     Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
-    AerodynamicsConditions, ControlsConditions, DynamicsConditions)
+    AerodynamicsConditions, StabilityConditions, ControlsConditions, DynamicsConditions)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  State
@@ -40,6 +43,7 @@ class State(Conditions):
     mass:               MassConditions              = eqx.field(default_factory=MassConditions)
     energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
     aerodynamics:       AerodynamicsConditions      = eqx.field(default_factory=AerodynamicsConditions)
+    stability:          StabilityConditions         = eqx.field(default_factory=StabilityConditions)
 
     controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
     dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
@@ -117,7 +121,7 @@ class State(Conditions):
 
         return eqx.tree_at(lambda s: s.residuals, self, stacked_residuals)
 
-    #TODO: Update this to use Equinox methods
+    # TODO: Update this to use Equinox methods
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
         if verbose:
             print(f"Building controls from {system.tag}...")
@@ -127,15 +131,15 @@ class State(Conditions):
             if system.is_control_component:
                 if isinstance(component, RCAIDE.Library.Components.Wing):
                     self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.SurfaceControlVariable(
+                        RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
                             tag=component.tag + "_deflection",
-                            surfaces=[system],
+                            surfaces=(system,),
                         )
                     )
 
                 else:
                     self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.ControlVariable(
+                        RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
                             tag=component.tag
                         )
                     )

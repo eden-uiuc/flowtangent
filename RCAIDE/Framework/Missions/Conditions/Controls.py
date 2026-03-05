@@ -134,7 +134,7 @@ class DirectControlVariable(ControlVariable):
     tag:            str                     = eqx.field(static=True, default='Direct Control Variable')
 
     path:           tuple[str, ...] |None   = eqx.field(static=True, default_factory=tuple)
-    path_indices:   tuple | None            = eqx.field(static=True, default_factory=tuple)
+    path_indices:   tuple | None            = eqx.field(static=True, default_factory=lambda: (slice(None), 0))
 
 
 class SurfaceControlVariable(ControlVariable):

@@ -32,10 +32,13 @@ class Airfoil(Component):
     camber:             float = 0.0
 
     coordinates:        jnp.ndarray = eqx.field(default_factory=jnp.empty((0, 2)))
+    
     x_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
     y_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
+    
     x_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
     x_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    
     y_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
     y_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
 

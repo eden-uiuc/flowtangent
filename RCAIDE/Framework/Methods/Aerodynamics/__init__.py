@@ -1,2 +1,2 @@
 from . import Test_Aero
-from . import VLM
+from . import Vortex_Lattice

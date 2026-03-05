@@ -292,14 +292,14 @@ if __name__ == "__main__":
         return state, system, settings
 
     square_and_add = Process(
-        steps=[fw_sq_func, fw_add_func],
+        steps=(ProcessStep(function=fw_sq_func), ProcessStep(function=fw_add_func)),
         initial_step=0
     )
 
     def sq_add_func(x, y):
         square_and_add.initial_state.x = x
         square_and_add.initial_state.y = y
-        st, set, sys = square_and_add.run()
+        st, set, sys = square_and_add.run(State(), System(), Settings())
         return st.x
 
     from jax import value_and_grad

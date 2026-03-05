@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 import equinox as eqx
 
-from RCAIDE.Library import Component, ComponentDimensions
+from RCAIDE.Library import Component, ComponentDimensions, ComponentAreas
 from RCAIDE.Library.Components.Airfoils import Airfoil
 
 
@@ -61,7 +61,7 @@ class WingControlSurface(Component):
     span_fraction_end: float    = 0.0
 
     hinge_fraction: float       = 0.0
-    chord_fraction: float       = 0.0
+    root_chord_percent: float   = 0.0
 
     sign_duplicate: float       = 1.0
     deflection: float           = 0.0
@@ -100,12 +100,12 @@ class Wing(Component):
 
     aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0,3)))
 
-    spans:  WingDimensions  = eqx.field(default_factory=WingDimensions(ordinal_direction=True))
+    spans:  WingDimensions  = eqx.field(default_factory=lambda: WingDimensions(ordinal_direction=True))
     twists: WingDimensions  = eqx.field(default_factory=WingDimensions)
     chords: WingChords      = eqx.field(default_factory=WingDimensions)
     sweeps: WingSweeps      = eqx.field(default_factory=WingSweeps)
 
-    #TODO: Update these methods to be functional
+    # TODO: Update these methods to be functional
     def _update_segment_properties(self, update_areas=False):
 
         exposed_root_chord_offset = self.exposed_root_chord_offset
@@ -155,7 +155,7 @@ class Wing(Component):
                 segment.chords                  = WingDimensions()
                 segment.chords.mean_aerodynamic = mac_seg
 
-                segment.areas                   = rcl.ComponentAreas()
+                segment.areas                   = ComponentAreas()
                 segment.areas.reference         = Sref_seg
                 segment.areas.exposed           = S_exposed_seg
                 segment.areas.wetted            = Swet_seg
@@ -318,7 +318,7 @@ class Wing(Component):
         self._update_segment_properties()
 
         def add_subcomponent(self,
-                         subcomponent: ComponentType,
+                         subcomponent: Component,
                          sum_mass=False,
                          sum_center_of_gravity=False,
                          sum_moments_of_inertia=False
@@ -329,4 +329,4 @@ class Wing(Component):
             elif isinstance(subcomponent, WingControlSurface):
                 setattr(self.control_surfaces, subcomponent.get_field_name(), subcomponent)
 
-            super().add_subcomponent(subcomponent, sum_mass, sum_center_of_gravity, sum_moments_of_inertia)
+            super().add_subcomponent(subcomponent)

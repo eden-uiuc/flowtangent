@@ -24,10 +24,10 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import System, Aircraft
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
 # package imports 
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords
+from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords, WingControlSurface
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -47,6 +47,13 @@ class VLMWingRecord(eqx.Module):
     """ A fully differentiable container for the VLM solver. """
     wing: eqx.Module  # The differentiable geometry!
     
+    # Number of Spanwise/Chordwise Panels
+    n_sw: int = eqx.field(static=True, default=10)
+    n_cw: int = eqx.field(static=True, default=10)
+
+    segment_x_offsets: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    segment_z_offsets: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+
     # Static VLM routing flags
     is_a_control_surface: bool = eqx.field(static=True, default=False)
     is_slat: bool = eqx.field(static=True, default=False)
@@ -55,13 +62,13 @@ class VLMWingRecord(eqx.Module):
     # Optional metadata (Only populated if this is a control surface)
     cs_meta: Optional[ControlSurfaceMetadata] = eqx.field(static=True, default=None)
     
-    # We will put the span_breaks in here next!
-    strip_eta_starts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    strip_eta_ends: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    strip_le_cs_ids: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    strip_te_cs_ids: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    strip_le_cuts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
-    strip_te_cuts: jnp.ndarray = eqx.field(static=True, default_factory=jnp.empty(0))
+    # Span break data
+    strip_eta_starts: jnp.ndarray   = eqx.field(default_factory=lambda: jnp.empty(0))
+    strip_eta_ends: jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
+    strip_le_cs_ids: jnp.ndarray    = eqx.field(default_factory=lambda: jnp.empty(0))
+    strip_te_cs_ids: jnp.ndarray    = eqx.field(default_factory=lambda: jnp.empty(0))
+    strip_le_cuts: jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
+    strip_te_cuts: jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
 
 class Interval(eqx.Module):
     """ Represents a spanwise strip of the wing between two breaks. """
@@ -96,7 +103,6 @@ def convert_to_segmented_wing(wing):
         dihedral_outboard=wing.dihedral,
         sweeps=root_sweeps,
         thickness_to_chord=wing.thickness_to_chord,
-        # We handle the 'chord' non-standard attribute later, or add it if your new Segment supports it
     )
     if hasattr(wing, 'airfoil') and wing.airfoil is not None:
         root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, wing.airfoil)
@@ -223,18 +229,19 @@ def calculate_segment_offsets(wing):
     wing_halfspan = wing.spans.projected * 0.5 if wing.symmetric else wing.spans.projected
 
     new_segments = []
+    new_x_offsets = []
+    new_z_offsets = []
+    
     current_x_offset = 0.0
-    current_dih_offset = 0.0
+    current_z_offset = 0.0
 
     for i, seg in enumerate(wing.segments):
         # Base case: Root segment has no offsets
         if i == 0:
-            new_seg = eqx.tree_at(
-                lambda s: (s.chord, s.x_offset, s.dih_offset),
-                seg,
-                (seg.root_chord_percent * wing.chords.root, 0.0, 0.0)
-            )
+            new_seg = eqx.tree_at(lambda s: s.chords.root, seg, (seg.root_chord_percent * wing.chords.root))
             new_segments.append(new_seg)
+            new_x_offsets.append(current_x_offset)
+            new_z_offsets.append(current_z_offset)
             continue
 
         prev_seg = wing.segments[i-1]
@@ -259,52 +266,106 @@ def calculate_segment_offsets(wing):
         # 2. Cumulative Offsets
         section_span = (seg.percent_span_location - prev_seg.percent_span_location) * wing_halfspan
         current_x_offset = current_x_offset + section_span * jnp.tan(le_sweep)
-        current_dih_offset = current_dih_offset + section_span * jnp.tan(prev_seg.dihedral_outboard)
+        current_z_offset = current_z_offset + section_span * jnp.tan(prev_seg.dihedral_outboard)
 
         # 3. Update current segment
-        new_seg = eqx.tree_at(
-            lambda s: (s.chord, s.x_offset, s.dih_offset),
-            seg,
-            (seg.root_chord_percent * wing.chords.root, current_x_offset, current_dih_offset)
-        )
+        new_seg = eqx.tree_at(lambda s: s.chords.root, seg, seg.root_chord_percent * wing.chords.root)
         new_segments.append(new_seg)
+        new_x_offsets.append(current_x_offset)
+        new_z_offsets.append(current_z_offset)
 
     # Standard VLM cap: force the absolute tip segment's LE sweep to ~0 to prevent singularities
     new_segments[-1] = eqx.tree_at(lambda s: s.sweeps.leading_edge, new_segments[-1], 1e-8)
 
     # Pack the tuple back into the Wing PyTree
-    return eqx.tree_at(lambda w: w.segments, wing, tuple(new_segments))
+    return eqx.tree_at(lambda w: w.segments, wing, tuple(new_segments)), jnp.array(new_x_offsets), jnp.array(new_z_offsets)
 
-def setup_cs_skeleton(cs, parent_wing_idx, seg_a_idx, seg_b_idx, parent_wing, cs_ID):
+def setup_cs_skeleton(
+        cs: WingControlSurface,
+        parent_wing_idx: int,
+        seg_a_idx: int,
+        seg_b_idx: int,
+        parent_wing: Wing,
+        parent_intervals: list[Interval],
+        cs_ID: int,
+        vlm_settings: "VLMSettings"
+    ):
     """ Builds the empty skeleton and metadata record in pure Python. """
     
     is_slat = "slat" in cs.tag.lower()
+
+    cs_start = cs.span_fraction_start
+    cs_end = cs.span_fraction_end
+
+    base_n_sw: int = vlm_settings.vortices.wing_spanwise_vortices #type: ignore
+
+    # Dry run of normalized spacing
+    if vlm_settings.vortices.spanwise_cosine_spacing:
+        thetan = jnp.linspace(jnp.pi/2, 0, base_n_sw + 1)
+        base_etas = jnp.cos(thetan)
+    else:
+        base_etas = jnp.linspace(0.0, 1.0, base_n_sw + 1)
+
+    # Snap the base etas to the parent wing's topological breaks
+    req_etas = jnp.append(jnp.array([i.eta_start for i in parent_intervals]), parent_intervals[-1].eta_end)
+    shifted_idxs = jnp.zeros(base_n_sw + 1)
     
-    # 1. Build the metadata map
+    for req_eta in req_etas:
+        diffs = jnp.abs(base_etas - req_eta) + shifted_idxs
+        idx = jnp.argmin(diffs)
+        
+        # JAX arrays are immutable! Must reassign to save the update.
+        base_etas = base_etas.at[idx].set(req_eta)
+        shifted_idxs = shifted_idxs.at[idx].set(jnp.inf)
+        
+    base_etas = jnp.sort(base_etas)
+    
+    # Extract only the etas that fall inside this control surface
+    cs_etas = base_etas[(base_etas >= cs_start - 1e-6) & (base_etas <= cs_end + 1e-6)]
+    
+    # Calculate the static panel counts
+    cs_n_sw = max(len(cs_etas) - 1, 1)
+    
+    base_n_cw: int = vlm_settings.vortices.wing_chordwise_vortices #type: ignore
+    
+    # Use .item() to safely extract the standard Python integer from the JAX 0D array
+    cs_n_cw = max(int(jnp.ceil(cs.root_chord_percent * base_n_cw).item()), 2)
+    
+    # Build the metadata map
     cs_meta = ControlSurfaceMetadata(
         parent_wing_index=parent_wing_idx,
         seg_a_index=seg_a_idx,
         seg_b_index=seg_b_idx,
         span_fraction_start=cs.span_fraction_start,
         span_fraction_end=cs.span_fraction_end,
-        chord_fraction=cs.chord_fraction,
+        chord_fraction=cs.root_chord_percent,
         is_slat=is_slat
     )
     
-    # 2. Spawn the Skeleton Wing (Floats don't matter here, they get overwritten in JAX!)
+    # Spawn the Skeleton Wing (Floats don't matter here, they get overwritten in JAX
+    skeleton_chords = WingChords(
+        root=parent_wing.chords.root * cs.root_chord_percent
+    )
+    
     skeleton_wing = Wing(
         tag=f"{parent_wing.tag}__cs_id_{cs_ID}",
         symmetric=parent_wing.symmetric,
         vertical=parent_wing.vertical,
-
+        chords=skeleton_chords
     )
-    
-    # Pack it into your VLMWingRecord
+    cs_segments = convert_to_segmented_wing(skeleton_wing)
+    skeleton_wing = eqx.tree_at(lambda w: w.segments, skeleton_wing, cs_segments)
+
+    # Pack it into VLMWingRecord
     return VLMWingRecord(
         wing=skeleton_wing,
         is_a_control_surface=True,
         cs_ID=cs_ID,
-        cs_meta=cs_meta # Attach the metadata!
+        cs_meta=cs_meta,
+        n_cw=cs_n_cw,
+        n_sw=cs_n_sw,
+        strip_eta_starts=cs_etas[:-1],
+        strip_eta_ends=cs_etas[1:]
     )
 
 @jax.jit
@@ -362,7 +423,7 @@ def calculate_cs_geometry(skeleton_wing, parent_wing, cs_meta: ControlSurfaceMet
     
     return updated_cs_wing
 
-def generate_topological_span_breaks(wing):
+def generate_topological_span_breaks(wing: Wing) -> list[Interval]:
     """
     Finds every unique spanwise slicing plane (from segments and control surfaces)
     and builds non-overlapping spanwise intervals.
@@ -412,7 +473,7 @@ def generate_topological_span_breaks(wing):
         
     return intervals
 
-def make_VLM_wings(state: "State", system: "Aircraft", settings: "Settings"):
+def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
     # unpack inputs
     vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
     discretize_cs = vlm_settings.discretize_control_surfaces
@@ -444,7 +505,7 @@ def make_VLM_wings(state: "State", system: "Aircraft", settings: "Settings"):
 
         wing = populate_control_sections(wing) if discretize_cs else wing
         
-        wing = calculate_segment_offsets(wing)
+        wing, seg_x_offsets, seg_z_offsets = calculate_segment_offsets(wing)
 
         intervals = generate_topological_span_breaks(wing)
 
@@ -468,7 +529,12 @@ def make_VLM_wings(state: "State", system: "Aircraft", settings: "Settings"):
             strip_le_cs_ids=jnp.array([i.le_cs_id for i in intervals]),
             strip_te_cs_ids=jnp.array([i.te_cs_id for i in intervals]),
             strip_le_cuts=jnp.array(le_cuts),
-            strip_te_cuts=jnp.array(te_cuts)
+            strip_te_cuts=jnp.array(te_cuts),
+            n_sw=vlm_settings.vortices.wing_spanwise_vortices, #type: ignore
+            n_cw=vlm_settings.vortices.wing_chordwise_vortices, #type: ignore
+            segment_x_offsets=seg_x_offsets,
+            segment_z_offsets=seg_z_offsets
+\
         )
         vlm_records.append(main_record)
 
@@ -481,24 +547,31 @@ def make_VLM_wings(state: "State", system: "Aircraft", settings: "Settings"):
 
                     cs_record = setup_cs_skeleton(
                         cs, 
-                        parent_wing_idx=wing_idx, 
+                        parent_wing_idx=wing_idx,
                         seg_a_idx=seg_a_idx, 
                         seg_b_idx=seg_b_idx, 
-                        parent_wing=wing, 
-                        cs_ID=cs_ID
+                        parent_wing=wing,
+                        parent_intervals=intervals,
+                        cs_ID=cs_ID,
+                        vlm_settings=vlm_settings
                     )
                     
                     vlm_records.append(cs_record)
                     cs_ID += 1
         
-        from RCAIDE.Framework.Analyses.Aerodynamics.VLM import VLMTopology
+        from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMTopology
         topology = VLMTopology.build_from_records(vlm_records, vlm_settings)
         
-        updated_system  = eqx.tree_at(lambda s: (s.analysis_data['vlm_wings'], s.analysis_data['vlm_topology']), updated_system, (vlm_records, topology))
+        updated_analysis_data = system.analysis_data | {
+            "vlm_wings":vlm_records,
+            "vlm_topology": topology
+        }
+        
+        updated_system  = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
 
     return state, updated_system, settings
 
-def update_wing_geometry(state: "State", system: "System", settings: "Settings"):
+def update_wing_geometry(state: "State", system: "Aircraft", settings: "Settings"):
     old_vlm_records = system.analysis_data["vlm_wings"]
     ready_vlm_records = []
     
@@ -516,10 +589,11 @@ def update_wing_geometry(state: "State", system: "System", settings: "Settings")
                 fresh_wing = eqx.tree_at(lambda w: w.segments, fresh_wing, new_segments)
             
             # 3. Calculate offsets using the bridged geometry
-            updated_wing = calculate_segment_offsets(fresh_wing)
+            updated_wing, updated_x_offsets, updated_z_offsets = calculate_segment_offsets(fresh_wing)
             
             updated_main_wings.append(updated_wing)
-            ready_record = eqx.tree_at(lambda r: r.wing, record, updated_wing)
+            ready_record = eqx.tree_at(lambda r: (r.wing, r.segment_x_offsets, r.segment_z_offsets),
+                                       record, (updated_wing, updated_x_offsets, updated_z_offsets))
             ready_vlm_records.append(ready_record)
             
             main_wing_counter += 1
@@ -535,11 +609,12 @@ def update_wing_geometry(state: "State", system: "System", settings: "Settings")
             ready_vlm_records.append(ready_record)
 
     # Pack the updated records back into the solver dictionary ONLY.
-    # We DO NOT overwrite system.wings, preserving the pristine global vehicle!
-    new_analysis_data = {
+    # We DO NOT overwrite system.wings, preserving the global vehicle
+    new_analysis_data = system.analysis_data | {
         "vlm_wings": tuple(ready_vlm_records),
         "vlm_topology": system.analysis_data["vlm_topology"]
     }
+    
     current_system = eqx.tree_at(lambda s: s.analysis_data, system, new_analysis_data)
 
     return state, current_system, settings

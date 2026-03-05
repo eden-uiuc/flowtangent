@@ -9,4 +9,4 @@
 # ----------------------------------------------------------------------------------------------------------------------
  
 from .TestAero import TestAero
-# from .VLM import VLM
+from .Vortex_Lattice import VLM, VLMSettings, VLMVortices, InitializeVLM

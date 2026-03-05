@@ -57,7 +57,7 @@ class DragCoefficients(Conditions):
     # Attribute         Type            Default Value
     tag:                str             = eqx.field(static=True, default='Drag Coefficients')
 
-    total:              jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
+    total:              jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
     parasite:           Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Parasite Drag'))
     compressible:       Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Compressible Drag'))
