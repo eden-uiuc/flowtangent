@@ -27,14 +27,16 @@ def update_forces(
         
         wind    = state.frames.wind.total_force_vector
         thrust  = state.frames.body.thrust_force_vector
-        Weight  = state.frames.inertial.gravity_force_vector
+        weight  = state.frames.inertial.gravity_force_vector
 
         TB2I = state.frames.body.transform_to_inertial
         TW2I = state.frames.wind.transform_to_inertial
 
-        w_inertial = jnp.einsum('nij,nj->ni', TW2I, wind)
-        t_inertial = jnp.einsum('nij,nj->ni', TB2I, thrust)
+        wind_force      = jnp.einsum('nij,nj->ni', TW2I, wind)
+        thrust_force    = jnp.einsum('nij,nj->ni', TB2I, thrust)
 
-        state = eqx.tree_at(lambda s: s.frames.inertial.total_force_vector, state, Weight + w_inertial + t_inertial)
+        total_force = weight + wind_force + thrust_force
+
+        state = eqx.tree_at(lambda s: s.frames.inertial.total_force_vector, state, total_force)
 
         return state, system, settings

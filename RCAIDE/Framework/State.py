@@ -39,6 +39,7 @@ class State(Conditions):
 
     frames:             FrameConditions             = eqx.field(default_factory=FrameConditions)
     freestream:         FreestreamConditions        = eqx.field(default_factory=FreestreamConditions)
+    # TODO: Refactor Freestream into Environmental Conditions, Incl. Planet, etc.
 
     mass:               MassConditions              = eqx.field(default_factory=MassConditions)
     energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
@@ -92,7 +93,7 @@ class State(Conditions):
         control_idx = 0
 
         # 3. Slice and set
-        for i, (path, path_indices) in enumerate(routing_table):
+        for i, (_, path_indices) in enumerate(routing_table):
             values = unknowns[control_idx : control_idx + n_points]
             
             current_array = current_targets[i]

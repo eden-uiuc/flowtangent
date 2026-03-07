@@ -60,14 +60,22 @@ class AltitudeChange(ProcessStep):
 PositionProfile = ConstantAltitude | AltitudeChange
 
 # Speed Profiles
-# TODO: Add sideslip calculation and/or depricate in favor of full 6-DOF
+# TODO: Add sideslip calculation and/or deprecate in favor of full 6-DOF
 
 class ConstantSpeed(ProcessStep):
-
     speed: float = 1.0 * Units.m/Units.s
 
     def __call__(self, state, system, settings):
-        updated_state = eqx.tree_at(lambda s: s.freestream.speed, state, self.speed)
+        new_speed = jnp.full_like(state.freestream.speed, self.speed)
+        
+        # Set the X-component of the inertial velocity vector
+        new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(new_speed.flatten())
+        
+        updated_state = eqx.tree_at(
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), 
+            state, 
+            (new_speed, new_velocity)
+        )
         return updated_state, system, settings
 
 class ConstantMach(ProcessStep):
@@ -81,7 +89,13 @@ class ConstantMach(ProcessStep):
         
         v_mag = self.mach_number * a
 
-        updated_state = eqx.tree_at(lambda s: s.freestream.speed, state, v_mag)
+        new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_mag.flatten())
+        
+        updated_state = eqx.tree_at(
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), 
+            state, 
+            (v_mag, new_velocity)
+        )
         return updated_state, system, settings
 
 SpeedProfile = ConstantSpeed | ConstantMach
@@ -97,7 +111,7 @@ class ConstantAltitudeChangeRate(ProcessStep):
         v_z = -self.change_rate # Z points down, so positive rate (climb) is negative and vice-versa
         v_x = jnp.sqrt(v_mag **2 - v_z ** 2)
         
-        updated_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_x)
+        updated_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_x.squeeze(-1))
         updated_velocity = updated_velocity.at[:, 2].set(v_z)
         
         updated_state = eqx.tree_at(lambda s:s.frames.inertial.velocity_vector, state, updated_velocity)

@@ -95,7 +95,7 @@ rev = 2.0 * math.pi * rad
 # ==============================================================================
 # TEMPERATURE (ABSOLUTE)
 # ==============================================================================
-# Note: These are for absolute temperature multiplication only!
+# Note: These are for absolute temperature multiplication only
 # DO NOT use these to convert offset temperatures (like 70°F to °C).
 R = 5.0 / 9.0 * K                # Rankine
 

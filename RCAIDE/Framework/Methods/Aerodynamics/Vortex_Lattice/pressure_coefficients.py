@@ -64,7 +64,7 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
         # a and b are tuples: (value, is_leading_edge_flag)
         v1, le1 = a
         v2, le2 = b
-        # If element 'b' is a leading edge, it resets the sum to just v2!
+        # If element 'b' is a leading edge, it resets the sum to just v2
         return jnp.where(le2, v2, v1 + v2), le1 | le2
     
     # Broadcast the 1D LE flag to match the (n_time, N) matrix
@@ -105,10 +105,7 @@ def compute_panel_pressures(state: "State", system: "System", settings: "Setting
     GAMMA = analysis["vortex_strengths"]
     v_inf = state.freestream.speed
     
-    # Needs to be reshaped to broadcast across (n_time, 1)
-    v_inf_array = v_inf[:, None] 
-    
-    DCP = compute_pressure_coefficients(VD, v_total, GAMMA, v_inf_array)
+    DCP = compute_pressure_coefficients(VD, v_total, GAMMA, v_inf)
     
     updated_analysis_data = analysis | {
         "pressure_coefficients": DCP

@@ -9,7 +9,10 @@
 
 from __future__ import annotations
 
+import threading
 import timeit
+import time
+import sys
 
 from typing import Callable, Literal, TYPE_CHECKING
 from dataclasses import replace
@@ -43,6 +46,37 @@ from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, Dynam
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, Settings, System
 
+#-----------------------------------------------------------------------------------------------------------------------
+# Mission Spinner
+#-----------------------------------------------------------------------------------------------------------------------
+
+class Spinner:
+    def __init__(self, message="JIT compiling and solving..."):
+        self.spinner_chars = "|/-\\"
+        self.message = message
+        self.running = False
+        self.thread = None
+
+    def spin(self):
+        i = 0
+        while self.running:
+            sys.stdout.write(f"\r{self.message} {self.spinner_chars[i % 4]}")
+            sys.stdout.flush()
+            time.sleep(0.1)
+            i += 1
+
+    def __enter__(self):
+        self.running = True
+        self.thread = threading.Thread(target=self.spin)
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.running = False
+        self.thread.join()
+        sys.stdout.write(f"\r{self.message} Done!    \n")
+        sys.stdout.flush()
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
 # ----------------------------------------------------------------------------------------------------------------------
@@ -53,15 +87,15 @@ def _activate_control(control: str | ControlVariable, state):
         control_name = control.replace(' ', '_').lower()
         
         if control_name not in state.controls.__dataclass_fields__:
-            # 1. It's custom: Create it and use the functional tuple method we wrote!
+            # It's a custom control:
             new_ctrl = ControlVariable(tag=control, active=True)
             new_controls = state.controls.add_control_variable(new_ctrl)
         else:
-            # 2. It's explicit: Grab the existing one, activate it, and replace it!
+            # It's a pre-existing control: grab the existing one, activate it, and replace it
             existing_ctrl = getattr(state.controls, control_name)
             active_ctrl = eqx.tree_at(lambda c: c.active, existing_ctrl, True)
             
-            # Use getattr safely (without the None default) to map the path
+            # Use getattr to map the path
             new_controls = eqx.tree_at(lambda p: getattr(p, control_name), state.controls, active_ctrl)
             
     elif isinstance(control, ControlVariable):
@@ -165,8 +199,6 @@ def _default_analyses():
         ProcessStep(tag="Time Differentials",   function=update_time_differentials),
         ProcessStep(tag="Acceleration",         function=update_acceleration),
         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
-        ProcessStep(tag="Altitude",             function=update_altitude),
-        ProcessStep(tag="Gravity",              function=update_gravity),
         ProcessStep(tag="Freestream",           function=update_freestream),
         ProcessStep(tag="Orientations",         function=update_orientations),
         ProcessStep(tag="Energy",               function=skip),
@@ -198,7 +230,7 @@ def find_circular_references(obj, path="root", visited=None):
 
     obj_id = id(obj)
     
-    # If we've seen this exact object ID in this branch, we found the loop!
+    # If we've seen this exact object ID in this branch, we found the loop
     if obj_id in visited:
         print(f"CIRCULARITY FOUND:")
         print(f"Path: {path} loops back to an already visited {type(obj).__name__}")
@@ -271,7 +303,7 @@ class IterateSegment(Process):
     root_finder:    RootFinders = eqx.field(static=True, default=GaussNewton) # type: ignore
     results_parser: Callable    = eqx.field(static=True, default=fsolve_results_parser) # type: ignore
     
-    def _get_residuals(self, unknowns, state, system, settings):
+    def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
 
         current_state = state.unpack_unknowns(unknowns)
         current_state, _, _ = self.analyze(current_state, system, settings)
@@ -301,104 +333,104 @@ class IterateSegment(Process):
         return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
+        with Spinner():
+            if self.root_finder is fsolve:
+                
+                root_finder_kwargs = {
+                    'func': self._get_residuals,
+                    'x0': state.unknowns,
+                    'args': (state, system, settings),
+                    'xtol': state.numerics.solution_tolerance,
+                    'maxfev': state.numerics.max_evaluations,
+                    'epsfcn': state.numerics.step_size,
+                    'full_output': True
+                }
 
-        if self.root_finder is fsolve:
+                results = self.root_finder(**root_finder_kwargs)
+
+                return fsolve_results_parser(results, state, system, settings)
+
+            elif self.root_finder in (ScipyRootFinding, Bisection):
+
+                x0 = state.unknowns
+
+                root = ScipyRootFinding(
+                    method='hybr',
+                    optimality_fun=self._get_residuals,
+                    tol = state.numerics.solution_tolerance,
+                    jit=True
+                )
+                if settings.mission.debugging:
+                    if any([
+                        find_circular_references(state, path="state"),
+                        find_circular_references(system, path="system"),
+                        find_circular_references(settings, path="settings")
+                    ]):
+                        raise RecursionError("Circularity found in mission data structures. Terminating mission.")
+
+                t0 = timeit.default_timer()
+
+                unknowns, _ = root.run(x0, state, system, settings)
+
+                unknowns.block_until_ready()
+
+                t1 = timeit.default_timer()
+
+                print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
+
+                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                current_state = current_state.unpack_unknowns(unknowns)
+
+                return self.analyze(current_state, system, settings)
+
+            elif self.root_finder is Broyden:
+                x0 = state.unknowns
+
+                # 2. Start the clock
+                t0 = timeit.default_timer()
+
+                # 3. Fire the compiled GPU kernel
+                # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
+                unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
+                
+                # 4. Wait for the final answer to come back across the PCIe bus
+                unknowns.block_until_ready()
+
+                # 5. Stop the clock
+                t1 = timeit.default_timer()
+                print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
+
+                # 6. Unpack and continue
+                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                current_state = current_state.unpack_unknowns(unknowns)
+
+                return self.analyze(current_state, system, settings)
             
-            root_finder_kwargs = {
-                'func': self._get_residuals,
-                'x0': state.unknowns,
-                'args': (state, system, settings),
-                'xtol': state.numerics.solution_tolerance,
-                'maxfev': state.numerics.max_evaluations,
-                'epsfcn': state.numerics.step_size,
-                'full_output': True
-            }
+            elif self.root_finder is GaussNewton:
+                x0 = state.unknowns
 
-            results = self.root_finder(**root_finder_kwargs)
+                # 2. Start the clock
+                # t0 = timeit.default_timer()
 
-            return fsolve_results_parser(results, state, system, settings)
+                # 3. Fire the compiled GPU kernel
+                # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
+                unknowns, _ = self._run_gauss_newton_solver(x0, state, system, settings)
+                
+                # 4. Wait for the final answer to come back across the PCIe bus
+                unknowns.block_until_ready()
 
-        elif self.root_finder in (ScipyRootFinding, Bisection):
+                # 5. Stop the clock
+                # t1 = timeit.default_timer()
+                # print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
 
-            x0 = state.unknowns
+                # 6. Unpack and continue
+                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                current_state = current_state.unpack_unknowns(unknowns)
 
-            root = ScipyRootFinding(
-                method='hybr',
-                optimality_fun=self._get_residuals,
-                tol = state.numerics.solution_tolerance,
-                jit=True
-            )
-            if settings.mission.debugging:
-                if any([
-                    find_circular_references(state, path="state"),
-                    find_circular_references(system, path="system"),
-                    find_circular_references(settings, path="settings")
-                ]):
-                    raise RecursionError("Circularity found in mission data structures. Terminating mission.")
-
-            t0 = timeit.default_timer()
-
-            unknowns, _ = root.run(x0, state, system, settings)
-
-            unknowns.block_until_ready()
-
-            t1 = timeit.default_timer()
-
-            print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
-
-            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-            current_state = current_state.unpack_unknowns(unknowns)
-
-            return self.analyze(current_state, system, settings)
-
-        elif self.root_finder is Broyden:
-            x0 = state.unknowns
-
-            # 2. Start the clock
-            t0 = timeit.default_timer()
-
-            # 3. Fire the compiled GPU kernel
-            # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
-            unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
+                return self.analyze(current_state, system, settings)
             
-            # 4. Wait for the final answer to come back across the PCIe bus
-            unknowns.block_until_ready()
-
-            # 5. Stop the clock
-            t1 = timeit.default_timer()
-            print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
-
-            # 6. Unpack and continue
-            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-            current_state = current_state.unpack_unknowns(unknowns)
-
-            return self.analyze(current_state, system, settings)
-        
-        elif self.root_finder is GaussNewton:
-            x0 = state.unknowns
-
-            # 2. Start the clock
-            t0 = timeit.default_timer()
-
-            # 3. Fire the compiled GPU kernel
-            # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
-            unknowns, _ = self._run_gauss_newton_solver(x0, state, system, settings)
-            
-            # 4. Wait for the final answer to come back across the PCIe bus
-            unknowns.block_until_ready()
-
-            # 5. Stop the clock
-            t1 = timeit.default_timer()
-            print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
-
-            # 6. Unpack and continue
-            current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-            current_state = current_state.unpack_unknowns(unknowns)
-
-            return self.analyze(current_state, system, settings)
-        
-        else:
-            return state, system, settings     
+            else:
+                return state, system, settings     
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Finalize Segment
@@ -483,7 +515,7 @@ class Segment(Process):
         # Only build the default steps if the user didn't explicitly provide custom ones
         if len(self.steps) == 0:
             
-            # 1. Build the steps, passing the controls configuration directly into InitializeSegment!
+            # 1. Build the steps, passing the controls configuration directly into InitializeSegment
             init_step = InitializeSegment(
                 tag=f"Initialize {self.tag}",
                 active_controls=self.active_controls,

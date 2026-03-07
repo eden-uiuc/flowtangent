@@ -217,8 +217,7 @@ def compute_induced_velocity_matrix(VD, mach_array):
     # Fix RFLAG (Subsonic is always 1)
     RFLAG = jnp.where(is_subsonic[:, :, 0], 1, RFLAG)
     
-    
-    # LEGACY VORLAX Downwash calcuation
+    # Legacy VORLAX Downwash calcuation
     
     # Panel Dihedral Angle (DL) using bound vortex nodes (AH and BH)
     # Original: D = sqrt((YAH-YBH)**2 + (ZAH-ZBH)**2)
@@ -260,7 +259,7 @@ def compute_induced_velocity(state: "State", system: "System", settings: "Settin
     VD = system.analysis_data["vortex_distribution"]
     mach_array = state.freestream.mach_number
     
-    C_mn, RFLAG = compute_induced_velocity_matrix(VD, mach_array)
+    C_mn, RFLAG, EW = compute_induced_velocity_matrix(VD, mach_array)
     
     updated_analysis_data = system.analysis_data | {
         "AICs": C_mn,

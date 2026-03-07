@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 def compute_vortex_strength(state: "State", system: "System", settings: "Settings"):
     """ Solves the linear system A * GAMMA = RHS for the vortex strengths. """
     
-    analysis = system.analysis_data
+    analysis: dict[str, jnp.ndarray] = system.analysis_data
     VD = analysis["vortex_distribution"]
     
     # Extract the arrays we built in previous steps
@@ -37,10 +37,10 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     RHS = analysis["boundary_conditions"]
     
     # RFLAG shape: (n_time, receiver_N)
-    RFLAG = analysis["subsonic_indicators"]
+    RFLAG = analysis["singularities"]
     
     # Zero out the RHS for supersonic panels swept parallel to the Mach cone
-    RHS = RHS * RFLAG
+    RHS = RHS * RFLAG.squeeze(1)
     
     # Build the 'A' matrix via Dot Product: sum(C_mn * n)
     # The normal vector belongs to the RECEIVING panel (dim 1). 
@@ -49,12 +49,12 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     normals_broadcast = VD.normal_vectors[None, :, None, :]
     
     # A shape: (n_time, receiver_N, sender_N)
-    A = jnp.sum(C_mn * normals_broadcast, axis=-1)
+    A = jnp.sum(C_mn * normals_broadcast, axis=-1).squeeze(1)
     
     # Solve the linear system
     # A is (n_time, N, N), RHS is (n_time, N)
     # Output GAMMA is perfectly shaped as (n_time, N)
-    GAMMA = jnp.linalg.solve(A, RHS)
+    GAMMA = jnp.linalg.solve(A, RHS[..., None]).squeeze(-1)
     
     # Pack the results
     updated_analysis_data = analysis | {

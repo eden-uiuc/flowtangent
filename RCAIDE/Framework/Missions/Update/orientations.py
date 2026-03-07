@@ -57,9 +57,8 @@ def update_orientations(state: "rcf.State",
     phi = body_inertial_rotations[:, 0, None]
 
     # Body Frame Transformation Matrices
-
-    TI2B = vmap_euler_to_dcm(body_inertial_rotations)
-    TB2I = jnp.swapaxes(TI2B, 1, 2)
+    TB2I = vmap_euler_to_dcm(body_inertial_rotations)
+    TI2B = jnp.swapaxes(TB2I, 1, 2)
 
     # Velocity Transformation
     v_body = jnp.einsum('nij,nj->ni', TI2B, v_inertial)

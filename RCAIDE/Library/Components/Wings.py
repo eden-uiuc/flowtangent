@@ -51,6 +51,11 @@ class WingSegment(Component):
     sweeps: WingSweeps = eqx.field(default_factory=WingSweeps)
     chords: WingChords = eqx.field(default_factory=WingChords)
 
+    @property
+    def taper(self):
+        safe_root = jnp.maximum(self.chords.root, 1e-8)
+        return self.chords.tip / safe_root
+
 
 class WingControlSurface(Component):
 
@@ -104,6 +109,69 @@ class Wing(Component):
     twists: WingDimensions  = eqx.field(default_factory=WingDimensions)
     chords: WingChords      = eqx.field(default_factory=WingDimensions)
     sweeps: WingSweeps      = eqx.field(default_factory=WingSweeps)
+
+    def __post_init__(self):
+        new_taper, new_chords = self.validate_chords()
+        object.__setattr__(self, "taper", new_taper)
+        object.__setattr__(self, "chords", new_chords)
+
+        updated_segments = []
+
+        for idx, seg in enumerate(self.segments):
+            root = new_chords.root * seg.root_chord_percent
+            if idx == len(self.segments) -1:
+                tip = new_chords.tip
+            else:
+                tip = new_chords.root * self.segments[idx + 1].root_chord_percent
+            
+            new_seg = eqx.tree_at(lambda s: s.chords, seg, WingChords(root=root, tip=tip))
+            updated_segments.append(new_seg)
+        
+        object.__setattr__(self, "segments", updated_segments)
+
+    
+    def validate_chords(self) -> tuple:
+        
+        root = self.chords.root
+        tip = self.chords.tip
+        taper = self.taper
+
+        new_taper = taper
+        new_chords = self.chords
+        
+        # Count how many variables the user explicitly set
+        # (Assuming 0.0 is the default "unset" value in your legacy code)
+        provided = sum([root != 0.0, tip != 0.0, taper != 0.0])
+        
+        if provided < 2:
+            raise ValueError(
+                f"Wing geometry under-defined. You must provide at least two of "
+                f"(root, tip, taper). Currently provided: root={root}, tip={tip}, taper={taper}"
+            )
+
+        elif provided == 2:
+            # Auto-complete the missing variable
+            
+            if tip == 0.0:
+                # Update the nested frozen child module cleanly
+                new_chords = eqx.tree_at(lambda c: c.tip, new_chords, root * taper)
+            elif taper == 0.0:
+                new_taper = tip / root
+            elif root == 0.0:
+                new_chords = eqx.tree_at(lambda c:c.root, new_chords, tip / taper)
+                
+            return new_taper, new_chords
+                
+        elif provided == 3:
+            # All three provided: Validate mathematical consistency
+            if abs(tip - (root * taper)) > 1e-2:
+                raise ValueError(
+                    f"Incompatible geometry for wing '{self.tag}': The provided tip chord ({tip}) "
+                    f"does not match root * taper ({root * taper})."
+                )
+            
+        return new_taper, new_chords
+
 
     # TODO: Update these methods to be functional
     def _update_segment_properties(self, update_areas=False):

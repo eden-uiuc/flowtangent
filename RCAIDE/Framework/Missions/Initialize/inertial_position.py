@@ -24,11 +24,11 @@ def initialize_inertial_position(state: "rcf.State",
                                  settings: "rcf.Settings",
                                  ):
 
-    # 1. Extract current arrays
+    # Extract current arrays
     p_initial = state.initials.frames.inertial.position_vector
     p_current = state.frames.inertial.position_vector
     
-    # Calculate deltas (Your JAX .at syntax here was already perfect!)
+    # Calculate deltas
     p_initial = p_initial.at[-1, None, -1].set(-state.initials.freestream.altitude[-1, 0])
     delta_p = p_initial[-1, None, :] - p_current[0, None, :]
 
@@ -36,11 +36,10 @@ def initialize_inertial_position(state: "rcf.State",
     R_current = state.frames.inertial.system_range
     delta_R = R_initial[-1, None, :] - R_current[0, None, :]
 
-    # 2. Calculate the new values pure-functionally (No += mutation)
+    # Calculate the new values
     new_position_vector = p_current + delta_p
     new_system_range = R_current + delta_R
 
-    # 3. Inject the updated arrays back into the PyTree
     state = eqx.tree_at(
         lambda s: (s.frames.inertial.position_vector, s.frames.inertial.system_range),
         state,

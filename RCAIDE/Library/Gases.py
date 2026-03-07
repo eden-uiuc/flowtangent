@@ -34,7 +34,7 @@ class Gas(eqx.Module):
     specific_heat_capacity: float   = eqx.field(static=True, default=0.0)
 
     gamma_coefficients:     tuple = eqx.field(default_factory=tuple)
-    cp_coefficients:        tuple = eqx.field(default_factory=tuple)
+    Cp_coefficients:        tuple = eqx.field(default_factory=tuple)
     thermal_coefficients:   tuple = eqx.field(default_factory=tuple)
 
     composition:            GasComposition = eqx.field(default_factory=GasComposition)
@@ -42,26 +42,26 @@ class Gas(eqx.Module):
     def __post_init__(self):
         self.molar_mass = self.R / self.R_specific
 
-    def compute_density(self, T=298.15, p=101325.):
+    def compute_density(self, T: float|jnp.ndarray=298.15, p: float|jnp.ndarray=101325.):
         return p / (self.R_specific * T)
 
-    def compute_gamma(self, T=298.15):
+    def compute_gamma(self, T: float|jnp.ndarray=298.15):
         return jnp.polyval(jnp.array(self.gamma_coefficients), T)
 
-    def compute_cp(self, T=298.):
-        return jnp.polyval(jnp.array(self.cp_coefficients), T)
+    def compute_Cp(self, T: float|jnp.ndarray=298.):
+        return jnp.polyval(jnp.array(self.Cp_coefficients), T)
 
-    def compute_thermal_conductivity(self, T=298.):
+    def compute_thermal_conductivity(self, T: float|jnp.ndarray=298.):
         return jnp.polyval(jnp.array(self.thermal_coefficients), T)
 
-    def compute_speed_of_sound(self, T=298.):
+    def compute_speed_of_sound(self, T: float|jnp.ndarray=298.):
         g = self.compute_gamma(T)
         return jnp.sqrt(g * self.R_specific * T)
 
-    def compute_absolute_viscosity(self, T=298.):
+    def compute_absolute_viscosity(self, T: float|jnp.ndarray=298.):
         raise NotImplementedError('Compute absolute viscosity not implemented for this gas')
 
-    def compute_prandtl_number(self, T=298.):
+    def compute_prandtl_number(self, T: float|jnp.ndarray=298.):
         return self.compute_absolute_viscosity(T) * self.specific_heat_capacity / self.compute_thermal_conductivity(T)
 
 def _air_composition():
@@ -76,13 +76,13 @@ class Air(Gas):
     molecular_mass         : float = eqx.field(static=True, default=28.96442)
     R_specific             : float = eqx.field(static=True, default=287.0528742)
     specific_heat_capacity : float = eqx.field(static=True, default=1006.)
-    cp_coefficients        : tuple[float] = eqx.field(static=True, default=(-7.357e-7, 0.001307, -0.5558, 1074.0))
+    Cp_coefficients        : tuple[float] = eqx.field(static=True, default=(-7.357e-7, 0.001307, -0.5558, 1074.0))
     gamma_coefficients     : tuple[float] = eqx.field(static=True, default=(1.629e-10, -3.588e-7, 0.0001418, 1.386))
     thermal_coefficients   : tuple[float] = eqx.field(static=True, default=(1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4))
 
     composition:            GasComposition  = eqx.field(static=True, default_factory=_air_composition)
 
-    def compute_absolute_viscosity(self, T=298.):
+    def compute_absolute_viscosity(self, T: float|jnp.ndarray=298.):
         return 1.458e-6 * (T ** 1.5) / (T + 110.4)
 
 def _steam_composition():
@@ -97,7 +97,7 @@ class Steam(Gas):
     molecular_mass      : float          = eqx.field(static=True, default=18.0)
     R_specific          : float          = eqx.field(static=True, default=461.889)
     gamma_coefficients  : tuple[float]   = eqx.field(static=True, default=(1.33))
-    cp_coefficients     : tuple[float]   = eqx.field(static=True, default=(5e-9, 1e-4, .9202, 1524.7))
+    Cp_coefficients     : tuple[float]   = eqx.field(static=True, default=(5e-9, 1e-4, .9202, 1524.7))
 
     composition         : GasComposition = eqx.field(static=True, default_factory=_steam_composition)
 
@@ -126,7 +126,7 @@ class CO2(Gas):
     def compute_gamma(self, T=298.15):
         raise NotImplementedError('Compute gamma not implemented for carbon dioxide.')
 
-    def compute_cp(self, T=298.):
+    def compute_Cp(self, T=298.):
         raise NotImplementedError('Compute cp not implemented for carbon dioxide.')
 
     def compute_thermal_conductivity(self, T=298.):

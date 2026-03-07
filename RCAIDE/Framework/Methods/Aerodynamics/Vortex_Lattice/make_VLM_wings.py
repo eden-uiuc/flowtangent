@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
 # package imports 
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords, WingControlSurface
+from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords, WingControlSurface, WingDimensions
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ class ControlSurfaceMetadata(eqx.Module):
 
 class VLMWingRecord(eqx.Module):
     """ A fully differentiable container for the VLM solver. """
-    wing: eqx.Module  # The differentiable geometry!
+    wing: eqx.Module  # The differentiable geometry
     
     # Number of Spanwise/Chordwise Panels
     n_sw: int = eqx.field(static=True, default=10)
@@ -114,13 +114,6 @@ def convert_to_segmented_wing(wing):
         root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, wing.airfoil)
 
     # 2. Build Tip Segment
-    taper = wing.taper if wing.taper != 0 else wing.chords.tip / wing.chords.root
-    tip_chord = wing.chords.tip if wing.chords.tip != 0 else wing.chords.root * taper
-
-    tip_chords = WingChords(
-        tip=tip_chord
-    )
-
     tip_sweeps = WingSweeps(
         quarter_chord=0.0,
         leading_edge=1e-8,
@@ -130,10 +123,9 @@ def convert_to_segmented_wing(wing):
         tag='tip_segment',
         percent_span_location=1.0,
         twist=wing.twists.tip,
-        root_chord_percent=taper,
+        root_chord_percent=wing.taper,
         dihedral_outboard=0.0,
         sweeps=tip_sweeps,
-        chords=tip_chords,
         thickness_to_chord=wing.thickness_to_chord,
     )
     
@@ -177,7 +169,6 @@ def populate_control_sections(wing):
             # 1D Intersection Check: Overlap occurs if start is before seg_end AND end is after seg_start
             if cs_start < seg_end and cs_end > seg_start:
                 
-                # Elegantly replaces the 8-case if/else block!
                 new_start = max(cs_start, seg_start)
                 new_end = min(cs_end, seg_end)
                 
@@ -259,7 +250,6 @@ def calculate_segment_offsets(wing):
         le_sweep_provided = prev_seg.sweeps.leading_edge
 
         # 2. Compute the fallback converted sweep unconditionally
-        # (JAX has no problem tracing this math!)
         converted_sweep = convert_sweep_segments(
             prev_seg.sweeps.quarter_chord,
             prev_seg.root_chord_percent,
@@ -336,7 +326,7 @@ def setup_cs_skeleton(
         diffs = jnp.abs(base_etas - req_eta) + shifted_idxs
         idx = jnp.argmin(diffs)
         
-        # JAX arrays are immutable! Must reassign to save the update.
+        # JAX arrays are immutable, must reassign to save the update.
         base_etas = base_etas.at[idx].set(req_eta)
         shifted_idxs = shifted_idxs.at[idx].set(jnp.inf)
         
@@ -368,11 +358,17 @@ def setup_cs_skeleton(
     skeleton_chords = WingChords(
         root=parent_wing.chords.root * cs.root_chord_percent
     )
+    skeleton_spans = WingDimensions(
+        projected=(cs.span_fraction_end-cs.span_fraction_start) * parent_wing.spans.projected
+    )
+
     skeleton_wing = Wing(
         tag=f"{parent_wing.tag}__cs_id_{cs_ID}",
         symmetric=parent_wing.symmetric,
         vertical=parent_wing.vertical,
-        chords=skeleton_chords
+        chords=skeleton_chords,
+        spans=skeleton_spans,
+        taper=1.0 # Dummy taper, gets updated in update geometry step before meshing
     )
 
     cs_segments = convert_to_segmented_wing(skeleton_wing)
@@ -448,7 +444,7 @@ def calculate_cs_geometry(skeleton_wing, parent_wing, parent_x_offsets, parent_z
     
     new_origin = parent_wing.origin + jnp.array([[x_off + le_te_offset, y_off, z_off]])
     
-    # 4. Inject back into the skeleton using eqx.tree_at!
+    # 4. Inject back into the skeleton using eqx.tree_at
     updated_cs_wing = eqx.tree_at(
         lambda w: (w.chords.root, w.chords.tip, w.twists.root, w.twists.tip, w.taper, w.origin),
         skeleton_wing,
@@ -485,7 +481,7 @@ def generate_topological_span_breaks(wing: Wing) -> list[Interval]:
         if val - unique_breaks[-1] > 1e-6: # 1e-6 tolerance for floating point overlaps
             unique_breaks.append(val)
             
-    # 3. Build the intervals and map the Control Surface IDs!
+    # 3. Build the intervals and map the Control Surface IDs
     intervals = []
     for i in range(len(unique_breaks) - 1):
         eta_start = unique_breaks[i]
@@ -620,13 +616,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
                     vlm_records.append(cs_record)
                     cs_ID += 1
         
-        from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMTopology
-        topology = VLMTopology.build_from_records(vlm_records, vlm_settings)
-        
-        updated_analysis_data = system.analysis_data | {
-            "vlm_wings": vlm_records,
-            "vlm_topology": topology
-        }
+        updated_analysis_data = system.analysis_data | {"vlm_wings": vlm_records}
         
         updated_system  = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
 
@@ -666,8 +656,8 @@ def update_wing_geometry(state: "State", system: "Aircraft", settings: "Settings
             # --- CONTROL SURFACES ---
             parent_idx = record.cs_meta.parent_wing_index
             parent_wing = updated_main_wings[parent_idx] #type: ignore
-            parent_x_offsets = updated_x_offsets[parent_idx]
-            parent_z_offsets = updated_z_offsets[parent_idx]
+            parent_x_offsets = updated_x_offsets
+            parent_z_offsets = updated_z_offsets
             
             updated_cs_wing = calculate_cs_geometry(
                 record.wing,
@@ -682,10 +672,8 @@ def update_wing_geometry(state: "State", system: "Aircraft", settings: "Settings
 
     # Pack the updated records back into the solver dictionary ONLY.
     # We DO NOT overwrite system.wings, preserving the global vehicle
-    new_analysis_data = system.analysis_data | {
-        "vlm_wings": tuple(ready_vlm_records),
-        "vlm_topology": system.analysis_data["vlm_topology"]
-    }
+    new_analysis_data = system.analysis_data | {"vlm_wings": tuple(ready_vlm_records)}
+    # TODO: Regenerate vortex distribution with updated wings.
     
     current_system = eqx.tree_at(lambda s: s.analysis_data, system, new_analysis_data)
 

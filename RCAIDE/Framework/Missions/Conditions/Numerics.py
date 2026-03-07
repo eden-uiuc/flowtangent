@@ -90,7 +90,7 @@ class Numerics(Conditions):
         if self.number_of_control_points <= 0:
             return
 
-        # 1. Calculate the matrices
+        # Calculate the matrices (finite-difference psudospectral operators)
         if self.discretization_method:
             cps, diff, intg = self.discretization_method()
         else:
@@ -99,7 +99,6 @@ class Numerics(Conditions):
                  calculate_integration=self.calculate_integration
             )
 
-        # 2. Build a brand new NumericalTime object with the generated arrays
         new_dimensionless = NumericalTime(
             tag='Dimensionless Time',
             control_points=cps,
@@ -107,5 +106,4 @@ class Numerics(Conditions):
             integrate=intg
         )
 
-        # 3. Use the sanctioned loophole to safely overwrite the attribute!
         object.__setattr__(self, "dimensionless", new_dimensionless)

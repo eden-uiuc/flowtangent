@@ -13,6 +13,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.Library.Atmospheres import Atmosphere, USStandard1976
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
@@ -74,17 +75,14 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    tag:                    str                 = eqx.field(static=True, default='Freestream')
-    atmosphere:             eqx.Module | None   = None
+    tag:                    str          = eqx.field(static=True, default='Freestream')
+    atmosphere:             Atmosphere   = eqx.field(default_factory=USStandard1976)
 
     speed:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    velocity_vector:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
-
     altitude:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-
     gravity:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    
     speed_of_sound:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-
     pressure:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
     temperature:            jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
     density:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))

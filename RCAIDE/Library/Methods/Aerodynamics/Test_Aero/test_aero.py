@@ -66,12 +66,12 @@ def direct_aero(
     qS = 0.5 * rho * flight_speed**2 * S
 
     F_Z = qS * C_L
-    F_X = qS * (C_D + 0.06)
+    F_X = qS * (C_D - 0.06)
 
     state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, state.frames.wind.total_force_vector.at[:, 2].set(F_Z.flatten()))
     state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, state.frames.wind.total_force_vector.at[:, 0].set(F_X.flatten()))
 
-    return state, system, settings,
+    return state, system, settings
 
 
 

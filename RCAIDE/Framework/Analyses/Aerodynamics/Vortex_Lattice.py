@@ -21,10 +21,11 @@ from RCAIDE.Framework import Process, ProcessStep
 
 from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice import (check_freestream,
                                                                   compute_coefficients, compute_induced_velocity, 
-                                                                  compute_panel_pressures, compute_vlm_rhs, 
+                                                                  compute_panel_pressures, compute_boundary_conditions, 
                                                                   compute_vortex_strength, update_wing_geometry,
                                                                   initialize_VLM_geometry, discretize_wings,
-                                                                  generate_full_vortex_distribution)
+                                                                  generate_full_vortex_distribution,
+                                                                  apply_aerodynamic_forces)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings
@@ -130,72 +131,6 @@ class VLMVortices(eqx.Module):
             object.__setattr__(self, 'fuselage_spanwise_vortices', self.number_of_spanwise_vortices)
             object.__setattr__(self, 'fuselage_chordwise_vortices', self.number_of_chordwise_vortices)
 
-
-class VLMTopology(eqx.Module):
-    """ Static topological mapping for the VLM mesh. Gradients do NOT flow here. """
-    
-    # Global Counters
-    total_panels: int = eqx.field(static=True, default=100)
-    total_wings: int = eqx.field(static=True, default=1)
-    
-    # 1D Integer/Boolean Arrays (Length = total_panels)
-    surface_ID: jnp.ndarray       = eqx.field(default_factory = lambda: jnp.empty(0))# Maps panel 'i' to wing 'j'
-    is_leading_edge: jnp.ndarray  = eqx.field(default_factory = lambda: jnp.empty(0))# True if panel 'i' is at the leading edge
-    is_trailing_edge: jnp.ndarray = eqx.field(default_factory = lambda: jnp.empty(0))# True if panel 'i' is at the trailing edge
-    
-    # Slicing Helpers 
-    surface_breaks: jnp.ndarray = eqx.field(default_factory = lambda: jnp.empty(0))   # The starting panel index for each wing
-
-    @classmethod
-    def build_from_records(cls, vlm_records_list, settings):
-        """ 
-        Pure Python builder. Runs ONCE during initialization to map the grid. 
-        """
-        surface_id_list = []
-        is_le_list = []
-        is_te_list = []
-        surface_breaks_list = []
-        
-        total_panels = 0
-        
-        # We iterate over the 1D list of VLM records we just built!
-        for current_surface_id, record in enumerate(vlm_records_list):
-            
-            # Record the panel index where this wing starts
-            surface_breaks_list.append(total_panels)
-            
-            # --- Discretization Logic ---
-            # NOTE: If we are using span_breaks to distribute panels proportionally, 
-            # that calculation goes here! For now, we use the global settings.
-            n_sw = settings.vortices.wing_spanwise_vortices
-            n_cw = settings.vortices.wing_chordwise_vortices
-            n_panels = n_sw * n_cw
-            
-            # Map every panel in this grid to the current wing/surface ID
-            surface_id_list.extend([current_surface_id] * n_panels)
-            
-            # Build Leading Edge boolean mask
-            # The first row of panels (n_sw) is the leading edge
-            wing_le = [True] * n_sw + [False] * (n_panels - n_sw)
-            is_le_list.extend(wing_le)
-            
-            # Build Trailing Edge boolean mask
-            # The last row of panels (n_sw) is the trailing edge
-            wing_te = [False] * (n_panels - n_sw) + [True] * n_sw
-            is_te_list.extend(wing_te)
-            
-            total_panels += n_panels
-
-        # Pack everything into immutable JAX arrays exactly ONCE
-        return cls(
-            total_panels=total_panels,
-            total_wings=len(vlm_records_list),
-            surface_ID=jnp.array(surface_id_list, dtype=jnp.int32),
-            is_leading_edge=jnp.array(is_le_list, dtype=bool),
-            is_trailing_edge=jnp.array(is_te_list, dtype=bool),
-            surface_breaks=jnp.array(surface_breaks_list, dtype=jnp.int32)
-        )
-
 class VLMSettings(eqx.Module): 
 
     model_fuselage:                 bool    = eqx.field(static=True, default=False)
@@ -204,7 +139,7 @@ class VLMSettings(eqx.Module):
     discretize_control_surfaces:    bool    = eqx.field(static=True, default=True)
     recalculate_total_wetted_area:  bool    = eqx.field(static=True, default=False)
     model_propeller_wake:           bool    = eqx.field(static=True, default=False)
-    VORLAX_empirical_corrections:   bool    = eqx.field(static=True, default=False)
+    VORLAX_empirical_corrections:   bool    = eqx.field(static=True, default=True)
 
     CL_max:                         float   = jnp.inf
     CD_increment:                   float   = 0.0
@@ -216,7 +151,6 @@ class VLMSettings(eqx.Module):
     parasite_drag:  ParasiteDragFormFactors = eqx.field(default_factory=ParasiteDragFormFactors)
     training:       Training                = eqx.field(default_factory=Training)
     
-    topology:       VLMTopology             = eqx.field(default_factory=VLMTopology)
     vortices:       VLMVortices             = eqx.field(default_factory=VLMVortices)
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -244,11 +178,12 @@ def _default_VLM_steps():
     return(
         ProcessStep(check_freestream, "Check Freestream"),
         ProcessStep(update_wing_geometry, "Update Wing Geometry"), # Updates System for shape optimization
-        ProcessStep(compute_vlm_rhs, "Calculate Boundary Conditions"),
+        ProcessStep(compute_boundary_conditions, "Calculate Boundary Conditions"),
         ProcessStep(compute_induced_velocity, "Calculate AICs"),
         ProcessStep(compute_vortex_strength, "Compute Vortex Strength"),
         ProcessStep(compute_panel_pressures, "Compute Pressure Coefficients"),
-        ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients")
+        ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients"),
+        ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
     )
 
 class VLM(Process):

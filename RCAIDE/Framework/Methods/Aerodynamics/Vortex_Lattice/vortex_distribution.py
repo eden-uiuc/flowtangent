@@ -8,6 +8,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+import dataclasses
+
+# pacakge imports
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -49,7 +52,8 @@ class VortexDistribution(eqx.Module):
     is_leading_edge: jnp.ndarray
     is_trailing_edge: jnp.ndarray
     surface_id: jnp.ndarray
-    total_strips: int = 0
+    panels_per_strip: jnp.ndarray
+    total_strips: int = eqx.field(static=True, default=0)
 
 # ---------------------------------------------------------
 # Helper Functions
@@ -75,6 +79,9 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
     all_te = []
 
     all_surface_ids = []
+    all_panels_per_strip = []
+
+    total_strips = 0
 
     for id_index, record in enumerate(vlm_wings):
         
@@ -86,6 +93,8 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         n_cw = record.n_cw
         n_af_pts = record.n_af_pts
         
+        total_strips += n_sw
+
         # Determine spanwise spacing (Uniform or Cosine)
         span = jnp.where(wing.symmetric, wing.spans.projected / 2.0, wing.spans.projected)
         
@@ -168,7 +177,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
             camber_x_b = jax.vmap(jnp.interp, in_axes=(None, None, 1))(y_b, seg_y, seg_camber_xs)
             camber_z_b = jax.vmap(jnp.interp, in_axes=(None, None, 1))(y_b, seg_y, seg_camber_zs)
             
-            # Look up the cuts for this specific panel strip!
+            # Look up the cuts for this specific panel strip
             y_mid = (y_a + y_b) / 2.0
             
             # searchsorted finds which topological interval y_mid belongs to
@@ -256,7 +265,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
 
             z_c_ac_center = (z_c_ac_a + z_c_ac_b) / 2.0
 
-            # Add Camber to the Flat Z Coordinates!
+            # Add Camber to the Flat Z Coordinates
             bound_vortex_z_a = bound_vortex_z_a + z_c_ah_a
             bound_vortex_z_b = bound_vortex_z_b + z_c_ah_b
             colloc_z_center = colloc_z_center + z_c_ac_center
@@ -303,19 +312,18 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
             chords = jnp.full(n_cw, (chord_a + chord_b) / 2.0)
             areas = chords * (y_b - y_a)
             incidences = jnp.full(n_cw, col_twist)
+            panels = jnp.full(n_cw, n_cw, dtype=jnp.int32)
             
             le_flags = jnp.zeros(n_cw, dtype=bool).at[0].set(True)
             te_flags = jnp.zeros(n_cw, dtype=bool).at[-1].set(True)
             
             return (left_nodes, right_nodes, collocations, normals, chords, areas, incidences,
-                    corner_a1, corner_a2, corner_b1, corner_b2, le_flags, te_flags)
+                    corner_a1, corner_a2, corner_b1, corner_b2, le_flags, te_flags, panels)
 
-        # We map the strip generator over the left and right edges of every spanwise station!
+        # We map the strip generator over the left and right edges of every spanwise station
         y_lefts = y_coords[:-1]
         y_rights = y_coords[1:]
         
-        # JAX vmap is perfectly safe here because n_cw is static!
-        # The output of vmap is shape (n_sw, n_cw, 3). We use jnp.reshape to flatten it to (total_panels, 3).
         strip_results = jax.vmap(generate_strip)(y_lefts, y_rights)
         
         # Symmetry Calculation
@@ -336,6 +344,8 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
 
         strip_le      = jnp.reshape(strip_results[11], (-1,))
         strip_te      = jnp.reshape(strip_results[12], (-1,))
+
+        cw_panels     = jnp.reshape(strip_results[13], (-1,))
 
         n_panels      = strip_chords.shape[0]
         strip_ids     = jnp.full(n_panels, current_id)
@@ -358,8 +368,9 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         all_te.append(strip_te)
 
         all_surface_ids.append(strip_ids)
+        all_panels_per_strip.append(cw_panels)
 
-        # 3. If symmetric, mirror and append!
+        # 3. If symmetric, mirror and append
         if wing.symmetric:
             if wing.vertical:
                 mirrored_L_nodes = strip_L_nodes.at[:, 2].multiply(-1.0)
@@ -382,9 +393,11 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
                 mirrored_a2 = strip_a2.at[:, 1].multiply(-1.0)
                 mirrored_b1 = strip_b1.at[:, 1].multiply(-1.0)
                 mirrored_b2 = strip_b2.at[:, 1].multiply(-1.0)
+
+                total_strips += n_sw
             
             # CRITICAL: To maintain the Right-Hand Rule for vortex circulation, 
-            # the geometric "Left" and "Right" nodes must swap!
+            # the geometric "Left" and "Right" nodes must swap
             all_left_nodes.append(mirrored_R_nodes)
             all_right_nodes.append(mirrored_L_nodes)
             
@@ -402,13 +415,14 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
             all_le.append(strip_le)
             all_te.append(strip_te)
             all_surface_ids.append(-strip_ids)
+            all_panels_per_strip.append(cw_panels)
 
     # Concatenate all wings into the final VortexDistribution
     return VortexDistribution(
         bound_vortex_left=jnp.concatenate(all_left_nodes, axis=0),
         bound_vortex_right=jnp.concatenate(all_right_nodes, axis=0),
         collocation_points=jnp.concatenate(all_collocations, axis=0),
-        normal_vectors=jnp.concatenate(all_normals, axis=0),
+        normal_vectors=jnp.concatenate(all_normals),
         chord_lengths=jnp.concatenate(all_chords, axis=0),
         panel_areas=jnp.concatenate(all_areas, axis=0),
         tangent_incidence_angle=jnp.concatenate(all_incidences, axis=0),
@@ -418,7 +432,9 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         panel_corner_b2=jnp.concatenate(all_b2, axis=0),
         is_leading_edge=jnp.concatenate(all_le, axis=0),
         is_trailing_edge=jnp.concatenate(all_te, axis=0),
-        surface_id=jnp.concatenate(all_surface_ids, axis=0)
+        surface_id=jnp.concatenate(all_surface_ids, axis=0),
+        panels_per_strip=jnp.concatenate(all_panels_per_strip, axis=0),
+        total_strips = total_strips
     )
 
 
@@ -494,12 +510,13 @@ def generate_body_panel_coordinates(body, n_cw: int, n_sw: int, surface_id: int)
         chords = jnp.full(n_cw, (chord_a + chord_b) / 2.0)
         areas = chords * (y_b - y_a)
         incidences = jnp.zeros(n_cw)
+        panels = jnp.full(n_cw, n_cw, dtype=jnp.int32)
         
         le_flags = jnp.zeros(n_cw, dtype=bool).at[0].set(True)
         te_flags = jnp.zeros(n_cw, dtype=bool).at[-1].set(True)
         
         return (left_nodes, right_nodes, collocations, normals, chords, areas, incidences,
-                c_a1, c_a2, c_b1, c_b2, le_flags, te_flags)
+                c_a1, c_a2, c_b1, c_b2, le_flags, te_flags, panels)
 
     # 4. Vmap across the right-side strips
     y_lefts = y_coords[:-1]
@@ -525,6 +542,8 @@ def generate_body_panel_coordinates(body, n_cw: int, n_sw: int, surface_id: int)
 
     le_flags  = jnp.reshape(strip_results[11], (-1,))
     te_flags  = jnp.reshape(strip_results[12], (-1,))
+
+    cw_panels = jnp.reshape(strip_results[13], (-1,))
     
     num_panels = chords.shape[0]
     right_ids = jnp.full(num_panels, surface_id)
@@ -542,7 +561,7 @@ def generate_body_panel_coordinates(body, n_cw: int, n_sw: int, surface_id: int)
     
     left_ids  = jnp.full(num_panels, -surface_id)
 
-    # 7. Concatenate and Return! (Swapping L and R nodes on the left side to preserve Right Hand Rule)
+    # 7. Concatenate and Return (Swapping L and R nodes on the left side to preserve Right Hand Rule)
     return VortexDistribution(
         bound_vortex_left=jnp.concatenate([R_L_nodes, L_R_nodes], axis=0),
         bound_vortex_right=jnp.concatenate([R_R_nodes, L_L_nodes], axis=0),
@@ -557,11 +576,33 @@ def generate_body_panel_coordinates(body, n_cw: int, n_sw: int, surface_id: int)
         panel_corner_b2=jnp.concatenate([R_b2, L_b2], axis=0),
         is_leading_edge=jnp.concatenate([le_flags, le_flags], axis=0),
         is_trailing_edge=jnp.concatenate([te_flags, te_flags], axis=0),
-        surface_id=jnp.concatenate([right_ids, left_ids], axis=0)
+        surface_id=jnp.concatenate([right_ids, left_ids], axis=0),
+        panels_per_strip=jnp.concatenate([cw_panels, cw_panels], axis=0),
+        total_strips=n_sw*2
     )
-
 def combine_vortex_distributions(vd1: VortexDistribution, vd2: VortexDistribution) -> VortexDistribution:
-    return jax.tree_util.tree_map(lambda arr1, arr2: jnp.concatenate([arr1, arr2], axis=0), vd1, vd2)
+    merged_kwargs = {}
+    
+    # Iterate through every field in the Equinox module natively
+    for field in dataclasses.fields(vd1):
+        key = field.name
+        val1 = getattr(vd1, key)
+        val2 = getattr(vd2, key)
+
+        if key == "total_strips":
+            # Pure Python integer addition! (No JAX tracers involved)
+            merged_kwargs[key] = val1 + val2
+            
+        elif isinstance(val1, jnp.ndarray):
+            # Safely concatenate all the dynamic JAX geometry arrays
+            merged_kwargs[key] = jnp.concatenate([val1, val2], axis=0)
+            
+        else:
+            # Fallback for any other configuration flags (just passes vd1's value)
+            merged_kwargs[key] = val1
+
+    # Instantiate a brand new module, completely circumventing JAX Treedef mismatches
+    return VortexDistribution(**merged_kwargs)
 
 # ---------------------------------------------------------
 # Stateful Version
@@ -591,9 +632,12 @@ def generate_full_vortex_distribution(state: "State", system: "Aircraft", settin
             VD = combine_vortex_distributions(VD, nac_vd)
             
             body_id += 1
-    
-    total_strips = int(jnp.sum(VD.is_leading_edge))
-    VD = eqx.tree_at(lambda v: v.total_strips, VD, total_strips)
+
+    # Normal vector orientation correction
+    normal_arr = VD.normal_vectors
+    normal_arr = normal_arr.at[:,0].set(-normal_arr[:,0])
+    normal_arr = normal_arr.at[:,2].set(-normal_arr[:,2])
+    VD = eqx.tree_at(lambda v:v.normal_vectors, VD, normal_arr)
 
     n_panels    = VD.collocation_points.shape[0]
     n_time      = state.numerics.number_of_control_points

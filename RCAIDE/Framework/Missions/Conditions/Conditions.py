@@ -41,6 +41,11 @@ class Conditions(eqx.Module):
 
     def expand_rows(self, n: int):
 
+        CLASSES_TO_SKIP = (
+            'AtmosphericBreakpoints',
+            # Add any future classes to skip here
+        )
+
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray, np.ndarray)):
                 
@@ -61,7 +66,10 @@ class Conditions(eqx.Module):
                     
             return leaf
         
-        return jax.tree_util.tree_map(_expand, self)
+        def _is_static_node(node):
+            return hasattr(node, '__class__') and node.__class__.__name__ in CLASSES_TO_SKIP
+        
+        return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
     
     def add_subcondition(self, subcondition: "Conditions"):
 

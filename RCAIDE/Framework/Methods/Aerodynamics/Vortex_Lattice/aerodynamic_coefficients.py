@@ -26,16 +26,25 @@ if TYPE_CHECKING:
 # Trefftz Plane Induced Drag
 # ---------------------------------------------------------
 @jax.jit
-def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho, v_inf):
+def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
     """
     Computes Trefftz plane induced drag using JAX broadcasting.
-    Inputs are expected to be shape (n_time, n_spanwise_strips).
     """
-    cos_a = jnp.cos(alpha)[:, None]
-    sin_a = jnp.sin(alpha)[:, None]
+    n_time, n_strips = gamma_segments.shape
     
+    # Force coordinates to (n_time, n_strips)
+    y_ctrl = jnp.broadcast_to(y_ctrl.reshape(-1, n_strips), (n_time, n_strips))
+    z_ctrl = jnp.broadcast_to(z_ctrl.reshape(-1, n_strips), (n_time, n_strips))
+    x_ctrl = jnp.broadcast_to(x_ctrl.reshape(-1, n_strips), (n_time, n_strips))
+    
+    # Force alpha to (n_time, 1)
+    alpha = alpha.reshape(n_time, 1)
+    cos_a = jnp.cos(alpha)
+    sin_a = jnp.sin(alpha)
+    
+    # Trefftz Plane Transformation
     tp_y_ctrl = y_ctrl
-    tp_z_ctrl = z_ctrl * cos_a - x_ctrl * sin_a
+    tp_z_ctrl = z_ctrl * cos_a - x_ctrl * sin_a  # Now guaranteed perfectly (16, 42)!
     
     tp_y_center = (tp_y_ctrl[:, :-1] + tp_y_ctrl[:, 1:]) / 2.0
     tp_z_center = (tp_z_ctrl[:, :-1] + tp_z_ctrl[:, 1:]) / 2.0
@@ -44,11 +53,13 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho, v_
     direction = jnp.sign(dy)
     shed_vortex = direction * (gamma_segments[:, 1:] - gamma_segments[:, :-1])
     
-    dy_mat = tp_y_ctrl[:, :, None] - tp_y_center[:, None, :]
-    dz_mat = tp_z_ctrl[:, :, None] - tp_z_center[:, None, :]
+    # Distance Matrices
+    dy_mat = tp_y_ctrl[:, :, None] - tp_y_center[:, None, :] 
+    dz_mat = tp_z_ctrl[:, :, None] - tp_z_center[:, None, :] 
     
     r = jnp.sqrt(dy_mat**2 + dz_mat**2)
     
+    # Induced Velocities
     slope = jnp.gradient(tp_z_ctrl, axis=1) / jnp.gradient(tp_y_ctrl, axis=1)
     n_hat_y = jnp.cos(jnp.arctan2(-1.0, slope))
     n_hat_z = jnp.sin(jnp.arctan2(-1.0, slope))
@@ -59,8 +70,11 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho, v_
     
     v_induced = jnp.sum(v_ind_y * n_hat_y[:, :, None] + v_ind_z * n_hat_z[:, :, None], axis=2)
     
+    # Integrate Drag
     ds = jnp.sqrt(jnp.diff(y_ctrl, axis=1)**2 + jnp.diff(z_ctrl, axis=1)**2)
     integrand = v_induced[:, :-1] * gamma_segments[:, :-1] + v_induced[:, 1:] * gamma_segments[:, 1:]
+    
+    rho = rho.reshape(n_time) # Ensure 1D for safety
     D_induced = -0.25 * rho * jnp.sum(integrand * ds, axis=1)
     
     return D_induced, v_induced
@@ -75,169 +89,210 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     Computes CL, CD, CM, CY, Cl, Cn and induced drag.
     Maintains 1:1 parity with VORLAX LE Suction and Strip integrations.
     """
-    # 1. Extract States & Reference Values
-    alpha = state.freestream.angles.alpha[:, None]
-    beta = state.freestream.angles.beta[:, None]
-    v_inf = state.freestream.speed[:, None]
-    mach = state.freestream.mach_number[:, None]
-    rho = state.freestream.density[:, None]
+    # Extract States & Reference Values
+    alpha   = state.aerodynamics.angles.alpha
+    beta    = state.aerodynamics.angles.beta
+    v_inf   = state.freestream.speed
+    mach    = state.freestream.mach_number
+    rho     = state.freestream.density
     
-    S_ref = system.reference_geometry.reference_area
-    c_ref = system.reference_geometry.reference_chord
-    b_ref = system.reference_geometry.reference_span
-    cg = system.reference_geometry.center_of_gravity
-    x_m, y_m, z_m = cg[0], cg[1], cg[2]
+    S_ref = system.areas.reference
+    c_ref = system.reference_geometry.mean_aerodynamic_chord
+    b_ref = system.reference_geometry.projected_span
+    
+    cg    = system.reference_geometry.center_of_gravity
+    x_m   = cg[:, 0][:, None]
+    y_m   = cg[:, 1][:, None]
+    z_m   = cg[:, 2][:, None]
     
     # Pre-compute Trig
-    SINALF, COSALF, TANALF = jnp.sin(alpha), jnp.cos(alpha), jnp.tan(alpha)
-    SINPSI, COPSI = jnp.sin(beta), jnp.cos(beta)
-    COSIN = COSALF * SINPSI * 2.0
+    sin_alpha, cos_alpha, tan_alpha = jnp.sin(alpha), jnp.cos(alpha), jnp.tan(alpha)
+    sin_beta, cos_beta = jnp.sin(beta), jnp.cos(beta)
+    crosswind_factor = cos_alpha * sin_beta * 2.0
     
-    # 2. Geometry & Strip Mapping
-    le_mask = VD.is_leading_edge
-    strip_ids = jnp.cumsum(le_mask) - 1 # Assigns 0, 1, 2... to each spanwise strip!
+    # Geometry & Strip Mapping
+    # JAX-compatible leading edge mask
+    le_mask_float = VD.is_leading_edge.astype(jnp.float32)
+    strip_ids = jnp.cumsum(VD.is_leading_edge) - 1 # Assigns 0, 1, 2... to each spanwise strip
     
-    RNMAX = VD.panels_per_strip
-    RNMAX_strip = RNMAX[le_mask]
-    CHORD_strip = VD.chord_lengths[le_mask]
+    panels_per_strip = VD.panels_per_strip
+    stripwise_panels = jax.ops.segment_max(VD.panels_per_strip, strip_ids, num_segments=VD.total_strips)
+    stripwise_chords = jax.ops.segment_max(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
     
-    # Local Panel Sweep and Dihedral
-    dy_LE = VD.panel_corner_b1[le_mask, 1] - VD.panel_corner_a1[le_mask, 1]
-    dz_LE = VD.panel_corner_b1[le_mask, 2] - VD.panel_corner_a1[le_mask, 2]
-    dx_LE = VD.panel_corner_b1[le_mask, 0] - VD.panel_corner_a1[le_mask, 0]
+    # Local Panel Sweep and Dihedral (All panels)
+    dx_all = VD.panel_corner_b1[:, 0] - VD.panel_corner_a1[:, 0]
+    dy_all = VD.panel_corner_b1[:, 1] - VD.panel_corner_a1[:, 1]
+    dz_all = VD.panel_corner_b1[:, 2] - VD.panel_corner_a1[:, 2]
+
+    # Extract the leading edge values using the float mask and segment_sum
+    # (The trailing edge panels are zeroed out, then collapsed into the strips)
+    dy_LE = jax.ops.segment_sum(dy_all * le_mask_float, strip_ids, num_segments=VD.total_strips)
+    dz_LE = jax.ops.segment_sum(dz_all * le_mask_float, strip_ids, num_segments=VD.total_strips)
+    dx_LE = jax.ops.segment_sum(dx_all * le_mask_float, strip_ids, num_segments=VD.total_strips)
     
-    dist_LE = jnp.maximum(jnp.sqrt(dy_LE**2 + dz_LE**2), 1e-12)
-    TLE = dx_LE / dist_LE
-    COD = dy_LE / dist_LE  # cos(dihedral)
-    SID = dz_LE / dist_LE  # sin(dihedral)
+    dihedral_length_LE = jnp.maximum(jnp.sqrt(dy_LE**2 + dz_LE**2), 1e-12)
+    true_sweep_LE = dx_LE / dihedral_length_LE # leading edge sweep in the plane of the wing
+    cos_dihedral = jnp.abs(dy_LE) / dihedral_length_LE  # cos(dihedral), absolute value for negative sign in left hand sings
+    sin_dihedral = jnp.sign(dy_LE) * dz_LE / dihedral_length_LE  # sin(dihedral) - multiply by dy_LE so opposed vectors cancel
     
-    # 3. Panel Forces (SINF, CAXL, BMLE)
-    PION = 2.0 / RNMAX
-    ADC = 0.5 * PION
-    XLE = 0.125 * PION
-    SINF = ADC[None, :] * DCP
+    # Panel Forces
+    panel_dx_nondim = 1.0 / panels_per_strip
+    quarter_chord_offset = 0.25 * panel_dx_nondim
+    panel_normal_coeff = panel_dx_nondim[None, :] * DCP
     
     # Local slope (TX = -nx/nz)
-    nx, _, nz = VD.normal_vectors[:, 0], VD.normal_vectors[:, 1], VD.normal_vectors[:, 2]
-    TX = -nx / jnp.maximum(jnp.abs(nz), 1e-12)
+    nx, _, nz = VD.normal_vectors[:, 0], VD.normal_vectors[:, 1], VD.normal_vectors[:, 2] # Z points down by convention
+    panel_chordwise_slope = -nx / jnp.maximum(jnp.abs(nz), 1e-12)
     
-    CAXL_panel = -SINF * TX[None, :] / (1.0 + TX[None, :]**2)
+    panel_axial_coeff = -panel_normal_coeff * panel_chordwise_slope[None, :] / (1.0 + panel_chordwise_slope[None, :]**2)
     
-    # Derive chordwise index (RK = 1, 2, 3...)
-    panel_indices = jnp.arange(len(le_mask))
-    strip_start_indices = panel_indices[le_mask][strip_ids]
-    RK = panel_indices - strip_start_indices + 1.0
+    # Derive chordwise index
+    panel_indices = jnp.arange(VD.collocation_points.shape[0])
+    strip_starts = jax.ops.segment_min(panel_indices, strip_ids, num_segments=VD.total_strips)
+    strip_start_indices = strip_starts[strip_ids]
+    chordwise_indices = panel_indices - strip_start_indices + 1.0
     
-    XX = (RK - 0.75) * PION / 2.0
-    BMLE_panel = (XLE[None, :] - XX[None, :]) * SINF
+    vortex_x_nondim = (chordwise_indices - 0.75) * panel_dx_nondim
+    panel_pitching_moment = (quarter_chord_offset[None, :] - vortex_x_nondim[None, :]) * panel_normal_coeff
     
     # Rolling couple from sideslip
-    X = VD.collocation_points[:, 0]
-    XTE = (VD.panel_corner_a2[:, 0] + VD.panel_corner_b2[:, 0]) / 2.0
-    CORMED = XTE - X
-    SICPLE_panel = SINF * CORMED[None, :]
+    collocation_x = VD.collocation_points[:, 0]
+    trailing_edge_x_avg = (VD.panel_corner_a2[:, 0] + VD.panel_corner_b2[:, 0]) / 2.0
+    rear_quarter_x = trailing_edge_x_avg - collocation_x
+    panel_sideslip_couple = panel_normal_coeff * rear_quarter_x[None, :]
     
-    # 4. Integrate Panels into Strips (jax.ops.segment_sum)
+    # Integrate Panels into Strips (jax.ops.segment_sum)
     # Vmap the segment sum across the n_time batch dimension
     seg_sum = jax.vmap(lambda arr: jax.ops.segment_sum(arr, strip_ids, num_segments=VD.total_strips))
     
-    CNC = seg_sum(SINF)
-    CAXL = seg_sum(CAXL_panel)
-    BMLE = seg_sum(BMLE_panel)
-    SICPLE = seg_sum(SICPLE_panel)
+    # Sum and linearly dimensionalize coefficients
+    normal_coeff    = seg_sum(panel_normal_coeff)    * stripwise_chords[None, :]
+    axial_coeff     = seg_sum(panel_axial_coeff)     * stripwise_chords[None, :] 
+    pitching_moment = seg_sum(panel_pitching_moment) * (stripwise_chords[None, :] ** 2)
     
-    SICPLE = SICPLE * (-1.0) * COSIN * COD[None, :] * 0.5 # GAF approx = 0.5
+    sideslip_couple = seg_sum(panel_sideslip_couple) * stripwise_chords[None, :]
+    sideslip_couple = sideslip_couple * (-1.0) * crosswind_factor * cos_dihedral[None, :] * 0.5 # GAF approx = 0.5
     
-    # 5. VORLAX Leading Edge Suction (CLE & CSUC)
+    # VORLAX Leading Edge Suction
     if settings.analysis.aerodynamics.VORLAX_empirical_corrections:
-        # Recreate CLE = sum(EW * Gamma) - EFFINC
-        EW_LE = EW[:, le_mask, :] # Shape: (n_time, n_strips, N)
-        CLE_ind = jnp.sum(EW_LE * GAMMA[:, None, :], axis=2)
+        EW_squeezed = EW.squeeze(1)
+        EW_masked   = EW_squeezed * le_mask_float[None, :, None]
+        EW_LE       = seg_sum(EW_masked)
         
-        EFFINC_LE = jnp.sum(v_total[:, le_mask, :] * VD.normal_vectors[None, le_mask, :], axis=2)
-        CLE = CLE_ind - EFFINC_LE
-        
-        B2_LE = jnp.square(mach) - 1.0
-        T2 = jnp.square(TLE)[None, :]
-        STB = jnp.where(B2_LE < T2, jnp.sqrt(jnp.maximum(T2 - B2_LE, 0.0)), 0.0)
-        
-        CLE = jnp.where(STB > 0, CLE / RNMAX_strip[None, :] / STB, CLE)
-        CLE = CLE + 0.5 * DCP[:, le_mask] * jnp.sqrt(XLE[le_mask])[None, :]
-        
-        SPC = 1.0 # Vortex lift flag hook
-        CSUC = 0.5 * jnp.pi * jnp.abs(SPC) * jnp.square(CLE) * STB
-        
-        # Suction Resolution (TFX, TFZ)
-        TFX = jnp.ones_like(CSUC)
-        TFZ = -VD.tangent_incidence_angle[le_mask][None, :]
-        
-        CAXL = CAXL - TFX * CSUC
-        CNC = CNC + CSUC * jnp.sqrt(1.0 + T2) * TFZ
+        v_total_masked  = v_total * le_mask_float[None, :, None]
+        v_total_LE      = seg_sum(v_total_masked)
 
-    # 6. Body Axis Transformation
-    ZETA = VD.tangent_incidence_angle[le_mask][None, :]
-    FCOS, FSIN = jnp.cos(ZETA), jnp.sin(ZETA)
+        # Use jax.ops directly for static geometry, and broadcast the mask [:, None]
+        normals_masked  = VD.normal_vectors * le_mask_float[:, None]
+        normals_LE      = jax.ops.segment_sum(normals_masked, strip_ids, num_segments=VD.total_strips)
+        
+        induced_velocity_LE     = jnp.sum(EW_LE * GAMMA[:, None, :], axis=-1)
+        eff_incidence_LE        = jnp.sum(v_total_LE * normals_LE[None, :, :], axis=-1)
+        singularity_strength_LE = induced_velocity_LE - eff_incidence_LE
+        
+        prandtl_glauert_beta_sq = jnp.square(mach) - 1.0
+        sweep_sq = jnp.square(true_sweep_LE)[None, :]
+        subsonic_LE_factor = jnp.where(
+            prandtl_glauert_beta_sq < sweep_sq,
+            jnp.sqrt(jnp.maximum(sweep_sq - prandtl_glauert_beta_sq, 0.0)),
+            0.0
+        )
+        
+        # Use jax.ops for the 1D structural XLE array
+        strip_quarter_chord_offset = jax.ops.segment_sum(quarter_chord_offset * le_mask_float, strip_ids, num_segments=VD.total_strips)
+        strip_DCP = seg_sum(DCP * le_mask_float[None, :])
+
+        # Lan's approximation of LE pressure correction
+        singularity_strength_LE = jnp.where(
+            subsonic_LE_factor > 0,
+            singularity_strength_LE / stripwise_panels[None, :] / subsonic_LE_factor,
+            singularity_strength_LE
+        )
+        
+        singularity_strength_LE = singularity_strength_LE + 0.5 * strip_DCP * jnp.sqrt(strip_quarter_chord_offset)[None, :]
+        
+        suction_flag = 1.0
+        suction_coeff_LE = 0.5 * jnp.pi * jnp.abs(suction_flag) * jnp.square(singularity_strength_LE) * subsonic_LE_factor
+        
+        # Use jax.ops for tangent_incidence_angle
+        suction_vector_x = jnp.ones_like(suction_coeff_LE)
+        suction_vector_z = -jax.ops.segment_sum(VD.tangent_incidence_angle * le_mask_float, strip_ids, num_segments=VD.total_strips)[None, :]
+        
+        axial_coeff = axial_coeff - suction_vector_x * suction_coeff_LE
+        normal_coeff = normal_coeff + suction_coeff_LE * jnp.sqrt(1.0 + sweep_sq) * suction_vector_z
+
+    # Body Axis Transformation
+    incidence_angle = jax.ops.segment_sum(VD.tangent_incidence_angle * le_mask_float, strip_ids, num_segments=VD.total_strips)[None, :]
+    cos_incidence, sin_incidence = jnp.cos(incidence_angle), jnp.sin(incidence_angle)
     
-    BFX = -CNC * FSIN + CAXL * FCOS
-    BFY = -(CNC * FCOS + CAXL * FSIN) * SID[None, :]
-    BFZ =  (CNC * FCOS + CAXL * FSIN) * COD[None, :]
+    strip_body_force_x =  -normal_coeff * sin_incidence + axial_coeff * cos_incidence
+    strip_body_force_y = -(normal_coeff * cos_incidence + axial_coeff * sin_incidence) * sin_dihedral[None, :]
+    strip_body_force_z =  (normal_coeff * cos_incidence + axial_coeff * sin_incidence) * cos_dihedral[None, :]
     
-    CNC = CNC * CHORD_strip[None, :]
-    BMLE = BMLE * CHORD_strip[None, :]
+    # Get leading-edge collocation points
+    colloc_LE = jax.ops.segment_sum(VD.collocation_points * le_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
     
-    X_s = VD.collocation_points[le_mask, 0][None, :]
-    Y_s = VD.collocation_points[le_mask, 1][None, :]
-    Z_s = VD.collocation_points[le_mask, 2][None, :]
+    colloc_LE_x = colloc_LE[:, 0][None, :]
+    colloc_LE_y = colloc_LE[:, 1][None, :]
+    colloc_LE_z = colloc_LE[:, 2][None, :]
     
-    BMX = BFZ * Y_s - BFY * (Z_s - z_m) + SICPLE
-    BMY = BMLE * COD[None, :] + BFX * (Z_s - z_m) - BFZ * (X_s - x_m)
-    BMZ = BMLE * SID[None, :] - BFX * Y_s + BFY * (X_s - x_m)
+    strip_body_moment_x = strip_body_force_z * colloc_LE_y - strip_body_force_y * (colloc_LE_z - z_m) + sideslip_couple
+    strip_body_moment_y = pitching_moment * cos_dihedral[None, :] + strip_body_force_x * (colloc_LE_z - z_m) - strip_body_force_z * (colloc_LE_x - x_m)
+    strip_body_moment_z = pitching_moment * sin_dihedral[None, :] - strip_body_force_x * colloc_LE_y + strip_body_force_y * (colloc_LE_x - x_m)
     
-    # 7. Strip Aerodynamic Integration
-    s_half = jnp.abs(VD.panel_corner_b1[le_mask, 1] - VD.panel_corner_a1[le_mask, 1])
-    ES = 2.0 * s_half
-    STRIP_AREA = ES * CHORD_strip
+    # Strip Aerodynamic Integration: collapse, then slice the Y column [:, 1]
+    corner_b1_LE = jax.ops.segment_sum(VD.panel_corner_b1 * le_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    corner_a1_LE = jax.ops.segment_sum(VD.panel_corner_a1 * le_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
     
-    LIFT = (BFZ * COSALF - (BFX * COPSI + BFY * SINPSI) * SINALF) * STRIP_AREA[None, :]
-    FY = (BFY * COPSI - BFX * SINPSI) * STRIP_AREA[None, :]
-    MOMENT = STRIP_AREA[None, :] * (BMY * COPSI - BMX * SINPSI)
+    panel_span_LE = jnp.abs(corner_b1_LE[:, 1] - corner_a1_LE[:, 1])
+    strip_area = panel_span_LE * stripwise_chords
     
-    RM = STRIP_AREA[None, :] * (BMX * COSALF * COPSI + BMY * COSALF * SINPSI + BMZ * SINALF)
-    YM = STRIP_AREA[None, :] * (BMZ * COSALF - (BMX * COPSI + BMY * SINPSI) * SINALF)
+    lift = (strip_body_force_z * cos_alpha - (strip_body_force_x * cos_beta + strip_body_force_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
+    force_y = (strip_body_force_y * cos_beta - strip_body_force_x * sin_beta) * strip_area[None, :]
+    moment = strip_area[None, :] * (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta)
+    
+    strip_rolling_moment = (strip_body_moment_x * cos_alpha * cos_beta + strip_body_moment_y * cos_alpha * sin_beta + strip_body_moment_z * sin_alpha)
+    strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha)
     
     # Global Coefficients
-    CL = jnp.sum(LIFT, axis=1) / S_ref
-    CY = jnp.sum(FY, axis=1) / S_ref
-    CM = jnp.sum(MOMENT, axis=1) / (S_ref * c_ref)
+    CL = jnp.sum(lift, axis=1) / S_ref              # Lift coefficient
+    CY = jnp.sum(force_y, axis=1) / S_ref           # Side-force coefficient
+    CM = jnp.sum(moment, axis=1) / (S_ref * c_ref)  # Pitch moment coefficient
     
-    CRTOT = jnp.sum(RM, axis=1) / S_ref
-    Cl_roll = -CRTOT / b_ref
+    Cl_roll = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref) # Rolling moment, negative for sign conventions
+    Cn_yaw  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)  # Yawing moment, negative for sign conventions
     
-    CNTOT = jnp.sum(YM, axis=1) / S_ref
-    Cn_yaw = -CNTOT / b_ref
+    # Trefftz Plane Induced Drag
+    # JAX-compatible trailing edge mask
+    te_mask_float = VD.is_trailing_edge.astype(jnp.float32)
     
-    # 8. Trefftz Plane Induced Drag
-    y_ctrl = jnp.reshape(VD.collocation_points[:, 1], (-1, VD.panels_per_strip[0]))[:, 0]
-    z_ctrl = jnp.reshape(VD.collocation_points[:, 2], (-1, VD.panels_per_strip[0]))[:, 0]
-    x_ctrl = jnp.reshape(VD.collocation_points[:, 0], (-1, VD.panels_per_strip[0]))[:, 0]
+    # Extract TE coordinates directly
+    te_coords = jax.ops.segment_sum(VD.collocation_points * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    x_ctrl = te_coords[:, 0]
+    y_ctrl = te_coords[:, 1]
+    z_ctrl = te_coords[:, 2]
     
-    gamma_reshaped = jnp.reshape(GAMMA, (GAMMA.shape[0], -1, VD.panels_per_strip[0]))
-    gamma_spanwise = jnp.sum(gamma_reshaped, axis=2)
+    # Sum gamma over strip
+    gamma_spanwise = seg_sum(GAMMA)
+    gamma_physical = gamma_spanwise * v_inf
     
     D_induced, _ = _compute_trefftz_drag(
         y_ctrl[None, :], z_ctrl[None, :], x_ctrl[None, :], 
-        gamma_spanwise, alpha[:, 0], rho[:, 0], v_inf[:, 0]
+        gamma_physical, alpha[:, 0], rho[:, 0]
     )
     
     CDi = D_induced / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)
     
     # Profile Drag (CX and CZ projection back to Wind Axes)
-    CX = (TANALF[:, 0] * CL - CDi) / (COSALF[:, 0] - SINALF[:, 0] * TANALF[:, 0])
-    CZ = (CDi + CX * COSALF[:, 0]) / SINALF[:, 0]
+    cx_denom = cos_alpha[:, 0] - sin_alpha[:, 0] * tan_alpha[:, 0]
+    safe_cx_denom = jnp.where(jnp.abs(cx_denom) < 1e-8, 1e-8 * jnp.sign(cx_denom + 1e-12), cx_denom)
+    CX =  (tan_alpha[:, 0] * CL - CDi) / safe_cx_denom
     
-    CD = CDi + CX * COSALF[:, 0] * COPSI[:, 0] + CY * SINPSI[:, 0] + CZ * SINALF[:, 0] * COPSI[:, 0]
+    safe_sinalf = jnp.where(jnp.abs(sin_alpha[:, 0]) < 1e-8, 1e-8 * jnp.sign(sin_alpha[:, 0] + 1e-12), sin_alpha[:, 0])
+    CZ = (CDi + CX * cos_alpha[:, 0]) / safe_sinalf
     
-    return CL, CD, CDi, CM, CY, Cl_roll, Cn_yaw
+    CD = CDi + CX * cos_alpha[:, 0] * cos_beta[:, 0] + CY * sin_beta[:, 0] + CZ * sin_alpha[:, 0] * cos_beta[:, 0]
+    return CL, CD, CDi, CM, Cl_roll, Cn_yaw
 
 def compute_coefficients(state: "State", system: "System", settings: "Settings"):
     """ Final VLM step to extract global coefficients and append to State. """
@@ -247,7 +302,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
 
     # TODO: Add State bookkeeping for secondary coefficients
     # TODO: Add book-keeping for individual wing coefficients
-    CL, CD, CDi, CM, CY, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
+    CL, CD, CDi, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
         VD,
         analysis["pressure_coefficients"],
         analysis["vortex_strengths"],
@@ -259,8 +314,12 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     )
     
     # Update the Vehicle/Segment State with the aerodynamic forces
-    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL)
-    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CD)
-    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi)    
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CD[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi[:, None])
+
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.pitch, state, CM[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.roll,  state, Cl_roll[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.yaw,   state, Cn_yaw[:, None])
     
     return state, system, settings

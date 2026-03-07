@@ -8,11 +8,13 @@ from functools import reduce
 
 import jax
 from jax import value_and_grad, jit
+# jax.config.update("jax_disable_jit", True)
 
 import equinox as eqx
 import jax.numpy as jnp
 
 from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
+from RCAIDE.Framework.Missions.Conditions import Numerics
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Segments.Profiles import ConstantSpeed, ConstantAltitude, FixedDistance
@@ -81,7 +83,7 @@ def vehicle_setup():
 
     # Root Segment
 
-    root_sweeps = WingSweeps(
+    root_sweeps  = WingSweeps(
         quarter_chord=jnp.deg2rad(28.225)
     )
     root_segment = WingSegment(
@@ -96,7 +98,7 @@ def vehicle_setup():
     )
 
     # Yehudi Segment
-    yehudi_sweeps = WingSweeps(
+    yehudi_sweeps  = WingSweeps(
         quarter_chord=jnp.deg2rad(25.)
     )
     yehudi_segment = WingSegment(
@@ -112,7 +114,7 @@ def vehicle_setup():
 
     # Mid Segment
 
-    mid_sweeps = WingSweeps(
+    mid_sweeps  = WingSweeps(
         quarter_chord=jnp.deg2rad(56.75)
     )
     mid_segment = WingSegment(
@@ -175,7 +177,7 @@ def vehicle_setup():
     main_sweeps = WingSweeps(
         quarter_chord=jnp.deg2rad(25.)
     )
-    main_spans = WingDimensions(
+    main_spans  = WingDimensions(
         projected = 34.32
     )
     main_chords = WingChords(
@@ -183,7 +185,7 @@ def vehicle_setup():
         tip              = 0.782,
         mean_aerodynamic = 4.235,
     )
-    main_areas = ComponentAreas(
+    main_areas  = ComponentAreas(
         reference         = 124.862,
         wetted            = 225.08,
     )
@@ -196,7 +198,6 @@ def vehicle_setup():
         tag='Main Wing',
         aspect_ratio=10.18,
         thickness_to_chord=0.1,
-        taper=0.1,
         origin=jnp.array([[13.61, 0., -0.93]]),
         aerodynamic_center=jnp.array([0, 0, 0]),
         vertical= False,
@@ -376,8 +377,6 @@ def vehicle_setup():
     # ------------------------------------------------------------------------------------------------------------------
     # Fuselage
     # ------------------------------------------------------------------------------------------------------------------
-
-
 
     # Fuselage Segments ------------------------------------------------------------------------------------------------
 
@@ -666,12 +665,9 @@ def vehicle_setup():
 
 def mission_setup(state: "State", system: "System", settings: "Settings"):
 
+    # TODO: Create pre-set controls with paths/indices
     controls = (
-        DirectControlVariable(
-            tag='angle_of_attack',
-            path=("aerodynamics", "angles", "alpha"),
-            active=True
-        ),
+        "body_angle",
         DirectControlVariable(
             tag='Thrust',
             path=("frames", "body", "thrust_force_vector",),
@@ -688,7 +684,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
         active_residuals=("force_x", "force_z"),
-        controls_initial_guess=(1.0, 0.05)
+        controls_initial_guess=(3 * Units.deg, 10000. * Units.N),
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
@@ -717,7 +713,9 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
 
 def state_setup():
 
-    state = State()
+    numerics = Numerics(number_of_control_points=4)
+    
+    state = State(numerics=numerics)
 
     state = eqx.tree_at(lambda s: s.freestream.atmosphere, state, USStandard1976(), is_leaf=lambda x: x is None)
 
@@ -740,14 +738,27 @@ def mission_b737(state, system, settings):
 
 if __name__ == '__main__':
 
+    print("Setting up mission ...")
+
     state = state_setup()
     system = vehicle_setup()
     settings = Settings()
 
+    print("Setup complete, starting mission ...")
+
     final_state, _, _ = mission_b737(state, system, settings)
-        
-    print(f"AoA: {final_state.aerodynamics.angles.alpha}")
-    print(f"Thrust: {final_state.frames.body.thrust_force_vector[:, 0]}")
+    
+    print("Controls:")
+    print(f"  AoA: {final_state.aerodynamics.angles.alpha.item(0):.2f}")
+    print(f"  Thrust: {final_state.frames.body.thrust_force_vector[:, 0].item(0):.2f}")
+    print(f"\nAerodynamics:")
+    print(f"  CL: {final_state.aerodynamics.coefficients.lift.total.item(0):.2f}")
+    print(f"  CD: {final_state.aerodynamics.coefficients.drag.total.item(0):.2f}")
+    print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total.item(0):.2f}")
+    print(f"\n  Cm: {final_state.aerodynamics.coefficients.moments.pitch.item(0):.2f}")
+    print(f"  Cl: {final_state.aerodynamics.coefficients.moments.roll.item(0):.2f}")
+    print(f"  Cn: {final_state.aerodynamics.coefficients.moments.yaw.item(0):.2f}")
+    
 
     # def CL_M(total_mass, state, system, settings):
     #     # Setup Phase (Pure Python, executes every time)
@@ -795,4 +806,4 @@ if __name__ == '__main__':
     
     # avg_time = (t3 - t2) / iterations
     # print(f"Average Total Time (Setup + Execution): {avg_time:.6f} seconds per run")
-    # print(f"Equivalent to {1 / avg_time:.2f} full mission evaluations per second!")
+    # print(f"Equivalent to {1 / avg_time:.2f} full mission evaluations per second")
