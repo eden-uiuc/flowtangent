@@ -108,7 +108,7 @@ def supersonic_jax(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, TOLSQ2,
     T2A = jnp.where(LE_ind, 0.0, jnp.roll(T2S, shift=1))
     
     TRANS = (B2[:, 0, :] - T2F[None, :]) * (B2[:, 0, :] - T2A[None, :])
-    RFLAG = jnp.where(TRANS < 0, 0, 1) # Shape (n_mach, N)
+    RFLAG = jnp.where(TRANS < 0, 0, 1) # Shape (n_time, N)
     sonic_mask = (TRANS < 0)
     
     sonic_matrix = jnp.diag(jnp.full(N, 2.0)) + jnp.diag(jnp.full(N-1, -1.0), k=-1) + jnp.diag(jnp.full(N-1, -1.0), k=1)
@@ -123,7 +123,7 @@ def supersonic_jax(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, TOLSQ2,
 def compute_induced_velocity_matrix(VD, mach_array):
     """
     Computes the Aerodynamic Influence Coefficient matrix C_mn.
-    Output Shape: (n_mach, N, N, 3)
+    Output Shape: (n_time, N, N, 3)
     """
     N = VD.collocation_points.shape[0]
     
@@ -185,7 +185,7 @@ def compute_induced_velocity_matrix(VD, mach_array):
     XSQ1 = X1 * X1
     XSQ2 = X2 * X2
     
-    # 4. Temporal Mach Broadcasting to (n_mach, N, N)
+    # 4. Temporal Mach Broadcasting to (n_time, N, N)
     mach = mach_array[:, None, None]
     B2 = jnp.square(mach) - 1.0
     RO1 = B2 * RTV1[None, :, :]
@@ -217,23 +217,21 @@ def compute_induced_velocity_matrix(VD, mach_array):
     # Fix RFLAG (Subsonic is always 1)
     RFLAG = jnp.where(is_subsonic[:, :, 0], 1, RFLAG)
     
-    # Legacy VORLAX Downwash calcuation
+    # Legacy VORLAX downwash calcuation
     
     # Panel Dihedral Angle (DL) using bound vortex nodes (AH and BH)
     # Original: D = sqrt((YAH-YBH)**2 + (ZAH-ZBH)**2)
     dy_h = VD.bound_vortex_right[:, 1] - VD.bound_vortex_left[:, 1]
     dz_h = VD.bound_vortex_right[:, 2] - VD.bound_vortex_left[:, 2]
-    
-    dist_h = jnp.maximum(jnp.sqrt(dy_h**2 + dz_h**2), 1e-12)
-    cos_dl = dy_h / dist_h
-    
-    DL = jnp.arccos(cos_dl)
-    DL = jnp.where(DL > jnp.pi / 2.0, DL - jnp.pi, DL) # Flip dihedral for the other side
-    
+
+    DL = jnp.arctan2(dz_h, dy_h)
+    DL = jnp.where(DL > jnp.pi / 2.0, DL - jnp.pi, DL)
+    DL = jnp.where(DL < -jnp.pi / 2.0, DL + jnp.pi, DL)
+
     # Broadcast the relative dihedral: DL.T - DL -> DL_receiver - DL_sender
     DL_diff = DL[:, None] - DL[None, :]
     
-    # Broadcast over the Mach dimension (n_mach, N, N)
+    # Broadcast over the time dimension (n_time, N, N)
     COS1 = jnp.cos(DL_diff)[None, :, :]
     SIN1 = jnp.sin(DL_diff)[None, :, :]
     

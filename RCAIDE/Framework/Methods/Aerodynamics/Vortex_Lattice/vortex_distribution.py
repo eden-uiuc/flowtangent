@@ -325,97 +325,83 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         y_rights = y_coords[1:]
         
         strip_results = jax.vmap(generate_strip)(y_lefts, y_rights)
-        
-        # Symmetry Calculation
 
-        # 1. Grab the generated arrays for the right side of the aircraft
-        strip_L_nodes = jnp.reshape(strip_results[0], (-1, 3)) + wing.origin
-        strip_R_nodes = jnp.reshape(strip_results[1], (-1, 3)) + wing.origin
-        strip_C_nodes = jnp.reshape(strip_results[2], (-1, 3)) + wing.origin
+        # Batch reshape of coordinates
+        coord_indices = [0, 1, 2, 7, 8, 9, 10]
+        coord_arrays = [jnp.reshape(strip_results[i], (-1, 3)) for i in coord_indices]
+
+        # Reshape normals without origin shift
         strip_normals = jnp.reshape(strip_results[3], (-1, 3))
-        strip_chords  = jnp.reshape(strip_results[4], (-1,))
-        strip_areas   = jnp.reshape(strip_results[5], (-1,))
-        strip_inc     = jnp.reshape(strip_results[6], (-1,))
-        
-        strip_a1      = jnp.reshape(strip_results[7], (-1, 3)) + wing.origin
-        strip_a2      = jnp.reshape(strip_results[8], (-1, 3)) + wing.origin
-        strip_b1      = jnp.reshape(strip_results[9], (-1, 3)) + wing.origin
-        strip_b2      = jnp.reshape(strip_results[10], (-1, 3)) + wing.origin
 
-        strip_le      = jnp.reshape(strip_results[11], (-1,))
-        strip_te      = jnp.reshape(strip_results[12], (-1,))
+        # Batch reshape of scalar properties
+        scalar_indices = [4, 5, 6, 11, 12, 13]
+        strip_chords, strip_areas, strip_inc, strip_le, strip_te, cw_panels = [
+            jnp.reshape(strip_results[i], (-1,)) for i in scalar_indices
+        ]
 
-        cw_panels     = jnp.reshape(strip_results[13], (-1,))
+        n_panels = strip_chords.shape[0]
+        strip_ids = jnp.full(n_panels, current_id)
 
-        n_panels      = strip_chords.shape[0]
-        strip_ids     = jnp.full(n_panels, current_id)
+        arrays_3d = coord_arrays + [strip_normals]
 
-        # 2. Append the original right-side geometry
-        all_left_nodes.append(strip_L_nodes)
-        all_right_nodes.append(strip_R_nodes)
-        all_collocations.append(strip_C_nodes)
+        # 2. Vertical Orientation (90-deg rotation on all 3D arrays)
+        if wing.vertical:
+            for i in range(len(arrays_3d)):
+                y_old, z_old = arrays_3d[i][:, 1], arrays_3d[i][:, 2]
+                arrays_3d[i] = arrays_3d[i].at[:, 1].set(-z_old).at[:, 2].set(y_old)
+
+        for i in range(len(coord_arrays)):
+            arrays_3d[i] = arrays_3d[i] + wing.origin
+
+        strip_L, strip_R, strip_C, strip_a1, strip_a2, strip_b1, strip_b2, strip_normals = arrays_3d
+
+        # 3. Unconditional Append (Primary Side)
+        all_left_nodes.append(strip_L)
+        all_right_nodes.append(strip_R)
+        all_collocations.append(strip_C)
         all_normals.append(strip_normals)
-        all_chords.append(strip_chords)
-        all_areas.append(strip_areas)
-        all_incidences.append(strip_inc)
-
         all_a1.append(strip_a1)
         all_a2.append(strip_a2)
         all_b1.append(strip_b1)
         all_b2.append(strip_b2)
-        
+
+        all_chords.append(strip_chords)
+        all_areas.append(strip_areas)
+        all_incidences.append(strip_inc)
         all_le.append(strip_le)
         all_te.append(strip_te)
-
-        all_surface_ids.append(strip_ids)
         all_panels_per_strip.append(cw_panels)
+        all_surface_ids.append(strip_ids)
 
-        # 3. If symmetric, mirror and append
+        # 4. Global Symmetry (Mirror across XZ-plane)
         if wing.symmetric:
-            if wing.vertical:
-                mirrored_L_nodes = strip_L_nodes.at[:, 2].multiply(-1.0)
-                mirrored_R_nodes = strip_R_nodes.at[:, 2].multiply(-1.0)
-                mirrored_C_nodes = strip_C_nodes.at[:, 2].multiply(-1.0)
-                mirrored_normals = strip_normals.at[:, 2].multiply(-1.0)
-                
-                mirrored_a1 = strip_a1.at[:, 2].multiply(-1.0)
-                mirrored_a2 = strip_a2.at[:, 2].multiply(-1.0)
-                mirrored_b1 = strip_b1.at[:, 2].multiply(-1.0)
-                mirrored_b2 = strip_b2.at[:, 2].multiply(-1.0)
-            
-            else: # Mirror Y coordinates
-                mirrored_L_nodes = strip_L_nodes.at[:, 1].multiply(-1.0)
-                mirrored_R_nodes = strip_R_nodes.at[:, 1].multiply(-1.0)
-                mirrored_C_nodes = strip_C_nodes.at[:, 1].multiply(-1.0)
-                mirrored_normals = strip_normals.at[:, 1].multiply(-1.0)
-                
-                mirrored_a1 = strip_a1.at[:, 1].multiply(-1.0)
-                mirrored_a2 = strip_a2.at[:, 1].multiply(-1.0)
-                mirrored_b1 = strip_b1.at[:, 1].multiply(-1.0)
-                mirrored_b2 = strip_b2.at[:, 1].multiply(-1.0)
+            # Mirror all 3D arrays by flipping the Y-axis (-1.0)
+            m_L, m_R, m_C, m_normals, m_a1, m_a2, m_b1, m_b2 = [
+                arr.at[:, 1].multiply(-1.0) for arr in arrays_3d
+            ]
 
-                total_strips += n_sw
-            
-            # CRITICAL: To maintain the Right-Hand Rule for vortex circulation, 
-            # the geometric "Left" and "Right" nodes must swap
-            all_left_nodes.append(mirrored_R_nodes)
-            all_right_nodes.append(mirrored_L_nodes)
-            
-            all_collocations.append(mirrored_C_nodes)
-            all_normals.append(mirrored_normals)
+            # CRITICAL: Swap Left and Right to maintain Right-Hand Rule vortex circulation
+            all_left_nodes.append(m_R)
+            all_right_nodes.append(m_L)
+
+            all_collocations.append(m_C)
+            all_normals.append(m_normals)
+            all_a1.append(m_a1)
+            all_a2.append(m_a2)
+            all_b1.append(m_b1)
+            all_b2.append(m_b2)
+
+            # 1D arrays are geometric properties (areas, chords), append them exactly as is
             all_chords.append(strip_chords)
             all_areas.append(strip_areas)
             all_incidences.append(strip_inc)
-
-            all_a1.append(mirrored_a1)
-            all_a2.append(mirrored_a2)
-            all_b1.append(mirrored_b1)
-            all_b2.append(mirrored_b2)
-            
             all_le.append(strip_le)
             all_te.append(strip_te)
-            all_surface_ids.append(-strip_ids)
             all_panels_per_strip.append(cw_panels)
+
+            # Symmetrical surfaces get negated IDs
+            all_surface_ids.append(-strip_ids)
+            total_strips += n_sw
 
     # Concatenate all wings into the final VortexDistribution
     return VortexDistribution(
@@ -434,7 +420,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         is_trailing_edge=jnp.concatenate(all_te, axis=0),
         surface_id=jnp.concatenate(all_surface_ids, axis=0),
         panels_per_strip=jnp.concatenate(all_panels_per_strip, axis=0),
-        total_strips = total_strips
+        total_strips=total_strips
     )
 
 

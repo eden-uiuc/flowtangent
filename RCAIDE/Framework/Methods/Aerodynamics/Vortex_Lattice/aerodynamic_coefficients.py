@@ -136,9 +136,9 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     sin_dihedral = jnp.sign(dy_LE) * dz_LE / dihedral_length_LE  # sin(dihedral) - multiply by dy_LE so opposed vectors cancel
     
     # Panel Forces
-    panel_dx_nondim = 1.0 / panels_per_strip
-    quarter_chord_offset = 0.25 * panel_dx_nondim
-    panel_normal_coeff = panel_dx_nondim[None, :] * DCP
+    panel_dx_nondim = 1.0 / panels_per_strip  # Fraction of overall chord length in each panel
+    quarter_chord_offset = 0.25 * panel_dx_nondim  # Location of leading edge vortex for each panel
+    panel_normal_coeff = panel_dx_nondim[None, :] * DCP  # Fraction of chordwise delta Cp for each panel
     
     # Local slope (TX = -nx/nz)
     nx, _, nz = VD.normal_vectors[:, 0], VD.normal_vectors[:, 1], VD.normal_vectors[:, 2] # Z points down by convention
@@ -249,10 +249,10 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     
     lift = (strip_body_force_z * cos_alpha - (strip_body_force_x * cos_beta + strip_body_force_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
     force_y = (strip_body_force_y * cos_beta - strip_body_force_x * sin_beta) * strip_area[None, :]
-    moment = strip_area[None, :] * (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta)
-    
-    strip_rolling_moment = (strip_body_moment_x * cos_alpha * cos_beta + strip_body_moment_y * cos_alpha * sin_beta + strip_body_moment_z * sin_alpha)
-    strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha)
+
+    moment = (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta) * panel_span_LE[None, :]
+    strip_rolling_moment = (strip_body_moment_x * cos_alpha * cos_beta + strip_body_moment_y * cos_alpha * sin_beta + strip_body_moment_z * sin_alpha) * panel_span_LE[None, :]
+    strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
     
     # Global Coefficients
     CL = jnp.sum(lift, axis=1) / S_ref              # Lift coefficient
@@ -286,7 +286,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # Profile Drag (CX and CZ projection back to Wind Axes)
     cx_denom = cos_alpha[:, 0] - sin_alpha[:, 0] * tan_alpha[:, 0]
     safe_cx_denom = jnp.where(jnp.abs(cx_denom) < 1e-8, 1e-8 * jnp.sign(cx_denom + 1e-12), cx_denom)
-    CX =  (tan_alpha[:, 0] * CL - CDi) / safe_cx_denom
+    CX = (tan_alpha[:, 0] * CL - CDi) / safe_cx_denom
     
     safe_sinalf = jnp.where(jnp.abs(sin_alpha[:, 0]) < 1e-8, 1e-8 * jnp.sign(sin_alpha[:, 0] + 1e-12), sin_alpha[:, 0])
     CZ = (CDi + CX * cos_alpha[:, 0]) / safe_sinalf

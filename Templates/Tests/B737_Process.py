@@ -8,7 +8,7 @@ from functools import reduce
 
 import jax
 from jax import value_and_grad, jit
-# jax.config.update("jax_disable_jit", True)
+jax.config.update("jax_disable_jit", True)
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -178,16 +178,16 @@ def vehicle_setup():
         quarter_chord=jnp.deg2rad(25.)
     )
     main_spans  = WingDimensions(
-        projected = 34.32
+        projected=34.32
     )
     main_chords = WingChords(
-        root             = 7.760,
-        tip              = 0.782,
-        mean_aerodynamic = 4.235,
+        root             =7.760,
+        tip              =0.782,
+        mean_aerodynamic =4.235,
     )
     main_areas  = ComponentAreas(
-        reference         = 124.862,
-        wetted            = 225.08,
+        reference         =124.862,
+        wetted            =225.08,
     )
     main_twists = WingDimensions(
         root = jnp.deg2rad(4.0),
@@ -200,9 +200,9 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         origin=jnp.array([[13.61, 0., -0.93]]),
         aerodynamic_center=jnp.array([0, 0, 0]),
-        vertical= False,
-        symmetric= True,
-        high_lift= True,
+        vertical=False,
+        symmetric=True,
+        high_lift=True,
         dynamic_pressure_ratio = 1.0,
         sweeps=main_sweeps,
         spans=main_spans,
@@ -230,6 +230,7 @@ def vehicle_setup():
         percent_span_location   = 0.0,
         root_chord_percent      = 1.0,
         dihedral_outboard       = jnp.deg2rad(8.63),
+        sweeps= h_root_sweeps,
     )
 
     h_tip_segment = WingSegment(
@@ -368,7 +369,8 @@ def vehicle_setup():
         sweeps                  = v_sweeps,
         spans                   = v_spans,
         chords                  = v_chords,
-        areas                   = v_areas
+        areas                   = v_areas,
+        segments = (root_segment, mid_segment, tip_segment)
         
     )  
 
@@ -684,7 +686,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
         active_residuals=("force_x", "force_z"),
-        controls_initial_guess=(3 * Units.deg, 10000. * Units.N),
+        controls_initial_guess=(0.0309, 96112.7545 * Units.N),
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
@@ -749,15 +751,15 @@ if __name__ == '__main__':
     final_state, _, _ = mission_b737(state, system, settings)
     
     print("Controls:")
-    print(f"  AoA: {final_state.aerodynamics.angles.alpha.item(0):.2f}")
-    print(f"  Thrust: {final_state.frames.body.thrust_force_vector[:, 0].item(0):.2f}")
+    print(f"  AoA: {final_state.aerodynamics.angles.alpha.item(0):.4f}")
+    print(f"  Thrust: {final_state.frames.body.thrust_force_vector[:, 0].item(0):.4f}")
     print(f"\nAerodynamics:")
-    print(f"  CL: {final_state.aerodynamics.coefficients.lift.total.item(0):.2f}")
-    print(f"  CD: {final_state.aerodynamics.coefficients.drag.total.item(0):.2f}")
-    print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total.item(0):.2f}")
-    print(f"\n  Cm: {final_state.aerodynamics.coefficients.moments.pitch.item(0):.2f}")
-    print(f"  Cl: {final_state.aerodynamics.coefficients.moments.roll.item(0):.2f}")
-    print(f"  Cn: {final_state.aerodynamics.coefficients.moments.yaw.item(0):.2f}")
+    print(f"  CL: {final_state.aerodynamics.coefficients.lift.total.item(0):.4f}")
+    print(f"  CD: {final_state.aerodynamics.coefficients.drag.total.item(0):.4f}")
+    print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total.item(0):.4f}")
+    print(f"\n  Cm: {final_state.aerodynamics.coefficients.moments.pitch.item(0):.4f}")
+    print(f"  Cl: {final_state.aerodynamics.coefficients.moments.roll.item(0):.4f}")
+    print(f"  Cn: {final_state.aerodynamics.coefficients.moments.yaw.item(0):.4f}")
     
 
     # def CL_M(total_mass, state, system, settings):

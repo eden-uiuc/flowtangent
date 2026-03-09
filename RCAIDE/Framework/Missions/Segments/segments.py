@@ -51,9 +51,10 @@ if TYPE_CHECKING:
 #-----------------------------------------------------------------------------------------------------------------------
 
 class Spinner:
-    def __init__(self, message="JIT compiling and solving..."):
+    def __init__(self, message="JIT compiling and solving...", enabled=True):
         self.spinner_chars = "|/-\\"
         self.message = message
+        self.enabled = enabled  # Flag to easily turn it off during debugging
         self.running = False
         self.thread = None
 
@@ -66,16 +67,19 @@ class Spinner:
             i += 1
 
     def __enter__(self):
-        self.running = True
-        self.thread = threading.Thread(target=self.spin)
-        self.thread.start()
+        if self.enabled:
+            self.running = True
+            self.thread = threading.Thread(target=self.spin)
+            self.thread.start()
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.running = False
-        self.thread.join()
-        sys.stdout.write(f"\r{self.message} Done!    \n")
-        sys.stdout.flush()
+        if self.enabled:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
+            sys.stdout.write(f"\r{self.message} Done!    \n")
+            sys.stdout.flush()
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
@@ -333,7 +337,7 @@ class IterateSegment(Process):
         return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
-        with Spinner():
+        with Spinner(enabled=False):
             if self.root_finder is fsolve:
                 
                 root_finder_kwargs = {
