@@ -668,7 +668,6 @@ def vehicle_setup():
 
 def mission_setup(state: "State", system: "System", settings: "Settings"):
 
-    # TODO: Create pre-set controls with paths/indices
     controls = (
         "body_angle",
         DirectControlVariable(

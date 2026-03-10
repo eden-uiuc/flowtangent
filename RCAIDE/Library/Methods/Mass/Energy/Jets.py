@@ -20,7 +20,7 @@ from RCAIDE.Library.Methods.Energy.Converters.Turbofans import func_thrust_and_p
 
 def func_Jet_Mass_from_SLS(
     sls_thrust: float
-                           ):
+):
 
     t_lbf = sls_thrust * 0.224809  # Convert to lbf
     mass = (0.4054 * t_lbf ** 0.9255) * 0.453592

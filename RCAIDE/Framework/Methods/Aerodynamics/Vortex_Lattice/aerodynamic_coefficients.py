@@ -307,7 +307,6 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     analysis = system.analysis_data
     VD = analysis["vortex_distribution"]
 
-    # TODO: Add State bookkeeping for secondary coefficients
     # TODO: Add book-keeping for individual wing coefficients
     CL, CD, CDi, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
         VD,

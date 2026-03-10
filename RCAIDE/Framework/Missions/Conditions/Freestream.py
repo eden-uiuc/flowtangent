@@ -14,6 +14,7 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.Framework.Missions.Conditions import Conditions
 from RCAIDE.Library.Atmospheres import Atmosphere, USStandard1976
+from RCAIDE.Library.Planets import Planet, Earth
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
@@ -77,6 +78,7 @@ class FreestreamConditions(Conditions):
 
     tag:                    str          = eqx.field(static=True, default='Freestream')
     atmosphere:             Atmosphere   = eqx.field(default_factory=USStandard1976)
+    planet:                 Planet       = eqx.field(default_factory=Earth)
 
     speed:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
     altitude:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))

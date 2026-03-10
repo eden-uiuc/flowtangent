@@ -26,13 +26,14 @@ def update_freestream(state: "State",
                       settings: "Settings",
                       ):
 
-    # Update Gravity
-    state = eqx.tree_at(lambda s:s.freestream.gravity, state, state.freestream.gravity.at[:,0].set(9.81))
-    # TODO: Update gravity calculation once planetary analysis added back in
 
     # Update Altitude
     alt = -state.frames.inertial.position_vector[:, 2][:, None] # Z is negative by right hand rule convention
     state = eqx.tree_at(lambda s:s.freestream.altitude, state, alt)
+
+    # Update gravity
+    G = state.freestream.planet.compute_gravity()
+    state = eqx.tree_at(lambda s:s.freestream.gravity, state, state.freestream.gravity.at[:,0].set(G))
 
     # Update Atmospheric Properties
     atmo = state.freestream.atmosphere

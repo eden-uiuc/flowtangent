@@ -152,6 +152,7 @@ class InitializeSegment(Process):
 
     def __call__(self, state, system, settings):
 
+        current_state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, self.true_course)
         current_state = state.expand_rows(state.numerics.number_of_control_points)
 
         for ctrl in self.active_controls:
@@ -211,7 +212,7 @@ def _default_analyses():
         ProcessStep(tag="Mass",                 function=update_mass_and_weight),
         ProcessStep(tag="Forces",               function=update_forces),
         ProcessStep(tag="Moments",              function=update_moments),
-        ProcessStep(tag="Planetary Position",   function=skip),
+        ProcessStep(tag="Planetary Position",   function=update_planetary_position),
         ProcessStep(tag="Calculate Residuals",  function=flight_dynamics_residuals)
     )
 
@@ -525,6 +526,7 @@ class Segment(Process):
     # Global dynamics variables
     sideslip_angle:         float = 0.0
     temperature_deviation:  float = 0.0
+    true_course:            float = 0.0
 
     # Start with an empty tuple. We will populate it securely in __post_init__
     steps: tuple = eqx.field(default_factory=tuple)

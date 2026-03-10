@@ -30,7 +30,7 @@ class Cruise(Segment):
     tag: str = 'Cruise'
 
     distance: float = 0.0
-    true_course: float = 0.0
+    
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Test CSA Cruise

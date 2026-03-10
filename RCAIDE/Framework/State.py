@@ -39,7 +39,6 @@ class State(Conditions):
 
     frames:             FrameConditions             = eqx.field(default_factory=FrameConditions)
     freestream:         FreestreamConditions        = eqx.field(default_factory=FreestreamConditions)
-    # TODO: Refactor Freestream into Environmental Conditions, Incl. Planet, etc.
 
     mass:               MassConditions              = eqx.field(default_factory=MassConditions)
     energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
@@ -126,6 +125,7 @@ class State(Conditions):
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
         if verbose:
             print(f"Building controls from {system.tag}...")
+        
         for component in system.subcomponents:
             self.build_controls_from_system(component)
 

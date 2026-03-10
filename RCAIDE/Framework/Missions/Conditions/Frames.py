@@ -78,8 +78,9 @@ class PlanetFrame(Frame):
     tag:            str             = eqx.field(static=True, default='Planet Frame')
     start_time:     jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
 
-    latitude:       jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
-    longitude:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0)))
+    # Default to takeoff at JFK
+    latitude:       jnp.ndarray     = eqx.field(default_factory=lambda: jnp.array([40.6446]))
+    longitude:      jnp.ndarray     = eqx.field(default_factory=lambda: jnp.array([73.7797]))
 
     true_course:    jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
