@@ -8,7 +8,8 @@ from functools import reduce
 
 import jax
 from jax import value_and_grad, jit
-jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_debug_nans", True)
 
 import equinox as eqx
 import jax.numpy as jnp

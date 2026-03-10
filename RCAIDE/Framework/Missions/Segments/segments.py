@@ -337,7 +337,7 @@ class IterateSegment(Process):
         return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
-        with Spinner(enabled=False):
+        with Spinner():
             if self.root_finder is fsolve:
                 
                 root_finder_kwargs = {
@@ -418,10 +418,24 @@ class IterateSegment(Process):
 
                 # 3. Fire the compiled GPU kernel
                 # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
-                unknowns, _ = self._run_gauss_newton_solver(x0, state, system, settings)
+                unknowns, opt_state = self._run_gauss_newton_solver(x0, state, system, settings)
                 
                 # 4. Wait for the final answer to come back across the PCIe bus
                 unknowns.block_until_ready()
+
+                print("\n" + "="*30)
+                print("JAXOPT SOLVER DIAGNOSTICS")
+                print("="*30)
+                # JAX arrays need to be cast or formatted to print cleanly
+                print(f"Iterations taken: {opt_state.iter_num}")
+                print(f"Final Error/Residual: {opt_state.error}")
+                
+                # Depending on the specific JAXopt solver, you might also have:
+                if hasattr(opt_state, 'stepsize'):
+                    print(f"Final Stepsize: {opt_state.stepsize}")
+                if hasattr(opt_state, 'value'):
+                    print(f"Objective Value: {opt_state.value}")
+                print("="*30 + "\n")
 
                 # 5. Stop the clock
                 # t1 = timeit.default_timer()

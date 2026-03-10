@@ -376,7 +376,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         # 4. Global Symmetry (Mirror across XZ-plane)
         if wing.symmetric:
             # Mirror all 3D arrays by flipping the Y-axis (-1.0)
-            m_L, m_R, m_C, m_normals, m_a1, m_a2, m_b1, m_b2 = [
+            m_L, m_R, m_C, m_a1, m_a2, m_b1, m_b2, m_normals = [
                 arr.at[:, 1].multiply(-1.0) for arr in arrays_3d
             ]
 

@@ -57,16 +57,23 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
     dy_mat = tp_y_ctrl[:, :, None] - tp_y_center[:, None, :] 
     dz_mat = tp_z_ctrl[:, :, None] - tp_z_center[:, None, :] 
     
-    r = jnp.sqrt(dy_mat**2 + dz_mat**2)
+    # Safe Distance
+    r = jnp.sqrt(dy_mat**2 + dz_mat**2 + 1e-16)
+    r_safe = jnp.maximum(r, 1e-8) # Clamp once and use everywhere
     
-    # Induced Velocities
-    slope = jnp.gradient(tp_z_ctrl, axis=1) / jnp.gradient(tp_y_ctrl, axis=1)
-    n_hat_y = jnp.cos(jnp.arctan2(-1.0, slope))
-    n_hat_z = jnp.sin(jnp.arctan2(-1.0, slope))
+    # 2. Gradient-Safe Normal Vectors (Fixes the Vertical Tail divide-by-zero)
+    dy_ctrl = jnp.gradient(tp_y_ctrl, axis=1)
+    dz_ctrl = jnp.gradient(tp_z_ctrl, axis=1)
     
-    v_mag = shed_vortex[:, None, :] / (2.0 * jnp.pi * jnp.maximum(r, 1e-8))
-    v_ind_y = v_mag * (-dz_mat / r)
-    v_ind_z = v_mag * (dy_mat / r)
+    ctrl_mag = jnp.sqrt(dy_ctrl**2 + dz_ctrl**2 + 1e-16)
+    
+    n_hat_y = dz_ctrl / ctrl_mag
+    n_hat_z = -dy_ctrl / ctrl_mag
+    
+    # 3. Induced Velocities (Strictly using r_safe)
+    v_mag = shed_vortex[:, None, :] / (2.0 * jnp.pi * r_safe)
+    v_ind_y = v_mag * (-dz_mat / r_safe)
+    v_ind_z = v_mag * (dy_mat / r_safe)
     
     v_induced = jnp.sum(v_ind_y * n_hat_y[:, :, None] + v_ind_z * n_hat_z[:, :, None], axis=2)
     
@@ -103,7 +110,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     cg    = system.reference_geometry.center_of_gravity
     x_m   = cg[:, 0][:, None]
     y_m   = cg[:, 1][:, None]
-    z_m   = cg[:, 2][:, None]
+    z_m   = -cg[:, 2][:, None]
     
     # Pre-compute Trig
     sin_alpha, cos_alpha, tan_alpha = jnp.sin(alpha), jnp.cos(alpha), jnp.tan(alpha)
