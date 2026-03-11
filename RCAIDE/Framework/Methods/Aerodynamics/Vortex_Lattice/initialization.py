@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System, Aircraft, AircraftReferenceGeometry
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
@@ -32,6 +33,10 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     and packs them into JAX arrays for the VLM solver.
     """
     
+    if not isinstance(settings.analysis.aerodynamics, VLMSettings):
+        raise ValueError("settings.analysis.aerodynaics are not VLM Settings." \
+        "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings")
+
     # Standard Python Control Flow (Safe outside of @jax.jit)
     wings = system.wings
     

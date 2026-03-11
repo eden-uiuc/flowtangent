@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
+    from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation
@@ -259,15 +260,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
 
     moment = (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta) * panel_span_LE[None, :]
     strip_rolling_moment = (strip_body_moment_x * cos_alpha * cos_beta + strip_body_moment_y * cos_alpha * sin_beta + strip_body_moment_z * sin_alpha) * panel_span_LE[None, :]
-    strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
-    
-    # Global Coefficients
-    CL = jnp.sum(lift, axis=1) / S_ref              # Lift coefficient
-    CY = jnp.sum(force_y, axis=1) / S_ref           # Side-force coefficient
-    CM = jnp.sum(moment, axis=1) / (S_ref * c_ref)  # Pitch moment coefficient
-    
-    Cl_roll = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref) # Rolling moment, negative for sign conventions
-    Cn_yaw  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)  # Yawing moment, negative for sign conventions
+    strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]    
     
     # Trefftz Plane Induced Drag
     # JAX-compatible trailing edge mask
@@ -289,8 +282,16 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     )
     
     CDi = D_induced / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)
+
+    # Global Coefficients
+    CL = jnp.sum(lift, axis=1) / S_ref              # Lift coefficient
+    CY = jnp.sum(force_y, axis=1) / S_ref           # Side-force coefficient
+    CM = jnp.sum(moment, axis=1) / (S_ref * c_ref)  # Pitch moment coefficient
     
-    # Profile Drag (CX and CZ projection back to Wind Axes)
+    Cl_roll = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref) # Rolling moment, negative for sign conventions
+    Cn_yaw  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)  # Yawing moment, negative for sign conventions
+    
+    # Profile Drag (CX and CZ projection back to inertial axes)
     cx_denom = cos_alpha[:, 0] - sin_alpha[:, 0] * tan_alpha[:, 0]
     safe_cx_denom = jnp.where(jnp.abs(cx_denom) < 1e-8, 1e-8 * jnp.sign(cx_denom + 1e-12), cx_denom)
     CX = (tan_alpha[:, 0] * CL - CDi) / safe_cx_denom
@@ -298,8 +299,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     safe_sinalf = jnp.where(jnp.abs(sin_alpha[:, 0]) < 1e-8, 1e-8 * jnp.sign(sin_alpha[:, 0] + 1e-12), sin_alpha[:, 0])
     CZ = (CDi + CX * cos_alpha[:, 0]) / safe_sinalf
     
-    CD = CDi + CX * cos_alpha[:, 0] * cos_beta[:, 0] + CY * sin_beta[:, 0] + CZ * sin_alpha[:, 0] * cos_beta[:, 0]
-    return CL, CD, CDi, CM, Cl_roll, Cn_yaw
+    return CL, CDi, CX, CY, -CZ, CM, Cl_roll, Cn_yaw
 
 def compute_coefficients(state: "State", system: "System", settings: "Settings"):
     """ Final VLM step to extract global coefficients and append to State. """
@@ -308,7 +308,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     VD = analysis["vortex_distribution"]
 
     # TODO: Add book-keeping for individual wing coefficients
-    CL, CD, CDi, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
+    CL, CDi, CX, CY, CZ, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
         VD,
         analysis["pressure_coefficients"],
         analysis["vortex_strengths"],
@@ -318,10 +318,16 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
         system,
         settings
     )
+
+    # Apply Correction Factors
+
+    vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
+
+    CL = CL * vlm_settings.correction.fuselage_lift
     
     # Update the Vehicle/Segment State with the aerodynamic forces
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL[:, None])
-    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CD[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CDi[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi[:, None])
 
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.pitch, state, CM[:, None])
