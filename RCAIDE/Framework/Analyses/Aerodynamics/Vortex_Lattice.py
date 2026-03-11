@@ -177,7 +177,7 @@ class InitializeVLM(Process):
 def _default_VLM_steps():
     return(
         ProcessStep(check_freestream, "Check Freestream"),
-        ProcessStep(update_wing_geometry, "Update Wing Geometry"), # Updates System for shape optimization
+        # ProcessStep(update_wing_geometry, "Update Wing Geometry"), # Updates System for shape optimization
         ProcessStep(compute_boundary_conditions, "Calculate Boundary Conditions"),
         ProcessStep(compute_induced_velocity, "Calculate AICs"),
         ProcessStep(compute_vortex_strength, "Compute Vortex Strength"),
@@ -185,6 +185,7 @@ def _default_VLM_steps():
         ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients"),
         ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
     )
+    # TODO: Add trimming/stability analysis
 
 class VLM(Process):
 

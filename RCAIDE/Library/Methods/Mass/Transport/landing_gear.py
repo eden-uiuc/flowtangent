@@ -1,12 +1,18 @@
 # RCAIDE/Library/Methods/Mass/Correlation/Transport/landing_gear.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 # Created:  May 2024, J. Smart
-# Modified: 
+# Modified: Mar 2026, J. Smart
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------
 
-import RCAIDE.Framework as rcf
+from typing import TYPE_CHECKING
+
+# package imports
+import equinox as eqx
+
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Aircraft, Settings
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version
@@ -23,9 +29,9 @@ def func_landing_gear(
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
 
-def landing_gear(state: "rcf.State",
-                 system: "rcf.System",
-                 settings: "rcf.Settings"):
+def landing_gear(state: "State",
+                 system: "Aircraft",
+                 settings: "Settings"):
     """
     Framework version of landing_gear
     
@@ -35,12 +41,8 @@ def landing_gear(state: "rcf.State",
         Functional implementation which this method calls.
     """
 
-    # TODO: Unpack functional arguments
+    lg_mass = func_landing_gear(system.mass_properties.max_takeoff)
 
-    results = func_landing_gear(*args,
-                                **kwargs
-                                )
+    updated_system = eqx.tree_at(lambda s: s.landing_gear.mass_properties.total, system, lg_mass)
 
-    # TODO: Unpack results
-
-    return state, system, settings
+    return state, updated_system, settings

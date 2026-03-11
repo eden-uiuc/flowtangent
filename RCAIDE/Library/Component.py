@@ -213,3 +213,9 @@ class Component(eqx.Module):
         new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index + 1:]
         
         return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
+
+class ControlComponent(Component):
+
+    is_control_component:   bool = eqx.field(static=True, default=True)
+    control_path:           tuple[str, ...] |None   = eqx.field(static=True, default_factory=tuple)
+    control_path_indices:   tuple | None            = eqx.field(static=True, default_factory=lambda: (slice(None), 0))

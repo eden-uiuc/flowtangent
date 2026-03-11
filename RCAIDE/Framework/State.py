@@ -109,7 +109,6 @@ class State(Conditions):
         Pulls the active residual values from the dynamics and packs them into the residuals array.
         """
 
-        n_points = self.numerics.number_of_control_points
         residual_list = []
 
         residual_list = [res.value for res in self.dynamics.get_active_residuals()]
@@ -121,35 +120,67 @@ class State(Conditions):
 
         return eqx.tree_at(lambda s: s.residuals, self, stacked_residuals)
 
-    # TODO: Update this to use Equinox methods
+
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
+        
+        new_controls = self.controls
+        surface_controls = []
+        direct_controls = []
+        unbound_controls = []
+
+        
         if verbose:
             print(f"Building controls from {system.tag}...")
         
         for component in system.subcomponents:
             self.build_controls_from_system(component)
 
-            if system.is_control_component:
+            if component.is_control_component:
                 if isinstance(component, RCAIDE.Library.Components.Wing):
-                    self.controls.add_control_variable(
+                    new_controls = self.controls.add_control_variable(
                         RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
                             tag=component.tag + "_deflection",
                             surfaces=(system,),
                         )
                     )
+                    surface_controls.append(component.tag + "_deflection")
 
                 else:
-                    self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
-                            tag=component.tag
+                    unbound = False
+                    if hasattr(component, "control_path"): path = component.control_path
+                    else: path = (); unbound = True
+
+                    if hasattr(component, "control_path_indices"): indices = component.control_path_indices
+                    else: indices = (slice(None), 0); unbound = True
+
+                    if unbound: unbound_controls.append(component.tag)
+
+                    new_controls = self.controls.add_control_variable(
+                        RCAIDE.Framework.Missions.Conditions.Controls.DirectControlVariable(
+                            tag=component.tag,
+                            path=path,
+                            path_indices=indices,
                         )
                     )
+                    if not unbound: direct_controls.append(component.tag)
+
                 if verbose:
-                    print(f"\tAdded controls.{system.get_field_name()} as a control variable.")
+                    if surface_controls:
+                        print(f"Added the following aerodynamic surface controls:" +
+                              "\n\t- ".join(surface_controls))
+                    if direct_controls:
+                        print(f"Added the following direct controls:" +
+                              "\n\t- ".join(direct_controls))
+                    if unbound_controls:
+                        print(f"The following control components were found, but without path information."
+                              f"They may not function as intended:"
+                              "\n\t- ".join(unbound_controls))
+        
         if verbose:
             print(f"Completed building controls from {system.tag}.\n"
                   f"Controls may be activated for mission segments by setting "
                   f"segment.active_controls = ('control_variable', ...)")
-        return
+        
+        return eqx.tree_at(lambda s: s.controls, self, new_controls)
 
 

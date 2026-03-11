@@ -130,11 +130,11 @@ class ControlVariable(Conditions):
 
 class DirectControlVariable(ControlVariable):
 
-    # Attribute     Type                    Default Value
-    tag:            str                     = eqx.field(static=True, default='Direct Control Variable')
+    # Attribute     Type            Default Value
+    tag:            str             = eqx.field(static=True, default='Direct Control Variable')
 
-    path:           tuple[str, ...] |None   = eqx.field(static=True, default_factory=tuple)
-    path_indices:   tuple | None            = eqx.field(static=True, default_factory=lambda: (slice(None), 0))
+    path:           tuple[str, ...] = eqx.field(static=True, default_factory=tuple)
+    path_indices:   tuple | None    = eqx.field(static=True, default_factory=lambda: (slice(None), 0))
 
 
 class SurfaceControlVariable(ControlVariable):
@@ -162,11 +162,11 @@ class SurfaceControlVariable(ControlVariable):
         An instance of the SurfaceControlVariable class with the specified attributes.
     """
 
-    #Attribute          Type                    Default Value
-    tag:                str                     = eqx.field(static=True, default='Surface Control Variable')
-    surfaces:           tuple[Component] | None = None
+    #Attribute          Type                        Default Value
+    tag:                str                         = eqx.field(static=True, default='Surface Control Variable')
+    surfaces:           tuple[Component] | None     = None
 
-    stability:          StabilityConditions     = eqx.field(default_factory=StabilityConditions)
+    stability:          StabilityConditions         = eqx.field(default_factory=StabilityConditions)
 
 
 class EnergyControlVariable(ControlVariable):

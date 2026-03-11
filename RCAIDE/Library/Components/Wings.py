@@ -172,229 +172,210 @@ class Wing(Component):
             
         return new_taper, new_chords
 
+    @staticmethod
+    def _compute_segment_properties(
+        seg_span_fractions: jnp.ndarray,       # Shape: (N+1,)
+        seg_root_chord_fractions: jnp.ndarray, # Shape: (N+1,)
+        wing_root_chord: float,
+        wing_projected_span: float,
+        is_symmetric: float,
+        wing_exposed_root_offset: float,
+        wing_t_c: float,
+        seg_t_c: jnp.ndarray                   # Shape: (N,)
+    ) -> tuple[
+        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, 
+        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
+    ]:
+        """Computes basic geometries for each individual segment."""
+        symm_mult = 1.0 if is_symmetric else 0.0
+        wing_semispan = wing_projected_span / (1.0 + symm_mult)
+        
+        seg_span_fractions_diff = seg_span_fractions[1:] - seg_span_fractions[:-1]
+        seg_dy = seg_span_fractions_diff * wing_semispan
+        
+        # Calculate chords in absolute dimensions
+        seg_c_root = wing_root_chord * seg_root_chord_fractions[:-1]
+        seg_c_tip = wing_root_chord * seg_root_chord_fractions[1:]
+        
+        # Apply exposed root offset to the very first segment (if applicable)
+        # Using jnp.where avoids mutating arrays directly, which is safer in JAX
+        if wing_exposed_root_offset > 0.0:
+            offset_val = wing_exposed_root_offset * ((seg_c_tip[0] - seg_c_root[0]) / seg_dy[0])
+            seg_c_root = seg_c_root.at[0].add(offset_val)
+            
+        seg_tapers = seg_c_tip / seg_c_root
+        
+        # Segment Mean Aerodynamic Chord
+        seg_macs = seg_c_root * (2.0 / 3.0) * ((1.0 + seg_tapers + seg_tapers**2) / (1.0 + seg_tapers))
+        
+        # Segment Areas
+        seg_s_ref = seg_dy * (seg_c_root + seg_c_tip) * 0.5
+        seg_s_exposed = seg_s_ref * 1.0
+        
+        if wing_exposed_root_offset > 0.0:
+            exposed_area_0 = (seg_dy[0] - wing_exposed_root_offset) * (seg_c_root[0] + seg_c_tip[0]) * 0.5
+            seg_s_exposed = seg_s_exposed.at[0].set(exposed_area_0)
+            
+        if is_symmetric:
+            seg_s_ref = seg_s_ref * 2.0
+            seg_s_exposed = seg_s_exposed * 2.0
+            
+        # Segment Wetted Area
+        seg_s_wet = jnp.where(
+            wing_t_c < 0.05, 
+            2.003 * seg_s_exposed, 
+            (1.977 + 0.52 * seg_t_c) * seg_s_exposed
+        )
+        
+        return seg_dy, seg_c_root, seg_c_tip, seg_tapers, seg_macs, seg_s_ref, seg_s_exposed, seg_s_wet
 
-    # TODO: Update these methods to be functional
-    def _update_segment_properties(self, update_areas=False):
+    @staticmethod
+    def _compute_global_planform(
+        seg_dy: jnp.ndarray,                   # Shape: (N,)
+        seg_c_root: jnp.ndarray,               # Shape: (N,)
+        seg_c_tip: jnp.ndarray,                # Shape: (N,)
+        seg_s_ref: jnp.ndarray,                # Shape: (N,)
+        seg_s_wet: jnp.ndarray,                # Shape: (N,)
+        seg_span_fractions: jnp.ndarray,       # Shape: (N+1,)
+        seg_quarter_chord_sweeps: jnp.ndarray, # Shape: (N,)
+        seg_dihedrals: jnp.ndarray,            # Shape: (N+1,)
+        wing_projected_span: float,
+        is_symmetric: bool
+    ) -> tuple[
+        float, float, float, float, float, float, 
+        jnp.ndarray, float, float, jnp.ndarray, jnp.ndarray, float
+    ]:
+        """Rolls up segment properties into global wing metrics."""
+        symm_mult = 1.0 if is_symmetric else 0.0
+        wing_semispan = wing_projected_span / (1.0 + symm_mult)
+        
+        wing_s_ref = jnp.sum(seg_s_ref)
+        wing_s_wet = jnp.sum(seg_s_wet)
+        wing_aspect_ratio = (wing_projected_span**2) / wing_s_ref
+        
+        # Total physical length and Mean Geometric Chord
+        seg_lens = seg_dy / jnp.cos(seg_dihedrals[:-1])
+        wing_total_span = jnp.sum(seg_lens) * (1.0 + symm_mult)
+        wing_mgc = wing_s_ref / wing_projected_span
+        
+        # Global MAC (Analytical integral approach)
+        seg_span_fractions_diff = seg_span_fractions[1:] - seg_span_fractions[:-1]
+        
+        B = (seg_c_root - seg_c_tip) / (-seg_span_fractions_diff)
+        C = seg_span_fractions[:-1]
+        
+        integral_term_1 = (seg_c_root + B * (seg_span_fractions[1:] - C))**3
+        integral_term_2 = (seg_c_root + B * (seg_span_fractions[:-1] - C))**3
+        integral = (integral_term_1 - integral_term_2) / (3.0 * B)
+        
+        # Fallback for rectangular segments where B is 0 (NaN prevention)
+        integral = jnp.where(jnp.isnan(integral), (seg_c_root**2) * seg_span_fractions_diff, integral)
+        wing_mac = (wing_semispan * (1.0 + symm_mult) / wing_s_ref) * jnp.sum(integral)
+        
+        # Sweeps
+        r_offsets = seg_c_root / 4.0
+        t_offsets = seg_c_tip / 4.0
+        seg_le_sweeps = jnp.arctan((r_offsets + jnp.tan(seg_quarter_chord_sweeps) * seg_dy - t_offsets) / seg_dy)
+        
+        wing_c4_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_quarter_chord_sweeps)))
+        wing_le_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_le_sweeps)))
+        
+        # AC Centroids
+        dxs = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), jnp.tan(seg_le_sweeps) * seg_dy]))
+        dys = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), seg_dy]))
+        dzs = jnp.cumsum(jnp.concatenate([jnp.array([0.0]), jnp.tan(seg_dihedrals[:-1]) * seg_dy]))
+        
+        # Vectorized Centroid Calculation
+        c = jnp.tan(seg_le_sweeps) * seg_dy
+        cx = (2 * seg_c_tip * c + seg_c_tip**2 + c * seg_c_root + seg_c_tip * seg_c_root + seg_c_root**2) / (3 * (seg_c_tip + seg_c_root))
+        tapers = seg_c_tip / seg_c_root
+        cy = seg_dy / 3.0 * ((1.0 + 2.0 * tapers) / (1.0 + tapers))
+        cz = cy * jnp.tan(seg_dihedrals[:-1])
+        
+        cxys = jnp.stack([cx + dxs[:-1], cy + dys[:-1], cz + dzs[:-1]], axis=0)
+        wing_ac = jnp.dot(cxys, seg_s_ref / (1.0 + symm_mult)) / (wing_s_ref / (1.0 + symm_mult))
+        
+        wing_ss_ac = wing_ac.at[0].set(wing_ac[0] - wing_mac * 0.25)
+        wing_ac = wing_ac.at[0].set(wing_ss_ac[0])
+        return eqx.t
+        if is_symmetric:
+            wing_ac = wing_ac.at[1].set(0.0)
 
-        exposed_root_chord_offset = self.exposed_root_chord_offset
-        symm                      = self.symmetric
-        semispan                  = self.spans.projected*0.5 * (2 - symm)
-        t_c_w                     = self.thickness_to_chord
-        num_segments              = len(self.segments)
+        wing_total_length = jnp.tan(wing_le_sweep) * wing_semispan + seg_c_tip[-1]
+        
+        return (
+            wing_s_ref, wing_s_wet, wing_aspect_ratio, wing_total_span, 
+            wing_mgc, wing_mac, seg_le_sweeps, wing_c4_sweep, 
+            wing_le_sweep, wing_ac, wing_ss_ac, wing_total_length
+        ) # type: ignore
+    
+    def update_geometry(self):
+        """Returns a new Wing instance with all geometric properties calculated and populated."""
+        
+        # 1. Extract Arrays
+        span_locs = jnp.array([seg.percent_span_location for seg in self.segments])
+        root_chords_pct = jnp.array([seg.root_chord_percent for seg in self.segments])
+        sweeps = jnp.array([seg.sweeps.quarter_chord for seg in self.segments])
+        dihedrals = jnp.array([seg.dihedral_outboard for seg in self.segments])
+        t_cs = jnp.array([seg.thickness_to_chord for seg in self.segments])
+        
+        symm = float(self.symmetric)
+        
+        # 2. Compute Segment Geometries
+        dy, c_root, c_tip, tapers, macs, s_ref_seg, s_exposed_seg, s_wet_seg = self._compute_segment_properties(
+            span_locs, root_chords_pct, self.chords.root, self.spans.projected, 
+            symm, self.exposed_root_chord_offset, self.thickness_to_chord, t_cs
+        )
+        
+        # 3. Compute Global Geometries
+        (total_s_ref, total_s_wet, ar, total_span, mgc, global_mac, le_sweeps, c_4_sweep, 
+         le_sweep_total, ac, ss_ac, total_length) = self._compute_global_planform(
+            dy, c_root, c_tip, s_ref_seg, s_wet_seg, span_locs, sweeps, dihedrals, 
+            self.spans.projected, symm,
+        )
+        
+        # 4. Create updated segments (Pure functional update)
+        updated_segments = []
+        for i in range(len(self.segments) - 1):
+            seg = self.segments[i]
+            # Assuming you have an immutable dataclass or tree update method here
+            new_seg = eqx.tree_at(
+                lambda s: (s.taper, s.chords.mean_aerodynamic, s.areas.reference, s.areas.exposed, s.areas.wetted),
+                seg,
+                (tapers[i], macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i])
+            )
+            updated_segments.append(new_seg)
+        updated_segments.append(self.segments[-1]) # Append the tip node unaltered
+        
+        # 5. Create and return the updated wing
+        return eqx.tree_at(
+            lambda w: (
+                w.segments, w.areas.reference, w.areas.wetted, w.aspect_ratio,
+                w.spans.total, w.chords.mean_geometric, w.chords.mean_aerodynamic, w.chords.tip,
+                w.taper, w.sweeps.quarter_chord, w.sweeps.leading_edge, 
+                w.aerodynamic_center, w.single_side_aerodynamic_center, w.lengths.total
+            ),
+            self,
+            (
+                updated_segments, total_s_ref, total_s_wet, ar,
+                total_span, mgc, global_mac, c_tip[-1],
+                tapers[-1] * (c_root[-1] / c_root[0]), c_4_sweep, le_sweep_total, 
+                ac, ss_ac, total_length
+            )
+        )
 
-        total_wetted_area            = 0.
-        total_reference_area         = 0.
-        root_chord                   = self.chords.root
 
-        for i_segs in range(num_segments):
-            if i_segs == num_segments-1:
-                continue
-            else:
-                span_seg  = semispan*(self.segments[i_segs+1].percent_span_location
-                                      - self.segments[i_segs].percent_span_location)
-                segment   = self.segments[i_segs]
+    def add_subcomponent(self, subcomponent: Component, update_geometry=True):
 
-                chord_root    = root_chord * self.segments[i_segs].root_chord_percent
-                chord_tip     = root_chord * self.segments[i_segs+1].root_chord_percent
+        if isinstance(subcomponent, WingSegment):
+            new_segments = self.segments + (subcomponent,)
+            new_wing = eqx.tree_at(lambda s: s.segments, self, new_segments)
+            if update_geometry:
+                new_wing = new_wing.update_geometry()
+            return new_wing
+        
+        elif isinstance(subcomponent, WingControlSurface):
+            new_controls = self.control_surfaces.add_subcomponent(subcomponent)
+            return eqx.tree_at(lambda s: s.control_surfaces, self, new_controls)
 
-                if i_segs == 0:
-                    chord_root     = chord_root + exposed_root_chord_offset*((chord_tip - chord_root)/span_seg)
-
-                taper         = chord_tip/chord_root
-                mac_seg       = chord_root  * 2/3 * ((1 + taper  + taper**2)/(1 + taper))
-                Sref_seg      = span_seg*(chord_root+chord_tip)*0.5
-                S_exposed_seg = Sref_seg
-
-                if i_segs == 0:
-                    S_exposed_seg = (span_seg-exposed_root_chord_offset)*(chord_root+chord_tip)*0.5
-
-                if self.symmetric:
-                    Sref_seg = Sref_seg * 2
-                    S_exposed_seg = S_exposed_seg * 2
-
-                # compute wetted area of segment
-                if t_c_w < 0.05:
-                    Swet_seg = 2.003 * S_exposed_seg
-                else:
-                    Swet_seg = (1.977 + 0.52 * t_c_w) * S_exposed_seg
-
-                segment.taper                   = taper
-
-                segment.chords                  = WingDimensions()
-                segment.chords.mean_aerodynamic = mac_seg
-
-                segment.areas                   = ComponentAreas()
-                segment.areas.reference         = Sref_seg
-                segment.areas.exposed           = S_exposed_seg
-                segment.areas.wetted            = Swet_seg
-
-                total_wetted_area    = total_wetted_area + Swet_seg
-                total_reference_area = total_reference_area + Sref_seg
-
-        if self.areas.reference == 0. or update_areas:
-            self.areas.reference = total_reference_area
-
-        if self.areas.wetted == 0. or update_areas:
-            self.areas.wetted    = total_wetted_area
-
-    def make_segmented_planform(self):
-
-        def _segment_centroid(le_sweep,
-                              seg_span,
-                              dx, dy, dz,
-                              taper,
-                              dihedral,
-                              root_chord,
-                              tip_chord):
-
-            a = tip_chord
-            b = root_chord
-            c = jnp.tan(le_sweep)*seg_span
-            cx = (2*a*c + a**2 + c*b + a*b + b**2) / (3*(a+b))
-            cy = seg_span / 3. * ((1. + 2. * taper) / (1. + taper))
-            cz = cy * jnp.tan(dihedral)
-
-            return jnp.array([cx+dx, cy+dy, cz+dz])
-
-        span = self.spans.projected
-        RC   = self.chords.root
-        sym  = self.symmetric
-
-        # Pull all the segment data into array format
-        span_locs = []
-        twists    = []
-        sweeps    = []
-        dihedrals = []
-        chords    = []
-        t_cs      = []
-
-        for seg in self.segments:
-
-            span_locs.append(seg.percent_span_location)
-            twists.append(seg.twist)
-            chords.append(seg.root_chord_percent)
-            sweeps.append(seg.sweeps.quarter_chord)
-            t_cs.append(seg.thickness_to_chord)
-            dihedrals.append(seg.dihedral_outboard)
-
-        # Convert to arrays
-        chords    = jnp.array(chords)
-        span_locs = jnp.array(span_locs)
-        sweeps    = jnp.array(sweeps)
-        t_cs      = jnp.array(t_cs)
-
-        # Basic calcs:
-        semispan     = span/(1+sym)
-        lengths_ndim = span_locs[1:]-span_locs[:-1]
-        lengths_dim  = lengths_ndim*semispan
-        chords_dim   = RC*chords
-        tapers       = chords[1:]/chords[:-1]
-
-        # Calculate the areas of each segment
-        As = (lengths_dim*chords_dim[:-1]-(chords_dim[:-1]-chords_dim[1:])*(lengths_dim/2))
-
-        # Calculate the weighted area, this should not include any unexposed area
-        A_wets = 2*(1+0.2*t_cs[:-1])*As
-        wet_area = jnp.sum(A_wets)
-
-        # Calculate the wing area
-        ref_area = jnp.sum(As)*(1+sym)
-
-        # Calculate the Aspect Ratio
-        AR = (span**2)/ref_area
-
-        # Calculate the total span
-        lens = lengths_dim/jnp.cos(jnp.array(dihedrals)[:-1])
-        total_len = jnp.sum(jnp.array(lens))*(1+sym)
-
-        # Calculate the mean geometric chord
-        mgc = ref_area/span
-
-        # Calculate the mean aerodynamic chord
-        A = chords_dim[:-1]
-        B = (A-chords_dim[1:])/(-lengths_ndim)
-        C = span_locs[:-1]
-        integral = ((A+B*(span_locs[1:]-C))**3-(A+B*(span_locs[:-1]-C))**3)/(3*B)
-        # For the cases when the wing doesn't taper in a spot
-        integral = integral.at[jnp.isnan(integral)].set((A[jnp.isnan(integral)]**2)*(lengths_ndim[jnp.isnan(integral)]))
-        MAC = (semispan*(1+sym)/ref_area)*jnp.sum(integral)
-
-        # Calculate the taper ratio
-        lamda = chords[-1]/chords[0]
-
-        # the tip chord
-        ct = chords_dim[-1]
-
-        # Calculate an average t/c weighted by area
-        t_c = jnp.sum(As*t_cs[:-1])/(ref_area/2)
-
-        # Calculate the segment leading edge sweeps
-        r_offsets = chords_dim[:-1]/4
-        t_offsets = chords_dim[1:]/4
-        le_sweeps = jnp.arctan((r_offsets+jnp.tan(sweeps[:-1])*(lengths_dim)-t_offsets)/(lengths_dim))
-
-        # Calculate the effective sweeps
-        c_4_sweep   = jnp.arctan(jnp.sum(lengths_ndim*jnp.tan(sweeps[:-1])))
-        le_sweep_total= jnp.arctan(jnp.sum(lengths_ndim*jnp.tan(le_sweeps)))
-
-        # Calculate the aerodynamic center, but first the centroid
-        dxs = jnp.cumsum(jnp.concatenate([jnp.array([0]),jnp.tan(le_sweeps[:-1])*lengths_dim[:-1]]))
-        dys = jnp.cumsum(jnp.concatenate([jnp.array([0]),lengths_dim[:-1]]))
-        dzs = jnp.cumsum(jnp.concatenate([jnp.array([0]),jnp.tan(jnp.array(dihedrals)[:-2])*lengths_dim[:-1]]))
-
-        Cxys = []
-        for i in range(len(lengths_dim)):
-            Cxys.append(_segment_centroid(le_sweeps[i],
-                                          lengths_dim[i],
-                                          dxs[i], dys[i], dzs[i],
-                                          tapers[i],
-                                          dihedrals[i],
-                                          chords_dim[i],
-                                          chords_dim[i+1]))
-
-        aerodynamic_center = (jnp.dot(jnp.transpose(jnp.array(Cxys)),As)/(ref_area/(1+sym)))
-
-        single_side_aerodynamic_center = (jnp.array(aerodynamic_center)*1.)
-        single_side_aerodynamic_center = single_side_aerodynamic_center.at[0].set(single_side_aerodynamic_center[0] - MAC*.25)
-        if sym== True:
-            aerodynamic_center = aerodynamic_center.at[1].set(0)
-
-        aerodynamic_center = aerodynamic_center.at[0].set(single_side_aerodynamic_center[0])
-
-        # Total length for supersonics
-        total_length = jnp.tan(le_sweep_total)*semispan + chords[-1]*RC
-
-        # Pack stuff
-
-        self.areas.reference         = ref_area
-        self.areas.wetted            = wet_area
-        self.aspect_ratio            = AR
-
-        self.spans.total                    = total_len
-        self.chords.mean_geometric          = mgc
-        self.chords.mean_aerodynamic        = MAC
-        self.chords.tip                     = ct
-        self.taper                          = lamda
-        self.sweeps.quarter_chord           = c_4_sweep
-        self.sweeps.leading_edge            = le_sweep_total
-        self.thickness_to_chord             = t_c
-        self.aerodynamic_center             = aerodynamic_center
-        self.single_side_aerodynamic_center = single_side_aerodynamic_center
-        self.lengths.total                  = total_length
-
-        # update remainder segment properties
-        self._update_segment_properties()
-
-        def add_subcomponent(self,
-                         subcomponent: Component,
-                         sum_mass=False,
-                         sum_center_of_gravity=False,
-                         sum_moments_of_inertia=False
-                         ):
-
-            if isinstance(subcomponent, WingSegment):
-                self.segments.append(subcomponent)
-            elif isinstance(subcomponent, WingControlSurface):
-                setattr(self.control_surfaces, subcomponent.get_field_name(), subcomponent)
-
-            super().add_subcomponent(subcomponent)
+        return super().add_subcomponent(subcomponent)
