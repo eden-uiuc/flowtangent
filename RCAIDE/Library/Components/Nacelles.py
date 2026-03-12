@@ -18,16 +18,18 @@ from RCAIDE.Library import Component, ComponentDimensions
 #  Nacelle
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class NacelleDiameters(ComponentDimensions):
 
     inlet: float = 0.0
+
 
 class Nacelle(Component):
 
     tag:                        str     = eqx.field(static=True, default='Nacelle')
     flow_through:               bool    = eqx.field(static=True, default=False)
-    has_pylon:                  bool    = eqx.field(static=True, default=True)
     fuselage_integrated:        bool    = eqx.field(static=True, default=False)
+    has_pylon:                  bool    = eqx.field(default=True)
 
     aerodynamic_center:         jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
     orientation_euler_angles:   jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))

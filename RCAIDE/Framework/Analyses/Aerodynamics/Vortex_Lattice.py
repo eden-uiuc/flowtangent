@@ -27,6 +27,8 @@ from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice import (check_freestre
                                                                   generate_full_vortex_distribution,
                                                                   apply_aerodynamic_forces)
 
+from RCAIDE.Framework.Methods.Aerodynamics import compute_parasite_drag, expand_component_coefficients
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings
 # ----------------------------------------------------------------------------------------------------------------------
@@ -39,8 +41,8 @@ class SupersonicSettings(eqx.Module):
     end_drag_rise_mach_number               = 1.2
     transonic_drag_multiplier               = 1.25
     volume_wave_drag_scaling                = 3.2
-    fuselage_parasite_drag_begin_blend_mach = 0.91
-    fuselage_parasite_drag_end_blend_mach   = 0.99
+    begin_blend_mach                        = 0.91
+    end_blend_mach                          = 0.99
     cross_sectional_area_calculation_type:  str = eqx.field(static=True, default='Fixed')
     wave_drag_type:                         str = eqx.field(static=True, default='Raymer')
 
@@ -62,6 +64,7 @@ class ParasiteDragFormFactors(eqx.Module):
 
     wing: float = 1.1
     fuselage: float = 2.3
+    pylon: float = 0.2
 
 class Training(eqx.Module):
 
@@ -131,7 +134,8 @@ class VLMVortices(eqx.Module):
             object.__setattr__(self, 'fuselage_spanwise_vortices', self.number_of_spanwise_vortices)
             object.__setattr__(self, 'fuselage_chordwise_vortices', self.number_of_chordwise_vortices)
 
-class VLMSettings(eqx.Module): 
+
+class VLMSettings(eqx.Module):
 
     model_fuselage:                 bool    = eqx.field(static=True, default=False)
     trim_aircraft:                  bool    = eqx.field(static=True, default=False)
@@ -158,6 +162,7 @@ class VLMSettings(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 def _default_VLM_init_steps():
     return(
+        ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),
         ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
         ProcessStep(discretize_wings, "Discretize VLM Wings"),
         ProcessStep(generate_full_vortex_distribution, "Generate Wing Vortices"),
@@ -170,9 +175,9 @@ class InitializeVLM(Process):
     steps: tuple = eqx.field(default_factory=_default_VLM_init_steps)
 
 
-# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------
 #  VLM Process
-# ----------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------
 
 def _default_VLM_steps():
     return(
@@ -186,9 +191,10 @@ def _default_VLM_steps():
         ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
 
         # Parasite Drag
-        
+        ProcessStep(compute_parasite_drag, "Compute Parasite Drag"),
     )
     # TODO: Add trimming/stability analysis
+
 
 class VLM(Process):
 
@@ -196,3 +202,8 @@ class VLM(Process):
 
     steps : tuple = eqx.field(default_factory=_default_VLM_steps)
 
+# ----------------------------------------------------------
+#  Surrogate VLM Process
+# ----------------------------------------------------------
+
+# TODO: Surrogate VLM initialization, steps, and analysis

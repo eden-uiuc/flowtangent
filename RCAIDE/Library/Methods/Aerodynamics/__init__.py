@@ -1,2 +1,2 @@
-from .Test_Aero.test_aero import direct_aero
+from .flat_plate_friction import flat_plate_friction
 from .Vortex_Lattice.check_freestream import check_freestream_stateful as check_freestream

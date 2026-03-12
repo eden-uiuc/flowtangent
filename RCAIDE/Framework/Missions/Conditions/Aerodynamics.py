@@ -29,6 +29,17 @@ class AerodynamicAngles(Conditions):
     phi:                jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
 
 
+class ComponentCoefficients(Conditions):
+    tag:            str = eqx.field(static=True, default='Component Coefficients')
+
+    total:          jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+
+    # Component Arrays: (n_time, n_components)
+    wings:          jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 0)))
+    fuselages:      jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 0)))
+    nacelles:       jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 0)))
+
+
 class LiftCoefficients(Conditions):
 
     # Attribute     Type            Default Value
@@ -36,33 +47,33 @@ class LiftCoefficients(Conditions):
 
     total:          jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    inviscid:       Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Inviscid Bodies'))
-    compressible:   Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
+    inviscid:       ComponentCoefficients   = eqx.field(default_factory=lambda: Conditions(tag='Inviscid Bodies'))
+    compressible:   ComponentCoefficients   = eqx.field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
 
 
 class InducedDrag(Conditions):
 
-    # Attribute         Type            Default Value
-    tag:                str             = eqx.field(static=True, default='Induced Drag')
+    # Attribute   Type            Default Value
+    tag:          str             = eqx.field(static=True, default='Induced Drag')
 
-    total:              jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
+    total:        jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    inviscid_wings:     Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Inviscid Wings'))
+    inviscid:     ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Inviscid Wings'))
 
 
 class DragCoefficients(Conditions):
 
-    # Attribute         Type            Default Value
-    tag:                str             = eqx.field(static=True, default='Drag Coefficients')
+    # Attribute     Type            Default Value
+    tag:            str             = eqx.field(static=True, default='Drag Coefficients')
 
-    total:              jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
+    total:          jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    parasite:           Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Parasite Drag'))
-    compressible:       Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Compressible Drag'))
-    miscellaneous:      Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Miscellaneous Drag'))
-    spoiler:            Conditions      = eqx.field(default_factory=lambda: Conditions(tag='Spoiler Drag'))
+    parasite:       ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Parasite Drag'))
+    compressible:   ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Compressible Drag'))
+    miscellaneous:  ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Miscellaneous Drag'))
+    spoiler:        ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Spoiler Drag'))
 
-    induced:            InducedDrag     = eqx.field(default_factory=InducedDrag)
+    induced:        ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Induced Drag'))
 
 class MomentCoefficients(Conditions):
 

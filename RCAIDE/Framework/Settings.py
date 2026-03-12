@@ -7,8 +7,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import jax
 import equinox as eqx
-from typing import Callable
+from typing import Callable, Optional
 
 # package imports
 from jaxopt import ScipyRootFinding
@@ -19,9 +20,9 @@ from jaxopt import ScipyRootFinding
 #  Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------
 #  Analysis Settings
-# ----------------------------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------
 
 # Mass Analysis
 
@@ -41,8 +42,8 @@ class MassAnalysisSettings(eqx.Module):
 
 class AnalysisSettings(eqx.Module):
 
-    aerodynamics: eqx.Module | None = None
-    mass: MassAnalysisSettings = eqx.field(default_factory=MassAnalysisSettings)
+    aerodynamics: Optional[eqx.Module] = None
+    mass: Optional[MassAnalysisSettings] = eqx.field(default_factory=MassAnalysisSettings)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mission Settings
@@ -64,4 +65,11 @@ class Settings(eqx.Module):
 
     analysis:       AnalysisSettings    = eqx.field(default_factory=AnalysisSettings)
     mission:        MissionSettings     = eqx.field(default_factory=MissionSettings)
+
+    DEBUG_MODE:     bool                = eqx.field(static=True, default=False)
+
+    def __post_init__(self):
+        if self.DEBUG_MODE:
+            jax.config.update("jax_disable_jit", True)
+            jax.config.update("jax_debug_nans", True)
 

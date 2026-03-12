@@ -148,12 +148,14 @@ class InitializeSegment(Process):
     controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
     steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
+
+    true_course:            float = 0.0
     
 
     def __call__(self, state, system, settings):
 
-        current_state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, self.true_course)
-        current_state = state.expand_rows(state.numerics.number_of_control_points)
+        current_state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
+        current_state = state.expand_rows(current_state.numerics.number_of_control_points)
 
         for ctrl in self.active_controls:
             current_state = _activate_control(ctrl, current_state)
@@ -338,7 +340,7 @@ class IterateSegment(Process):
         return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
-        with Spinner():
+        with Spinner(enabled=not settings.DEBUG_MODE):
             if self.root_finder is fsolve:
                 
                 root_finder_kwargs = {
@@ -540,7 +542,8 @@ class Segment(Process):
                 tag=f"Initialize {self.tag}",
                 active_controls=self.active_controls,
                 active_residuals=self.active_residuals,
-                controls_initial_guess=self.controls_initial_guess
+                controls_initial_guess=self.controls_initial_guess,
+                true_course=self.true_course,
             )
             
             # Add profile initialization

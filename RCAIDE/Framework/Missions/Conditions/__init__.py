@@ -1,6 +1,6 @@
 from .Conditions import Conditions
 
-from .Aerodynamics import (AerodynamicAngles, LiftCoefficients, InducedDrag, DragCoefficients, AerodynamicCoefficients,
+from .Aerodynamics import (AerodynamicAngles, ComponentCoefficients, LiftCoefficients, InducedDrag, DragCoefficients, AerodynamicCoefficients,
                            AerodynamicsConditions)
 
 from .Controls import (ResidualNames, DynamicResidual, DynamicsConditions, ControlVariable, SurfaceControlVariable, EnergyControlVariable,

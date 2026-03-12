@@ -26,6 +26,7 @@ class Conditions(eqx.Module):
 
     subconditions: tuple = eqx.field(default_factory=tuple)
 
+
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
             return self.subconditions[item]
@@ -35,7 +36,6 @@ class Conditions(eqx.Module):
         else:
             raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
 
-    
     def __iter__(self):
         return iter(self.subconditions)
 

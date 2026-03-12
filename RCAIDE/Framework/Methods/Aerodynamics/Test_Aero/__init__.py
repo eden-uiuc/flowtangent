@@ -1,1 +1,1 @@
-from RCAIDE.Library.Methods.Aerodynamics.Test_Aero.test_aero import direct_aero
+from .direct_aero_control import direct_aero

@@ -674,7 +674,8 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
             tag='Thrust',
             path=("frames", "body", "thrust_force_vector",),
             active=True
-        ))
+        )
+    )
     aero_settings = VLMSettings()
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
@@ -710,7 +711,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         
         final_segments.append(final_seg)
 
-    return eqx.tree_at(lambda m:m.steps, mission, tuple(final_segments)), updated_settings
+    return eqx.tree_at(lambda m: m.steps, mission, tuple(final_segments)), updated_settings
 
 
 def state_setup():
@@ -730,7 +731,6 @@ def state_setup():
 
 def mission_b737(state, system, settings):
 
-
     mission, updated_settings = mission_setup(state, system, settings)
 
     final_state, final_system, final_settings = mission.run(state, system, updated_settings)
@@ -744,7 +744,7 @@ if __name__ == '__main__':
 
     state = state_setup()
     system = vehicle_setup()
-    settings = Settings()
+    settings = Settings(DEBUG_MODE=True)
 
     print("Setup complete, starting mission ...")
 
@@ -757,9 +757,7 @@ if __name__ == '__main__':
     print(f"  CL: {final_state.aerodynamics.coefficients.lift.total.item(0):.4f}")
     print(f"  CD: {final_state.aerodynamics.coefficients.drag.total.item(0):.4f}")
     print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total.item(0):.4f}")
-    print(f"\n  Cm: {final_state.aerodynamics.coefficients.moments.pitch.item(0):.4f}")
-    print(f"  Cl: {final_state.aerodynamics.coefficients.moments.roll.item(0):.4f}")
-    print(f"  Cn: {final_state.aerodynamics.coefficients.moments.yaw.item(0):.4f}")
+    print(f"    CDp: {final_state.aerodynamics.coefficients.drag.parasite.total.item(0):.4f}")
     
 
     # def CL_M(total_mass, state, system, settings):
