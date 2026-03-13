@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System, Aircraft
     from RCAIDE.Framework.Settings import Settings
 
-from RCAIDE.Framework.Missions.Conditions.Aerodynamics import AerodynamicsConditions, ComponentCoefficients
+from RCAIDE.Framework.Missions.Conditions.Aerodynamics import ComponentCoefficients
 
 
 # ----------------------------------------------------------------------------------------------------------------------

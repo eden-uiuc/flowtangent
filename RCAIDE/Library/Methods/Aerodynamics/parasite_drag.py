@@ -177,16 +177,16 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
     # Wing Parasite Drag -----------------------------------
     wing_drags = []
 
-    for wing in system.wings.subcomponents:
+    for wing in system.wings:
 
         # Check if the wing has defined lifting segments
         if len(wing.segments) > 0:
 
             # Segment-Level Fidelity Pathway
-            seg_macs = jnp.array([seg.chords.mean_aerodynamic for seg in wing.segments[:-1]])
-            seg_sweeps = jnp.array([seg.sweeps.quarter_chord for seg in wing.segments[:-1]])
-            seg_tc = jnp.array([seg.thickness_to_chord for seg in wing.segments[:-1]])
-            seg_swet = jnp.array([seg.areas.wetted for seg in wing.segments[:-1]])
+            seg_macs = jnp.array([seg.chords.mean_aerodynamic for seg in wing.segments])
+            seg_sweeps = jnp.array([seg.sweeps.quarter_chord for seg in wing.segments])
+            seg_tc = jnp.array([seg.thickness_to_chord for seg in wing.segments])
+            seg_swet = jnp.array([seg.areas.wetted for seg in wing.segments])
 
             # Vectorize the function to process the 1D segment arrays
             vmap_wing_drag = jax.vmap(
@@ -230,9 +230,9 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
             wing_drags.append(drag)
 
     # Pack the final list into a JAX array
-    total_wing_parasite_drag = jnp.sum(jnp.column_stack(wing_drags), axis=1) if wing_drags else jnp.zeros_like(M)
-
     packed_wings = jnp.column_stack(wing_drags)
+    total_wing_parasite_drag = jnp.sum(packed_wings, axis=1)[:, None] if wing_drags else jnp.zeros_like(M)
+    
     updated_state = eqx.tree_at(
         lambda s: s.aerodynamics.coefficients.drag.parasite.wings,
         updated_state,
@@ -254,9 +254,9 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
         )
         fuselage_drags.append(drag)
 
-    total_fuselage_parasite_drag = jnp.sum(jnp.stack(fuselage_drags), axis=0) if fuselage_drags else jnp.zeros_like(M)
-
     packed_fuselages = jnp.column_stack(fuselage_drags)
+    total_fuselage_parasite_drag = jnp.sum(packed_fuselages, axis=1)[:, None] if fuselage_drags else jnp.zeros_like(M)
+
     updated_state = eqx.tree_at(
         lambda s: s.aerodynamics.coefficients.drag.parasite.fuselages,
         updated_state,
@@ -279,9 +279,9 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
         )
         nacelle_drags.append(drag)
 
-    total_nacelle_parasite_drag = jnp.sum(jnp.stack(nacelle_drags), axis=0) if nacelle_drags else jnp.zeros_like(M)
-
     packed_nacelles = jnp.column_stack(nacelle_drags)
+    total_nacelle_parasite_drag = jnp.sum(packed_nacelles, axis=1)[:, None] if nacelle_drags else jnp.zeros_like(M)
+
     updated_state = eqx.tree_at(
         lambda s: s.aerodynamics.coefficients.drag.parasite.nacelles,
         updated_state,

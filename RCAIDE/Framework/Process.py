@@ -43,7 +43,7 @@ class ProcessStep(eqx.Module):
 
 
     def __call__(self, state, system, settings):
-        
+        if settings.DEBUG_MODE: print(f"  Step: '{self.tag}'")
         # Default calling behavior, assumes function is callable.
         # String overwrite only for steps with __call__ override
         return self.function(state, system, settings) #type: ignore
@@ -126,9 +126,10 @@ class Process(eqx.Module):
         raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
     def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
+        if settings.DEBUG_MODE: print(f"Beginning Process: '{self.tag}'")
         for step in self.steps[self.initial_step:]:
             state, system, settings = step(state, system, settings)
-
+        if settings.DEBUG_MODE: print(f"Process '{self.tag}' Complete.")
         return state, system, settings
 
     def run(self, state, system, settings):

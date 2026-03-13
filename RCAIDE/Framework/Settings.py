@@ -12,7 +12,7 @@ import equinox as eqx
 from typing import Callable, Optional
 
 # package imports
-from jaxopt import ScipyRootFinding
+from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 # RCAIDE imports
 
@@ -49,10 +49,12 @@ class AnalysisSettings(eqx.Module):
 #  Mission Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
+
+RootFinders = ScipyRootFinding | Broyden | GaussNewton
+
 class MissionSettings(eqx.Module):
 
-    verbose:    bool = eqx.field(static=True, default=False)
-    debugging:  bool = eqx.field(static=True, default=False)
+    root_finder:    RootFinders         = eqx.field(static=True, default=GaussNewton)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Full Settings

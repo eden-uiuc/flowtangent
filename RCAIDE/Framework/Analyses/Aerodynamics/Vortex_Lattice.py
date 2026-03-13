@@ -165,7 +165,7 @@ def _default_VLM_init_steps():
         ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),
         ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
         ProcessStep(discretize_wings, "Discretize VLM Wings"),
-        ProcessStep(generate_full_vortex_distribution, "Generate Wing Vortices"),
+        ProcessStep(generate_full_vortex_distribution, "Generate Vehicle Mesh"),
     )
 
 

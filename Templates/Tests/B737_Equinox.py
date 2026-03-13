@@ -212,7 +212,7 @@ def vehicle_setup():
         twists=main_twists,
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
         control_surfaces=main_controls
-    )
+    ).update_geometry()
     
     vehicle = vehicle.add_subcomponent(main_wing)
 
@@ -297,7 +297,7 @@ def vehicle_setup():
         twists                  = h_twists,
         control_surfaces        = h_stab_controls,
         segments                = (h_root_segment, h_tip_segment)
-    )
+    ).update_geometry()
 
     # Add H-Stab to vehicle
     vehicle = vehicle.add_subcomponent(h_stab)
@@ -373,7 +373,7 @@ def vehicle_setup():
         areas                   = v_areas,
         segments = (root_segment, mid_segment, tip_segment)
         
-    )  
+    ).update_geometry()
 
     vehicle = vehicle.add_subcomponent(v_stab)
     
@@ -687,7 +687,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
         active_residuals=("force_x", "force_z"),
-        controls_initial_guess=(0.0309, 96112.7545 * Units.N),
+        controls_initial_guess=(0.03, 50000.0 * Units.N),
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
@@ -744,7 +744,7 @@ if __name__ == '__main__':
 
     state = state_setup()
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=True)
+    settings = Settings(DEBUG_MODE=False)
 
     print("Setup complete, starting mission ...")
 

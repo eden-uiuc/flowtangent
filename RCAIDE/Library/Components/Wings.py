@@ -53,8 +53,15 @@ class WingSegment(Component):
 
     @property
     def taper(self):
-        safe_root = jnp.maximum(self.chords.root, 1e-8)
-        return self.chords.tip / safe_root
+        
+        # Sidestep Equinox LeafWrappers
+        if hasattr(self.chords.root, "value"): safe_root = jnp.maximum(self.chords.root.value, 1e-8) # type: ignore
+        else: safe_root = jnp.maximum(self.chords.root, 1e-8)
+
+        if hasattr(self.chords.tip, "value"): safe_tip = self.chords.tip.value
+        else: safe_tip = self.chords.tip
+        
+        return safe_tip / safe_root
 
 
 class WingControlSurface(Component):
@@ -297,7 +304,7 @@ class Wing(Component):
         
         wing_ss_ac = wing_ac.at[0].set(wing_ac[0] - wing_mac * 0.25)
         wing_ac = wing_ac.at[0].set(wing_ss_ac[0])
-        return eqx.t
+        
         if is_symmetric:
             wing_ac = wing_ac.at[1].set(0.0)
 
@@ -309,14 +316,14 @@ class Wing(Component):
             wing_le_sweep, wing_ac, wing_ss_ac, wing_total_length
         ) # type: ignore
     
-    def update_geometry(self):
+    def update_geometry(self, calculate_reference_area=False, calculate_wetted_area=False):
         """Returns a new Wing instance with all geometric properties calculated and populated."""
         
-        # 1. Extract Arrays
-        span_locs = jnp.array([seg.percent_span_location for seg in self.segments])
-        root_chords_pct = jnp.array([seg.root_chord_percent for seg in self.segments])
+        # 1. Extract Arrays, add ghost tip segment
+        span_locs = jnp.array([seg.percent_span_location for seg in self.segments] + [1.0])
+        root_chords_pct = jnp.array([seg.root_chord_percent for seg in self.segments] + [self.taper])
         sweeps = jnp.array([seg.sweeps.quarter_chord for seg in self.segments])
-        dihedrals = jnp.array([seg.dihedral_outboard for seg in self.segments])
+        dihedrals = jnp.array([seg.dihedral_outboard for seg in self.segments] + [0.0])
         t_cs = jnp.array([seg.thickness_to_chord for seg in self.segments])
         
         symm = float(self.symmetric)
@@ -333,6 +340,10 @@ class Wing(Component):
             dy, c_root, c_tip, s_ref_seg, s_wet_seg, span_locs, sweeps, dihedrals, 
             self.spans.projected, symm,
         )
+
+        total_s_ref = jnp.where(calculate_reference_area, total_s_ref, self.areas.reference)
+        total_s_wet = jnp.where(calculate_wetted_area, total_s_wet, self.areas.wetted)
+
         
         # 4. Create updated segments (Pure functional update)
         updated_segments = []
@@ -340,9 +351,9 @@ class Wing(Component):
             seg = self.segments[i]
             # Assuming you have an immutable dataclass or tree update method here
             new_seg = eqx.tree_at(
-                lambda s: (s.taper, s.chords.mean_aerodynamic, s.areas.reference, s.areas.exposed, s.areas.wetted),
+                lambda s: (s.chords.mean_aerodynamic, s.areas.reference, s.areas.exposed, s.areas.wetted),
                 seg,
-                (tapers[i], macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i])
+                (macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i])
             )
             updated_segments.append(new_seg)
         updated_segments.append(self.segments[-1]) # Append the tip node unaltered
@@ -363,6 +374,7 @@ class Wing(Component):
                 ac, ss_ac, total_length
             )
         )
+    
 
 
     def add_subcomponent(self, subcomponent: Component, update_geometry=True):
@@ -370,12 +382,13 @@ class Wing(Component):
         if isinstance(subcomponent, WingSegment):
             new_segments = self.segments + (subcomponent,)
             new_wing = eqx.tree_at(lambda s: s.segments, self, new_segments)
-            if update_geometry:
+            if self.update_geometry:
                 new_wing = new_wing.update_geometry()
             return new_wing
         
         elif isinstance(subcomponent, WingControlSurface):
             new_controls = self.control_surfaces.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda s: s.control_surfaces, self, new_controls)
+            
 
         return super().add_subcomponent(subcomponent)

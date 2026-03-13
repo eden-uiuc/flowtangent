@@ -16,6 +16,7 @@ import sys
 
 from typing import Callable, Literal, TYPE_CHECKING
 from dataclasses import replace
+from enum import Enum
 
 # package imports
 
@@ -220,7 +221,7 @@ def _default_analyses():
 
 class AnalyzeSegment(Process):
 
-    tag: str = eqx.field(static=True, default="Segment Analysis Specification")
+    tag: str = eqx.field(static=True, default="Segment Analysis")
 
     steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_default_analyses)
 
@@ -270,45 +271,11 @@ def find_circular_references(obj, path="root", visited=None):
 # Iterate Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
-def fsolve_results_parser(
-        fsolve_result: tuple,
-        state: State,
-        system: System,
-        settings: Settings,
-) -> tuple[State, System, Settings]:
-
-        unknowns:       jnp.ndarray     = jnp.array(fsolve_result[0])
-        infodict:       dict            = fsolve_result[1]
-        ier:            int             = fsolve_result[2]
-        mesg:           str             = fsolve_result[3]
-
-        current_state = state
-
-        if ier != 1:
-            print("Segment Convergence Failed:", mesg)
-            unconverged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, False)
-            current_state = eqx.tree_at(lambda s: s.numerics, state, unconverged_numerics)
-        else:
-            print("Segment Converged.")
-            print("Number of function evaluations:", infodict['nfev'])
-            converged_numerics = eqx.tree_at(lambda n:n.converged, state.numerics, True)
-            current_state = eqx.tree_at(lambda s: s.numerics, state, converged_numerics)
-        
-        current_state = eqx.tree_at(lambda s: s.unknowns, current_state, unknowns)
-        current_state = current_state.unpack_unknowns(unknowns)
-        
-        return current_state, system, settings
-
-RootFinders = Literal[fsolve, ScipyRootFinding, Broyden, Bisection, GaussNewton]
-
 class IterateSegment(Process):
 
     tag:            str     = eqx.field(static=True, default='Segment Convergence')
     analyze:        Process = eqx.field(default_factory=AnalyzeSegment)
 
-    # Root-finder arguments and parser
-    root_finder:    RootFinders = eqx.field(static=True, default=GaussNewton) # type: ignore
-    results_parser: Callable    = eqx.field(static=True, default=fsolve_results_parser) # type: ignore
     
     def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
 
@@ -340,118 +307,112 @@ class IterateSegment(Process):
         return root.run(x0, state, system, settings)
 
     def __call__(self, state, system, settings):
+
+        root_finder = settings.mission.root_finder
+        
         with Spinner(enabled=not settings.DEBUG_MODE):
-            if self.root_finder is fsolve:
-                
-                root_finder_kwargs = {
-                    'func': self._get_residuals,
-                    'x0': state.unknowns,
-                    'args': (state, system, settings),
-                    'xtol': state.numerics.solution_tolerance,
-                    'maxfev': state.numerics.max_evaluations,
-                    'epsfcn': state.numerics.step_size,
-                    'full_output': True
-                }
-
-                results = self.root_finder(**root_finder_kwargs)
-
-                return fsolve_results_parser(results, state, system, settings)
-
-            elif self.root_finder in (ScipyRootFinding, Bisection):
-
-                x0 = state.unknowns
-
-                root = ScipyRootFinding(
-                    method='hybr',
-                    optimality_fun=self._get_residuals,
-                    tol = state.numerics.solution_tolerance,
-                    jit=True
-                )
-                if settings.mission.debugging:
-                    if any([
-                        find_circular_references(state, path="state"),
-                        find_circular_references(system, path="system"),
-                        find_circular_references(settings, path="settings")
-                    ]):
-                        raise RecursionError("Circularity found in mission data structures. Terminating mission.")
-
-                t0 = timeit.default_timer()
-
-                unknowns, _ = root.run(x0, state, system, settings)
-
-                unknowns.block_until_ready()
-
-                t1 = timeit.default_timer()
-
-                print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
-
-                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-                current_state = current_state.unpack_unknowns(unknowns)
-
-                return self.analyze(current_state, system, settings)
-
-            elif self.root_finder is Broyden:
-                x0 = state.unknowns
-
-                # 2. Start the clock
-                t0 = timeit.default_timer()
-
-                # 3. Fire the compiled GPU kernel
-                # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
-                unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
-                
-                # 4. Wait for the final answer to come back across the PCIe bus
-                unknowns.block_until_ready()
-
-                # 5. Stop the clock
-                t1 = timeit.default_timer()
-                print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
-
-                # 6. Unpack and continue
-                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-                current_state = current_state.unpack_unknowns(unknowns)
-
-                return self.analyze(current_state, system, settings)
             
-            elif self.root_finder is GaussNewton:
-                x0 = state.unknowns
+            match root_finder:
+                case cls if cls is GaussNewton:
+                    
+                    x0 = state.unknowns
 
-                # 2. Start the clock
-                # t0 = timeit.default_timer()
+                    # 2. Start the clock
+                    # t0 = timeit.default_timer()
 
-                # 3. Fire the compiled GPU kernel
-                # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
-                unknowns, opt_state = self._run_gauss_newton_solver(x0, state, system, settings)
+                    # 3. Fire the compiled GPU kernel
+                    unknowns, opt_state = self._run_gauss_newton_solver(x0, state, system, settings)
+                    
+                    # 4. Wait for the final answer to come back across the PCIe bus
+                    
+
+                    if settings.DEBUG_MODE:
+
+                        unknowns.block_until_ready()
+
+                        print("\n" + "="*30)
+                        print("JAXOPT SOLVER DIAGNOSTICS")
+                        print("="*30)
+                        # JAX arrays need to be cast or formatted to print cleanly
+                        print(f"Iterations taken: {opt_state.iter_num}")
+                        print(f"Final Error/Residual: {opt_state.error: .3e}")
+                        
+                        # Depending on the specific JAXopt solver, you might also have:
+                        if hasattr(opt_state, 'stepsize'):
+                            print(f"Final Stepsize: {opt_state.stepsize}")
+                        if hasattr(opt_state, 'value'):
+                            print(f"Objective Value: {opt_state.value: .3e}")
+                        print("="*30 + "\n")
+
+                    # 5. Stop the clock
+                    # t1 = timeit.default_timer()
+                    # print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
+
+                    # 6. Unpack and continue
+                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = current_state.unpack_unknowns(unknowns)
+
+                    return self.analyze(current_state, system, settings)
+
+                case cls if cls is ScipyRootFinding:
+
+                    x0 = state.unknowns
+
+                    root = ScipyRootFinding(
+                        method='hybr',
+                        optimality_fun=self._get_residuals,
+                        tol = state.numerics.solution_tolerance,
+                        jit=True
+                    )
+                    if settings.DEBUG_MODE:
+                        if any([
+                            find_circular_references(state, path="state"),
+                            find_circular_references(system, path="system"),
+                            find_circular_references(settings, path="settings")
+                        ]):
+                            raise RecursionError("Circularity found in mission data structures. Terminating mission.")
+
+                    t0 = timeit.default_timer()
+
+                    unknowns, _ = root.run(x0, state, system, settings)
+
+                    unknowns.block_until_ready()
+
+                    t1 = timeit.default_timer()
+
+                    print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
+
+                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = current_state.unpack_unknowns(unknowns)
+
+                    return self.analyze(current_state, system, settings)
+
+                case cls if cls is Broyden:
+                    x0 = state.unknowns
+
+                    # 2. Start the clock
+                    t0 = timeit.default_timer()
+
+                    # 3. Fire the compiled GPU kernel
+                    # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
+                    unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
+                    
+                    # 4. Wait for the final answer to come back across the PCIe bus
+                    unknowns.block_until_ready()
+
+                    # 5. Stop the clock
+                    t1 = timeit.default_timer()
+                    print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
+
+                    # 6. Unpack and continue
+                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = current_state.unpack_unknowns(unknowns)
+
+                    return self.analyze(current_state, system, settings)
                 
-                # 4. Wait for the final answer to come back across the PCIe bus
-                unknowns.block_until_ready()
 
-                print("\n" + "="*30)
-                print("JAXOPT SOLVER DIAGNOSTICS")
-                print("="*30)
-                # JAX arrays need to be cast or formatted to print cleanly
-                print(f"Iterations taken: {opt_state.iter_num}")
-                print(f"Final Error/Residual: {opt_state.error}")
-                
-                # Depending on the specific JAXopt solver, you might also have:
-                if hasattr(opt_state, 'stepsize'):
-                    print(f"Final Stepsize: {opt_state.stepsize}")
-                if hasattr(opt_state, 'value'):
-                    print(f"Objective Value: {opt_state.value}")
-                print("="*30 + "\n")
-
-                # 5. Stop the clock
-                # t1 = timeit.default_timer()
-                # print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
-
-                # 6. Unpack and continue
-                current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
-                current_state = current_state.unpack_unknowns(unknowns)
-
-                return self.analyze(current_state, system, settings)
-            
-            else:
-                return state, system, settings     
+                case _:
+                    return state, system, settings     
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Finalize Segment
@@ -539,7 +500,7 @@ class Segment(Process):
             
             # 1. Build the steps, passing the controls configuration directly into InitializeSegment
             init_step = InitializeSegment(
-                tag=f"Initialize {self.tag}",
+                tag=f"{self.tag} Initializations",
                 active_controls=self.active_controls,
                 active_residuals=self.active_residuals,
                 controls_initial_guess=self.controls_initial_guess,
@@ -551,8 +512,8 @@ class Segment(Process):
                 lambda i:i.steps, init_step, 
                 init_step.steps + (self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
             
-            iter_step = IterateSegment(tag=f"Iterate {self.tag}")
-            fin_step  = FinalizeSegment(tag=f"Finalize {self.tag}")
+            iter_step = IterateSegment(tag=f"{self.tag} Iteration")
+            fin_step  = FinalizeSegment(tag=f"{self.tag} Finalization")
             
             # 2. Safely lock them into the frozen object
             object.__setattr__(self, "steps", (init_step, iter_step, fin_step))
@@ -581,7 +542,7 @@ class Segment(Process):
     # ----------------------------------------------------------------------------------
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
         
-        if settings.mission.verbose:
+        if settings.DEBUG_MODE:
             for step in self.analyze.steps:
                 if isinstance(step, ProcessStep) and step.function is skip:
                     print(f"Warning: Skipping step '{step.tag}' due to missing analysis function.")
