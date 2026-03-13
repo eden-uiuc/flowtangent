@@ -29,6 +29,14 @@ from RCAIDE.Framework.Missions.Conditions import (
 #  State
 # ----------------------------------------------------------------------------------------------------------------------
 
+class SolverConditions(Conditions):
+
+    tag: str = eqx.field(static=True, default='Solver Conditions')
+
+    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    
+
 class State(Conditions):
 
     # Attribute         Type                        Default Value
@@ -48,8 +56,9 @@ class State(Conditions):
     controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
     dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
 
-    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
-    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    solver:             SolverConditions            = eqx.field(default_factory=SolverConditions)
+
+    
 
     def check_controls(self, verbose=True) -> bool:
         """
@@ -118,7 +127,7 @@ class State(Conditions):
         else:
             stacked_residuals = jnp.empty((0,))
 
-        return eqx.tree_at(lambda s: s.residuals, self, stacked_residuals)
+        return eqx.tree_at(lambda s: s.solver.residuals, self, stacked_residuals)
 
 
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:

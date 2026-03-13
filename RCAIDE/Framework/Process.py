@@ -24,13 +24,13 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def skip(*args):
+def null_step(*args):
     return args
 
 
 class ProcessStep(eqx.Module):
 
-    function:       Callable | str     = eqx.field(static=True, default=skip)
+    function:       Callable | str     = eqx.field(static=True, default=null_step)
     tag:            str                = eqx.field(static=True, default="Process Step")
     
     initial_state:        State | None     = None
@@ -48,9 +48,16 @@ class ProcessStep(eqx.Module):
         # String overwrite only for steps with __call__ override
         return self.function(state, system, settings) #type: ignore
     
+    
+    def run(self, state, system, settings):
+        return self(state, system, settings)
+    
+    def run_with_history(self, state, system, settings):
+        return *self(state, system, settings), None
+    
     def __repr__(self):
         return self.tag
-    
+
     def record_history(
             self,
             initial_state,
@@ -77,24 +84,17 @@ class ProcessStep(eqx.Module):
                 final_state,
                 final_system,
                 final_settings,
-            )
+            ),
+            is_leaf=lambda x: x is None
         )
 
-class Process(eqx.Module):
+class Process(ProcessStep):
 
     tag:                str                     = eqx.field(static=True, default="Process")
 
     steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
 
     initial_step:       int                     = eqx.field(static=True, default=0)
-
-    initial_state:      "State | None"          = None
-    initial_system:     "System | None"         = None
-    initial_settings:   "Settings | None"       = None
-
-    final_state:        "State | None"          = None
-    final_system:       "System | None"         = None
-    final_settings:     "Settings | None"       = None
 
 
     def __getitem__(self, item):
@@ -136,7 +136,8 @@ class Process(eqx.Module):
         return self(state, system, settings)
 
     def run_with_history(self, state, system, settings):
-        
+        if settings.DEBUG_MODE: print(f"Beginning Process: '{self.tag}'")
+
         original_state = state
         original_system = system
         original_settings = settings
@@ -145,18 +146,21 @@ class Process(eqx.Module):
 
         for step in self.steps:
             # 1. Run the step
-            new_state, new_system, new_settings = step(state, system, settings)
+            new_state, new_system, new_settings, history = step.run_with_history(state, system, settings)
             
             # 2. Record the pre-step (or post-step) conditions into the history
-            logged_step = step.record_history(
-                initial_state=state,
-                initial_system=system,
-                initial_settings=settings,
-                final_state=new_state,
-                final_system=new_system,
-                final_settings=new_settings,
-            )
-            logged_steps.append(logged_step)
+            if not history: # Single Process Step
+                logged_step = step.record_history(
+                    initial_state=state,
+                    initial_system=system,
+                    initial_settings=settings,
+                    final_state=new_state,
+                    final_system=new_system,
+                    final_settings=new_settings,
+                )
+                logged_steps.append(logged_step)
+            else: # Multi-Step Process
+                logged_steps.append(history)
             
             # 3. Advance to next step
             state, system, settings = new_state, new_system, new_settings
@@ -173,8 +177,10 @@ class Process(eqx.Module):
                 tuple(logged_steps),
                 original_state, original_system, original_settings,
                 state, system, settings # The final ones
-            )
+            ),
+            is_leaf=lambda x: x is None
         )
+        if settings.DEBUG_MODE: print(f"Process '{self.tag}' Complete.")
         
         return state, system, settings, logged_process
 
@@ -229,10 +235,6 @@ class Process(eqx.Module):
     def remove(self, value: str | Callable | ProcessStep | Self):    
         idx_to_remove = self.index(value) 
         return self.pop(idx_to_remove)
-
-    def __repr__(self):
-
-        return self.tag
     
     @property
     def details(self) -> str:
@@ -251,12 +253,13 @@ class Process(eqx.Module):
             step_tags.append(str(tag))
 
             # Safely get the name whether it's a function or a class instance
-            if isinstance(step, ProcessStep):
+            if isinstance(step, Process):
+                step_func_names.append(f"<Process>: {len(step.steps)} Step(s)")
+            elif isinstance(step, ProcessStep):
                 func = step.function
                 name = getattr(func, '__name__', func.__class__.__name__)
                 step_func_names.append(name)
-            elif isinstance(step, Process):
-                step_func_names.append(f"<Process>: {len(step.steps)} Step(s)")
+            
 
         # Handle edge case where process has steps but they have empty tags
         max_tag_length = max([len(t) for t in step_tags]) if step_tags else 0

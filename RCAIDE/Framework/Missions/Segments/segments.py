@@ -39,7 +39,7 @@ from .Profiles import *
 from RCAIDE.Library import Units
 
 from RCAIDE.Framework import Process, ProcessStep
-from RCAIDE.Framework.Process import skip
+from RCAIDE.Framework.Process import null_step
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
 from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
@@ -132,6 +132,7 @@ def _activate_residual(residual_name: ResidualNames, state):
 
 def _initialization_steps():
     return (
+        ProcessStep(tag="State",                function=expand_state),
         ProcessStep(tag="Time",                 function=initialize_time),
         ProcessStep(tag="Mass",                 function=initialize_mass),
         ProcessStep(tag="Energy",               function=initialize_energy),
@@ -149,14 +150,11 @@ class InitializeSegment(Process):
     controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
     steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
-
-    true_course:            float = 0.0
     
 
     def __call__(self, state, system, settings):
 
-        current_state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
-        current_state = state.expand_rows(current_state.numerics.number_of_control_points)
+        current_state = state
 
         for ctrl in self.active_controls:
             current_state = _activate_control(ctrl, current_state)
@@ -180,7 +178,7 @@ class InitializeSegment(Process):
         new_residuals = jnp.zeros((n_cp, len(self.active_residuals)))
         
         current_state = eqx.tree_at(
-            lambda s: (s.unknowns, s.residuals),
+            lambda s: (s.solver.unknowns, s.solver.residuals),
             current_state,
             (new_unknowns, new_residuals)
         )
@@ -191,7 +189,7 @@ class InitializeSegment(Process):
             "did not match the number of active residuals.\n"
         )
 
-        current_state = current_state.unpack_unknowns(current_state.unknowns)
+        current_state = current_state.unpack_unknowns(current_state.solver.unknowns)
 
         # 6. Run the sub-steps
         current_state, system, settings = super().__call__(current_state, system, settings)
@@ -209,9 +207,9 @@ def _default_analyses():
         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
         ProcessStep(tag="Freestream",           function=update_freestream),
         ProcessStep(tag="Orientations",         function=update_orientations),
-        ProcessStep(tag="Energy",               function=skip),
-        ProcessStep(tag="Aerodynamics",         function=skip),
-        ProcessStep(tag="Stability",            function=skip),
+        ProcessStep(tag="Energy",               function=null_step),
+        ProcessStep(tag="Aerodynamics",         function=null_step),
+        ProcessStep(tag="Stability",            function=null_step),
         ProcessStep(tag="Mass",                 function=update_mass_and_weight),
         ProcessStep(tag="Forces",               function=update_forces),
         ProcessStep(tag="Moments",              function=update_moments),
@@ -283,7 +281,7 @@ class IterateSegment(Process):
         current_state, _, _ = self.analyze(current_state, system, settings)
         current_state = current_state.pack_residuals()
 
-        return current_state.residuals
+        return current_state.solver.residuals
 
     @eqx.filter_jit
     def _run_broyden_solver(self, x0, state, system, settings):
@@ -315,7 +313,7 @@ class IterateSegment(Process):
             match root_finder:
                 case cls if cls is GaussNewton:
                     
-                    x0 = state.unknowns
+                    x0 = state.solver.unknowns
 
                     # 2. Start the clock
                     # t0 = timeit.default_timer()
@@ -349,7 +347,7 @@ class IterateSegment(Process):
                     # print(f"--- Pure GPU Gauss-Newton Solver: {t1 - t0:.6f} seconds ---")
 
                     # 6. Unpack and continue
-                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = eqx.tree_at(lambda s: s.solver.unknowns, state, unknowns)
                     current_state = current_state.unpack_unknowns(unknowns)
 
                     return self.analyze(current_state, system, settings)
@@ -382,7 +380,7 @@ class IterateSegment(Process):
 
                     print(f"--- Hybrid JAX/SciPy Solver: {t1 - t0:.6f} seconds ---")
 
-                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = eqx.tree_at(lambda s: s.solver.unknowns, state, unknowns)
                     current_state = current_state.unpack_unknowns(unknowns)
 
                     return self.analyze(current_state, system, settings)
@@ -405,7 +403,7 @@ class IterateSegment(Process):
                     print(f"--- Pure GPU Broyden Solver: {t1 - t0:.6f} seconds ---")
 
                     # 6. Unpack and continue
-                    current_state = eqx.tree_at(lambda s: s.unknowns, state, unknowns)
+                    current_state = eqx.tree_at(lambda s: s.solver.unknowns, state, unknowns)
                     current_state = current_state.unpack_unknowns(unknowns)
 
                     return self.analyze(current_state, system, settings)
@@ -414,6 +412,9 @@ class IterateSegment(Process):
                 case _:
                     return state, system, settings     
 
+    def run_with_history(self, state, system, settings):
+        conv_state, conv_system, conv_settings = self(state, system, settings)
+        return self.analyze.run_with_history(conv_state, conv_system, conv_settings)
 # ----------------------------------------------------------------------------------------------------------------------
 # Finalize Segment
 # ----------------------------------------------------------------------------------------------------------------------
@@ -481,6 +482,7 @@ class Segment(Process):
     active_residuals: tuple[ResidualNames, ...]             = eqx.field(default_factory=tuple)
     controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
 
+    course_profile:     CourseProfile   = eqx.field(default_factory=ConstantCourse)
     position_profile:   PositionProfile = eqx.field(default_factory=ConstantAltitude)
     speed_profile:      SpeedProfile    = eqx.field(default_factory=ConstantSpeed)
     velocity_profile:   VelocityProfile = eqx.field(default_factory=ConstantAltitudeChangeRate)
@@ -504,13 +506,12 @@ class Segment(Process):
                 active_controls=self.active_controls,
                 active_residuals=self.active_residuals,
                 controls_initial_guess=self.controls_initial_guess,
-                true_course=self.true_course,
             )
             
             # Add profile initialization
             init_step = eqx.tree_at(
                 lambda i:i.steps, init_step, 
-                init_step.steps + (self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
+                init_step.steps + (self.course_profile, self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
             
             iter_step = IterateSegment(tag=f"{self.tag} Iteration")
             fin_step  = FinalizeSegment(tag=f"{self.tag} Finalization")
@@ -542,10 +543,12 @@ class Segment(Process):
     # ----------------------------------------------------------------------------------
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
         
+        state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
+
         if settings.DEBUG_MODE:
             for step in self.analyze.steps:
-                if isinstance(step, ProcessStep) and step.function is skip:
-                    print(f"Warning: Skipping step '{step.tag}' due to missing analysis function.")
+                if isinstance(step, ProcessStep) and not isinstance(step, Process) and step.function is null_step:
+                    print(f"Warning: Skipping {step.tag} analysis due to missing function.")
         
         return super().__call__(state, system, settings)
 

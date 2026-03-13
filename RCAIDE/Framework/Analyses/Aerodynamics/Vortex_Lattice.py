@@ -27,7 +27,8 @@ from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice import (check_freestre
                                                                   generate_full_vortex_distribution,
                                                                   apply_aerodynamic_forces)
 
-from RCAIDE.Framework.Methods.Aerodynamics import compute_parasite_drag, expand_component_coefficients
+from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, expand_component_coefficients,
+                                                   compute_viscous_induced_drag)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings
@@ -49,7 +50,7 @@ class SupersonicSettings(eqx.Module):
 class CorrectionFactors(eqx.Module):
 
     fuselage_lift: float = 1.14
-    trim_drag: float = 1.0
+    trim_drag: float = 1.02
 
     viscous_lift_drag: float = 0.38
     lift_to_drag: float = 0.0
@@ -190,8 +191,9 @@ def _default_VLM_steps():
         ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients"),
         ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
 
-        # Parasite Drag
+        # Full Drag Buildup
         ProcessStep(compute_parasite_drag, "Compute Parasite Drag"),
+        ProcessStep(compute_viscous_induced_drag, "Compute Viscous Induced Drag"),
     )
     # TODO: Add trimming/stability analysis
 

@@ -1,2 +1,3 @@
 from .flat_plate_friction import flat_plate_friction
+from .viscous_induced_drag import func_viscous_induced_drag as viscous_induced_drag
 from .Vortex_Lattice.check_freestream import check_freestream_stateful as check_freestream

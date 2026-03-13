@@ -18,7 +18,10 @@ from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.Missions.Conditions import Numerics
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Segments.Profiles import ConstantSpeed, ConstantAltitude, FixedDistance
+from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange, # Position Profiles
+                                                         ConstantSpeed,  # Speed Profiles
+                                                         ConstantAltitudeChangeRate, # Velocity Profiles
+                                                         FixedDistance, FixedTime,) # Duration Profiles
 from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
 from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VLM, VLMSettings, VLMVortices, InitializeVLM
 
@@ -668,6 +671,8 @@ def vehicle_setup():
 
 def mission_setup(state: "State", system: "System", settings: "Settings"):
 
+    # Set Controls & Analysis Settings
+
     controls = (
         "body_angle",
         DirectControlVariable(
@@ -676,31 +681,62 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
             active=True
         )
     )
+
+    residuals = ("force_x", "force_z")
+
     aero_settings = VLMSettings()
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
+    # Create Segments
+
+    climb_segment = Segment(
+        tag="Climb Segment",
+        position_profile=AltitudeChange(initial_altitude=0.0 * Units.m, final_altitude=10000.0 * Units.m),
+        speed_profile=ConstantSpeed(speed=125 * Units.m/Units.s),
+        velocity_profile=ConstantAltitudeChangeRate(change_rate=6.0 * Units.m/Units.s),
+        duration_profile=FixedTime(time = 10000.0 / 6.0 * Units.s),
+        active_controls=controls,
+        active_residuals=residuals,
+        controls_initial_guess=(0.03, 50000.0 * Units.N),
+    )
+    
     cruise_segment = Segment(
         tag="Cruise Segment",
         position_profile=ConstantAltitude(altitude=10000.0 * Units.m),
         speed_profile=ConstantSpeed(speed=230 * Units.m/Units.s),
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
-        active_residuals=("force_x", "force_z"),
+        active_residuals=residuals,
         controls_initial_guess=(0.03, 50000.0 * Units.N),
+    )
+
+    descent_segment = Segment(
+        tag="Descent Segment",
+        position_profile=AltitudeChange(initial_altitude=10000.0 * Units.m, final_altitude=0.0 * Units.m),
+        speed_profile=ConstantSpeed(speed=145 * Units.m/Units.s),
+        velocity_profile=ConstantAltitudeChangeRate(change_rate=5.0 * Units.m/Units.s),
+        duration_profile=FixedTime(time = 10000.0 / 5.0 * Units.s),
+        active_controls=controls,
+        active_residuals=residuals,
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
 
     mission = Process(
         tag='Boeing 737 Mission',
-        steps=(cruise_segment,), #type: ignore
+        steps=(
+            climb_segment,
+            # cruise_segment,
+            # descent_segment,
+            ), #type: ignore
         initial_state=state,
         initial_system=system,
         initial_settings=settings
     )
 
     final_segments = []
+    
     for segment in mission.steps:
         aero_analysis = VLM()
         seg_w_analysis = eqx.tree_at(lambda s: s.analyze.aerodynamics, segment, aero_analysis)
@@ -733,9 +769,9 @@ def mission_b737(state, system, settings):
 
     mission, updated_settings = mission_setup(state, system, settings)
 
-    final_state, final_system, final_settings = mission.run(state, system, updated_settings)
+    final_state, final_system, final_settings, history = mission.run_with_history(state, system, updated_settings)
 
-    return final_state, final_system, final_settings
+    return final_state, final_system, final_settings, history
 
 
 if __name__ == '__main__':
@@ -748,16 +784,18 @@ if __name__ == '__main__':
 
     print("Setup complete, starting mission ...")
 
-    final_state, _, _ = mission_b737(state, system, settings)
+    final_state, final_system, _, mission_history = mission_b737(state, system, settings)
     
     print("Controls:")
-    print(f"  AoA: {final_state.aerodynamics.angles.alpha.item(0):.4f}")
-    print(f"  Thrust: {final_state.frames.body.thrust_force_vector[:, 0].item(0):.4f}")
+    print(f"  AoA: {final_state.aerodynamics.angles.alpha}")
+    print(f"  Thrust: {final_state.frames.body.thrust_force_vector[:, 0]}")
     print(f"\nAerodynamics:")
-    print(f"  CL: {final_state.aerodynamics.coefficients.lift.total.item(0):.4f}")
-    print(f"  CD: {final_state.aerodynamics.coefficients.drag.total.item(0):.4f}")
-    print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total.item(0):.4f}")
-    print(f"    CDp: {final_state.aerodynamics.coefficients.drag.parasite.total.item(0):.4f}")
+    print(f"  CL: {final_state.aerodynamics.coefficients.lift.total}")
+    print(f"  CD: {final_state.aerodynamics.coefficients.drag.total}")
+    print(f"    CDi: {final_state.aerodynamics.coefficients.drag.induced.total}")
+    print(f"      Inv.: {final_state.aerodynamics.coefficients.drag.induced.inviscid.total}")
+    print(f"      Visc.: {final_state.aerodynamics.coefficients.drag.induced.viscous.total}")
+    print(f"    CDp: {final_state.aerodynamics.coefficients.drag.parasite.total}")
     
 
     # def CL_M(total_mass, state, system, settings):

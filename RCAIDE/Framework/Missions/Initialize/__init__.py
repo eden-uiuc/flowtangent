@@ -1,3 +1,4 @@
+from .state                 import expand_state
 from .timing                import initialize_time
 from .mass                  import initialize_mass
 from .energy                import initialize_energy

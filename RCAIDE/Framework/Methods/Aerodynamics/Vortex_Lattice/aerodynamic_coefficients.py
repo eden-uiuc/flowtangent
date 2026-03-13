@@ -307,7 +307,6 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     analysis = system.analysis_data
     VD = analysis["vortex_distribution"]
 
-    # TODO: Add book-keeping for individual wing coefficients
     CL, CDi, CX, CY, CZ, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
         VD,
         analysis["pressure_coefficients"],
@@ -325,10 +324,14 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
 
     CL = CL * vlm_settings.correction.fuselage_lift
     
-    # Update the Vehicle/Segment State with the aerodynamic forces
+    # Update the Vehicle/Segment State with the aerodynamic coefficients
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CDi[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi[:, None])
+
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.X, state, CX[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.Y, state, CY[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.Z, state, CZ[:, None])
 
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.pitch, state, CM[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.roll,  state, Cl_roll[:, None])

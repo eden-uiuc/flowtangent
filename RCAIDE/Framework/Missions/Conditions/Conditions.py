@@ -43,6 +43,7 @@ class Conditions(eqx.Module):
 
         CLASSES_TO_SKIP = (
             'AtmosphericBreakpoints',
+            'SolverConditions'
             # Add any future classes to skip here
         )
 
@@ -87,3 +88,6 @@ class Conditions(eqx.Module):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1:]
         
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
+    
+    def __repr__(self):
+        return self.tag

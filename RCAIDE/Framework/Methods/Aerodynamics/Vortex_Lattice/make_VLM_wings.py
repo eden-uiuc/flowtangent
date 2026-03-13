@@ -673,7 +673,6 @@ def update_wing_geometry(state: "State", system: "Aircraft", settings: "Settings
     # Pack the updated records back into the solver dictionary ONLY.
     # We DO NOT overwrite system.wings, preserving the global vehicle
     new_analysis_data = system.analysis_data | {"vlm_wings": tuple(ready_vlm_records)}
-    # TODO: Regenerate vortex distribution with updated wings.
     
     current_system = eqx.tree_at(lambda s: s.analysis_data, system, new_analysis_data)
 

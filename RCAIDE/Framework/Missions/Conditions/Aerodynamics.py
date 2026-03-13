@@ -18,16 +18,11 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 #  Aerodynamics
 # ----------------------------------------------------------------------------------------------------------------------
 
+# ----------------------------------------------------------
+#  Coefficients
+# ----------------------------------------------------------
 
-class AerodynamicAngles(Conditions):
-
-    # Attribute         Type        Default Value
-    tag:                str         = eqx.field(static=True, default='Aerodynamic Angles')
-
-    alpha:              jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
-    beta:               jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
-    phi:                jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0))
-
+# Component-Level Bookkeeping ------------------------------
 
 class ComponentCoefficients(Conditions):
     tag:            str = eqx.field(static=True, default='Component Coefficients')
@@ -39,6 +34,7 @@ class ComponentCoefficients(Conditions):
     fuselages:      jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 0)))
     nacelles:       jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 0)))
 
+# Lift Coefficients ----------------------------------------
 
 class LiftCoefficients(Conditions):
 
@@ -47,9 +43,10 @@ class LiftCoefficients(Conditions):
 
     total:          jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    inviscid:       ComponentCoefficients   = eqx.field(default_factory=lambda: Conditions(tag='Inviscid Bodies'))
-    compressible:   ComponentCoefficients   = eqx.field(default_factory=lambda: Conditions(tag='Compressible Bodies'))
+    inviscid:       ComponentCoefficients   = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Inviscid Lift'))
+    compressible:   ComponentCoefficients   = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Compressible Lift'))
 
+# Drag Coefficients ----------------------------------------
 
 class InducedDrag(Conditions):
 
@@ -58,7 +55,8 @@ class InducedDrag(Conditions):
 
     total:        jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
-    inviscid:     ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Inviscid Wings'))
+    inviscid:     ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Inviscid Induced Drag'))
+    viscous:      ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Viscous Induced Drag'))
 
 
 class DragCoefficients(Conditions):
@@ -73,7 +71,9 @@ class DragCoefficients(Conditions):
     miscellaneous:  ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Miscellaneous Drag'))
     spoiler:        ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Spoiler Drag'))
 
-    induced:        ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Induced Drag'))
+    induced:        InducedDrag = eqx.field(default_factory=InducedDrag)
+
+# Moment Coefficients --------------------------------------
 
 class MomentCoefficients(Conditions):
 
@@ -84,6 +84,8 @@ class MomentCoefficients(Conditions):
     roll:               jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
     yaw:                jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty(0))
 
+# All Coefficients -----------------------------------------
+
 class AerodynamicCoefficients(Conditions):
 
     # Attribute         Type                Default Value
@@ -91,7 +93,29 @@ class AerodynamicCoefficients(Conditions):
 
     lift:               LiftCoefficients    = eqx.field(default_factory=LiftCoefficients)
     drag:               DragCoefficients    = eqx.field(default_factory=DragCoefficients)
+    
     moments:            MomentCoefficients  = eqx.field(default_factory=MomentCoefficients)
+
+    X:                  jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    Y:                  jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    Z:                  jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+
+# ----------------------------------------------------------
+#  Aerodynamic Angles
+# ----------------------------------------------------------
+
+class AerodynamicAngles(Conditions):
+
+    # Attribute         Type        Default Value
+    tag:                str         = eqx.field(static=True, default='Aerodynamic Angles')
+
+    alpha:              jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0)) # Y-axis / angle of attack
+    beta:               jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0)) # Z-axis / sideslip angle
+    phi:                jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty(0)) # X-axis / roll angle
+
+# ----------------------------------------------------------
+#  Full Aerodynamic Conditions
+# ----------------------------------------------------------
 
 
 class AerodynamicsConditions(Conditions):
