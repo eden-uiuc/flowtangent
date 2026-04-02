@@ -52,6 +52,7 @@ class AircraftReferenceGeometry(eqx.Module):
     aerodynamic_center: jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
     center_of_gravity: jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
+
 class AircraftMassProperties(MassProperties):
 
     max_takeoff         :float = 0.

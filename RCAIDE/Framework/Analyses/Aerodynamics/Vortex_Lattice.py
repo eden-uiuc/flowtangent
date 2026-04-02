@@ -161,6 +161,8 @@ class VLMSettings(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
 # ----------------------------------------------------------------------------------------------------------------------
+
+
 def _default_VLM_init_steps():
     return(
         ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),

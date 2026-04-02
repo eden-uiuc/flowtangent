@@ -103,14 +103,14 @@ class Wing(Component):
     thickness_to_chord:         float   = 0.0
     exposed_root_chord_offset:  float   = 0.0
 
-    single_side_aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0,3)))
+    single_side_aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
     transition_x_upper: float = 0.0
     transition_x_lower: float = 0.0
 
     dynamic_pressure_ratio: float = 0.0
 
-    aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0,3)))
+    aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
 
     spans:  WingDimensions  = eqx.field(default_factory=lambda: WingDimensions(ordinal_direction=True))
     twists: WingDimensions  = eqx.field(default_factory=WingDimensions)
@@ -268,21 +268,23 @@ class Wing(Component):
         # Global MAC (Analytical integral approach)
         seg_span_fractions_diff = seg_span_fractions[1:] - seg_span_fractions[:-1]
         
-        B = (seg_c_root - seg_c_tip) / (-seg_span_fractions_diff)
+        B = (seg_c_root - seg_c_tip) / (-seg_span_fractions_diff + 1e-6)
         C = seg_span_fractions[:-1]
         
         integral_term_1 = (seg_c_root + B * (seg_span_fractions[1:] - C))**3
         integral_term_2 = (seg_c_root + B * (seg_span_fractions[:-1] - C))**3
-        integral = (integral_term_1 - integral_term_2) / (3.0 * B)
+        integral = (integral_term_1 - integral_term_2) / (3.0 * B + 1e-6)
         
         # Fallback for rectangular segments where B is 0 (NaN prevention)
-        integral = jnp.where(jnp.isnan(integral), (seg_c_root**2) * seg_span_fractions_diff, integral)
+        rec_mac = (seg_c_root**2) * seg_span_fractions_diff
+        integral = jnp.where(jnp.isnan(integral), rec_mac, integral)
+        integral = jnp.where(integral == 0., rec_mac, integral)
         wing_mac = (wing_semispan * (1.0 + symm_mult) / wing_s_ref) * jnp.sum(integral)
         
         # Sweeps
         r_offsets = seg_c_root / 4.0
         t_offsets = seg_c_tip / 4.0
-        seg_le_sweeps = jnp.arctan((r_offsets + jnp.tan(seg_quarter_chord_sweeps) * seg_dy - t_offsets) / seg_dy)
+        seg_le_sweeps = jnp.arctan((r_offsets + jnp.tan(seg_quarter_chord_sweeps) * seg_dy - t_offsets) / (seg_dy + 1e-6))
         
         wing_c4_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_quarter_chord_sweeps)))
         wing_le_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_le_sweeps)))

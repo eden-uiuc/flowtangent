@@ -239,54 +239,58 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
         packed_wings
     )
 
-    # Fuselage Parasite Drag -------------------------------
-    fuselage_drags = []
-    for fuselage in system.fuselages:
-        drag, *_ = func_tube_fuselage_parasite_drag(
-            Re, M, T,
-            system.areas.reference,
-            fuselage.areas.wetted,
-            fuselage.lengths.total,
-            fuselage.diameters.effective,
-            aero_settings.parasite_drag.fuselage,
-            aero_settings.supersonic.begin_blend_mach,
-            aero_settings.supersonic.end_blend_mach
+    if settings.analysis.aerodynamics.model_fuselage:
+        # Fuselage Parasite Drag -------------------------------
+        fuselage_drags = []
+        for fuselage in system.fuselages:
+            drag, *_ = func_tube_fuselage_parasite_drag(
+                Re, M, T,
+                system.areas.reference,
+                fuselage.areas.wetted,
+                fuselage.lengths.total,
+                fuselage.diameters.effective,
+                aero_settings.parasite_drag.fuselage,
+                aero_settings.supersonic.begin_blend_mach,
+                aero_settings.supersonic.end_blend_mach
+            )
+            fuselage_drags.append(drag)
+
+        packed_fuselages = jnp.column_stack(fuselage_drags)
+        total_fuselage_parasite_drag = jnp.sum(packed_fuselages, axis=1)[:, None] if fuselage_drags else jnp.zeros_like(M)
+
+        updated_state = eqx.tree_at(
+            lambda s: s.aerodynamics.coefficients.drag.parasite.fuselages,
+            updated_state,
+            packed_fuselages
         )
-        fuselage_drags.append(drag)
 
-    packed_fuselages = jnp.column_stack(fuselage_drags)
-    total_fuselage_parasite_drag = jnp.sum(packed_fuselages, axis=1)[:, None] if fuselage_drags else jnp.zeros_like(M)
+        # Nacelle Parasite Drag --------------------------------
+        nacelle_drags = []
+        for nacelle in system.nacelles:
+            drag, *_ = func_nacelle_parasite_drag(
+                Re, M, T,
+                nacelle.areas.wetted,
+                system.areas.reference,
+                nacelle.lengths.total,
+                nacelle.diameters.maximum,
+                aero_settings.parasite_drag.pylon,
+                aero_settings.supersonic.begin_blend_mach,
+                aero_settings.supersonic.end_blend_mach,
+                nacelle.has_pylon
+            )
+            nacelle_drags.append(drag)
 
-    updated_state = eqx.tree_at(
-        lambda s: s.aerodynamics.coefficients.drag.parasite.fuselages,
-        updated_state,
-        packed_fuselages
-    )
+        packed_nacelles = jnp.column_stack(nacelle_drags)
+        total_nacelle_parasite_drag = jnp.sum(packed_nacelles, axis=1)[:, None] if nacelle_drags else jnp.zeros_like(M)
 
-    # Nacelle Parasite Drag --------------------------------
-    nacelle_drags = []
-    for nacelle in system.nacelles:
-        drag, *_ = func_nacelle_parasite_drag(
-            Re, M, T,
-            nacelle.areas.wetted,
-            system.areas.reference,
-            nacelle.lengths.total,
-            nacelle.diameters.maximum,
-            aero_settings.parasite_drag.pylon,
-            aero_settings.supersonic.begin_blend_mach,
-            aero_settings.supersonic.end_blend_mach,
-            nacelle.has_pylon
+        updated_state = eqx.tree_at(
+            lambda s: s.aerodynamics.coefficients.drag.parasite.nacelles,
+            updated_state,
+            packed_nacelles
         )
-        nacelle_drags.append(drag)
-
-    packed_nacelles = jnp.column_stack(nacelle_drags)
-    total_nacelle_parasite_drag = jnp.sum(packed_nacelles, axis=1)[:, None] if nacelle_drags else jnp.zeros_like(M)
-
-    updated_state = eqx.tree_at(
-        lambda s: s.aerodynamics.coefficients.drag.parasite.nacelles,
-        updated_state,
-        packed_nacelles
-    )
+    else:
+        total_fuselage_parasite_drag = jnp.zeros_like(M)
+        total_nacelle_parasite_drag = jnp.zeros_like(M)
 
     # Total Aircraft Parasite Drag
     total_parasite_drag = total_wing_parasite_drag + total_fuselage_parasite_drag + total_nacelle_parasite_drag

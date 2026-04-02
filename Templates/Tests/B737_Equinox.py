@@ -726,8 +726,8 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
     mission = Process(
         tag='Boeing 737 Mission',
         steps=(
-            climb_segment,
-            # cruise_segment,
+            # climb_segment,
+            cruise_segment,
             # descent_segment,
             ), #type: ignore
         initial_state=state,

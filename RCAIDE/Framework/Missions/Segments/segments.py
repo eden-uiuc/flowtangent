@@ -29,14 +29,11 @@ first_treedef = None
 import equinox as eqx
 import jax.numpy as jnp
 
-from jaxopt import ScipyRootFinding, Broyden, Bisection, GaussNewton
-from scipy.optimize import fsolve
+from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 # RCAIDE imports
 
 from .Profiles import *
-
-from RCAIDE.Library import Units
 
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import null_step
@@ -150,9 +147,8 @@ class InitializeSegment(Process):
     controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
     steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
-    
 
-    def __call__(self, state, system, settings):
+    def __call__(self, state, system, settings, validate_controls=False):
 
         current_state = state
 
@@ -183,15 +179,14 @@ class InitializeSegment(Process):
             (new_unknowns, new_residuals)
         )
 
-        # 5. Validation
-        assert current_state.check_controls(verbose=False), (
-            f"During initialization of {self.tag} the number of active controls "
-            "did not match the number of active residuals.\n"
-        )
+        if validate_controls:
+            assert current_state.check_controls(verbose=False), (
+                f"During initialization of {self.tag} the number of active controls "
+                "did not match the number of active residuals.\n"
+            )
 
         current_state = current_state.unpack_unknowns(current_state.solver.unknowns)
 
-        # 6. Run the sub-steps
         current_state, system, settings = super().__call__(current_state, system, settings)
 
         return current_state, system, settings
@@ -552,6 +547,44 @@ class Segment(Process):
         
         return super().__call__(state, system, settings)
 
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Fixed/Unconverged Segments
+#-----------------------------------------------------------------------------------------------------------------------
+
+class FixedSegment(Segment):
+
+    tag: str = eqx.field(static=True, default="Fixed Segment")
+
+    def __post_init__(self):
+        # Only build the default steps if the user didn't explicitly provide custom ones
+        if len(self.steps) == 0:
+            # 1. Build the steps, passing the controls configuration directly into InitializeSegment
+            init_step = InitializeSegment(
+                tag=f"{self.tag} Initializations",
+                active_controls=self.active_controls,
+                active_residuals=self.active_residuals,
+                controls_initial_guess=self.controls_initial_guess,
+            )
+
+            # Add profile initialization
+            init_step = eqx.tree_at(
+                lambda i: i.steps, init_step,
+                init_step.steps + (self.course_profile, self.position_profile, self.speed_profile,
+                                   self.velocity_profile, self.duration_profile))
+
+            iter_step = AnalyzeSegment(
+                tag=f"{self.tag} Analysis",
+                steps=_default_analyses()[:-1]  # Skip Residual Calculation
+            )
+            fin_step = FinalizeSegment(tag=f"{self.tag} Finalization")
+
+            # 2. Safely lock them into the frozen object
+            object.__setattr__(self, "steps", (init_step, iter_step, fin_step))
+
+    @property
+    def analyze(self) -> AnalyzeSegment:
+        return self.steps[1]
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Optimal Segments
