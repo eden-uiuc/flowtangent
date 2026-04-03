@@ -47,6 +47,7 @@ class SupersonicSettings(eqx.Module):
     cross_sectional_area_calculation_type:  str = eqx.field(static=True, default='Fixed')
     wave_drag_type:                         str = eqx.field(static=True, default='Raymer')
 
+
 class CorrectionFactors(eqx.Module):
 
     fuselage_lift: float = 1.14
@@ -56,16 +57,19 @@ class CorrectionFactors(eqx.Module):
     lift_to_drag: float = 0.0
     CL_max: float = 1.0
 
+
 class EfficiencyFactors(eqx.Module):
 
     span: float = 1.0
     oswald: float = 1.0
+
 
 class ParasiteDragFormFactors(eqx.Module):
 
     wing: float = 1.1
     fuselage: float = 2.3
     pylon: float = 0.2
+
 
 class Training(eqx.Module):
 

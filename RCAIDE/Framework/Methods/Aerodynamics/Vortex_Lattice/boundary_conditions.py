@@ -30,8 +30,8 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     RHS = (V_freestream + V_rotation + V_wake) @ n
     """
     
-    vlm_settings: "VLMSettings" = settings.analysis.aerodynamics # type: ignore
-    VD: VortexDistribution = system.analysis_data["vortex_distribution"] # type: ignore
+    vlm_settings: "VLMSettings" = settings.analysis.aerodynamics  # type: ignore
+    VD: VortexDistribution = system.analysis_data["vortex_distribution"]  # type: ignore
     
     # Extract State Conditions
     alpha = state.aerodynamics.angles.alpha

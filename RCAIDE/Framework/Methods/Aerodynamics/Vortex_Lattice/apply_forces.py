@@ -36,7 +36,7 @@ def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settin
     qS = 0.5 * rho * (flight_speed ** 2) * S
     
     F_Z = -qS * C_L # Z negative by right hand rule convention
-    F_X = -qS * C_D # Drag is in negative-x direction by definition
+    F_X = qS * C_D
 
     wind_forces = state.frames.wind.total_force_vector
     wind_forces = wind_forces.at[:, 2].set(F_Z.flatten())

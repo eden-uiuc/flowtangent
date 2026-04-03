@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 # Trefftz Plane Induced Drag
 # ---------------------------------------------------------
 @jax.jit
-def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
+def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, fil_y_L, fil_y_R, fil_z_L, fil_z_R, gamma_segments, alpha, rho):
     """
     Computes Trefftz plane induced drag using JAX broadcasting.
     """
@@ -37,6 +37,31 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
     y_ctrl = jnp.broadcast_to(y_ctrl.reshape(-1, n_strips), (n_time, n_strips))
     z_ctrl = jnp.broadcast_to(z_ctrl.reshape(-1, n_strips), (n_time, n_strips))
     x_ctrl = jnp.broadcast_to(x_ctrl.reshape(-1, n_strips), (n_time, n_strips))
+
+    fil_y_L = jnp.broadcast_to(fil_y_L.reshape(-1, n_strips), (n_time, n_strips))
+    fil_y_R = jnp.broadcast_to(fil_y_R.reshape(-1, n_strips), (n_time, n_strips))
+    fil_z_L = jnp.broadcast_to(fil_z_L.reshape(-1, n_strips), (n_time, n_strips))
+    fil_z_R = jnp.broadcast_to(fil_z_R.reshape(-1, n_strips), (n_time, n_strips))
+
+    fil_y_center = (fil_y_L + fil_y_R) / 2.0
+    sort_idx = jnp.argsort(fil_y_center, axis=1)
+
+    fil_y_L_sorted = jnp.take_along_axis(fil_y_L, sort_idx, axis=1)
+    fil_z_L_sorted = jnp.take_along_axis(fil_z_L, sort_idx, axis=1)
+
+    fil_y_R_sorted = jnp.take_along_axis(fil_y_R, sort_idx, axis=1)
+    fil_z_R_sorted = jnp.take_along_axis(fil_z_R, sort_idx, axis=1)
+
+    tp_y_vortex = jnp.concatenate([fil_y_L_sorted[:, :1], fil_y_R_sorted], axis=1)
+    tp_z_vortex = jnp.concatenate([fil_z_L_sorted[:, :1], fil_z_R_sorted], axis=1)
+
+    tp_x_eval = jnp.take_along_axis(x_ctrl, sort_idx, axis=1)
+    tp_y_eval = jnp.take_along_axis(y_ctrl, sort_idx, axis=1)
+    tp_z_eval = jnp.take_along_axis(z_ctrl, sort_idx, axis=1)
+
+    gamma_sorted = jnp.take_along_axis(gamma_segments, sort_idx, axis=1)
+    gamma_padded = jnp.pad(gamma_sorted, ((0, 0), (1, 1)), mode='constant')
+    shed_vortex = gamma_padded[:, :-1] - gamma_padded[:, 1:]
     
     # Force alpha to (n_time, 1)
     alpha = alpha.reshape(n_time, 1)
@@ -44,27 +69,24 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
     sin_a = jnp.sin(alpha)
     
     # Trefftz Plane Transformation
-    tp_y_ctrl = y_ctrl
-    tp_z_ctrl = z_ctrl * cos_a - x_ctrl * sin_a  # Now guaranteed perfectly (16, 42)!
-    
-    tp_y_center = (tp_y_ctrl[:, :-1] + tp_y_ctrl[:, 1:]) / 2.0
-    tp_z_center = (tp_z_ctrl[:, :-1] + tp_z_ctrl[:, 1:]) / 2.0
-    
-    dy = tp_y_ctrl[:, 1:] - tp_y_ctrl[:, :-1]
-    direction = jnp.sign(dy)
-    shed_vortex = direction * (gamma_segments[:, 1:] - gamma_segments[:, :-1])
+    tp_y_ctrl = tp_y_eval
+    tp_z_ctrl = tp_z_eval * cos_a - tp_x_eval * sin_a
     
     # Distance Matrices
-    dy_mat = tp_y_ctrl[:, :, None] - tp_y_center[:, None, :] 
-    dz_mat = tp_z_ctrl[:, :, None] - tp_z_center[:, None, :] 
+    dy_mat = tp_y_eval[:, :, None] - tp_y_vortex[:, None, :]
+    dz_mat = tp_z_eval[:, :, None] - tp_z_vortex[:, None, :]
     
     # Safe Distance
     r = jnp.sqrt(dy_mat**2 + dz_mat**2 + 1e-16)
     r_safe = jnp.maximum(r, 1e-8) # Clamp once and use everywhere
+
+    panel_dy = fil_y_R_sorted - fil_y_L_sorted
+    panel_dz = fil_z_R_sorted - fil_z_L_sorted
+    panel_width = jnp.sqrt(panel_dy ** 2 + panel_dz ** 2)
     
     # 2. Gradient-Safe Normal Vectors (Fixes the Vertical Tail divide-by-zero)
-    dy_ctrl = jnp.gradient(tp_y_ctrl, axis=1)
-    dz_ctrl = jnp.gradient(tp_z_ctrl, axis=1)
+    dy_ctrl = jnp.gradient(tp_y_ctrl, axis=-1)
+    dz_ctrl = jnp.gradient(tp_z_ctrl, axis=-1)
     
     ctrl_mag = jnp.sqrt(dy_ctrl**2 + dz_ctrl**2 + 1e-16)
     
@@ -73,19 +95,14 @@ def _compute_trefftz_drag(y_ctrl, z_ctrl, x_ctrl, gamma_segments, alpha, rho):
     
     # 3. Induced Velocities (Strictly using r_safe)
     v_mag = shed_vortex[:, None, :] / (2.0 * jnp.pi * r_safe)
-    v_ind_y = v_mag * (-dz_mat / r_safe)
-    v_ind_z = v_mag * (dy_mat / r_safe)
+    v_ind_y = jnp.sum(v_mag * (-dz_mat / r_safe), axis=-1)
+    v_ind_z = jnp.sum(v_mag * (dy_mat / r_safe), axis=-1)
     
-    v_induced = jnp.sum(v_ind_y * n_hat_y[:, :, None] + v_ind_z * n_hat_z[:, :, None], axis=2)
+    v_normal = v_ind_y * n_hat_y + v_ind_z * n_hat_z
+
+    D_induced = 0.5 * rho * jnp.sum(gamma_sorted * v_normal * panel_width, axis=1)
     
-    # Integrate Drag
-    ds = jnp.sqrt(jnp.diff(y_ctrl, axis=1)**2 + jnp.diff(z_ctrl, axis=1)**2)
-    integrand = v_induced[:, :-1] * gamma_segments[:, :-1] + v_induced[:, 1:] * gamma_segments[:, 1:]
-    
-    rho = rho.reshape(n_time) # Ensure 1D for safety
-    D_induced = -0.25 * rho * jnp.sum(integrand * ds, axis=1)
-    
-    return D_induced, v_induced
+    return D_induced, v_normal
 
 # ---------------------------------------------------------
 # Full Coefficient Calculation
@@ -146,6 +163,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # Panel Forces
     panel_dx_nondim = 1.0 / panels_per_strip  # Fraction of overall chord length in each panel
     quarter_chord_offset = 0.25 * panel_dx_nondim  # Location of leading edge vortex for each panel
+    colloc_offset = 0.75 * panel_dx_nondim # Location of leading edge collocation point for each panel
     panel_normal_coeff = panel_dx_nondim[None, :] * DCP  # Fraction of chordwise delta Cp for each panel
     
     # Local slope (TX = -nx/nz)
@@ -161,7 +179,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     chordwise_indices = panel_indices - strip_start_indices + 1.0
     
     vortex_x_nondim = (chordwise_indices - 0.75) * panel_dx_nondim
-    panel_pitching_moment = (quarter_chord_offset[None, :] - vortex_x_nondim[None, :]) * panel_normal_coeff
+    panel_pitching_moment = (colloc_offset[None, :] - vortex_x_nondim[None, :]) * panel_normal_coeff
     
     # Rolling couple from sideslip
     collocation_x = VD.collocation_points[:, 0]
@@ -266,18 +284,28 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # JAX-compatible trailing edge mask
     te_mask_float = VD.is_trailing_edge.astype(jnp.float32)
     
-    # Extract TE coordinates directly
-    te_coords = jax.ops.segment_sum(VD.collocation_points * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
-    x_ctrl = te_coords[:, 0]
-    y_ctrl = te_coords[:, 1]
-    z_ctrl = te_coords[:, 2]
-    
+    # Extract trailing edge collocation and filament coordinates
+    colloc_TE = jax.ops.segment_sum(VD.collocation_points * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    colloc_TE_x = colloc_TE[:, 0]
+    colloc_TE_y = colloc_TE[:, 1]
+    colloc_TE_z = colloc_TE[:, 2]
+
+    fil_TE_L = jax.ops.segment_sum(VD.bound_vortex_left * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    fil_TE_R = jax.ops.segment_sum(VD.bound_vortex_right * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+
+    fil_y_L = fil_TE_L[:, 1]
+    fil_y_R = fil_TE_R[:, 1]
+
+    fil_z_L = fil_TE_L[:, 2]
+    fil_z_R = fil_TE_R[:, 2]
+
     # Sum gamma over strip
     gamma_spanwise = seg_sum(GAMMA)
     gamma_physical = gamma_spanwise * v_inf
-    
+
     D_induced, _ = _compute_trefftz_drag(
-        y_ctrl[None, :], z_ctrl[None, :], x_ctrl[None, :], 
+        colloc_TE_y[None, :], colloc_TE_z[None, :], colloc_TE_x[None, :],
+        fil_y_L, fil_y_R, fil_z_L, fil_z_R,
         gamma_physical, alpha[:, 0], rho[:, 0]
     )
     
@@ -288,8 +316,8 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     CY = jnp.sum(force_y, axis=1) / S_ref           # Side-force coefficient
     CM = jnp.sum(moment, axis=1) / (S_ref * c_ref)  # Pitch moment coefficient
     
-    Cl_roll = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref) # Rolling moment, negative for sign conventions
-    Cn_yaw  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)  # Yawing moment, negative for sign conventions
+    Cl_roll = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref)  # Rolling moment, negative for sign conventions
+    Cn_yaw  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)   # Yawing moment, negative for sign conventions
     
     # Profile Drag (CX and CZ projection back to inertial axes)
     cx_denom = cos_alpha[:, 0] - sin_alpha[:, 0] * tan_alpha[:, 0]
