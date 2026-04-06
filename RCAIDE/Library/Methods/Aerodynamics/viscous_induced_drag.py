@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Viscous Induced Drag
 # ----------------------------------------------------------------------------------------------------------------------
@@ -38,6 +39,17 @@ def func_viscous_induced_drag(
 # ---------------------------------------------------------
 # 2. STATEFUL FRAMEWORK ROUTER
 # ---------------------------------------------------------
+@inputs(
+    "state.aerodynamics.coefficients.lift.total",
+    "state.aerodynamics.coefficients.drag.parasite.total",
+    "settings.analysis.aerodynamics.correction.viscous_lift_drag",
+    "state.aerodynamics.coefficients.drag.induced.inviscid.total",
+    "state.aerodynamics.coefficients.drag.parasite.wings",
+)
+@outputs(
+    "state.aerodynamics.coefficients.drag.induced.total",
+    "state.aerodynamics.coefficients.drag.induced.viscous.total",
+)
 def compute_viscous_induced_drag(state: "State", system: "System", settings: "Settings"):
     """ Computes system and wing viscous induced drag """
     
@@ -48,19 +60,13 @@ def compute_viscous_induced_drag(state: "State", system: "System", settings: "Se
 
     CDiv_all    = func_viscous_induced_drag(CL_all, CDp_all, K)
     total_induced_drag = state.aerodynamics.coefficients.drag.induced.inviscid.total + CDiv_all
-    
-    CL_w        = state.aerodynamics.coefficients.lift.inviscid.wings
-    CDp_w       = state.aerodynamics.coefficients.drag.parasite.wings
-
-    CDiv_w      = func_viscous_induced_drag(CL_w, CDp_w, K)
-    wing_induced_drag = state.aerodynamics.coefficients.drag.induced.inviscid.wings + CDiv_w
 
     updated_induced_drag = eqx.tree_at(lambda i:
         (
-            i.total, i.viscous.total, i.viscous.wings
+            i.total, i.viscous.total
         ), state.aerodynamics.coefficients.drag.induced,
         (
-            total_induced_drag, CDiv_all, wing_induced_drag
+            total_induced_drag, CDiv_all
         )
     )
 

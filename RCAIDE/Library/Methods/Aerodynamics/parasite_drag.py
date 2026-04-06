@@ -11,18 +11,17 @@ from typing import TYPE_CHECKING
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-import scipy.io.arff
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System, Aircraft
+    from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
 
 from .flat_plate_friction import flat_plate_friction
 from RCAIDE.Library.Methods.Utilities import cubic_spline_blender
 
-from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.utils import inputs, outputs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Parasite Drag Methods
@@ -73,7 +72,7 @@ def func_wing_parasite_drag(
     k_w = k_w_raw * h00_val + 1.0 * (1.0 - h00_val)
 
     # find the final result
-    wing_parasite_drag = k_w * cf_w_u * S_wet / S_ref /2. + k_w * cf_w_l * S_wet / S_ref /2.
+    wing_parasite_drag = k_w * cf_w_u * S_wet / S_ref / 2. + k_w * cf_w_l * S_wet / S_ref / 2.
 
     return wing_parasite_drag, k_w, cf_w_u, cf_w_l, k_comp_u, k_comp_l, k_reyn_u, k_reyn_l
 
@@ -164,6 +163,37 @@ def func_nacelle_parasite_drag(
 # ---------------------------------------------------------
 
 
+@inputs(
+    "settings.analysis.parasite_drag.wing",
+    "settings.analysis.aerodynamics.supersonic.begin_blend_mach",
+    "settings.analysis.aerodynamics.supersonic.end_blend_mach",
+    "settings.analysis.aerodynamics.model_fuselage",
+    "state.freestream.reynolds_number",
+    "state.freestream.mach_number",
+    "state.freestream.temperature",
+    "system.wings.[Wing].segments.[WingSegment].chords.mean_aerodynamic",
+    "system.wings.[Wing].segments.[WingSegment].sweeps.quarter_chord",
+    "system.wings.[Wing].segments.[WingSegment].thickness_to_chord",
+    "system.wings.[Wing].segments.[WingSegment].areas.wetted",
+    "system.wings.[Wing].transition_x_upper",
+    "system.wings.[Wing].transition_x_lower",
+    "system.wings.[Wing].chords.mean_aerodynamic",
+    "system.wings.[Wing].sweeps.quarter_chord",
+    "system.wings.[Wing].thickness_to_chord",
+    "system.fuselages.[Fuselage].areas.wetted",
+    "system.fuselages.[Fuselage].lengths.total",
+    "system.fuselages.[Fuselage].diameters.effective",
+    "system.nacelles.[Nacelle].areas.reference",
+    "system.nacelles.[Nacelle].lengths.total",
+    "system.nacelles.[Nacelle].diameters.maximum"
+)
+@outputs(
+    "state.aerodynamics.coefficients.drag.total",
+    "state.aerodynamics.coefficients.drag.parasite.total",
+    "state.aerodynamics.coefficients.drag.parasite.wings",
+    "state.aerodynamics.coefficients.drag.parasite.fuselages",
+    "state.aerodynamics.coefficients.drag.parasite.nacelles",
+)
 def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Settings"):
     """Computes whole aircraft parasite drag."""
 

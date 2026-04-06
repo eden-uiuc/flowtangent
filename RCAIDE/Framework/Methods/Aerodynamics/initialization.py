@@ -15,9 +15,10 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System, Aircraft
+    from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 from RCAIDE.Framework.Missions.Conditions.Aerodynamics import ComponentCoefficients
 
 
@@ -25,6 +26,16 @@ from RCAIDE.Framework.Missions.Conditions.Aerodynamics import ComponentCoefficie
 #  Initialize Aerodynamic Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
+@inputs(
+    "system.wings",
+    "system.fuselages",
+    "system.nacelles"
+)
+@outputs(
+    "state.aerodynamics.coefficients.[ComponentCoefficients].wings",
+    "state.aerodynamics.coefficients.[ComponentCoefficients].fuselages",
+    "state.aerodynamics.coefficients.[ComponentCoefficients].nacelles"
+)
 def expand_component_coefficients(
     state: "State",
     system: "Aircraft",

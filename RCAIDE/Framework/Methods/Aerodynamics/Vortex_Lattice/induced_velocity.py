@@ -18,9 +18,11 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper Functions
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 @jax.jit
 def subsonic_jax(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, X1, Y1, X2, Y2, RTV1, RTV2):
@@ -252,6 +254,15 @@ def compute_induced_velocity_matrix(VD, mach_array):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@inputs(
+    "system.analysis_data['vortex_distribution']",
+    "state.freestream.mach_number"
+)
+@outputs(
+    "system.analysis_data['AICs']",
+    "system.analysis_data['singularities']",
+    "system.analysis_data['VORLAX_EW_matrix']"
+)
 def compute_induced_velocity(state: "State", system: "System", settings: "Settings"):
     
     VD = system.analysis_data["vortex_distribution"]

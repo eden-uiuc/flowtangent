@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation
 # ----------------------------------------------------------------------------------------------------------------------
@@ -329,14 +330,41 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     
     return CL, CDi, CX, CY, -CZ, CM, Cl_roll, Cn_yaw
 
+@inputs(
+    "system.analysis_data['vortex_distribution']",
+    "system.analysis_data['pressure_coefficients']",
+    "system.analysis_data['vortex_strengths']",
+    "system.analysis_data['VORLAX_EW_matrix']",
+    "system.analysis_data['relative_velocity']",
+    "state.aerodynamics.angles.alpha",
+    "state.aerodynamics.angles.beta",
+    "state.freestream.speed",
+    "state.freestream.mach_number",
+    "state.freestream.density",
+    "system.areas.reference",
+    "system.reference_geometry.mean_aerodynamic_chord",
+    "system.reference_geometry.projected_span",
+    "system.reference_geometry.center_of_gravity",
+)
+@outputs(
+    "state.aerodynamics.coefficients.lift.total",
+    "state.aerodynamics.coefficients.drag.total",
+    "state.aerodynamics.coefficients.drag.induced.total",
+    "state.aerodynamics.coefficients.drag.induced.inviscid.total",
+    "state.aerodynamics.coefficients.X",
+    "state.aerodynamics.coefficients.Y",
+    "state.aerodynamics.coefficients.Z",
+    "state.aerodynamics.coefficients.moments.pitch",
+    "state.aerodynamics.coefficients.moments.roll",
+    "state.aerodynamics.coefficients.moments.yaw"
+)
 def compute_coefficients(state: "State", system: "System", settings: "Settings"):
     """ Final VLM step to extract global coefficients and append to State. """
     
     analysis = system.analysis_data
-    VD = analysis["vortex_distribution"]
 
     CL, CDi, CX, CY, CZ, CM, Cl_roll, Cn_yaw = _compute_aerodynamic_coefficients(
-        VD,
+        analysis["vortex_distribution"],
         analysis["pressure_coefficients"],
         analysis["vortex_strengths"],
         analysis["VORLAX_EW_matrix"],
@@ -350,12 +378,14 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
 
     vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
 
-    CL = CL * vlm_settings.correction.fuselage_lift
+    if settings.analysis.aerodynamics.model_fuselage:
+        CL = CL * vlm_settings.correction.fuselage_lift
     
     # Update the Vehicle/Segment State with the aerodynamic coefficients
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CDi[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi[:, None])
+    state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.inviscid.total, state, CDi[:, None])
 
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.X, state, CX[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.Y, state, CY[:, None])

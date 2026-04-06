@@ -18,9 +18,10 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System, Aircraft
+    from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Data Structures
 # ----------------------------------------------------------------------------------------------------------------------
@@ -594,6 +595,13 @@ def combine_vortex_distributions(vd1: VortexDistribution, vd2: VortexDistributio
 # Stateful Version
 # ---------------------------------------------------------
 
+@inputs(
+    "system.analysis_data['vlm_wings']",
+    "settings.analysis.aerodynamics.vortices",
+)
+@outputs(
+    "system.analysis_data['vortex_distribution']",
+)
 def generate_full_vortex_distribution(state: "State", system: "Aircraft", settings: "Settings"):
 
     vlm_wings = system.analysis_data["vlm_wings"]

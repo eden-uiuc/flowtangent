@@ -8,16 +8,16 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System, Aircraft, AircraftReferenceGeometry
+    from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,6 +25,18 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------
 # Geometry Initialization
 # ---------------------------------------------------------
+
+
+@inputs(
+    "settings.analysis.aerodynamics: VLMSettings",
+    "system.wings.[Wing].chords.mean_aerodynamic",
+    "system.wings.[Wing].spans.projected",
+    "system.mass_properties.center_of_gravity",
+)
+@outputs(
+    "system.reference_geometry",
+    "system.analysis_data"
+)
 def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Parses the vehicle geometry to find the primary reference parameters 
@@ -32,7 +44,7 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     """
     
     if "VLMSettings" not in settings.analysis.aerodynamics.__class__.__name__:
-        raise ValueError("settings.analysis.aerodynaics are not VLM Settings." \
+        raise ValueError("settings.analysis.aerodynamics are not VLM Settings."\
         "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings")
 
     # Standard Python Control Flow (Safe outside of @jax.jit)

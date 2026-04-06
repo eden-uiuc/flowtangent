@@ -8,7 +8,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -20,10 +19,26 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
     from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice.vortex_distribution import VortexDistribution
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Boundary Conditions (Vortex Strength Right Hand Side Matrix)
 # ----------------------------------------------------------------------------------------------------------------------
 
+
+@inputs(
+    "settings.analysis.aerodynamics: VLMSettings",
+    "system.analysis_data['vortex_distribution']",
+    "state.aerodynamics.angles.alpha",
+    "state.aerodynamics.angles.beta",
+    "state.freestream.speed",
+    "state.stability.static.roll_rate",
+    "state.stability.static.pitch_rate",
+    "state.stability.static.yaw_rate"
+)
+@outputs(
+    "system.analysis_data['boundary_conditions']",
+    "system.analysis_data['relative_velocity']"
+)
 def compute_boundary_conditions(state: "State", system: "System", settings: "Settings"):
     """
     Computes the Neumann boundary condition (RHS) for the VLM.
@@ -47,7 +62,6 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     omega = jnp.concatenate([p, q, r], axis=1)
     
     # Build Freestream Velocity Vector
-    # V_fs = [V*cos(a)*cos(b), V*cos(a)*sin(b), V*sin(a)]
     v_fs = jnp.concatenate([
         v_inf * jnp.cos(alpha) * jnp.cos(beta),
         v_inf * jnp.cos(alpha) * jnp.sin(beta), 

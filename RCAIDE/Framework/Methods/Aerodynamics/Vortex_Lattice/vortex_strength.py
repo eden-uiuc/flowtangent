@@ -8,7 +8,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -18,11 +17,21 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compute VLM Vortex Strength
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@inputs(
+    "system.analysis_data['vortex_distribution']",
+    "system.analysis_data['AICs']",
+    "system.analysis_data['boundary_conditions']",
+    "system.analysis_data['singularities']",
+)
+@outputs(
+    "system.analysis_data['vortex_strengths']",
+)
 def compute_vortex_strength(state: "State", system: "System", settings: "Settings"):
     """ Solves the linear system A * GAMMA = RHS for the vortex strengths. """
     

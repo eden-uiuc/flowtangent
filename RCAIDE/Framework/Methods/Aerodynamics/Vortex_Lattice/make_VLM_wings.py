@@ -10,23 +10,20 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from dataclasses import dataclass
-
 # package imports
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from jax import vmap
-
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System, Aircraft
+    from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
 
 # package imports 
+from RCAIDE.utils import inputs, outputs
 from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingChords, WingControlSurface, WingDimensions
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 
@@ -526,6 +523,16 @@ def validate_airfoil_resolutions(wing):
         return 2 # Number of airfoil coordinates, 2 if no airfoil for flat line
 
 
+@inputs(
+    "settings.analysis.aerodynamics: VLMSettings",
+    "settings.analysis.aerodynamics.discretize_control_surfaces",
+    "settings.analysis.aerodynamics.vortices.wing_spanwise_vortices",
+    "settings.analysis.aerodynamics.vortices.wing_chordwise_vortices",
+    "system.wings",
+)
+@outputs(
+    "system.analysis_data['vlm_wings']",
+)
 def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
     # unpack inputs
     vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore

@@ -6,15 +6,13 @@ import subprocess
 import os
 import re
 
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions
 
-from RCAIDE.Framework import Process, ProcessStep, State, Settings
+from RCAIDE.Framework import Process, State, Settings
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
@@ -23,7 +21,7 @@ from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeV
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
-def write_avl_geometry(filename, name="Test_Wing", span=10.0, chord=1.0):
+def create_avl_geometry(filename, name="Test_Wing", span=10.0, chord=1.0):
     """Writes a simple rectangular wing .avl file."""
 
     # Global Reference Values
@@ -89,7 +87,7 @@ quit
     # The '\n' drops us out of the OPER menu back to the main menu
 
     avl_exe = os.path.expanduser("~/.local/bin/avl")
-    print(f"Running AVL for {avl_file} at Alpha = {alpha}...")
+    print(f"\nRunning AVL for {avl_file} at Alpha = {alpha}...")
 
     # Call AVL natively from your PATH, piping the keystrokes in
     result = subprocess.run(
@@ -172,9 +170,9 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
 
     # Set State Values
     initial_state = eqx.tree_at(
-        lambda s:(s.stability.static.roll_rate, s.stability.static.pitch_rate, s.stability.static.yaw_rate),
+        lambda s: (s.stability.static.roll_rate, s.stability.static.pitch_rate, s.stability.static.yaw_rate),
         state,
-        (jnp.zeros((1,1)), jnp.zeros((1, 1)), jnp.zeros((1, 1)))
+        (jnp.zeros((1, 1)), jnp.zeros((1, 1)), jnp.zeros((1, 1)))
     )
 
     initial_state = eqx.tree_at(lambda s: s.freestream.speed, initial_state, jnp.array([100.0]))
@@ -194,7 +192,7 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
         number_of_chordwise_vortices=12
     )
     aero_settings = VLMSettings(vortices=vortices)
-    initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=True), aero_settings)
+    initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=False), aero_settings)
 
     analysis = Process(
         steps=(
@@ -208,9 +206,9 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
 
     final_state, final_system, final_settings = analysis.run(initial_state, initial_system, initial_settings)
 
-    alpha = final_state.aerodynamics.angles.alpha.item(0)
+    alpha = jnp.rad2deg(final_state.aerodynamics.angles.alpha).item(0)
     CL = final_state.aerodynamics.coefficients.lift.total.item(0)
-    CD = final_state.aerodynamics.coefficients.drag.induced.inviscid.item(0)
+    CD = final_state.aerodynamics.coefficients.drag.induced.inviscid.total.item(0)
     CM = final_state.aerodynamics.coefficients.moments.pitch.item(0)
 
     return alpha, CL, CD, CM
@@ -220,21 +218,21 @@ if __name__ == "__main__":
     geometry_file = "vnv_test1.avl"
 
     # 1. Generate the geometry file
-    write_avl_geometry(geometry_file, span=10.0, chord=1.0)
+    create_avl_geometry(geometry_file, span=10.0, chord=1.0)
 
     # 2. Run AVL at 2.0 degrees Angle of Attack
     run_avl_alpha_sweep(geometry_file, alpha=2.0, run_name="test1")
 
     parsed_data = parse_avl_stability("test1_stab.txt")
 
-    print("--- Extracted AVL Results ---")
+    print("\n--- Extracted AVL Results ---")
     for k, v in parsed_data.items():
         print(f"{k}: {v}")
 
     vehicle = create_vorjax_geometry(span=10.0, chord=1.0)
     alpha, CL, CD, CM = run_vorjax_alpha_sweep(vehicle, alpha=2.0)
-    print(f"--- Extracted VORJAX Results ---")
+    print(f"\n--- Extracted VORJAX Results ---")
     print(f"Alpha: {alpha}")
-    print(f"CL: {CL}")
-    print(f"CD: {CD}")
-    print(f"CM: {CM}")
+    print(f"CL: {CL:.5f}")
+    print(f"CD: {CD:.5f}")
+    print(f"CM: {CM:.5f}")

@@ -8,8 +8,6 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
-import jax
-import jax.numpy as jnp
 import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
@@ -18,11 +16,22 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Apply Aerodynamic Forces
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@inputs(
+    "state.aerodynamics.coefficients.lift.total",
+    "state.aerodynamics.coefficients.drag.total",
+    "state.freestream.density",
+    "state.freestream.speed",
+    "system.areas.reference",
+)
+@outputs(
+    "state.frames.wind.total_force_vector"
+)
 def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settings"):
     
     # Get coefficients from analysis

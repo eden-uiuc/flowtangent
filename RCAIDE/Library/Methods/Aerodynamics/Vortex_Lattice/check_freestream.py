@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Check Freestream
 # ----------------------------------------------------------------------------------------------------------------------
@@ -38,6 +39,13 @@ def func_check_freestream(velocity):
 # ---------------------------------------------------------
 # 2. STATEFUL FRAMEWORK ROUTER
 # ---------------------------------------------------------
+@inputs(
+    "state.frames.inertial.velocity_vector",
+)
+@outputs(
+    "state.frames.inertial.velocity_vector",
+    "state.freestream.speed",
+)
 def check_freestream_stateful(state: "State", system: "System", settings: "Settings"):
     """ Unpacks PyTrees, calls pure math, repacks PyTrees. """
     

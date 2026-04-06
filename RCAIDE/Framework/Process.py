@@ -9,10 +9,13 @@
 
 from __future__ import annotations
 
-from typing import Callable, Self, TYPE_CHECKING
+from typing import Callable, Self, TYPE_CHECKING, Generator, Tuple
+
+import re
 
 # package imports
 import equinox as eqx
+import networkx as nx
 
 # RCAIDE imports
 if TYPE_CHECKING:
@@ -41,14 +44,12 @@ class ProcessStep(eqx.Module):
     final_system:         System | None    = None
     final_settings:       Settings | None  = None
 
-
     def __call__(self, state, system, settings):
         if settings.DEBUG_MODE: print(f"  Step: '{self.tag}'")
         # Default calling behavior, assumes function is callable.
         # String overwrite only for steps with __call__ override
-        return self.function(state, system, settings) #type: ignore
-    
-    
+        return self.function(state, system, settings)  # type: ignore
+
     def run(self, state, system, settings):
         return self(state, system, settings)
     
@@ -66,7 +67,7 @@ class ProcessStep(eqx.Module):
             final_state,
             final_system,
             final_settings,
-        ) -> ProcessStep:
+    ) -> ProcessStep:
         
         return eqx.tree_at(
             lambda s: (
@@ -88,6 +89,15 @@ class ProcessStep(eqx.Module):
             is_leaf=lambda x: x is None
         )
 
+    @property
+    def inputs(self) -> set:
+        return getattr(self.function, "_inputs", set())
+
+    @property
+    def outputs(self) -> set:
+        return getattr(self.function, "_results", set())
+
+
 class Process(ProcessStep):
 
     tag:                str                     = eqx.field(static=True, default="Process")
@@ -95,7 +105,6 @@ class Process(ProcessStep):
     steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
 
     initial_step:       int                     = eqx.field(static=True, default=0)
-
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -235,7 +244,209 @@ class Process(ProcessStep):
     def remove(self, value: str | Callable | ProcessStep | Self):    
         idx_to_remove = self.index(value) 
         return self.pop(idx_to_remove)
-    
+
+    @property
+    def inputs(self) -> set:
+        required_inputs = set()
+        available_inputs = set()
+
+        for step in self.steps:
+            unmet_needs = step.inputs - available_inputs
+            required_inputs |= unmet_needs
+            available_inputs |= step.outputs
+
+        return required_inputs
+
+    @property
+    def outputs(self) -> set:
+        return set.union(*[step.outputs for step in self.steps]) if self.steps else set()
+
+    def _get_flattened_steps(self, prefix: str = "") -> Generator[Tuple[str, ProcessStep], None, None]:
+        """
+        Recursively yields (node_name, step_obj) for all steps.
+        The prefix tracks the hierarchical origin (e.g., '0_InitializeVLM.2_ProcessGeometry').
+        """
+        for i, step in enumerate(self.steps):
+            node_name = step.tag
+
+            # Check if this step is itself a nested Process containing other steps
+            if hasattr(step, "steps") and step.steps is not None:
+                # Recursively yield its internal steps
+                yield from step._get_flattened_steps(prefix=f"{node_name}.")
+            else:
+                yield node_name, step
+
+    def graph(self, recursive: bool = False) -> nx.DiGraph:
+        """
+        Constructs a Directed Acyclic Graph (DAG) of the process.
+
+        Args:
+            recursive: If True, flattens nested Processes into their atomic base steps.
+                       If False, treats nested Processes as single black-box nodes.
+        """
+        G = nx.DiGraph()
+        latest_producers = {}
+
+        if recursive:
+            step_iterator = self._get_flattened_steps()
+        else:
+            step_iterator = ((f"{i}_{step.tag}", step) for i, step in enumerate(self.steps))
+
+        # 2. Build the chronological DAG
+        for step_node, step in step_iterator:
+            G.add_node(step_node, step_obj=step)
+
+            # Resolve Inputs
+            for in_var in step.inputs:
+                if in_var in latest_producers:
+                    producer_node = latest_producers[in_var]
+                    if G.has_edge(producer_node, step_node):
+                        G.edges[producer_node, step_node]['variables'].append(in_var)
+                    else:
+                        G.add_edge(producer_node, step_node, variables=[in_var])
+                else:
+                    global_node = "Global Inputs"
+                    if not G.has_node(global_node):
+                        G.add_node(global_node)
+
+                    if G.has_edge(global_node, step_node):
+                        G.edges[global_node, step_node]['variables'].append(in_var)
+                    else:
+                        G.add_edge(global_node, step_node, variables=[in_var])
+
+            # Resolve Outputs
+            for out_var in step.outputs:
+                latest_producers[out_var] = step_node
+
+        return G
+
+    def print_io_tree(self):
+        """
+        Extracts the inputs and outputs of the Process and prints them
+        in a hierarchical, human-readable ASCII tree structure.
+        Handles iterators ([Item]), dictionaries (['key']), and pseudo-types (: Type).
+        """
+        import re
+
+        def build_tree_and_metadata(paths: set[str]) -> tuple[dict, dict]:
+            """
+            Converts strings into a nested dict and extracts type hints.
+            Returns the structural tree and a dictionary of type hints keyed by path tuples.
+            """
+            tree = {}
+            type_hints = {}
+            # Regex extracts bracketed items (with or without quotes) and normal text, ignoring dots
+            pattern = re.compile(r"\[.*?\]|[^.\[\]]+")
+
+            for path in paths:
+                # 1. Strip out and store the type hint if it exists
+                if ":" in path:
+                    base_path, hint = path.split(":", 1)
+                    base_path = base_path.strip()
+                    hint = hint.strip()
+                else:
+                    base_path = path.strip()
+                    hint = None
+
+                # 2. Split the base path into parts
+                parts = tuple(pattern.findall(base_path))
+
+                # 3. Store the hint keyed by the exact structural path
+                if hint:
+                    type_hints[parts] = hint
+
+                # 4. Build the structural tree
+                current_level = tree
+                for part in parts:
+                    current_level = current_level.setdefault(part, {})
+
+            return tree, type_hints
+
+        def display_tree(tree: dict, type_hints: dict, depth: int = 0, current_parts: tuple = ()):
+            """Recursively prints the nested dictionary with ASCII indentation."""
+            for key in sorted(tree.keys()):
+                node_parts = current_parts + (key,)
+                display_name = str(key)
+
+                # Apply Type Hint if one was registered for this exact node
+                if node_parts in type_hints:
+                    display_name += f": {type_hints[node_parts]}"
+
+                # Look ahead: if a child is a dictionary key (has quotes inside brackets), flag this node
+                # Iterators like [Wing] have no quotes, so they won't trigger this.
+                has_dict_children = any(str(k).startswith("['") or str(k).startswith('["') for k in tree[key].keys())
+                if has_dict_children:
+                    display_name += ": {dict}"
+
+                # Print with formatting
+                if depth == 0:
+                    print(display_name)
+                else:
+                    prefix = "|" + "-" * (2 * depth)
+                    print(f"{prefix}{display_name}")
+
+                # Recurse
+                display_tree(tree[key], type_hints, depth + 1, node_parts)
+
+        print("=== Process Inputs ===")
+        if not self.inputs:
+            print("  (None)")
+        else:
+            in_tree, in_hints = build_tree_and_metadata(self.inputs)
+            display_tree(in_tree, in_hints)
+
+        print("\n=== Process Outputs ===")
+        if not self.outputs:
+            print("  (None)")
+        else:
+            out_tree, out_hints = build_tree_and_metadata(self.outputs)
+            display_tree(out_tree, out_hints)
+
+    def find_variable_usage(self, search_term: str):
+        """
+        Searches recursively through all steps and prints a report of
+        which steps consume (input) or produce (output) a specific variable.
+        """
+        print(f"=== Usage Report for: '{search_term}' ===")
+
+        producers = []
+        consumers = []
+
+        # Leverage our recursive flattener to get every atomic step
+        for step_name, step in self._get_flattened_steps():
+
+            # Check Inputs (Consumed)
+            for in_var in step.inputs:
+                # Strip type hints for a clean comparison
+                base_var = in_var.split(':')[0].strip()
+                if search_term in base_var:
+                    consumers.append((step_name, in_var))
+
+            # Check Outputs (Produced)
+            for out_var in step.outputs:
+                base_var = out_var.split(':')[0].strip()
+                if search_term in base_var:
+                    producers.append((step_name, out_var))
+
+        if not producers and not consumers:
+            print("  (No usage found in any step)")
+            return
+
+        print("\nProduced by (Outputs):")
+        if not producers:
+            print("  (None)")
+        else:
+            for step_name, var in producers:
+                # We print the raw 'var' to show if it had a type hint or bracket attached
+                print(f"  - [{step_name}] -> {var}")
+
+        print("\nConsumed by (Inputs):")
+        if not consumers:
+            print("  (None)")
+        else:
+            for step_name, var in consumers:
+                print(f"  - [{step_name}] <- {var}")
+
     @property
     def details(self) -> str:
         steps = getattr(self, "steps", None)
@@ -259,7 +470,6 @@ class Process(ProcessStep):
                 func = step.function
                 name = getattr(func, '__name__', func.__class__.__name__)
                 step_func_names.append(name)
-            
 
         # Handle edge case where process has steps but they have empty tags
         max_tag_length = max([len(t) for t in step_tags]) if step_tags else 0
@@ -270,8 +480,8 @@ class Process(ProcessStep):
 
         return process_str
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
 
     def lib_sq_func(x):
         return x**2

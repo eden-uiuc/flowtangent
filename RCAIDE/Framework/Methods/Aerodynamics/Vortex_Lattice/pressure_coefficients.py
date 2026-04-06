@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compute VLM Pressure Coefficients
 # ----------------------------------------------------------------------------------------------------------------------
@@ -95,6 +96,13 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
 # ---------------------------------------------------------
 #  STATEFUL VERSION
 # ---------------------------------------------------------
+@inputs(
+    "system.analysis_data['vortex_distribution']",
+    "system.analysis_data['relative_velocity']",
+    "system.analysis_data['vortex_strengths']",
+    "state.freestream.speed"
+)
+@outputs("system.analysis_data['pressure_coefficients']",)
 def compute_panel_pressures(state: "State", system: "System", settings: "Settings"):
     """ Calculates the differential pressure coefficient (Delta C_P) for all VLM panels. """
     
