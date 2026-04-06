@@ -7,7 +7,6 @@
 # IMPORT 
 # ----------------------------------------------------------------------------------------------------------------------
 
-#import numpy as np
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -81,6 +80,7 @@ class WingControlSurface(Component):
 
     gain: float                 = 1.0  # deflection multiplier used only for AVL
 
+
 class Wing(Component):
 
     tag:                str             = eqx.field(static=True, default='Wing')
@@ -135,7 +135,6 @@ class Wing(Component):
             updated_segments.append(new_seg)
         
         object.__setattr__(self, "segments", updated_segments)
-
     
     def validate_chords(self) -> tuple:
         
@@ -376,8 +375,6 @@ class Wing(Component):
                 ac, ss_ac, total_length
             )
         )
-    
-
 
     def add_subcomponent(self, subcomponent: Component, update_geometry=True):
 
