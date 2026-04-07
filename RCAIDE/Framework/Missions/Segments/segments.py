@@ -497,7 +497,7 @@ class Segment(Process):
             
             # 1. Build the steps, passing the controls configuration directly into InitializeSegment
             init_step = InitializeSegment(
-                tag=f"{self.tag} Initializations",
+                tag=f"{self.tag} Initialization",
                 active_controls=self.active_controls,
                 active_residuals=self.active_residuals,
                 controls_initial_guess=self.controls_initial_guess,

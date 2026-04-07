@@ -145,16 +145,15 @@ def populate_control_sections(wing):
     
     # Iterate through the frozen segments
     for i, seg in enumerate(wing.segments):
-        if i == 0:
-            # The root segment (index 0) cannot have control surfaces.
-            # We safely clear any existing ones.
+        if i == len(wing.segments) - 1:
+            # The tip segments cannot have control surfaces added to them
             new_seg = eqx.tree_at(lambda s: s.control_surfaces, seg, [])
             new_segments.append(new_seg)
             continue
 
-        prev_seg = wing.segments[i-1]
-        seg_start = prev_seg.percent_span_location
-        seg_end = seg.percent_span_location
+        next_seg = wing.segments[i+1]
+        seg_end = next_seg.percent_span_location
+        seg_start = seg.percent_span_location
 
         seg_cs_list = []
         
@@ -166,27 +165,21 @@ def populate_control_sections(wing):
             # 1D Intersection Check: Overlap occurs if start is before seg_end AND end is after seg_start
             if cs_start < seg_end and cs_end > seg_start:
                 
-                new_start = max(cs_start, seg_start)
-                new_end = min(cs_end, seg_end)
-                
-                # Calculate the proportional span of the sliced control surface
-                span_ratio = (new_end - new_start) / (cs_end - cs_start) if (cs_end - cs_start) > 0 else 0.0
-                new_span = cs.span * span_ratio
+                new_cs_start = max(cs_start, seg_start)
+                new_cs_end = min(cs_end, seg_end)
                 
                 # Create a new, frozen control surface with the updated bounds
                 new_cs = eqx.tree_at(
-                    lambda c: (c.span_fraction_start, c.span_fraction_end, c.span),
-                    cs,
-                    (new_start, new_end, new_span)
-                )
+                    lambda c: (c.span_fraction_start, c.span_fraction_end), cs,
+                    (new_cs_start, new_cs_end))
                 seg_cs_list.append(new_cs)
                 
         # Attach the valid control surfaces to this segment
-        new_seg = eqx.tree_at(lambda s: s.control_surfaces, seg, seg_cs_list)
+        new_seg = eqx.tree_at(lambda s: s.control_surfaces, seg, tuple(seg_cs_list))
         new_segments.append(new_seg)
 
     # Return a new frozen wing with the updated tuple of segments
-    return eqx.tree_at(lambda w: w.segments, wing, tuple(new_segments))
+    return eqx.tree_at(lambda w: (w.segments, w.control_surfaces), wing, (tuple(new_segments), ()))
 
 
 def convert_sweep_segments(old_sweep, root_chord_percent_a, root_chord_percent_b,
@@ -222,8 +215,8 @@ def calculate_segment_offsets(wing):
     Calculates the cumulative X and Y/Z offsets for wing segments.
     Returns a new Wing PyTree with updated segment attributes. 
     """
-    wingspan = wing.spans.projected if wing.symmetric else wing.spans.projected * 2
-    wing_halfspan = wing.spans.projected * 0.5 if wing.symmetric else wing.spans.projected
+    span = wing.spans.projected if wing.symmetric else wing.spans.projected * 2
+    semispan = wing.spans.projected * 0.5 if wing.symmetric else wing.spans.projected
 
     new_segments = []
     new_x_offsets = []
@@ -252,24 +245,20 @@ def calculate_segment_offsets(wing):
             prev_seg.root_chord_percent,
             seg.root_chord_percent,
             wing.chords.root,
-            wingspan,
+            span,
             old_ref=0.25,
             new_ref=0.0
         )
 
         # 3. Use Data Flow to select the correct value
         # (Using < 1e-8 is safer than exact == 0.0 for floating point tracers)
-        le_sweep = jnp.where(
-            jnp.abs(le_sweep_provided) < 1e-8,
-            converted_sweep,
-            le_sweep_provided
-        )
+        le_sweep = jnp.where(jnp.abs(le_sweep_provided) < 1e-8, converted_sweep, le_sweep_provided)
             
         # Update the previous segment in our new list with the calculated LE sweep
         new_segments[i-1] = eqx.tree_at(lambda s: s.sweeps.leading_edge, new_segments[i-1], le_sweep)
 
         # 2. Cumulative Offsets
-        section_span = (seg.percent_span_location - prev_seg.percent_span_location) * wing_halfspan
+        section_span = (seg.percent_span_location - prev_seg.percent_span_location) * semispan
         current_x_offset = current_x_offset + section_span * jnp.tan(le_sweep)
         current_z_offset = current_z_offset + section_span * jnp.tan(prev_seg.dihedral_outboard)
 
@@ -300,18 +289,15 @@ def setup_cs_skeleton(
         vlm_settings: "VLMSettings"
     ):
     """ Builds the empty skeleton and metadata record in pure Python. """
-    
-    is_slat = "slat" in cs.tag.lower()
 
     cs_start = cs.span_fraction_start
     cs_end = cs.span_fraction_end
 
-    base_n_sw: int = vlm_settings.vortices.wing_spanwise_vortices #type: ignore
+    base_n_sw: int = vlm_settings.vortices.wing_spanwise_vortices # type: ignore
 
     # Dry run of normalized spacing
     if vlm_settings.vortices.spanwise_cosine_spacing:
-        thetan = jnp.linspace(jnp.pi/2, 0, base_n_sw + 1)
-        base_etas = jnp.cos(thetan)
+        base_etas = jnp.cos(jnp.linspace(jnp.pi/2, 0, base_n_sw + 1))
     else:
         base_etas = jnp.linspace(0.0, 1.0, base_n_sw + 1)
 
@@ -335,7 +321,7 @@ def setup_cs_skeleton(
     # Calculate the static panel counts
     cs_n_sw = max(len(cs_etas) - 1, 1)
     
-    base_n_cw: int = vlm_settings.vortices.wing_chordwise_vortices #type: ignore
+    base_n_cw: int = vlm_settings.vortices.wing_chordwise_vortices  # type: ignore
     
     # Use .item() to safely extract the standard Python integer from the JAX 0D array
     cs_n_cw = max(int(jnp.ceil(cs.root_chord_percent * base_n_cw).item()), 2)
@@ -348,7 +334,7 @@ def setup_cs_skeleton(
         span_fraction_start=cs.span_fraction_start,
         span_fraction_end=cs.span_fraction_end,
         chord_fraction=cs.root_chord_percent,
-        is_slat=is_slat
+        is_slat=False
     )
     
     # Spawn the Skeleton Wing (Floats don't matter here, they get overwritten in JAX
@@ -365,7 +351,7 @@ def setup_cs_skeleton(
         vertical=parent_wing.vertical,
         chords=skeleton_chords,
         spans=skeleton_spans,
-        taper=1.0 # Dummy taper, gets updated in update geometry step before meshing
+        taper=1.0  # Dummy taper, gets updated in update geometry step before meshing
     )
 
     cs_segments = convert_to_segmented_wing(skeleton_wing)
@@ -388,6 +374,7 @@ def setup_cs_skeleton(
         segment_x_offsets=seg_x_offsets,
         segment_z_offsets=seg_z_offsets
     )
+
 
 @jax.jit
 def calculate_cs_geometry(skeleton_wing, parent_wing, parent_x_offsets, parent_z_offsets, cs_meta: ControlSurfaceMetadata):
@@ -473,10 +460,9 @@ def generate_topological_span_breaks(wing: Wing) -> list[Interval]:
     raw_breaks = jnp.array(raw_breaks)
     raw_breaks = jnp.sort(raw_breaks)
     
-    unique_breaks = [raw_breaks[0]]
-    for val in raw_breaks[1:]:
-        if val - unique_breaks[-1] > 1e-6: # 1e-6 tolerance for floating point overlaps
-            unique_breaks.append(val)
+    diffs = jnp.diff(raw_breaks)
+    mask = jnp.concatenate([jnp.array([True]), diffs > 1e-6])
+    unique_breaks = raw_breaks[mask]
             
     # 3. Build the intervals and map the Control Surface IDs
     intervals = []
@@ -561,7 +547,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
                                      Control surfaces must be attributes of the wing itself.")
         
         valid_cs = [cs for cs in wing.control_surfaces if "slat" not in cs.tag.lower()]
-        wing = eqx.tree_at(lambda w: w.control_surfaces, wing, valid_cs)
+        wing = eqx.tree_at(lambda w: w.control_surfaces, wing, tuple(valid_cs))
 
         wing = populate_control_sections(wing) if discretize_cs else wing
         
@@ -592,8 +578,8 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
             strip_te_cs_ids=jnp.array([i.te_cs_id for i in intervals]),
             strip_le_cuts=jnp.array(le_cuts),
             strip_te_cuts=jnp.array(te_cuts),
-            n_sw=vlm_settings.vortices.wing_spanwise_vortices, #type: ignore
-            n_cw=vlm_settings.vortices.wing_chordwise_vortices, #type: ignore
+            n_sw=vlm_settings.vortices.wing_spanwise_vortices,  # type: ignore
+            n_cw=vlm_settings.vortices.wing_chordwise_vortices,  # type: ignore
             n_af_pts=n_af_pts,
             segment_x_offsets=seg_x_offsets,
             segment_z_offsets=seg_z_offsets

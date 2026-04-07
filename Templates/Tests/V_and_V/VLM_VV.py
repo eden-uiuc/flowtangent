@@ -6,6 +6,8 @@ import subprocess
 import os
 import re
 
+from pathlib import Path
+
 import jax.numpy as jnp
 import equinox as eqx
 import plotly.graph_objects as go
@@ -19,6 +21,8 @@ from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
 from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices
+
+from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
@@ -201,7 +205,7 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
         number_of_chordwise_vortices=12
     )
     aero_settings = VLMSettings(vortices=vortices)
-    initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=False), aero_settings)
+    initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=True), aero_settings)
 
     analysis = Process(
         steps=(
@@ -224,110 +228,32 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
     return alpha, CL, CD, CM, analysis_data
 
 
-def plot_vlm_panels(VD, panel_values=None, title="VLM Aerodynamic Distribution"):
-    """
-    Plots a 3D interactive mesh of the VLM panels with an optional heatmap.
-
-    Args:
-        VD: VortexDistribution object containing the VLM panel vertices and normals.
-        panel_values: ndarray of shape (N_panels,)
-                      representing the heatmap value (e.g., Cp, Gamma) for each panel.
-    """
-    panel_vertices = np.asarray(jnp.stack(
-        (
-            VD.panel_corner_a1,
-            VD.panel_corner_a2,
-            VD.panel_corner_b2,
-            VD.panel_corner_b1
-        ),
-        axis=1
-    ))
-
-    x, y, z = [], [], []
-    i_idx, j_idx, k_idx = [], [], []
-    facecolor_intensities = []
-
-    v_count = 0
-    # Iterate through each panel to build the vertex and triangle arrays
-    for idx, panel in enumerate(panel_vertices):
-        # Flatten the coordinates for Plotly
-        x.extend(panel[:, 0])
-        y.extend(panel[:, 1])
-        z.extend(panel[:, 2])
-
-        # Split the quad into Triangle 1 (Vertices 0, 1, 2)
-        i_idx.append(v_count)
-        j_idx.append(v_count + 1)
-        k_idx.append(v_count + 2)
-
-        # Split the quad into Triangle 2 (Vertices 0, 2, 3)
-        i_idx.append(v_count)
-        j_idx.append(v_count + 2)
-        k_idx.append(v_count + 3)
-
-        if panel_values is not None:
-            # Both triangles making up this panel get the same intensity value
-            facecolor_intensities.extend([panel_values[idx], panel_values[idx]])
-
-        # Increment vertex counter by 4 for the next panel
-        v_count += 4
-
-    # Build the 3D Mesh
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=x, y=y, z=z,
-            i=i_idx, j=j_idx, k=k_idx,
-            intensity=facecolor_intensities if panel_values is not None else None,
-            intensitymode='cell',
-            colorscale='Plasma',  # Deep purple to bright orange/yellow
-            color='black',  # Fallback color if no panel_values are provided
-            showscale=panel_values is not None,
-            flatshading=True,
-            name='VLM Mesh',
-            hovertemplate='Value: %{intensity:.5f}<extra></extra>' if panel_values is not None else None
-        )
-    ])
-
-    # Define the isometric camera
-    isometric_camera = dict(
-        up=dict(x=0, y=0, z=1),  # Z is pointing up
-        center=dict(x=0, y=0, z=0),  # Look at the origin
-        eye=dict(x=1.5, y=-1.5, z=1.5),  # Positioned diagonally (Rear-Right-Up)
-        projection=dict(type='orthographic')  # Removes perspective distortion for true isometric
-    )
-
-    # Apply the styling and camera to the layout
-    fig.update_layout(
-        title=title,
-        template='plotly_white',  # Stark white background with black text/axes
-        scene=dict(
-            aspectmode='data',  # Locks true 1:1:1 geometry proportions
-            camera=isometric_camera,
-            xaxis=dict(title='X (Streamwise)', showbackground=False),
-            yaxis=dict(title='Y (Spanwise)', showbackground=False),
-            zaxis=dict(title='Z (Vertical)', showbackground=False)
-        ),
-        margin=dict(l=0, r=0, b=0, t=40)
-    )
-
-    return fig
-
-if __name__ == "__main__":
-    geometry_file = "vnv_test1.avl"
+def avl_basic_test(geometry_file, alpha=2.0, span=10.0, chord=1.0):
 
     # 1. Generate the geometry file
-    create_avl_geometry(geometry_file, span=10.0, chord=1.0)
+    create_avl_geometry(geometry_file, span=span, chord=chord)
 
     # 2. Run AVL at 2.0 degrees Angle of Attack
-    run_avl_alpha_sweep(geometry_file, alpha=2.0, run_name="test1")
+    run_avl_alpha_sweep(geometry_file, alpha=alpha, run_name=Path(geometry_file).stem)
 
-    parsed_data = parse_avl_stability("test1_stab.txt")
+    parsed_data = parse_avl_stability(f"{Path(geometry_file).stem}_stab.txt")
 
     print("\n--- Extracted AVL Results ---")
     for k, v in parsed_data.items():
         print(f"{k}: {v}")
 
-    vehicle = create_vorjax_geometry(span=10.0, chord=1.0)
+
+if __name__ == "__main__":
+
+    # vehicle = create_vorjax_geometry(span=10.0, chord=1.0)
+
+    avl_b737_data = parse_avl_file(Path('~/dev/avl3.52/runs/b737.avl').expanduser())
+    vehicle = convert_to_RCAIDE(avl_b737_data)
+
+    new_wing_list = vehicle.wings.subcomponents[:3]
+    new_wings = eqx.tree_at(lambda w: w.subcomponents, vehicle.wings, new_wing_list)
+    vehicle = eqx.tree_at(lambda v: v.wings, vehicle, new_wings)
+
     alpha, CL, CD, CM, data = run_vorjax_alpha_sweep(vehicle, alpha=2.0)
     print(f"\n--- Extracted VORJAX Results ---")
     print(f"Alpha: {alpha}")
@@ -339,3 +265,5 @@ if __name__ == "__main__":
     VD = data['vortex_distribution']
     fig = plot_vlm_panels(VD, panel_values=np.asarray(data['pressure_coefficients'].squeeze(0)))
     fig.show()
+
+    print("Done!")

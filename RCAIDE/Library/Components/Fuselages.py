@@ -21,10 +21,10 @@ from RCAIDE.Library import Component, ComponentDimensions, ComponentFineness, Co
 
 class FuselageHeights(ComponentDimensions):
 
-    at_quarter_length: float                = 0.0
-    at_three_quarters_length: float         = 0.0
-    at_wing_root_quarter_chord: float       = 0.0
-    at_vertical_root_quarter_chord: float   = 0.0
+    quarter_length: float                = 0.0
+    three_quarters_length: float         = 0.0
+    wing_root_quarter_chord: float       = 0.0
+    vertical_root_quarter_chord: float   = 0.0
 
 class FuselageLengths(ComponentDimensions):
 

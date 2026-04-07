@@ -19,5 +19,6 @@ from . import Missions
 from . import Core
 from . import Analyses
 from . import Interfaces
+from . import Plotting
 # from . import External_Interfaces
 # from . import Optimization

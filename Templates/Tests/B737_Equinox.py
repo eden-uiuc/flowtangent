@@ -4,12 +4,9 @@
 
 import time
 import dataclasses as dc
-from functools import reduce
 
 import jax
 from jax import value_and_grad, jit
-# jax.config.update("jax_disable_jit", True)
-# jax.config.update("jax_debug_nans", True)
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -18,12 +15,13 @@ from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
 from RCAIDE.Framework.Missions.Conditions import Numerics
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange, # Position Profiles
+from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,  # Speed Profiles
-                                                         ConstantAltitudeChangeRate, # Velocity Profiles
-                                                         FixedDistance, FixedTime,) # Duration Profiles
+                                                         ConstantAltitudeChangeRate,  # Velocity Profiles
+                                                         FixedDistance, FixedTime,)  # Duration Profiles
 from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
 from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VLM, VLMSettings, VLMVortices, InitializeVLM
+from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data
@@ -40,6 +38,7 @@ from RCAIDE.Library.Atmospheres import USStandard1976
 # Boeing 737 New Process
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def vehicle_setup():
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -47,33 +46,24 @@ def vehicle_setup():
     # ------------------------------------------------------------------------------------------------------------------
 
     mass_props = AircraftMassProperties(
-        total               = 79015.8,   # kg
-        max_takeoff         = 79015.8,   # kg
-        takeoff             = 79015.8,   # kg
-        operating_empty     = 62746.4,   # kg
-        max_zero_fuel       = 62732.0,   # kg
-        cargo               = 10000.0,   # kg
-        center_of_gravity   = jnp.array([[15.30987849,   0.,             -0.48023939]]),  # Estimated
-        moments_of_inertia  = jnp.array([[3173074.17,    0.,             28752.77565],
-                                        [0.,             3019041.443,    0],
-                                        [0.,             0.,             5730017.433]])
-    )
-
-    env = VehicleEnvelope(
-        ultimate_load_factor=3.75,
-        limit_load_factor=1.5
-    )
-    
-    areas = ComponentAreas(
-        reference=124.862
+        total=79015.8 * Units.kg,
+        max_takeoff=79015.8 * Units.kg,
+        takeoff=79015.8 * Units.kg,
+        operating_empty=62746.4 * Units.kg,
+        max_zero_fuel=62732.0 * Units.kg,
+        cargo=10000.0 * Units.kg,
+        center_of_gravity=jnp.array([[15.30987849,   0.,             -0.48023939]]),  # Estimated
+        moments_of_inertia=jnp.array([[3173074.17,    0.,             28752.77565],
+                                      [0.,             3019041.443,    0],
+                                      [0.,             0.,             5730017.433]])
     )
 
     vehicle = Aircraft(
         tag='Boeing 737',
-        passengers = 170,
+        passengers=170,
         mass_properties=mass_props,
-        areas=areas,
-        envelope=env,
+        areas=ComponentAreas(reference=124.862),
+        envelope=VehicleEnvelope(ultimate_load_factor=3.75, limit_load_factor=1.5),
         design_mach_number=0.78,
         design_range=3582,
         design_cruise_alt=35000.0,
@@ -86,118 +76,70 @@ def vehicle_setup():
     # Segments ---------------------------------------------------------------------------------------------------------
 
     # Root Segment
-
-    root_sweeps  = WingSweeps(
-        quarter_chord=jnp.deg2rad(28.225)
-    )
     root_segment = WingSegment(
         tag='Main Wing Root Segment',
         percent_span_location   = 0.0,
-        twist                   = jnp.deg2rad(4.),
+        twist                   = 4. * Units.deg,
         root_chord_percent      = 1.,
         thickness_to_chord      = 0.1,
-        dihedral_outboard       = jnp.deg2rad(2.5),
-        sweeps                  = root_sweeps,
-        airfoil                 = Airfoil.from_file(Airfoil_Data/'B737a.txt')
-    )
+        dihedral_outboard       = 2.5 * Units.deg,
+        sweeps                  = WingSweeps(quarter_chord=28.225 * Units.deg),
+        airfoil                 = Airfoil.from_file(Airfoil_Data/'B737a.txt'))
 
-    # Yehudi Segment
-    yehudi_sweeps  = WingSweeps(
-        quarter_chord=jnp.deg2rad(25.)
-    )
     yehudi_segment = WingSegment(
         tag='Main Wing Yehudi Segment',
-        percent_span_location   = 0.324,
-        twist                   = jnp.deg2rad(0.047193),
-        root_chord_percent      = 0.5,
-        thickness_to_chord      = 0.1,
-        dihedral_outboard       = jnp.deg2rad(5.5),
-        sweeps                  = yehudi_sweeps,
-        airfoil                 = Airfoil.from_file(Airfoil_Data/'B737b.txt')
-    )
+        percent_span_location=0.324,
+        twist=0.047193 * Units.deg,
+        root_chord_percent=0.5,
+        thickness_to_chord=0.1,
+        dihedral_outboard=5.5 * Units.deg,
+        sweeps=WingSweeps(quarter_chord=25. * Units.deg),
+        airfoil=Airfoil.from_file(Airfoil_Data/'B737b.txt'))
 
-    # Mid Segment
-
-    mid_sweeps  = WingSweeps(
-        quarter_chord=jnp.deg2rad(56.75)
-    )
     mid_segment = WingSegment(
         tag='Main Wing Mid Segment',
-        percent_span_location   = 0.963,
-        twist                   = jnp.deg2rad(0.00258),
-        root_chord_percent      = 0.220,
-        thickness_to_chord      = 0.1,
-        dihedral_outboard       = jnp.deg2rad(5.5),
-        sweeps                  = mid_sweeps,
-        airfoil                 = Airfoil.from_file(Airfoil_Data/'B737c.txt'),
-    )
-
-    # Tip Segment
+        percent_span_location=0.963,
+        twist=0.00258 * Units.deg,
+        root_chord_percent=0.220,
+        thickness_to_chord=0.1,
+        dihedral_outboard=5.5 * Units.deg,
+        sweeps=WingSweeps(quarter_chord=56.75 * Units.deg),
+        airfoil=Airfoil.from_file(Airfoil_Data/'B737c.txt'))
 
     tip_segment = WingSegment(
         tag='Main Wing Tip Segment',
-        percent_span_location         = 1.,
-        root_chord_percent            = 0.10077,
-        thickness_to_chord            = 0.1,
-        airfoil = Airfoil.from_file(Airfoil_Data/'B737d.txt'),
-    )
+        percent_span_location=1.,
+        root_chord_percent=0.10077,
+        thickness_to_chord=0.1,
+        airfoil=Airfoil.from_file(Airfoil_Data/'B737d.txt'))
 
     # Control Surfaces -------------------------------------------------------------------------------------------------
 
     slat = WingControlSurface(
         tag='Slat',
-        span_fraction_start    = 0.2,
-        span_fraction_end      = 0.963,
-        deflection             = 0.0,
-        root_chord_percent     = 0.075,
-        hinge_fraction         = 1.0,
-    )
+        span_fraction_start=0.2,
+        span_fraction_end=0.963,
+        deflection=0.0,
+        root_chord_percent=0.075,
+        hinge_fraction=1.0)
 
     flap = WingControlSurface(
         tag='Flap',
-        span_fraction_start    = 0.2,
-        span_fraction_end      = 0.7,
-        deflection             = 0.0,
-        configuration_type     = 'double_slotted',
-        root_chord_percent     = 0.30,
-    )
+        span_fraction_start=0.2,
+        span_fraction_end=0.7,
+        deflection=0.0,
+        configuration_type='double_slotted',
+        root_chord_percent=0.30)
 
     aileron = WingControlSurface(
         tag='Aileron',
-        span_fraction_start = 0.7,
-        span_fraction_end   = 0.963,
-        deflection          = 0.0,
-        root_chord_percent  = 0.16,
-        sign_duplicate      = -1.0,
-    )
-
-    main_controls = Component(
-        tag="Main Wing Control Surfaces",
-        subcomponents=(slat, flap, aileron)
-    )
+        span_fraction_start=0.7,
+        span_fraction_end=0.963,
+        deflection=0.0,
+        root_chord_percent=0.16,
+        sign_duplicate=-1.0)
 
     # Wing Properties --------------------------------------------------------------------------------------------------
-
-    main_sweeps = WingSweeps(
-        quarter_chord=jnp.deg2rad(25.)
-    )
-    main_spans  = WingDimensions(
-        projected=34.32
-    )
-    main_chords = WingChords(
-        root             =7.760,
-        tip              =0.782,
-        mean_aerodynamic =4.235,
-    )
-    main_areas  = ComponentAreas(
-        reference         =124.862,
-        wetted            =225.08,
-    )
-    main_twists = WingDimensions(
-        root = jnp.deg2rad(4.0),
-        tip  = jnp.deg2rad(0.0),
-    )
-    
     main_wing = Wing(
         tag='Main Wing',
         aspect_ratio=10.18,
@@ -207,14 +149,16 @@ def vehicle_setup():
         vertical=False,
         symmetric=True,
         high_lift=True,
-        dynamic_pressure_ratio = 1.0,
-        sweeps=main_sweeps,
-        spans=main_spans,
-        chords=main_chords,
-        areas=main_areas,
-        twists=main_twists,
+        dynamic_pressure_ratio=1.0,
+        sweeps=WingSweeps(quarter_chord=25. * Units.deg),
+        spans=WingDimensions(projected=34.32),
+        chords=WingChords(root=7.760, tip=0.782, mean_aerodynamic=4.235),
+        areas=ComponentAreas(reference=124.862, wetted=225.08),
+        twists=WingDimensions(root=4.0 * Units.deg, tip=0.0 * Units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
-        control_surfaces=main_controls
+        control_surfaces=Component(
+            tag="Main Wing Control Surfaces",
+            subcomponents=(slat, flap, aileron))
     ).update_geometry()
     
     vehicle = vehicle.add_subcomponent(main_wing)
@@ -224,159 +168,93 @@ def vehicle_setup():
     # ------------------------------------------------------------------------------------------------------------------
 
     # H-Stab Segments --------------------------------------------------------------------------------------------------
-    
-    h_root_sweeps = WingSweeps(
-        quarter_chord=jnp.deg2rad(28.2250),
-    )
     h_root_segment = WingSegment(
-        tag = "Main Wing Root Segment",
-        thickness_to_chord      = 0.1,
-        percent_span_location   = 0.0,
-        root_chord_percent      = 1.0,
-        dihedral_outboard       = jnp.deg2rad(8.63),
-        sweeps= h_root_sweeps,
-    )
+        tag="Main Wing Root Segment",
+        thickness_to_chord=0.1,
+        percent_span_location=0.0,
+        root_chord_percent=1.0,
+        dihedral_outboard=8.63 * Units.deg,
+        sweeps=WingSweeps(quarter_chord=28.2250 * Units.deg))
 
     h_tip_segment = WingSegment(
         tag='Horizontal Stabilizer Tip Segment',
-        percent_span_location  = 1.,
-        root_chord_percent     = 0.3333,
-        thickness_to_chord     = .1,
-    )
+        percent_span_location =1.,
+        root_chord_percent=0.3333,
+        thickness_to_chord=.1)
 
     # H-Stab Controls  -------------------------------------------------------------------------------------------------
 
     elevator = WingControlSurface(
         tag='Elevator',
-        span_fraction_start   = 0.09,
-        span_fraction_end     = 0.92,
-        deflection            = 0.0,
-        root_chord_percent        = 0.3,
-
-    )
-    
-    h_stab_controls = Component(
-        "Horizontal Stabilizer Controls",
-        subcomponents=(elevator,)
-    )
+        span_fraction_start=0.09,
+        span_fraction_end=0.92,
+        deflection=0.0,
+        root_chord_percent=0.3)
 
     # H-Stab Properties  -----------------------------------------------------------------------------------------------
-
-    h_sweeps = WingSweeps(
-        quarter_chord=jnp.deg2rad(28.2250)
-    )
-    h_spans = WingDimensions(
-        projected         = 14.4
-    )
-    h_chords = WingChords(
-        root             = 4.2731,
-        tip              = 1.4243,
-        mean_aerodynamic = 8.0,
-    )
-    h_areas = ComponentAreas(
-        reference         = 41.49,
-        exposed           = 59.354,
-        wetted            = 71.81,
-    )
-    h_twists = WingDimensions(
-        root             = jnp.deg2rad(3.0),
-        tip              = jnp.deg2rad(3.0),
-    )
-    
     h_stab = Wing(
         tag='Horizontal Stabilizer',
-        aspect_ratio            = 4.99,
-        thickness_to_chord      = 0.08,
-        taper                   = 0.3333,
-        dynamic_pressure_ratio  = 0.9,
-        origin                  = jnp.array([[33.02, 0, 1.466]]),
-        aerodynamic_center      = jnp.array([0, 0, 0]),
-        vertical                = False,
-        symmetric               = True,
-        sweeps                  = h_sweeps,
-        spans                   = h_spans,
-        chords                  = h_chords,
-        areas                   = h_areas,
-        twists                  = h_twists,
-        control_surfaces        = h_stab_controls,
-        segments                = (h_root_segment, h_tip_segment)
-    ).update_geometry()
+        aspect_ratio            =4.99,
+        thickness_to_chord      =0.08,
+        taper                   =0.3333,
+        dynamic_pressure_ratio  =0.9,
+        origin                  =jnp.array([[33.02, 0, 1.466]]),
+        aerodynamic_center      =jnp.array([0, 0, 0]),
+        vertical                =False,
+        symmetric               =True,
+        sweeps                  =WingSweeps(quarter_chord=28.2250 * Units.deg),
+        spans                   =WingDimensions(projected=14.4),
+        chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
+        areas                   =ComponentAreas(reference=41.49, exposed=59.354, wetted=71.81),
+        twists                  =WingDimensions(root=3.0 * Units.deg, tip=3.0 * Units.deg),
+        # control_surfaces        =Component("Horizontal Stabilizer Controls", subcomponents=(elevator,)),
+        segments                =(h_root_segment, h_tip_segment)).update_geometry()
 
-    # Add H-Stab to vehicle
     vehicle = vehicle.add_subcomponent(h_stab)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Vertical Stabilizer
     # ------------------------------------------------------------------------------------------------------------------
-
     
     # V-Stab Segments --------------------------------------------------------------------------------------------------
-    
-    v_root_sweeps = WingSweeps(
-        quarter_chord=61.485
-    )
+
     root_segment = WingSegment(
         tag='Vertical Stabilizer Root Segment',
-        percent_span_location   = 0.0,
-        root_chord_percent      = 1.,
-        thickness_to_chord      = .1,
-        sweeps                  = v_root_sweeps
-    )
+        percent_span_location=0.0,
+        root_chord_percent=1.,
+        thickness_to_chord=.1,
+        sweeps=WingSweeps(quarter_chord=61.485 * Units.deg))
 
-    v_mid_sweeps = WingSweeps(
-        quarter_chord=jnp.deg2rad(31.2)
-    )
     mid_segment = WingSegment(
         tag='Vertical Stabilizer Mid Segment',
-        percent_span_location   = 0.2962,
-        root_chord_percent      = 0.45,
-        sweeps                  = v_mid_sweeps,
-        thickness_to_chord      = .1,
-    )
+        percent_span_location=0.2962,
+        root_chord_percent=0.45,
+        sweeps=WingSweeps(quarter_chord=31.2 * Units.deg),
+        thickness_to_chord=.1,)
 
     tip_segment = WingSegment(
         tag='Vertical Stabilizer Tip Segment',
-        percent_span_location   = 1.0,
-        root_chord_percent      = 0.1183,
-        thickness_to_chord      = .1,
-    )
+        percent_span_location=1.0,
+        root_chord_percent=0.1183,
+        thickness_to_chord=.1,)
 
     # V-Stab Properties ------------------------------------------------------------------------------------------------
-
-    v_sweeps = WingSweeps(
-        quarter_chord=jnp.deg2rad(31.2)
-    )
-    v_spans = WingDimensions(
-        projected=8.33
-    )
-    v_chords = WingChords(
-        root             = 10.1,
-        tip              = 1.20,
-        mean_aerodynamic = 4.0,
-    )
-    v_areas = ComponentAreas(
-        reference=34.89,
-        wetted=57.25
-    )
-
     v_stab = Wing(
         tag='Vertical Stabilizer',
-        aspect_ratio            = 1.98865,
-        thickness_to_chord      = 0.08,
-        taper                   = 0.1183,
-        origin                  = jnp.array([[26.944, 0, 1.54]]),
-        aerodynamic_center      = jnp.array([0, 0, 0]),
-        vertical                = True,
-        symmetric               = False,
-        t_tail                  = False,
-        dynamic_pressure_ratio  = 1.0,
-        sweeps                  = v_sweeps,
-        spans                   = v_spans,
-        chords                  = v_chords,
-        areas                   = v_areas,
-        segments = (root_segment, mid_segment, tip_segment)
-        
-    ).update_geometry()
+        aspect_ratio            =1.98865,
+        thickness_to_chord      =0.08,
+        taper                   =0.1183,
+        origin                  =jnp.array([[26.944, 0, 1.54]]),
+        aerodynamic_center      =jnp.array([0, 0, 0]),
+        vertical                =True,
+        symmetric               =False,
+        t_tail                  =False,
+        dynamic_pressure_ratio  =1.0,
+        sweeps                  =WingSweeps(quarter_chord=32.2 * Units.deg),
+        spans                   =WingDimensions(projected=8.33),
+        chords                  =WingChords(root=10.1, tip=1.20, mean_aerodynamic=4.0),
+        areas                   =ComponentAreas(reference=34.89, wetted=57.25),
+        segments=(root_segment, mid_segment, tip_segment)).update_geometry()
 
     vehicle = vehicle.add_subcomponent(v_stab)
     
@@ -406,67 +284,30 @@ def vehicle_setup():
 
     f_segments = []
     for idx, (x, z, h, w) in enumerate(segment_specs):
-        s_h = ComponentDimensions(
-            maximum=h
-        )
-        s_w = ComponentDimensions(
-            maximum=w
-        )
-        segment = FuselageSegment(
+        f_segments.append(FuselageSegment(
             tag=f'Fuselage Segment {idx}',
-            percent_x_location  = x,
-            percent_z_location  = z,
-            heights             = s_h,
-            widths              = s_w,
-        )
-        f_segments.append(segment)
+            percent_x_location=x,
+            percent_z_location=z,
+            heights=ComponentDimensions(maximum=h),
+            widths=ComponentDimensions(maximum=w)))
 
-    # Fuselage Properties ----------------------------------------------------------------------------------------------    
-
-    f_diameters = ComponentDimensions(
-        effective=3.74
-    )
-    f_fineness = ComponentFineness(
-        nose = 1.6,
-        tail = 2.
-    )
-    f_lengths = FuselageLengths(
-        nose       = 6.4,
-        tail       = 8.0,
-        cabin      = 28.85,
-        total      = 38.02,
-        fore_space = 6.,
-        aft_space  = 5.,
-
-    )
-    f_widths = ComponentDimensions(
-        maximum=3.74
-    )
-    f_heights = FuselageHeights(
-        maximum = 3.74,
-        at_quarter_length = 3.74,
-        at_three_quarters_length = 3.65,
-        at_wing_root_quarter_chord = 3.74,
-    )
-    f_areas = ComponentAreas(
-        side_projected = 142.1948,
-        wetted = 385.51,
-        front_projected = 12.57,
-    )
-
+    # Fuselage Properties ----------------------------------------------------------------------------------------------
     fuse = Fuselage(
         tag='Fuselage',
-        number_of_seats         = 170,
-        seats_abreast           = 6,
-        seat_pitch              = 0.7874,
-        differential_pressure   = 5.0e4,
-        diameters               = f_diameters,
-        fineness                = f_fineness,
-        lengths                 = f_lengths,
-        widths                  = f_widths,
-        heights                 = f_heights,
-        areas                   = f_areas,
-        segments                = tuple(f_segments)
+        number_of_seats=170,
+        seats_abreast=6,
+        seat_pitch=0.7874,
+        differential_pressure=5.0e4,
+        diameters=ComponentDimensions(effective=3.74),
+        fineness=ComponentFineness(nose=1.6, tail=2.),
+        lengths=FuselageLengths(nose=6.4, tail=8.0, cabin=28.85, total=38.02, fore_space=6., aft_space=5.),
+        widths=ComponentDimensions(maximum=3.74),
+        heights=FuselageHeights(maximum=3.74,
+                                quarter_length=3.74,
+                                three_quarters_length=3.65,
+                                wing_root_quarter_chord=3.74),
+        areas=ComponentAreas(side_projected=142.1948, wetted=385.51, front_projected=12.57),
+        segments=tuple(f_segments)
     )
 
     vehicle = vehicle.add_subcomponent(fuse)
@@ -475,47 +316,23 @@ def vehicle_setup():
     # Landing Gear
     # ------------------------------------------------------------------------------------------------------------------
 
-    mlg = LandingGear(
-        tag='Main Landing Gear',
-        number_of_wheels    = 2,
-        tire_diameter       = 1.12,
-        strut_length        = 1.8,
-    )
+    mlg = LandingGear(tag='Main Landing Gear', number_of_wheels=2, tire_diameter=1.12, strut_length=1.8)
+    nlg = LandingGear(tag='Nose Landing Gear', number_of_wheels=2, tire_diameter=1.12, strut_length=1.3)
 
     vehicle.add_subcomponent(mlg)
-
-    nlg = LandingGear(
-        tag='Nose Landing Gear',
-        number_of_wheels    = 2,
-        tire_diameter       = 1.12,
-        strut_length        = 1.3,
-    )
-    
     vehicle.add_subcomponent(nlg)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Nacelles
     # ------------------------------------------------------------------------------------------------------------------
-    
-    n_lengths = ComponentDimensions(
-        total=2.71
-    )
-    n_diams = NacelleDiameters(
-        maximum=2.05,
-        inlet=1.90
-    )
-    n_areas = ComponentAreas(
-        wetted = 1.1 * jnp.pi * 2.05 * 2.71
-    )
-
     nacelle = Nacelle(
-        tag             ='Engine Nacelle 1',
-        flow_through    = True,
-        airfoil         = Airfoil.NACA_4_Series('2410'),
-        origin          = jnp.array([[13.72, -4.86, -1.9]]),
-        lengths         = n_lengths,
-        diameters       = n_diams,
-        areas           = n_areas
+        tag='Engine Nacelle 1',
+        flow_through= True,
+        airfoil=Airfoil.NACA_4_Series('2410'),
+        origin= jnp.array([[13.72, -4.86, -1.9]]),
+        lengths=ComponentDimensions(total=2.71),
+        diameters=NacelleDiameters(maximum=2.05, inlet=1.90),
+        areas=ComponentAreas(wetted=1.1 * jnp.pi * 2.05 * 2.71)
     )
 
     nacelle_2 = dc.replace(nacelle, tag="Engine Nacelle 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
@@ -528,29 +345,16 @@ def vehicle_setup():
     # ------------------------------------------------------------------------------------------------------------------
 
     # Energy Line ------------------------------------------------------------------------------------------------------
-
-    lines = vehicle.energy.lines
-    lines = lines.add_subcomponent(TurbofanEnergyLine())
-    vehicle = eqx.tree_at(lambda v:v.energy.lines, vehicle, lines)
+    vehicle = eqx.tree_at(lambda v: v.energy.lines, vehicle, vehicle.energy.lines.add_subcomponent(TurbofanEnergyLine()))
 
     # Engine -----------------------------------------------------------------------------------------------------------
-
-    tf_lengths = ComponentDimensions(
-        total = 2.71
-    )
-    tf_des = DesignParameters(
-        total_thrust            = 24000.,
-        altitude                = 10668.,
-        mach_number             = 0.78,
-    )
-
     tf = TurbofanEngine(
-        tag = "Engine 1",
+        tag="Engine 1",
         origin=jnp.array([[13.72, -4.86, -1.9]]),
-        bypass_ratio= 5.4,
-        plug_diameter= 0.1,
-        lengths=tf_lengths,
-        design_thrust_parameters=tf_des,
+        bypass_ratio=5.4,
+        plug_diameter=0.1,
+        lengths=ComponentDimensions(total=2.71),
+        design_thrust_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
     )
 
     # Converters -------------------------------------------------------------------------------------------------------
@@ -597,14 +401,8 @@ def vehicle_setup():
     # Fuel Tanks
     # ------------------------------------------------------------------------------------------------------------------
 
-    fuel_mass = FuelTankMass(
-        full_fuel_mass=79015.8-62732.0, # Max Takeoff - Max Zero Fuel
-        center_of_gravity=jnp.array([[13.61, 0., -0.93]]),
-    )
-    fuel = FuelTank(
-        origin = jnp.array([[13.61, 0., -0.93]]),
-        mass_properties=fuel_mass
-    )
+    fuel_mass = FuelTankMass(full_fuel_mass=79015.8-62732.0, center_of_gravity=jnp.array([[13.61, 0., -0.93]]))
+    fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]),mass_properties=fuel_mass)
 
     line_stores = vehicle.energy.lines[0].stores
     line_stores = line_stores.add_subcomponent(fuel)
@@ -675,16 +473,13 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
 
     controls = (
         "body_angle",
-        DirectControlVariable(
-            tag='Thrust',
-            path=("frames", "body", "thrust_force_vector",),
-            active=True
-        )
+        DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True)
     )
 
     residuals = ("force_x", "force_z")
 
-    aero_settings = VLMSettings()
+    vortex_settings = VLMVortices(number_of_spanwise_vortices=5, number_of_chordwise_vortices=2)
+    aero_settings = VLMSettings(vortices=vortex_settings)
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
@@ -755,11 +550,8 @@ def state_setup():
     numerics = Numerics(number_of_control_points=4)
     
     state = State(numerics=numerics)
-
     state = eqx.tree_at(lambda s: s.freestream.atmosphere, state, USStandard1976(), is_leaf=lambda x: x is None)
-
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-    
     state = eqx.tree_at(lambda s: s.initials, state, frozen_initials, is_leaf=lambda x: x is None)
 
     return state
@@ -769,9 +561,13 @@ def mission_b737(state, system, settings):
 
     mission, updated_settings = mission_setup(state, system, settings)
 
-    final_state, final_system, final_settings, history = mission.run_with_history(state, system, updated_settings)
+    final_state, final_system, final_settings = mission.run(state, system, updated_settings)
 
-    return final_state, final_system, final_settings, history
+    VLM_data = final_system.analysis_data
+    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['pressure_coefficients'][0])
+    fig.show()
+
+    return final_state, final_system, final_settings
 
 
 if __name__ == '__main__':
@@ -780,11 +576,11 @@ if __name__ == '__main__':
 
     state = state_setup()
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=False)
+    settings = Settings(DEBUG_MODE=True)
 
     print("Setup complete, starting mission ...")
 
-    final_state, final_system, _, mission_history = mission_b737(state, system, settings)
+    final_state, _, _ = mission_b737(state, system, settings)
     
     print("Controls:")
     print(f"  AoA: {final_state.aerodynamics.angles.alpha}")

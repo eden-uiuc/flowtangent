@@ -24,14 +24,17 @@ class WingDimensions(ComponentDimensions):
     root: float = 0.0
     tip:  float = 0.0
 
+
 class WingSweeps(WingDimensions):
     leading_edge:   float = 0.0
     quarter_chord:  float = 0.0
     half_chord:     float = 0.0
 
+
 class WingChords(WingDimensions):
     mean_aerodynamic:   float = 0.0
     mean_geometric:     float = 0.0
+
 
 class WingSegment(Component):
 
@@ -67,7 +70,6 @@ class WingControlSurface(Component):
 
     tag: str = eqx.field(static=True, default='Wing Control Surface')
 
-    span: float                 = 0.0
     span_fraction_start: float  = 0.0
     span_fraction_end: float    = 0.0
 

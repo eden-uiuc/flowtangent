@@ -214,6 +214,12 @@ class Component(eqx.Module):
         
         return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
 
+    def remove_subcomponent(self, index: int):
+        new_subcomponents = self.subcomponents[:index] + self.subcomponents[index + 1:]
+
+        return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
+
+
 class ControlComponent(Component):
 
     is_control_component:   bool = eqx.field(static=True, default=True)

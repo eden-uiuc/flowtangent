@@ -97,10 +97,10 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         total_strips += n_sw
 
         # Determine spanwise spacing (Uniform or Cosine)
-        span = jnp.where(wing.symmetric, wing.spans.projected / 2.0, wing.spans.projected)
+        semispan = jnp.where(wing.symmetric, wing.spans.projected / 2.0, wing.spans.projected)
         
         seg_etas = jnp.array([seg.percent_span_location for seg in wing.segments])
-        seg_y = seg_etas * span
+        seg_y = seg_etas * semispan
         
         seg_chords = jnp.array([seg.chords.root for seg in wing.segments])
         seg_twists = jnp.array([seg.twist for seg in wing.segments])
@@ -125,12 +125,12 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         if vlm_vortex_settings.spanwise_cosine_spacing:
             # Cosine spacing: clusters panels near the tips and roots
             thetan = jnp.linspace(jnp.pi/2, 0, n_sw + 1)
-            y_coords = span * jnp.cos(thetan)
+            y_coords = semispan * jnp.cos(thetan)
         else:
-            y_coords = jnp.linspace(0, span, n_sw + 1)
+            y_coords = jnp.linspace(0, semispan, n_sw + 1)
         
         req_etas = jnp.append(record.strip_eta_starts, record.strip_eta_ends[-1])
-        req_y = req_etas * span
+        req_y = req_etas * semispan
 
         le_cuts = record.strip_le_cuts
         te_cuts = record.strip_te_cuts
