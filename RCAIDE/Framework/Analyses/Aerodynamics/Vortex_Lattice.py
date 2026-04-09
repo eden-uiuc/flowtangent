@@ -145,7 +145,6 @@ class VLMSettings(eqx.Module):
     model_fuselage:                 bool    = eqx.field(static=True, default=False)
     trim_aircraft:                  bool    = eqx.field(static=True, default=False)
 
-    discretize_control_surfaces:    bool    = eqx.field(static=True, default=True)
     recalculate_total_wetted_area:  bool    = eqx.field(static=True, default=False)
     model_propeller_wake:           bool    = eqx.field(static=True, default=False)
     VORLAX_empirical_corrections:   bool    = eqx.field(static=True, default=True)

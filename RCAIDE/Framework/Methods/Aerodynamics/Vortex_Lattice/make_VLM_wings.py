@@ -438,54 +438,47 @@ def calculate_cs_geometry(skeleton_wing, parent_wing, parent_x_offsets, parent_z
     return updated_cs_wing
 
 
-def generate_topological_span_breaks(wing: Wing) -> list[Interval]:
+def find_span_intervals(wing: Wing) -> jnp.ndarray:
     """
     Finds every unique spanwise slicing plane (from segments and control surfaces)
     and builds non-overlapping spanwise intervals.
     """
     # 1. Collect all raw span fractions where a break occurs
-    raw_breaks = []
-    
-    # Add segment boundaries
-    for seg in wing.segments:
-        raw_breaks.append(seg.percent_span_location)
-        
-    # Add control surface boundaries
-    if hasattr(wing, 'control_surfaces'):
-        for cs in wing.control_surfaces:
-            raw_breaks.append(cs.span_fraction_start)
-            raw_breaks.append(cs.span_fraction_end)
-            
-    # 2. Sort and deduplicate (merge coincident breaks using a tight tolerance)
-    raw_breaks = jnp.array(raw_breaks)
-    raw_breaks = jnp.sort(raw_breaks)
+
+    cs_span_starts = [cs.span_fraction_start for cs in wing.control_surfaces]
+    cs_span_ends = [cs.span_fraction_end for cs in wing.control_surfaces]
+
+    raw_breaks = jnp.sort(jnp.array(
+        [seg.percent_span_location for seg in wing.segments] + cs_span_starts + cs_span_ends + [1.0]
+    ))
     
     diffs = jnp.diff(raw_breaks)
     mask = jnp.concatenate([jnp.array([True]), diffs > 1e-6])
     unique_breaks = raw_breaks[mask]
-            
-    # 3. Build the intervals and map the Control Surface IDs
-    intervals = []
-    for i in range(len(unique_breaks) - 1):
-        eta_start = unique_breaks[i]
-        eta_end = unique_breaks[i+1]
-        midpoint = (eta_start + eta_end) / 2.0  # Use midpoint to check who lives here
-        
-        le_id = -1
-        te_id = -1
-        
-        # Check which control surfaces overlap this interval's midpoint
-        if hasattr(wing, 'control_surfaces'):
-            for cs_idx, cs in enumerate(wing.control_surfaces):
-                if cs.span_fraction_start < midpoint < cs.span_fraction_end:
-                    if "slat" in cs.tag.lower():
-                        le_id = cs_idx
-                    else:
-                        te_id = cs_idx
-                        
-        intervals.append(Interval(eta_start, eta_end, le_id, te_id))
-        
-    return intervals
+
+    # Find midpoints between breaks
+    eta_starts = unique_breaks[:-1]
+    eta_ends = unique_breaks[1:]
+    midpoints = (eta_starts + eta_ends) / 2.0
+
+    # Convert CS info to arrays
+    cs_span_starts  = jnp.array(cs_span_starts)
+    cs_span_ends    = jnp.array(cs_span_ends)
+    cs_chord_starts = jnp.array([cs.chord_fraction_start for cs in wing.control_surfaces])
+    cs_chord_ends   = jnp.array([cs.chord_fraction_end for cs in wing.control_surfaces])
+
+    # Find which control surfaces intersect each interval
+    active_mask = (midpoints[:, None] > cs_span_starts[None, :]) & (midpoints[:, None] < cs_span_ends[None, :])
+
+    # Find leading edge and trailing edge cuts
+    # (Chord starts and ends are bound to LE/TE by WingControlSurface post_init validation)
+    is_le_cs = cs_chord_starts == 0.0
+    le_cuts = jnp.max(jnp.where(active_mask & is_le_cs[None, :], cs_chord_ends[None, :], 0.0), axis=1)
+
+    is_te_cs = cs_chord_ends == 1.0
+    te_cuts = jnp.min(jnp.where(active_mask & is_te_cs[None, :], cs_chord_starts[None, :], 1.0), axis=1)
+
+    return jnp.stack([eta_starts, eta_ends, le_cuts, te_cuts], axis=1)
 
 
 def validate_airfoil_resolutions(wing):
@@ -506,7 +499,7 @@ def validate_airfoil_resolutions(wing):
         else:
             return resolutions[0]
     else:
-        return 2 # Number of airfoil coordinates, 2 if no airfoil for flat line
+        return 2  # Number of airfoil coordinates, 2 if no airfoil for flat line
 
 
 @inputs(
@@ -522,13 +515,12 @@ def validate_airfoil_resolutions(wing):
 def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
     # unpack inputs
     vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
-    discretize_cs = vlm_settings.discretize_control_surfaces
         
     # Reformat original wings to have at least 2 segments and additional values for processing later
     vlm_records = []
     updated_system = system
     
-    for wing_idx, wing in enumerate(system.wings): #type: ignore
+    for wing_idx, wing in enumerate(system.wings):  # type: ignore
         wing: Wing
         if len(wing.segments) == 0:
             # convert to preferred format for the panelization loop
@@ -545,21 +537,18 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
                 if len(segment.control_surfaces) > 0:
                     raise ValueError(f"Found control surfaces on segment '{segment.tag}' of wing '{wing.tag}'. \
                                      Control surfaces must be attributes of the wing itself.")
-        
-        valid_cs = [cs for cs in wing.control_surfaces if "slat" not in cs.tag.lower()]
-        wing = eqx.tree_at(lambda w: w.control_surfaces, wing, tuple(valid_cs))
 
-        wing = populate_control_sections(wing) if discretize_cs else wing
+        span_breaks = find_span_intervals(wing)
+        wing        = populate_control_sections(wing)
         
         wing, seg_x_offsets, seg_z_offsets = calculate_segment_offsets(wing)
 
-        intervals = generate_topological_span_breaks(wing)
-
         n_af_pts = validate_airfoil_resolutions(wing)
 
+        # TODO: Reformat for new interval calculation
         le_cuts = []
         te_cuts = []
-        for i in intervals:
+        for i in span_breaks:
             # Default is no cut (0.0 to 1.0)
             le_c = 0.0
             te_c = 1.0
@@ -572,10 +561,10 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
 
         main_record = VLMWingRecord(
             wing=wing,
-            strip_eta_starts=jnp.array([i.eta_start for i in intervals]),
-            strip_eta_ends=jnp.array([i.eta_end for i in intervals]),
-            strip_le_cs_ids=jnp.array([i.le_cs_id for i in intervals]),
-            strip_te_cs_ids=jnp.array([i.te_cs_id for i in intervals]),
+            strip_eta_starts=jnp.array([i.eta_start for i in span_breaks]),
+            strip_eta_ends=jnp.array([i.eta_end for i in span_breaks]),
+            strip_le_cs_ids=jnp.array([i.le_cs_id for i in span_breaks]),
+            strip_te_cs_ids=jnp.array([i.te_cs_id for i in span_breaks]),
             strip_le_cuts=jnp.array(le_cuts),
             strip_te_cuts=jnp.array(te_cuts),
             n_sw=vlm_settings.vortices.wing_spanwise_vortices,  # type: ignore
@@ -601,7 +590,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
                         parent_wing=wing,
                         parent_x_offsets=seg_x_offsets,
                         parent_z_offsets=seg_z_offsets,
-                        parent_intervals=intervals,
+                        parent_intervals=span_breaks,
                         cs_ID=cs_ID,
                         vlm_settings=vlm_settings
                     )

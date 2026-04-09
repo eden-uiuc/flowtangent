@@ -567,6 +567,7 @@ def generate_body_panel_coordinates(body, n_cw: int, n_sw: int, surface_id: int)
         panels_per_strip=jnp.concatenate([cw_panels, cw_panels], axis=0),
         total_strips=n_sw*2
     )
+
 def combine_vortex_distributions(vd1: VortexDistribution, vd2: VortexDistribution) -> VortexDistribution:
     merged_kwargs = {}
     

@@ -73,6 +73,9 @@ class WingControlSurface(Component):
     span_fraction_start: float  = 0.0
     span_fraction_end: float    = 0.0
 
+    chord_fraction_start: float = 0.0
+    chord_fraction_end: float   = 1.0
+
     hinge_fraction: float       = 0.0
     root_chord_percent: float   = 0.0
 
@@ -81,6 +84,11 @@ class WingControlSurface(Component):
     configuration_type: str     = eqx.field(static=True, default='single_slotted')
 
     gain: float                 = 1.0  # deflection multiplier used only for AVL
+
+    def __post_init__(self):
+        if not (self.chord_fraction_start == 0.0 or self.chord_fraction_end == 1.0):
+            raise ValueError("Control surface chord fractions must terminate at either 0.0 or 1.0. "
+                             "Got: ({}, {})".format(self.chord_fraction_start, self.chord_fraction_end))
 
 
 class Wing(Component):
