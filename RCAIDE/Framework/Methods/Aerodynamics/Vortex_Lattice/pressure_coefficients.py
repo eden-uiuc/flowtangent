@@ -37,7 +37,9 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
     Vy_local = v_total[:, :, 1] / v_inf
     
     # 2. Local Panel Geometry (Sweep Tangents and Dihedral)
-    chord = VD.chord_lengths
+    strip_ids = jnp.cumsum(VD.is_leading_edge) - 1
+    strip_chord_array = jax.ops.segment_sum(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
+    strip_chord = strip_chord_array[strip_ids]
     n_cw = VD.panels_per_strip
     dx_frac = 1.0 / n_cw
     
@@ -59,7 +61,7 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
     TANB = dx_B / dy_z_B
     
     # 3. Segmented Cumulative Sum (GANT)
-    gamma_over_c = GAMMA / chord[None, :]
+    gamma_over_c = GAMMA / strip_chord[None, :]
     
     def scan_fn(a, b):
         # a and b are tuples: (value, is_leading_edge_flag)
@@ -86,7 +88,7 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
     
     # 5. Axial Load Component (GNET)
     # GNET = GAMMA * FACTOR * RNMAX / CHORD
-    GNET = GAMMA * Vx_local * n_cw[None, :] / chord[None, :]
+    GNET = GAMMA * Vx_local * n_cw[None, :] / strip_chord[None, :]
     
     # 6. Final Delta CP
     DCP = 2.0 * GNET + DCPSID

@@ -47,6 +47,30 @@ class VortexDistribution(eqx.Module):
     is_leading_edge: jnp.ndarray    # (N,) Boolean mask
     is_trailing_edge: jnp.ndarray   # (N,) Boolean mask
     
+    # --- Static Structural Integers (NOT traced by JAX) ---
+    total_panels: int = eqx.field(static=True)
+    total_strips: int = eqx.field(static=True)
+
+    def __init__(self, panel_vertices, surface_id, control_surface_id, is_leading_edge, is_trailing_edge, total_panels=None, total_strips=None, **kwargs):
+        self.panel_vertices = panel_vertices
+        self.surface_id = surface_id
+        self.control_surface_id = control_surface_id
+        self.is_leading_edge = is_leading_edge
+        self.is_trailing_edge = is_trailing_edge
+        
+        # If passed in from mirror_distribution or unpacking, use them directly
+        if total_panels is not None:
+            self.total_panels = total_panels
+        else:
+            self.total_panels = int(panel_vertices.shape[0])
+            
+        if total_strips is not None:
+            self.total_strips = total_strips
+        else:
+            # jnp.sum works perfectly here! We just cast the final result to int()
+            # so Equinox and JAX know it is safe to treat as a static dimension size.
+            self.total_strips = int(jnp.sum(is_leading_edge))
+    
 
     # --- Derived Physics (@properties) ---
     @property
@@ -105,14 +129,6 @@ class VortexDistribution(eqx.Module):
         return 0.5 * jnp.linalg.norm(raw_normals, axis=1)
     
     @property
-    def total_panels(self):
-        return self.panel_vertices.shape[0]
-    
-    @property
-    def total_strips(self):
-        return jnp.sum(self.is_leading_edge)
-    
-    @property
     def strip_ids(self):
         return jnp.cumsum(self.is_leading_edge) - 1
     
@@ -122,7 +138,6 @@ class VortexDistribution(eqx.Module):
         panel_ones = jnp.ones_like(strip_ids, dtype=jnp.float32)
         stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=self.total_strips)
         return stripwise_panels[strip_ids]
-
 
     
 def mirror_distribution(vd: VortexDistribution) -> VortexDistribution:
@@ -175,11 +190,14 @@ def merge_vortex_distributions(vd_list: list[VortexDistribution]) -> VortexDistr
                 val = getattr(vd, key)
                 adjusted_strip_ids.append(val + current_offset)
                 
-                # Advance the offset for the next wing/surface
                 if val.size > 0:
                     current_offset += jnp.max(val) + 1
                     
             merged_kwargs[key] = jnp.concatenate(adjusted_strip_ids, axis=0)
+            
+        elif key in ["total_panels", "total_strips"]:
+            # Explicitly sum the structural integers across all meshes
+            merged_kwargs[key] = sum(getattr(vd, key) for vd in vd_list)
             
         elif isinstance(first_val, jnp.ndarray):
             # One-shot concatenation for all geometry, flags, and surface IDs

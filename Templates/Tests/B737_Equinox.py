@@ -478,7 +478,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
 
     residuals = ("force_x", "force_z")
 
-    vortex_settings = VLMVortices(spanwise_vortices=5, chordwise_vortices=2)
+    vortex_settings = VLMVortices(spanwise_vortices=20, chordwise_vortices=12)
     aero_settings = VLMSettings(vortices=vortex_settings)
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)

@@ -197,8 +197,8 @@ def _default_VLM_steps():
         ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
 
         # Full Drag Buildup
-        ProcessStep(compute_parasite_drag, "Compute Parasite Drag"),
-        ProcessStep(compute_viscous_induced_drag, "Compute Viscous Induced Drag"),
+        # ProcessStep(compute_parasite_drag, "Compute Parasite Drag"),
+        # ProcessStep(compute_viscous_induced_drag, "Compute Viscous Induced Drag"),
     )
     # TODO: Add trimming/stability analysis
 

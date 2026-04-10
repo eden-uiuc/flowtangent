@@ -28,46 +28,34 @@ from RCAIDE.utils import inputs, outputs
 # Trefftz Plane Induced Drag
 # ---------------------------------------------------------
 @jax.jit
-def _compute_trefftz_drag(tp_y_ctrl, tp_z_ctrl, fil_y_L, fil_y_R, fil_z_L, fil_z_R, fil_x_LE, gamma_segments, alpha, rho):
-    # 1. Wind-Axis Rotation (Crucial: Rotate BOTH points and filaments)
-    cos_a = jnp.cos(alpha)
-    sin_a = jnp.sin(alpha)
+def _compute_trefftz_drag(tp_y_ctrl, tp_z_ctrl, tp_y_L, tp_y_R, tp_z_L, tp_z_R, gamma_segments, rho):
     
-    # Trefftz plane is at X=infinity, but we project the TE geometry onto it.
-    # To be mathematically consistent with AVL, we rotate the Z-positions 
-    # based on their X-distance from the LE.
-    tp_z_L = fil_z_L * cos_a - fil_x_LE * sin_a
-    tp_z_R = fil_z_R * cos_a - fil_x_LE * sin_a
-    
-    # 2. Distance Matrices
-    dy_L = tp_y_ctrl[:, :, None] - fil_y_L[:, None, :]
+    # 1. Distance Matrices
+    dy_L = tp_y_ctrl[:, :, None] - tp_y_L[:, None, :]
     dz_L = tp_z_ctrl[:, :, None] - tp_z_L[:, None, :]
     r2_L = jnp.maximum(dy_L**2 + dz_L**2, 1e-12)
     
-    dy_R = tp_y_ctrl[:, :, None] - fil_y_R[:, None, :]
+    dy_R = tp_y_ctrl[:, :, None] - tp_y_R[:, None, :]
     dz_R = tp_z_ctrl[:, :, None] - tp_z_R[:, None, :]
     r2_R = jnp.maximum(dy_R**2 + dz_R**2, 1e-12)
 
-    # 3. Induced Velocity (Point Vortices)
-    v_ind_y = jnp.sum((gamma_segments[:, None, :] / (2.0 * jnp.pi)) * ( (dz_L / r2_L) - (dz_R / r2_R) ), axis=-1)
-    v_ind_z = jnp.sum((gamma_segments[:, None, :] / (2.0 * jnp.pi)) * ( (-dy_L / r2_L) - (-dy_R / r2_R) ), axis=-1)
+    # 2. Induced Velocity (Corrected for Z-Down Downwash)
+    # Flipped signs so +Gamma produces +Z velocity between the vortices
+    v_ind_y = jnp.sum((gamma_segments[:, None, :] / (2.0 * jnp.pi)) * ( -(dz_L / r2_L) + (dz_R / r2_R) ), axis=-1)
+    v_ind_z = jnp.sum((gamma_segments[:, None, :] / (2.0 * jnp.pi)) * (  (dy_L / r2_L) - (dy_R / r2_R) ), axis=-1)
 
-    # 4. Normal Vectors in Wind Axis
-    dy_c = jnp.gradient(tp_y_ctrl, axis=-1)
-    dz_c = jnp.gradient(tp_z_ctrl, axis=-1)
-    ctrl_mag = jnp.sqrt(dy_c**2 + dz_c**2 + 1e-16)
+    # 3. Strict 2D Unstructured Normal Vectors
+    dy_panel = tp_y_R - tp_y_L
+    dz_panel = tp_z_R - tp_z_L
+    panel_width = jnp.maximum(jnp.sqrt(dy_panel**2 + dz_panel**2), 1e-16)
     
-    # These normals MUST be consistent with the VD.normal_vectors convention
-    n_hat_y = dz_c / ctrl_mag
-    n_hat_z = dy_c / ctrl_mag
+    # Orthogonal to the panel, pointing DOWN (+Z)
+    n_hat_y = -dz_panel / panel_width
+    n_hat_z =  dy_panel / panel_width
     
     v_normal = v_ind_y * n_hat_y + v_ind_z * n_hat_z
 
-    # 5. Drag Integration
-    panel_dy = fil_y_R - fil_y_L
-    panel_dz = tp_z_R - tp_z_L # Use rotated Z for panel width
-    panel_width = jnp.sqrt(panel_dy**2 + panel_dz**2)
-    
+    # 4. Drag Integration
     D_induced = 0.5 * rho * jnp.sum(gamma_segments * v_normal * panel_width, axis=1)
     
     return D_induced, v_normal
@@ -111,7 +99,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     panels_per_strip = stripwise_panels[strip_ids]
     panel_dx_nondim = 1.0 / panels_per_strip 
 
-    stripwise_chords = jax.ops.segment_max(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
+    stripwise_chords = jax.ops.segment_sum(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
     
     # ------------------------------------------------------------------
     # Local Panel Sweep and Dihedral (Using VD.panel_vertices)
@@ -182,7 +170,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
         normals_masked = VD.normal_vectors * le_mask_float[:, None]
         normals_LE = jax.ops.segment_sum(normals_masked, strip_ids, num_segments=VD.total_strips)
         
-        induced_velocity_LE = jnp.sum(EW_LE * GAMMA, axis=-1)
+        induced_velocity_LE = jnp.sum(EW_LE * GAMMA[:, None, :], axis=-1)
         
         # eff_incidence_LE dot product 
         eff_incidence_LE = jnp.sum(v_total_LE * normals_LE[None, :, :], axis=-1)
@@ -248,22 +236,24 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # ------------------------------------------------------------------
     # Trefftz Plane Execution
     # ------------------------------------------------------------------
-    colloc_TE = jax.ops.segment_sum(VD.collocation_points * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
-    fil_TE_L = jax.ops.segment_sum(VD.bound_vortex_left * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
-    fil_TE_R = jax.ops.segment_sum(VD.bound_vortex_right * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
-    
-    panel_le_x = (VD.panel_vertices[:, 0, 0] + VD.panel_vertices[:, 3, 0]) / 2.0
-    fil_x_LE = jax.ops.segment_sum(panel_le_x * le_mask_float, strip_ids, num_segments=VD.total_strips)
+    TE_corner_L = jax.ops.segment_sum(VD.panel_vertices[:, 1, :] * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    TE_corner_R = jax.ops.segment_sum(VD.panel_vertices[:, 2, :] * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
+    TE_mid = (TE_corner_L + TE_corner_R) / 2.0
 
-    # Wind-Axis Z conversion for the control point
-    tp_z_ctrl = colloc_TE[:, 2] * cos_alpha - colloc_TE[:, 0] * sin_alpha
+    # 2. Project exactly from the TE to infinity (No chordwise gaps!)
+    tp_z_ctrl = TE_mid[:, 2] * cos_alpha - TE_mid[:, 0] * sin_alpha
+    tp_z_L    = TE_corner_L[:, 2] * cos_alpha - TE_corner_L[:, 0] * sin_alpha
+    tp_z_R    = TE_corner_R[:, 2] * cos_alpha - TE_corner_R[:, 0] * sin_alpha
 
     D_induced, _ = _compute_trefftz_drag(
-        colloc_TE[:, 1][None, :], tp_z_ctrl, 
-        fil_TE_L[:, 1][None, :], fil_TE_R[:, 1][None, :], 
-        fil_TE_L[:, 2][None, :], fil_TE_R[:, 2][None, :], 
-        fil_x_LE[None, :],
-        seg_sum(GAMMA) * v_inf, alpha, rho
+        TE_mid[:, 1][None, :],
+        tp_z_ctrl,
+        TE_corner_L[:, 1][None, :],
+        TE_corner_R[:, 1][None, :],
+        tp_z_L,
+        tp_z_R,
+        seg_sum(GAMMA) * v_inf,
+        rho[:, 0]
     )
     
     CDi = D_induced / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)
