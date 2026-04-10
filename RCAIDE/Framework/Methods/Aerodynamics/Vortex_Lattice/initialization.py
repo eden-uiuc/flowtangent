@@ -94,7 +94,6 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
 
     # Add analysis data keys
     initial_analysis_data = {
-            "vlm_wings": tuple(),
             "vortex_distribution": None,
             "induced_wake": None,
             "boundary_conditions": None,

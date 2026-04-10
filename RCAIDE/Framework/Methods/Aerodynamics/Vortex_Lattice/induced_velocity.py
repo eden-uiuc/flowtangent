@@ -127,7 +127,6 @@ def compute_induced_velocity_matrix(VD, mach_array):
     Computes the Aerodynamic Influence Coefficient matrix C_mn.
     Output Shape: (n_time, N, N, 3)
     """
-    N = VD.collocation_points.shape[0]
     
     # 1. Coordinate Symmetry Flip
     flip = VD.bound_vortex_left[:, 1] > VD.bound_vortex_right[:, 1]

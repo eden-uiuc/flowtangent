@@ -1,5 +1,5 @@
 from .initialization import initialize_VLM_geometry
-from .make_VLM_wings import discretize_wings, update_wing_geometry
+from .panelization import discretize_wings, update_wing_geometry
 from .vortex_distribution import generate_full_vortex_distribution
 from .boundary_conditions import compute_boundary_conditions
 from .induced_velocity import compute_induced_velocity

@@ -123,9 +123,7 @@ def generate_wing_panel_coordinates(vlm_wings: tuple, vlm_vortex_settings):
         seg_z_off = record.segment_z_offsets
 
         if vlm_vortex_settings.spanwise_cosine_spacing:
-            # Cosine spacing: clusters panels near the tips and roots
-            thetan = jnp.linspace(jnp.pi/2, 0, n_sw + 1)
-            y_coords = semispan * jnp.cos(thetan)
+            y_coords = semispan * jnp.cos(jnp.linspace(jnp.pi/2, 0, n_sw + 1))
         else:
             y_coords = jnp.linspace(0, semispan, n_sw + 1)
         

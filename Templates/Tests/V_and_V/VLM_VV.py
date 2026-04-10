@@ -23,6 +23,7 @@ from RCAIDE.Framework.Missions.Conditions import Numerics
 from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
+from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
@@ -201,8 +202,8 @@ def run_vorjax_alpha_sweep(vehicle, alpha):
 
     vortices = VLMVortices(
         spanwise_cosine_spacing=False,
-        number_of_spanwise_vortices=20,
-        number_of_chordwise_vortices=12
+        spanwise_vortices=20,
+        chordwise_vortices=12
     )
     aero_settings = VLMSettings(vortices=vortices)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=True), aero_settings)
@@ -245,14 +246,14 @@ def avl_basic_test(geometry_file, alpha=2.0, span=10.0, chord=1.0):
 
 if __name__ == "__main__":
 
-    # vehicle = create_vorjax_geometry(span=10.0, chord=1.0)
+    vehicle = create_vorjax_geometry(span=10.0, chord=1.0)
 
-    avl_b737_data = parse_avl_file(Path('~/dev/avl3.52/runs/b737.avl').expanduser())
-    vehicle = convert_to_RCAIDE(avl_b737_data)
+    # avl_b737_data = parse_avl_file(Path('~/dev/avl3.52/runs/b737.avl').expanduser())
+    # vehicle = convert_to_RCAIDE(avl_b737_data)
 
-    new_wing_list = vehicle.wings.subcomponents[:3]
-    new_wings = eqx.tree_at(lambda w: w.subcomponents, vehicle.wings, new_wing_list)
-    vehicle = eqx.tree_at(lambda v: v.wings, vehicle, new_wings)
+    # new_wing_list = vehicle.wings.subcomponents[:3]
+    # new_wings = eqx.tree_at(lambda w: w.subcomponents, vehicle.wings, new_wing_list)
+    # vehicle = eqx.tree_at(lambda v: v.wings, vehicle, new_wings)
 
     alpha, CL, CD, CM, data = run_vorjax_alpha_sweep(vehicle, alpha=2.0)
     print(f"\n--- Extracted VORJAX Results ---")

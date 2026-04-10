@@ -11,15 +11,7 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Aerodynamic Distribution")
         panel_values: ndarray of shape (N_panels,)
                       representing the heatmap value (e.g., Cp, Gamma) for each panel.
     """
-    panel_vertices = np.asarray(jnp.stack(
-        (
-            VD.panel_corner_a1,
-            VD.panel_corner_a2,
-            VD.panel_corner_b2,
-            VD.panel_corner_b1
-        ),
-        axis=1
-    ))
+    panel_vertices = np.asarray(VD.panel_vertices)
 
     if panel_values is not None:
         panel_values = np.asarray(panel_values)

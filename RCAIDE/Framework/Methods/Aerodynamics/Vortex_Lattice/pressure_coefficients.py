@@ -41,19 +41,19 @@ def compute_pressure_coefficients(VD, v_total, GAMMA, v_inf):
     n_cw = VD.panels_per_strip
     dx_frac = 1.0 / n_cw
     
-    # Front edge sweep (a1 to b1)
-    dy_A = VD.panel_corner_b1[:, 1] - VD.panel_corner_a1[:, 1]
-    dz_A = VD.panel_corner_b1[:, 2] - VD.panel_corner_a1[:, 2]
-    dx_A = VD.panel_corner_b1[:, 0] - VD.panel_corner_a1[:, 0]
+    # Front edge sweep (Front-Left [0] to Front-Right [3])
+    dy_A = VD.panel_vertices[:, 3, 1] - VD.panel_vertices[:, 0, 1]
+    dz_A = VD.panel_vertices[:, 3, 2] - VD.panel_vertices[:, 0, 2]
+    dx_A = VD.panel_vertices[:, 3, 0] - VD.panel_vertices[:, 0, 0]
     dy_z_A = jnp.maximum(jnp.sqrt(dy_A**2 + dz_A**2), 1e-12) # Prevent DivByZero
     
     TANA = dx_A / dy_z_A
     cos_DL = dy_A / dy_z_A # Cosine of local dihedral
     
-    # Back edge sweep (a2 to b2)
-    dy_B = VD.panel_corner_b2[:, 1] - VD.panel_corner_a2[:, 1]
-    dz_B = VD.panel_corner_b2[:, 2] - VD.panel_corner_a2[:, 2]
-    dx_B = VD.panel_corner_b2[:, 0] - VD.panel_corner_a2[:, 0]
+    # Back edge sweep (Back-Left [1] to Back-Right [2])
+    dy_B = VD.panel_vertices[:, 2, 1] - VD.panel_vertices[:, 1, 1]
+    dz_B = VD.panel_vertices[:, 2, 2] - VD.panel_vertices[:, 1, 2]
+    dx_B = VD.panel_vertices[:, 2, 0] - VD.panel_vertices[:, 1, 0]
     dy_z_B = jnp.maximum(jnp.sqrt(dy_B**2 + dz_B**2), 1e-12)
     
     TANB = dx_B / dy_z_B

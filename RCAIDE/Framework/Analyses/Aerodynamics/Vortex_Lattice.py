@@ -94,14 +94,14 @@ class Training(eqx.Module):
 
 class VLMVortices(eqx.Module):
     # General Settings
-    spanwise_cosine_spacing: bool   = eqx.field(static=True, default=True)
-    model_fuselage: bool            = eqx.field(static=True, default=False)
-    floating_point_precision: str   = eqx.field(static=True, default="float64")
-    verbose: bool                   = eqx.field(static=True, default=False)
+    spanwise_cosine_spacing:    bool = eqx.field(static=True, default=True)
+    model_fuselage:             bool = eqx.field(static=True, default=False)
+    floating_point_precision:   str  = eqx.field(static=True, default="float64")
+    verbose:                    bool = eqx.field(static=True, default=False)
     
     # Discretization Inputs (Optional, so the user can choose which to define)
-    number_of_spanwise_vortices:    int = eqx.field(static=True, default=5)
-    number_of_chordwise_vortices:   int = eqx.field(static=True, default=2)
+    spanwise_vortices:    int = eqx.field(static=True, default=5)
+    chordwise_vortices:   int = eqx.field(static=True, default=2)
     
     wing_spanwise_vortices:         Optional[int] = eqx.field(static=True, default=None)
     wing_chordwise_vortices:        Optional[int] = eqx.field(static=True, default=None)
@@ -130,14 +130,14 @@ class VLMVortices(eqx.Module):
 
         else:
             # 2. User didn't provide separate settings, so we fallback to the global defaults
-            if not self.number_of_spanwise_vortices or not self.number_of_chordwise_vortices:
+            if not self.spanwise_vortices or not self.chordwise_vortices:
                 raise ValueError('If using global surface discretization, both n_sw and n_cw must be defined.')
 
             # Route the global settings to the specific component fields
-            object.__setattr__(self, 'wing_spanwise_vortices', self.number_of_spanwise_vortices)
-            object.__setattr__(self, 'wing_chordwise_vortices', self.number_of_chordwise_vortices)
-            object.__setattr__(self, 'fuselage_spanwise_vortices', self.number_of_spanwise_vortices)
-            object.__setattr__(self, 'fuselage_chordwise_vortices', self.number_of_chordwise_vortices)
+            object.__setattr__(self, 'wing_spanwise_vortices', self.spanwise_vortices)
+            object.__setattr__(self, 'wing_chordwise_vortices', self.chordwise_vortices)
+            object.__setattr__(self, 'fuselage_spanwise_vortices', self.spanwise_vortices)
+            object.__setattr__(self, 'fuselage_chordwise_vortices', self.chordwise_vortices)
 
 
 class VLMSettings(eqx.Module):
@@ -171,7 +171,7 @@ def _default_VLM_init_steps():
         ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),
         ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
         ProcessStep(discretize_wings, "Discretize VLM Wings"),
-        ProcessStep(generate_full_vortex_distribution, "Generate Vehicle Mesh"),
+        # ProcessStep(generate_full_vortex_distribution, "Generate Vehicle Mesh"),
     )
 
 
