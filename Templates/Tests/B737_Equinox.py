@@ -576,7 +576,7 @@ if __name__ == '__main__':
 
     state = state_setup()
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=True)
+    settings = Settings(DEBUG_MODE=False)
 
     print("Setup complete, starting mission ...")
 

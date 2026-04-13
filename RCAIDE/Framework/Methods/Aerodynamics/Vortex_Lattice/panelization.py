@@ -676,8 +676,16 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
 
         morph_results = morph_to_3d_mesh(xi_grid, zeta_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist)
         
+        if wing.vertical:
+            y_coords = morph_results[:, :, :, 1]
+            z_coords = morph_results[:, :, :, 2]
+            
+            morph_results = morph_results.at[:, :, :, 1].set(z_coords)
+            morph_results = morph_results.at[:, :, :, 2].set(y_coords)
+
+
         # Flatten and pack into VortexDistribution ---------------------------------------------------------------------
-        flat_vertices = morph_results.reshape(-1, 4, 3)
+        flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
         
         VD = VortexDistribution(
             panel_vertices=flat_vertices,
