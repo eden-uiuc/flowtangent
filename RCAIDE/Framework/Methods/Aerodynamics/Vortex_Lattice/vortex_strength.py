@@ -49,7 +49,7 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     RFLAG = analysis["singularities"]
     
     # Zero out the RHS for supersonic panels swept parallel to the Mach cone
-    RHS = RHS * RFLAG.squeeze(1)
+    RHS = RHS * RFLAG
     
     # Build the 'A' matrix via Dot Product: sum(C_mn * n)
     # The normal vector belongs to the RECEIVING panel (dim 1). 

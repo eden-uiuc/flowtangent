@@ -576,7 +576,6 @@ def combine_vortex_distributions(vd1: VortexDistribution, vd2: VortexDistributio
         val2 = getattr(vd2, key)
 
         if key == "total_strips":
-            # Pure Python integer addition! (No JAX tracers involved)
             merged_kwargs[key] = val1 + val2
             
         elif isinstance(val1, jnp.ndarray):

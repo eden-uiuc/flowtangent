@@ -153,6 +153,9 @@ class Component(eqx.Module):
 
         raise AttributeError(f"'{self.tag}' has no attribute or subcomponent named '{item}'")
 
+    def __bool__(self):
+        return True
+
     def __len__(self):
         return len(self.subcomponents)
 

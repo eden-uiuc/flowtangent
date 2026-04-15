@@ -33,6 +33,7 @@ from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingC
 # VLM-Specific Data Structures
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class VortexDistribution(eqx.Module):
     """ 
     A globally unstructured VLM mesh.
@@ -40,6 +41,7 @@ class VortexDistribution(eqx.Module):
     """
     # --- Base Geometric State ---
     panel_vertices: jnp.ndarray     # (N, 4, 3), CCW from Front-Left
+    camber_slopes: jnp.ndarray      # (N,) Camber slope at each panel
     
     # --- Identity & Topology (Calculated before flattening!) ---
     surface_id: jnp.ndarray         # (N,) ID of the originating wing/fuselage
@@ -51,8 +53,9 @@ class VortexDistribution(eqx.Module):
     total_panels: int = eqx.field(static=True)
     total_strips: int = eqx.field(static=True)
 
-    def __init__(self, panel_vertices, surface_id, control_surface_id, is_leading_edge, is_trailing_edge, total_panels=None, total_strips=None, **kwargs):
+    def __init__(self, panel_vertices, camber_slopes, surface_id, control_surface_id, is_leading_edge, is_trailing_edge, total_panels=None, total_strips=None, **kwargs):
         self.panel_vertices = panel_vertices
+        self.camber_slopes = camber_slopes
         self.surface_id = surface_id
         self.control_surface_id = control_surface_id
         self.is_leading_edge = is_leading_edge
@@ -67,10 +70,7 @@ class VortexDistribution(eqx.Module):
         if total_strips is not None:
             self.total_strips = total_strips
         else:
-            # jnp.sum works perfectly here! We just cast the final result to int()
-            # so Equinox and JAX know it is safe to treat as a static dimension size.
             self.total_strips = int(jnp.sum(is_leading_edge))
-    
 
     # --- Derived Physics (@properties) ---
     @property
@@ -82,6 +82,49 @@ class VortexDistribution(eqx.Module):
     def bound_vortex_right(self):
         verts = self.panel_vertices
         return 0.75 * verts[:, 3, :] + 0.25 * verts[:, 2, :]
+
+    @property
+    def bound_vortex_inboard(self):
+        left = self.bound_vortex_left
+        right = self.bound_vortex_right
+
+        # True if Left is further outboard (larger absolute Y) than Right.
+        flip = jnp.abs(left[:, 1]) > jnp.abs(right[:, 1])
+
+        # Expand mask from (N,) to (N, 1) so it broadcasts across X, Y, Z
+        return jnp.where(flip[:, None], right, left)
+
+    @property
+    def bound_vortex_outboard(self):
+        left = self.bound_vortex_left
+        right = self.bound_vortex_right
+
+        flip = jnp.abs(left[:, 1]) > jnp.abs(right[:, 1])
+        return jnp.where(flip[:, None], left, right)
+
+    @property
+    def bound_vortex_center(self):
+        # Center is mathematically identical regardless of inboard/outboard flip
+        return 0.5 * (self.bound_vortex_left + self.bound_vortex_right)
+
+    @property
+    def bound_vortex_A(self):
+        """Returns the vortex endpoint with the strictly smaller Y-coordinate for AIC calculation"""
+        left = self.bound_vortex_left
+        right = self.bound_vortex_right
+
+        flip = left[:, 1] > right[:, 1]
+        return jnp.where(flip[:, None], right, left)
+
+    @property
+    def bound_vortex_B(self):
+        """Returns the bound vortex endpoint with the strictly larger Y-coordinate for AIC calculation"""
+        left = self.bound_vortex_left
+        right = self.bound_vortex_right
+
+        flip = left[:, 1] > right[:, 1]
+        return jnp.where(flip[:, None], left, right)
+
     
     @property
     def collocation_points(self):
@@ -93,11 +136,12 @@ class VortexDistribution(eqx.Module):
     @property
     def normal_vectors(self):
         verts = self.panel_vertices
-        diag_1 = verts[:, 2, :] - verts[:, 0, :]  
-        diag_2 = verts[:, 1, :] - verts[:, 3, :]  
-        
-        # Points DOWN for VORLAX orientation (+Z in Z-down systems)
-        raw_normals = jnp.cross(diag_1, diag_2) 
+        diag_1 = verts[:, 2, :] - verts[:, 0, :]
+        diag_2 = verts[:, 1, :] - verts[:, 3, :]
+
+        # Swapped order: diag_2 x diag_1 forces the right-hand rule to point UP (+Z)
+        raw_normals = jnp.cross(diag_2, diag_1)
+
         return raw_normals / jnp.linalg.norm(raw_normals, axis=1, keepdims=True)
     
     @property
@@ -106,19 +150,21 @@ class VortexDistribution(eqx.Module):
         chord_left = jnp.linalg.norm(verts[:, 1, :] - verts[:, 0, :], axis=-1)
         chord_right = jnp.linalg.norm(verts[:, 2, :] - verts[:, 3, :], axis=-1)
         return (chord_left + chord_right) / 2.0
-    
-    @property
-    def tangent_incidence_angle(self):
-        verts = self.panel_vertices
-        dz_left = verts[:, 1, 2] - verts[:, 0, 2]
-        dx_left = verts[:, 1, 0] - verts[:, 0, 0]
-        twist_left = jnp.arctan2(-dz_left, dx_left)
-        
-        dz_right = verts[:, 2, 2] - verts[:, 3, 2]
-        dx_right = verts[:, 2, 0] - verts[:, 3, 0]
-        twist_right = jnp.arctan2(-dz_right, dx_right)
 
-        return (twist_left + twist_right) / 2.0
+    @property
+    def incidence_angle(self):
+        verts = self.panel_vertices
+
+        mid_front = 0.5 * (verts[:, 0, :] + verts[:, 3, :])
+        mid_back = 0.5 * (verts[:, 1, :] + verts[:, 2, :])
+
+        dx = mid_back[:, 0] - mid_front[:, 0]
+        dz = mid_back[:, 2] - mid_front[:, 2]
+
+        physical_twist = jnp.arctan2(-dz, dx)
+        camber_angle = jnp.arctan(self.camber_slopes)
+
+        return physical_twist + camber_angle
     
     @property
     def panel_areas(self):
@@ -148,7 +194,7 @@ def mirror_distribution(vd: VortexDistribution) -> VortexDistribution:
     
     # 2. Reorder the corners to fix the winding (Maintain UPWARD normals)
     # Original: [0: Front-Left, 1: Back-Left, 2: Back-Right, 3: Front-Right]
-    # Mirrored: Swap Left and Right!
+    # Mirrored: Swap Left and Right
     # New order: [3, 2, 1, 0] 
     mirrored_verts = flipped_verts[:, jnp.array([3, 2, 1, 0]), :]
     
@@ -504,7 +550,7 @@ def calculate_macro_properties(wing, eta_vertices: jnp.ndarray, semispan: float)
 
     return strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist
 
-def morph_to_3d_mesh(xi_grid, zeta_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist):
+def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist):
     """
     Morphs the non-dimensional topological grid into a 3D VLM panel mesh.
     Returns an array of shape (n_sw, n_cw, 4, 3) containing the 4 corner vertices of every panel.
@@ -513,7 +559,7 @@ def morph_to_3d_mesh(xi_grid, zeta_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_
     # Shapes become (n_sw, 1) so they broadcast against the (n_sw, n_cw + 1) grids
     c_L = strip_c[:-1][:, None]
     c_R = strip_c[1:][:, None]
-    
+
     twist_L = strip_twist[:-1][:, None]
     twist_R = strip_twist[1:][:, None]
     
@@ -529,22 +575,22 @@ def morph_to_3d_mesh(xi_grid, zeta_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_
     # 2. Scale up to physical 2D coordinates (still relative to the Leading Edge pivot)
     # Shapes: (n_sw, n_cw + 1)
     x_2d_L = xi_grid * c_L
-    z_2d_L = zeta_grid * c_L
+    z_2d_L = jnp.zeros_like(x_2d_L)
     
     x_2d_R = xi_grid * c_R
-    z_2d_R = zeta_grid * c_R  # Zeta is constant across the strip, scaled by local chord
+    z_2d_R = jnp.zeros_like(x_2d_R)
 
     # 3. Apply Twist Rotation (Pitching around the Leading Edge pivot)
-    x_rot_L = x_2d_L * jnp.cos(twist_L) - z_2d_L * jnp.sin(twist_L)
-    z_rot_L = x_2d_L * jnp.sin(twist_L) + z_2d_L * jnp.cos(twist_L)
-    
-    x_rot_R = x_2d_R * jnp.cos(twist_R) - z_2d_R * jnp.sin(twist_R)
-    z_rot_R = x_2d_R * jnp.sin(twist_R) + z_2d_R * jnp.cos(twist_R)
+    x_rot_L =  x_2d_L * jnp.cos(twist_L) + z_2d_L * jnp.sin(twist_L)
+    z_rot_L = -x_2d_L * jnp.sin(twist_L) + z_2d_L * jnp.cos(twist_L)
+
+    x_rot_R =  x_2d_R * jnp.cos(twist_R) + z_2d_R * jnp.sin(twist_R)
+    z_rot_R = -x_2d_R * jnp.sin(twist_R) + z_2d_R * jnp.cos(twist_R)
 
     # 4. Translate to the 3D Swept/Dihedraled Space
     # These contain the exact 3D coordinates for every chordwise vertex line 
     X_3D_L = X_LE_L + x_rot_L
-    Y_3D_L = jnp.broadcast_to(Y_L, X_3D_L.shape) # Y is constant along the chord
+    Y_3D_L = jnp.broadcast_to(Y_L, X_3D_L.shape)  # Y is constant along the chord
     Z_3D_L = Z_LE_L + z_rot_L
     
     X_3D_R = X_LE_R + x_rot_R
@@ -650,8 +696,8 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
 
         # Calculate strip zeta (non-dimensional z-coordinate) (Shape: (n_sw, n_cw + 1))
         n_af_pts = validate_airfoil_resolutions(wing)
-        flat_x = jnp.linspace(0.0, 1.0, n_af_pts)
-        flat_z = jnp.zeros(n_af_pts)
+        flat_x = jnp.linspace(0.0, 1.0, n_af_pts // 2)
+        flat_z = jnp.zeros(n_af_pts // 2)
 
         seg_camber_x = jnp.stack([
             seg.airfoil.x_lower_surface if getattr(seg, 'airfoil', None) else flat_x 
@@ -666,15 +712,21 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         strip_camber_x = seg_camber_x[strip_interval_map]
         strip_camber_z = seg_camber_z[strip_interval_map]
 
+        xi_colloc = 0.25 * xi_grid[:, :-1] + 0.75 * xi_grid[:, 1:]
+
         vmap_interp = jax.vmap(jnp.interp, in_axes=(0, 0, 0))
-        
-        zeta_grid = vmap_interp(xi_grid, strip_camber_x, strip_camber_z)
+
+        # Finite difference local camber slope/incidence angle
+        zeta_fwd = vmap_interp(xi_colloc + 1e-4, strip_camber_x, strip_camber_z)
+        zeta_bwd = vmap_interp(xi_colloc - 1e-4, strip_camber_x, strip_camber_z)
+
+        camber_slopes = (zeta_fwd - zeta_bwd) / 2e-4
 
         # Calculate strip macro-level properties
         semispan = wing.spans.projected / 2.0 if wing.symmetric else wing.spans.projected 
         strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist = calculate_macro_properties(wing, eta, semispan)
 
-        morph_results = morph_to_3d_mesh(xi_grid, zeta_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist)
+        morph_results = morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist)
         
         if wing.vertical:
             y_coords = morph_results[:, :, :, 1]
@@ -689,6 +741,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         
         VD = VortexDistribution(
             panel_vertices=flat_vertices,
+            camber_slopes=camber_slopes.reshape(-1),
             surface_id=jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32),
             control_surface_id=panel_cs_id,
             is_leading_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1),

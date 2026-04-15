@@ -15,6 +15,7 @@ import equinox as eqx
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas
+from RCAIDE.Library.Components.Airfoils import Airfoil
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Framework.System import Aircraft
 
@@ -48,6 +49,7 @@ def parse_avl_file(filepath: str | Path) -> dict:
     # Line 4: Xref Yref Zref
     avl_data = {
         "name": cleaned_lines[0],
+        "filepath": str(Path(filepath).absolute()),
         "mach": float(cleaned_lines[1].split()[0]),
         "symmetry": [float(x) for x in cleaned_lines[2].split()[:3]],
         "reference_area": [float(x) * Units.ft **2 for x in cleaned_lines[3].split()[:3]],
@@ -178,14 +180,23 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
             qc_sweep = jnp.arctan2(dx_qc, dz).item() if is_vertical else jnp.arctan2(dx_qc, dy).item()
             dihedral = jnp.arctan2(dy, dz) if is_vertical else jnp.arctan2(dz, dy)
 
-            #TODO: Airfoil parsing
+            if sec_in["airfoil_file"] is not None:
+                airfoil_file = sec_in["airfoil_file"]
+                airfoil = Airfoil.from_file(Path(avl_data["filepath"]).parent / airfoil_file)
+            elif sec_in["airfoil_naca"] is not None:
+                airfoil_naca = sec_in["airfoil_naca"]
+                airfoil = Airfoil.NACA_4_Series(airfoil_naca)
+            else:
+                airfoil = None
+
             segment = WingSegment(
                 tag=f"{surf_data['name']}_Seg_{i + 1}",
                 percent_span_location=span_fraction,
                 root_chord_percent=chord_fraction,
-                twist=sec_in["twist"],
+                # twist=sec_in["twist"],
                 dihedral_outboard=dihedral,
-                sweeps=WingSweeps(quarter_chord=qc_sweep)
+                sweeps=WingSweeps(quarter_chord=qc_sweep),
+                airfoil=airfoil
             )
             segments_list.append(segment)
 
@@ -196,7 +207,8 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
                 root_chord_percent=taper,
                 twist=tip_sec["twist"],
                 dihedral_outboard=0.0,
-                sweeps=WingSweeps(quarter_chord=0.0)
+                sweeps=WingSweeps(quarter_chord=0.0),
+                airfoil=airfoil
             )
         )
 
@@ -206,8 +218,9 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
             symmetric=is_symmetric,
             vertical=is_vertical,
             taper=taper,
-            segments=tuple(segments_list),  # Pass the pre-built segments here
+            segments=tuple(segments_list),
             spans=WingDimensions(projected=total_span),
+            # twists=WingDimensions(root=root_sec["twist"], tip=tip_sec["twist"]),
             chords=WingChords(root=root_chord, tip=tip_chord, mean_aerodynamic=cref),
             origin=jnp.array(surf_data["translate"]) + jnp.array([[root_sec["x_le"], root_sec["y_le"], root_sec["z_le"]]]),
             aerodynamic_center=jnp.array([[xref, yref, zref]])

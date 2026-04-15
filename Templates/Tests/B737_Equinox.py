@@ -78,13 +78,13 @@ def vehicle_setup():
     # Root Segment
     root_segment = WingSegment(
         tag='Main Wing Root Segment',
-        percent_span_location   = 0.0,
-        twist                   = 4. * Units.deg,
-        root_chord_percent      = 1.,
-        thickness_to_chord      = 0.1,
-        dihedral_outboard       = 2.5 * Units.deg,
-        sweeps                  = WingSweeps(quarter_chord=28.225 * Units.deg),
-        airfoil                 = Airfoil.from_file(Airfoil_Data/'B737a.txt'))
+        percent_span_location   =0.0,
+        twist                   =4. * Units.deg,
+        root_chord_percent      =1.,
+        thickness_to_chord      =0.1,
+        dihedral_outboard       =2.5 * Units.deg,
+        sweeps                  =WingSweeps(quarter_chord=28.225 * Units.deg),
+        airfoil                 =Airfoil.from_file(Airfoil_Data/'B737a.txt'))
 
     yehudi_segment = WingSegment(
         tag='Main Wing Yehudi Segment',

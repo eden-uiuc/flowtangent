@@ -61,7 +61,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     # transpose to prepare for cross product -> (n_time, 3)
     omega = jnp.concatenate([p, q, r], axis=1)
     
-    # Build Freestream Velocity Vector
+    # Build Freestream Velocity Vector (Wind Speed in Body Frame)
     v_fs = jnp.concatenate([
         v_inf * jnp.cos(alpha) * jnp.cos(beta),
         v_inf * jnp.cos(alpha) * jnp.sin(beta), 
@@ -86,7 +86,11 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     v_unit = v_total / v_inf[:, None]
     
     # Dot product: sum(V * N, axis=1)
-    rhs_array = jnp.sum(v_unit * VD.normal_vectors, axis=-1)
+    base_rhs_array = jnp.sum(v_unit * VD.normal_vectors, axis=-1)
+
+    # Camber correction from thin wing assumption
+    v_unit_x = v_unit[..., 0]
+    rhs_array = base_rhs_array + (v_unit_x * VD.camber_slopes)
 
     updated_analysis_data = system.analysis_data | {
         "boundary_conditions": rhs_array,

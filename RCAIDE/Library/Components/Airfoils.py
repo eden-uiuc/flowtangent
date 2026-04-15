@@ -7,14 +7,14 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 from decimal import Decimal
 from pathlib import Path
 
 # package imports
+import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
-from scipy import interpolate
+from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
 from RCAIDE.Library import Component
@@ -29,10 +29,11 @@ class Airfoil(Component):
 
     thickness_to_chord: float = 0.0
     max_thickness:      float = 0.0
-    camber:             float = 0.0
 
     coordinates:        jnp.ndarray = eqx.field(default_factory=jnp.empty((0, 2)))
-    
+
+    camber:             jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
+
     x_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
     y_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
     
@@ -134,199 +135,124 @@ class Airfoil(Component):
         )
 
     @classmethod
-    def from_file(cls, file_path: str | Path, n_pts: int = 201, interpolation: str = 'cubic'):
+    def from_file(cls, file_path: str | Path, n_pts: int = 101):
+        """
+        Parses Selig and Lednicer format airfoil .dat files.
+        Interpolates upper and lower surfaces onto a shared cosine-spaced X grid
+        to accurately calculate the mean camber line.
+        """
+        file_path = Path(file_path)
 
-        if n_pts % 2 == 0:
-            n_pts += 1
+        # 1. Read all non-empty lines
+        with open(file_path, 'r') as f:
+            lines = [line.strip() for line in f if line.strip()]
 
-        # Open file and read column names and data block
-        f = open(file_path, 'r')
+        is_lednicer = False
+        data_start_idx = 0
+        n_up, n_lo = 0, 0
 
-        # Extract data
-        data_block = f.readlines()
-        lednicer_format = False
-        try:
-            # Check for header block
-            first_element = float(data_block[0][0])
-            if first_element == 1.:
-                lednicer_format = False
-        except:
-            # Check for format line and remove header block
-            format_line = data_block[1]
-
-            # Check if it's a Selig or Lednicer file
-            try:
-                format_flag = float(format_line.strip().split()[0])
-            except:
-                format_flag = float(format_line.strip().split(',')[0])
-
-            if format_flag > 1.01: # Amount of wiggle room per airfoil tools
-                lednicer_format = True
-                # Remove header block
-                data_block      = data_block[3:]
-            else:
-                lednicer_format = False
-                # Remove header block
-                data_block = data_block[1:]
-
-        # Close the file
-        f.close()
-
-        if lednicer_format:
-            x_up_surf = []
-            y_up_surf = []
-            x_lo_surf = []
-            y_lo_surf = []
-
-            # Loop through each value: append to each column
-            upper_surface_flag = True
-            for line_count, line in enumerate(data_block):
-                #check for blank line which signifies the upper/lower surface division
-                line_check = data_block[line_count].strip()
-                if line_check == '':
-                    upper_surface_flag = False
+        # 2. Format Detection
+        # Lednicer files uniquely define the number of upper/lower points in the header
+        # (e.g., "30.0  30.0" or "30  30")
+        for i, line in enumerate(lines[:5]):
+            parts = line.replace(',', ' ').split()
+            if len(parts) == 2:
+                try:
+                    val1, val2 = float(parts[0]), float(parts[1])
+                    # If both are > 1.5, it's a point count, not an x-coordinate
+                    if val1 > 1.5 and val2 > 1.5:
+                        is_lednicer = True
+                        n_up, n_lo = int(val1), int(val2)
+                        data_start_idx = i + 1
+                        break
+                except ValueError:
                     continue
-                if upper_surface_flag:
-                    x_up_surf.append(float(data_block[line_count].strip().split()[0]))
-                    y_up_surf.append(float(data_block[line_count].strip().split()[1]))
-                else:
-                    x_lo_surf.append(float(data_block[line_count].strip().split()[0]))
-                    y_lo_surf.append(float(data_block[line_count].strip().split()[1]))
+
+        # If it's not Lednicer, it's Selig. Find the first line that is numeric coordinates.
+        if not is_lednicer:
+            for i, line in enumerate(lines):
+                parts = line.replace(',', ' ').split()
+                if len(parts) >= 2:
+                    try:
+                        float(parts[0]), float(parts[1])
+                        data_start_idx = i
+                        break
+                    except ValueError:
+                        continue
+
+        # 3. Extract Raw Coordinates
+        raw_coords = []
+        for line in lines[data_start_idx:]:
+            parts = line.replace(',', ' ').split()
+            if len(parts) >= 2:
+                try:
+                    raw_coords.append([float(parts[0]), float(parts[1])])
+                except ValueError:
+                    continue
+
+        raw_coords = np.array(raw_coords)
+        x_raw, y_raw = raw_coords[:, 0], raw_coords[:, 1]
+
+        # 4. Surface Splitting & Orientation (Force LE -> TE)
+        if is_lednicer:
+            # Lednicer: Upper first, then Lower. Both inherently LE -> TE.
+            x_up, y_up = x_raw[:n_up], y_raw[:n_up]
+            x_lo, y_lo = x_raw[n_up:n_up + n_lo], y_raw[n_up:n_up + n_lo]
 
         else:
-            x_up_surf_rev  = []
-            y_up_surf_rev  = []
-            x_lo_surf      = []
-            y_lo_surf      = []
+            # Selig: TE -> Upper -> LE -> Lower -> TE
+            le_idx = np.argmin(x_raw)
 
-            # Loop through each value: append to each column
-            upper_surface_flag = True
-            for line_count, line in enumerate(data_block):
-                #check for line which starts with 0., which should be the split between upper and lower in selig
-                line_check = data_block[line_count].strip()
+            x_up, y_up = x_raw[:le_idx + 1], y_raw[:le_idx + 1]
+            x_lo, y_lo = x_raw[le_idx:], y_raw[le_idx:]
 
-                # Remove any commas
-                line_check = line_check.replace(',','')
+            # Reverse upper to make it LE -> TE
+            x_up, y_up = x_up[::-1], y_up[::-1]
 
-                if float(line_check.split()[0]) == 0.:
-                    x_up_surf_rev.append(float(data_block[line_count].strip().replace(',','').split()[0]))
-                    y_up_surf_rev.append(float(data_block[line_count].strip().replace(',','').split()[1]))
+        # 5. Clean Duplicates and Enforce Strict Monotonicity for Interpolation
+        def make_monotonic(x, y):
+            # Finds unique X values and sorts them. (Since they go LE->TE, sorting is safe)
+            x_unique, idx = np.unique(x, return_index=True)
+            return x_unique, y[idx]
 
-                    x_lo_surf.append(float(data_block[line_count].strip().replace(',','').split()[0]))
-                    y_lo_surf.append(float(data_block[line_count].strip().replace(',','').split()[1]))
+        x_up_clean, y_up_clean = make_monotonic(x_up, y_up)
+        x_lo_clean, y_lo_clean = make_monotonic(x_lo, y_lo)
 
-                    upper_surface_flag = False
-                    continue
+        # 6. Create Common X-Grid (Cosine Spacing for clustering at LE/TE)
+        beta = np.linspace(0, np.pi, n_pts)
+        common_x = 0.5 * (1.0 - np.cos(beta))
 
-                if upper_surface_flag:
-                    x_up_surf_rev.append(float(data_block[line_count].strip().replace(',','').split()[0]))
-                    y_up_surf_rev.append(float(data_block[line_count].strip().replace(',','').split()[1]))
-                else:
-                    x_lo_surf.append(float(data_block[line_count].strip().replace(',','').split()[0]))
-                    y_lo_surf.append(float(data_block[line_count].strip().replace(',','').split()[1]))
+        # 7. Interpolate onto the Common Grid
+        # We use PCHIP (Shape-preserving piecewise cubic) because standard cubic splines
+        # tend to wildly overshoot and create "wiggles" near the blunt leading edge.
+        y_up_interp = PchipInterpolator(x_up_clean, y_up_clean)(common_x)
+        y_lo_interp = PchipInterpolator(x_lo_clean, y_lo_clean)(common_x)
 
+        # Force LE to exactly (0, 0) and TE to exactly (1, y)
+        y_up_interp[0], y_lo_interp[0] = 0.0, 0.0
+        common_x[0], common_x[-1] = 0.0, 1.0
 
-                if upper_surface_flag ==True:
-                    # check if next line flips without x-coordinate going to 0
-                    next_line  = data_block[line_count+1].strip()
-                    next_line  = next_line.replace(',','')
+        # 8. Calculate Aerodynamic Properties
+        camber = (y_up_interp + y_lo_interp) / 2.0
+        thickness = y_up_interp - y_lo_interp
+        max_t = np.max(thickness)
+        t_c = max_t / 1.0
 
-                    if next_line.split()[0]>line_check.split()[0] and float(next_line.split()[0]) >0.:
-                        upper_surface_flag = False
+        # 9. Reconstruct the continuous loop for standard plotting (TE -> LE -> TE)
+        x_loop = np.concatenate((common_x[::-1], common_x[1:]))
+        y_loop = np.concatenate((y_up_interp[::-1], y_lo_interp[1:]))
 
-            # Upper surface values in Selig format are reversed from Lednicer format, so fix that
-            x_up_surf_rev.reverse()
-            y_up_surf_rev.reverse()
-
-            x_up_surf = x_up_surf_rev
-            y_up_surf = y_up_surf_rev
-
-        x_up_surf = jnp.array(x_up_surf)
-        x_lo_surf = jnp.array(x_lo_surf)
-        y_up_surf = jnp.array(y_up_surf)
-        y_lo_surf = jnp.array(y_lo_surf)
-
-        # Check for extra zeros (OpenVSP exports extra zeros)
-        if len(jnp.unique(x_up_surf))!=len(x_up_surf):
-            x_up_surf = x_up_surf[1:]
-            x_lo_surf = x_lo_surf[1:]
-            y_up_surf = y_up_surf[1:]
-            y_lo_surf = y_lo_surf[1:]
-
-        # create custom spacing for more points and leading and trailing edge
-        t            = jnp.linspace(0, 4, n_pts - 1)
-        delta        = 0.25
-        A            = 5
-        f            = 0.25
-        smoothsq     = 5 + (2*A/jnp.pi) *jnp.arctan(jnp.sin(2*jnp.pi*t*f + jnp.pi/2)/delta)
-        dim_spacing  = jnp.append(0,jnp.cumsum(smoothsq)/sum(smoothsq))
-
-        # compute thickness, camber and concatenate coodinates
-        x_data        = jnp.hstack((x_lo_surf[::-1], x_up_surf[1:]))
-        y_data        = jnp.hstack((y_lo_surf[::-1], y_up_surf[1:]))
-        tck, u        = interpolate.splprep([x_data,y_data], k=3, s=0)
-        out           = interpolate.splev(dim_spacing, tck)
-        x_data        = jnp.array(out[0])
-        y_data        = jnp.array(out[1])
-
-        # shift points to leading edge (x = 0, y = 0)
-        x_delta  = min(x_data)
-        x_data   = x_data - x_delta
-
-        arg_min  = jnp.argmin(x_data)
-        y_delta  = y_data[arg_min]
-        y_data   = y_data - y_delta
-
-        if (x_data[arg_min] == 0) and (y_data[arg_min]  == 0):
-            x_data = x_data.at[arg_min].set(0)
-            y_data = y_data.at[arg_min].set(0)
-
-        # make sure points start and end at x = 1.0
-        x_data = x_data.at[0].set(1.0)
-        x_data = x_data.at[-1].set(1.0)
-
-        # make sure a small gap at trailing edge
-        if (y_data[0] == y_data[-1]):
-            y_data = y_data.at[0].set(y_data[0]  - 1E-4)
-            y_data = y_data.at[-1].set(y_data[-1] + 1E-4)
-
-        half_npoints = n_pts//2
-
-        # thickness and camber distributions require equal points
-        x_up_surf_old  = jnp.array(x_up_surf)
-        arrx_up_interp = interpolate.interp1d(jnp.arange(x_up_surf_old.size), x_up_surf_old, kind=interpolation)
-        x_up_surf_new  = arrx_up_interp(jnp.linspace(0, x_up_surf_old.size-1, half_npoints))
-
-        x_lo_surf_old  = jnp.array(x_lo_surf)
-        arrx_lo_interp = interpolate.interp1d(jnp.arange(x_lo_surf_old.size), x_lo_surf_old, kind=interpolation)
-        x_lo_surf_new  = arrx_lo_interp(jnp.linspace(0, x_lo_surf_old.size-1, half_npoints))
-
-        # y coordinate s
-        y_up_surf_old  = jnp.array(y_up_surf)
-        arry_up_interp = interpolate.interp1d(jnp.arange(y_up_surf_old.size), y_up_surf_old, kind=interpolation)
-        y_up_surf_new  = arry_up_interp(jnp.linspace(0, y_up_surf_old.size-1, half_npoints))
-
-        y_lo_surf_old  = jnp.array(y_lo_surf)
-        arry_lo_interp = interpolate.interp1d(jnp.arange(y_lo_surf_old.size), y_lo_surf_old, kind=interpolation)
-        y_lo_surf_new  = arry_lo_interp(jnp.linspace(0, y_lo_surf_old.size-1, half_npoints))
-
-        # compute thickness, camber and concatenate coodinates
-        thickness      = y_up_surf_new - y_lo_surf_new
-        camber         = y_lo_surf_new + thickness/2
-        max_t          = jnp.max(thickness)
-        max_c          = max(x_data) - min(x_data)
-        t_c            = max_t/max_c
-
+        # 10. Cast back to JAX arrays and return the initialized class
         return cls(
-            tag=Path(file_path).stem,
-            camber=camber,
-            max_thickness=max_t,
-            thickness_to_chord=t_c,
-            coordinates=jnp.vstack((x_data, y_data)).T,
-            x_coordinates=x_data,
-            y_coordinates=y_data,
-            x_upper_surface=x_up_surf_new,
-            x_lower_surface=x_lo_surf_new,
-            y_upper_surface=y_up_surf_new,
-            y_lower_surface=y_lo_surf_new
+            tag=file_path.stem,
+            camber=jnp.array(camber),
+            max_thickness=float(max_t),
+            thickness_to_chord=float(t_c),
+            coordinates=jnp.column_stack((jnp.array(x_loop), jnp.array(y_loop))),
+            x_coordinates=jnp.array(x_loop),
+            y_coordinates=jnp.array(y_loop),
+            x_upper_surface=jnp.array(common_x),
+            x_lower_surface=jnp.array(common_x),
+            y_upper_surface=jnp.array(y_up_interp),
+            y_lower_surface=jnp.array(y_lo_interp)
         )
