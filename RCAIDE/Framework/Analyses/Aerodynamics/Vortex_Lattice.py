@@ -8,7 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Iterable
 
 # package imports
 import equinox as eqx
@@ -100,13 +100,13 @@ class VLMVortices(eqx.Module):
     verbose:                    bool = eqx.field(static=True, default=False)
     
     # Discretization Inputs (Optional, so the user can choose which to define)
-    spanwise_vortices:    int = eqx.field(static=True, default=5)
-    chordwise_vortices:   int = eqx.field(static=True, default=2)
+    spanwise_vortices:    Optional[Iterable[int] | int] = eqx.field(static=True, default=5)
+    chordwise_vortices:   Optional[Iterable[int] | int] = eqx.field(static=True, default=2)
     
-    wing_spanwise_vortices:         Optional[int] = eqx.field(static=True, default=None)
-    wing_chordwise_vortices:        Optional[int] = eqx.field(static=True, default=None)
-    fuselage_spanwise_vortices:     Optional[int] = eqx.field(static=True, default=None)
-    fuselage_chordwise_vortices:    Optional[int] = eqx.field(static=True, default=None)
+    wing_spanwise_vortices:         Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
+    wing_chordwise_vortices:        Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
+    fuselage_spanwise_vortices:     Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
+    fuselage_chordwise_vortices:    Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
 
     def __post_init__(self):
         """Validates discretization inputs and resolves global vs separate routing."""

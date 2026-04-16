@@ -8,6 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import jax
 import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
@@ -52,5 +54,7 @@ def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settin
     wind_forces = wind_forces.at[:, 0].set(F_X.flatten())
 
     state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, wind_forces)
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_apply_forces.prof")
 
     return state, system, settings

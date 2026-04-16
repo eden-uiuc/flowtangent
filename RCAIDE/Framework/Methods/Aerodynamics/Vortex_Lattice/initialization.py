@@ -8,6 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import jax
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -110,4 +112,7 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
         system, 
         (new_ref_geom, initial_analysis_data)
     )
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_initialize_geometry.prof")
+
     return state, updated_system, settings

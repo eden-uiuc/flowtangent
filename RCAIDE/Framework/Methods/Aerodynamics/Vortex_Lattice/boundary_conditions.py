@@ -8,6 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import jax
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -98,5 +100,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_boundary_conditions.prof")
     
     return state, updated_system, settings

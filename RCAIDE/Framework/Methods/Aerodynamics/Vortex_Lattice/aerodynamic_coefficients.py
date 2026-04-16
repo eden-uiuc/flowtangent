@@ -154,7 +154,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # VORLAX LE Suction
     # ------------------------------------------------------------------
     if settings.analysis.aerodynamics.VORLAX_empirical_corrections:
-        EW_masked = EW.squeeze(1) * le_mask_float[None, :, None]
+        EW_masked = EW * le_mask_float[None, :, None]
 
         # Add the trailing None to broadcast across the 3 velocity components
         v_total_masked = v_total * le_mask_float[None, :, None]
@@ -345,5 +345,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.pitch, state, CM[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.roll,  state, Cl_roll[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.yaw,   state, Cn_yaw[:, None])
-    
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_compute_coefficients.prof")
+
     return state, system, settings

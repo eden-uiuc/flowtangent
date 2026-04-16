@@ -201,8 +201,8 @@ def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
 
     vortices = VLMVortices(
         spanwise_cosine_spacing=False,
-        spanwise_vortices=26,
-        chordwise_vortices=12
+        spanwise_vortices=(26, 5, 5),
+        chordwise_vortices=(12, 3, 3)
     )
     aero_settings = VLMSettings(vortices=vortices)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
@@ -226,6 +226,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
     CM = final_state.aerodynamics.coefficients.moments.pitch.item(0)
 
     return alpha, CL, CD, CM, analysis_data
+
 
 
 def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0, span=10.0, chord=1.0):
@@ -259,6 +260,7 @@ if __name__ == "__main__":
     AVL_basic_test(geometry_file, oper_mode="st")
 
     alpha, CL, CD, CM, data = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, debug_mode=True)
+
     print(f"\n--- Extracted VORJAX Results ---")
     print(f"Alpha: {alpha}")
     print(f"CL: {CL:.5f}")

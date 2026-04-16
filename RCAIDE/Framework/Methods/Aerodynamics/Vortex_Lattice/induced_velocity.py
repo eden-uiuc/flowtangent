@@ -113,7 +113,7 @@ def supersonic_in_plane(RAD1, RAD2, Y1, Y2, TOL, XTY, CPI):
 
 @jax.jit
 def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, TOLSQ2, X1, Y1, X2, Y2, RTV1, RTV2,
-                         CHORD, RNMAX, TE_ind, LE_ind):
+                         CHORD, RNMAX, sonic_mask, recv_idx):
     """
     Pure JAX translation of the VORLAX supersonic Biot-Savart induction.
 
@@ -176,42 +176,37 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
     W = jnp.where(in_plane, W_in, W)
 
     # WWAVE: Principal Part of the Integral (Self-Influence / Wave Drag)
-    N = U.shape[2]
-    # We only need the diagonal terms for self-influence
+    N = U.shape[1]
     COX = CHORD / RNMAX
-    WWAVE_cond = B2.squeeze(1) > T2
+    T2 = T ** 2
 
-    # Calculate the 1D diagonal array (shape: n_time, N)
-    WWAVE_diag = jnp.where(
+    WWAVE_cond = B2 > T2[None, :]
+
+    # Calculate WWAVE for all senders (Shape: n_time, N)
+    WWAVE_val = jnp.where(
         WWAVE_cond,
-        -0.5 * jnp.sqrt(jnp.maximum(B2.squeeze(1) - T2, 0.0)) / jnp.maximum(COX, 1e-12),
+        -0.5 * jnp.sqrt(jnp.maximum(B2 - T2[None, :], 0.0)) / jnp.maximum(COX, 1e-12),
         0.0
     )
-    # Project the 1D array into a 3D diagonal matrix (n_time, N, N)
-    WWAVE_matrix = jax.vmap(jnp.diag)(WWAVE_diag)
-    W = W + WWAVE_matrix
 
-    # Sonic Vortex Smoothing
-    T2S = T2[0, :]  # Shape (N,)
-    T2F = jnp.where(TE_ind, 0.0, jnp.roll(T2S, shift=-1))
-    T2A = jnp.where(LE_ind, 0.0, jnp.roll(T2S, shift=1))
+    # Create a boolean mask for the diagonal element of this specific row
+    j_indices = jnp.arange(N)
+    is_diag = (j_indices == recv_idx)[None, :]
 
-    TRANS = (B2[:, 0, :] - T2F[None, :]) * (B2[:, 0, :] - T2A[None, :])
-    RFLAG = jnp.where(TRANS < 0, 0, 1)  # Shape (n_time, N)
-    sonic_mask = (TRANS < 0)
+    # Only add the WWAVE value to the element where sender == receiver
+    W = W + jnp.where(is_diag, WWAVE_val, 0.0)
 
-    # Create the base smoothing operator (Laplacian-like stencil)
-    sonic_matrix = (
-        jnp.diag(jnp.full(N, 2.0)) +
-        jnp.diag(jnp.full(N - 1, -1.0), k=-1) +
-        jnp.diag(jnp.full(N - 1, -1.0), k=1)
-    )
-    sonic_matrix_3d = jnp.broadcast_to(sonic_matrix[None, :, :], W.shape)
+    # Build the 1D slice of the Laplacian stencil for THIS receiver row
+    sonic_row = jnp.where(
+        j_indices == recv_idx, 2.0,
+        jnp.where(j_indices == recv_idx - 1, -1.0,
+        jnp.where(j_indices == recv_idx + 1, -1.0, 0.0))
+    )[None, :]
 
-    # Overwrite columns where the sending panel is sonic
-    W = jnp.where(sonic_mask[:, None, :], sonic_matrix_3d, W)
+    # Overwrite the influence of sonic sending panels with the smoothing stencil
+    W = jnp.where(sonic_mask, sonic_row, W)
 
-    return U, V, W, RFLAG
+    return U, V, W
 
 @jax.jit
 def compute_induced_velocity_matrix(VD, mach_array):
@@ -348,10 +343,10 @@ def compute_C_mn(VD, Mach):
     """
 
     # Unpack Vortex Distribution Data ----------------------------------------------------------------------------------
-    vortex_A = VD.bound_vortex_A
-    vortex_B = VD.bound_vortex_B
-    center = VD.bound_vortex_center
-    colloc = VD.collocation_points
+    vortex_A = VD.bound_vortex_A.astype(jnp.float32)
+    vortex_B = VD.bound_vortex_B.astype(jnp.float32)
+    center = VD.bound_vortex_center.astype(jnp.float32)
+    colloc = VD.collocation_points.astype(jnp.float32)
 
     # Local Panel Orientation ------------------------------------------------------------------------------------------
     dy = vortex_B[:, 1] - vortex_A[:, 1]
@@ -366,128 +361,136 @@ def compute_C_mn(VD, Mach):
     dy_vortex = (vortex_B[:, 1] - center[:, 1]) * costheta + (vortex_B[:, 2] - center[:, 2]) * sintheta
 
     # s = local half-span, t = tangent of the sweep angle
-    s = jnp.abs(dy_vortex)[None, :]
-    t = (dx_vortex / jnp.maximum(dy_vortex, 1e-16))[None, :]
+    s = jnp.abs(dy_vortex)
+    t = (dx_vortex / jnp.maximum(dy_vortex, 1e-16))
+    t_sq = t ** 2
 
-    # Broadcasting Distances to (N_colloc, N_vortex) -------------------------------------------------------------------
-    diff = colloc[:, None, :] - center[None, :, :]
+    # Beta-Squared = Mach^2 - 1.0 --------------------------------------------------------------------------------------
+    beta_sq = (Mach.squeeze(1) ** 2 - 1.0).astype(jnp.float32)
+    beta_sq_exp = beta_sq[:, None] if beta_sq.ndim == 1 else beta_sq
+    is_subsonic = beta_sq_exp < 1.0
 
-    # Rotate distances into the panel's local coordinate frame
-    y_dist = diff[:, :, 1] * costheta[None, :] + diff[:, :, 2] * sintheta[None, :]
-    z_dist = -diff[:, :, 1] * sintheta[None, :] + diff[:, :, 2] * costheta[None, :]
+    # Sonic Mask Pre-Calc ----------------------------------------------------------------------------------------------
+    t_sq_fore = jnp.where(VD.is_leading_edge, 0.0, jnp.roll(t_sq, shift=1))
+    t_sq_aft = jnp.where(VD.is_trailing_edge, 0.0, jnp.roll(t_sq, shift=-1))
 
-    x_dist_left   = diff[:, :, 0] + t * s
-    x_dist_right  = diff[:, :, 0] - t * s
-    x_dist_center = diff[:, :, 0] - t * y_dist
+    sonic_check = (beta_sq_exp - t_sq_fore[None, :]) * (beta_sq_exp - t_sq_aft[None, :])
+    sonic_mask = (sonic_check < 0)
 
-    y_dist_left  = y_dist + s
-    y_dist_right = y_dist - s
+    # Check for singularity (Mach cone passes through panel)
+    singularity_flag = jnp.where(sonic_mask, 0, 1)
+    singularity_flag = jnp.where(is_subsonic, 1, singularity_flag)
 
-    # Broadcast tolerance to (N_colloc, N_vortex) ----------------------------------------------------------------------
-    tol        = s / 500.0        # tolerance for panel crossings
-    tol_sq     = tol ** 2         # tolerance squared
-    tol_sq_scl = 2500.0 * tol_sq  # scaled tolerance squared
+    # C_mn Calculation -------------------------------------------------------------------------------------------------
 
-    # Broadcast Mach conditions to (N_colloc, N_vortex) ----------------------------------------------------------------
-    M = Mach.squeeze(1)[:, None, None]
-    beta_sq = M ** 2 - 1.0
+    tol = s / 500.0
+    tol_sq = tol ** 2
+    tol_sq_scl = 2500.0 * tol_sq
 
-    # Precalculate the Biot-Savart Law components ----------------------------------------------------------------------
-    XSQ1 = (x_dist_left ** 2)[None, :, :]
-    XSQ2 = (x_dist_right ** 2)[None, :, :]
+    # Row-wise vector-mapping to minimize peak memory usage
+    def compute_row(c_pt, ct_R, st_R, recv_idx):
+        dx = c_pt[0] - center[:, 0]
+        dy = c_pt[1] - center[:, 1]
+        dz = c_pt[2] - center[:, 2]
 
-    YSQ1 = (y_dist_left ** 2)[None, :, :]
-    YSQ2 = (y_dist_right ** 2)[None, :, :]
+        y_dist = dy * costheta + dz * sintheta
+        z_dist = -dy * sintheta + dz * costheta
 
-    ZSQ = (z_dist ** 2)[None, :, :]
+        x_dist_left = dx + t * s
+        x_dist_right = dx - t * s
+        x_dist_center = dx - t * y_dist
 
-    RTV1 = YSQ1 + ZSQ
-    RTV2 = YSQ2 + ZSQ
+        y_dist_left = y_dist + s
+        y_dist_right = y_dist - s
 
-    R01 = beta_sq * RTV1
-    R02 = beta_sq * RTV2
+        # Arrays are (N,) instead of (N, N)
+        XSQ1 = x_dist_left ** 2
+        XSQ2 = x_dist_right ** 2
+        YSQ1 = y_dist_left ** 2
+        YSQ2 = y_dist_right ** 2
+        ZSQ = z_dist ** 2
 
-    # Subsonic Biot-Savart Law -----------------------------------------------------------------------------------------
-    U_sub, V_sub, W_sub = subsonic_induction(
-        XSQ1=XSQ1,
-        XSQ2=XSQ2,
-        XTY=x_dist_center[None, :, :],
-        X1=x_dist_left[None, :, :],
-        X2=x_dist_right[None, :, :],
-        Y1=y_dist_left[None, :, :],
-        Y2=y_dist_right[None, :, :],
-        Z=z_dist[None, :, :],
-        ZSQ=ZSQ,
-        RTV1=RTV1,
-        RTV2=RTV2,
-        RO1=R01,
-        RO2=R02,
-        T=t,
-        B2=beta_sq[None, :, :],
-        TOLSQ=tol_sq
-    )
+        RTV1 = YSQ1 + ZSQ
+        RTV2 = YSQ2 + ZSQ
 
-    # Supersonic Biot-Savart Law ---------------------------------------------------------------------------------------
-    U_sup, V_sup, W_sup, RFLAG = supersonic_induction(
-        XSQ1=XSQ1,
-        XSQ2=XSQ2,
-        XTY=x_dist_center[None, :, :],
-        X1=x_dist_left[None, :, :],
-        X2=x_dist_right[None, :, :],
-        Y1=y_dist_left[None, :, :],
-        Y2=y_dist_right[None, :, :],
-        Z=z_dist[None, :, :],
-        ZSQ=ZSQ,
-        RTV1=RTV1,
-        RTV2=RTV2,
-        RO1=R01,
-        RO2=R02,
-        T=t,
-        B2=beta_sq,
-        TOL=tol,
-        TOLSQ=tol_sq,
-        TOLSQ2=tol_sq_scl,
-        CHORD=VD.chord_lengths,
-        RNMAX=VD.panels_per_strip,
-        LE_ind=VD.is_leading_edge,
-        TE_ind=VD.is_trailing_edge
-    )
+        # Broadcast the Mach/Time dimension here: (n_time, 1) * (N,) -> (n_time, N)
+        R01 = beta_sq * RTV1[None, :]
+        R02 = beta_sq * RTV2[None, :]
 
-    # Downwash Calculation ---------------------------------------------------------------------------------------------
+        # --- Subsonic Kernel ---
+        U_sub, V_sub, W_sub = subsonic_induction(
+            XSQ1=XSQ1,
+            XSQ2=XSQ2,
+            XTY=x_dist_center,
+            X1=x_dist_left,
+            X2=x_dist_right,
+            Y1=y_dist_left,
+            Y2=y_dist_right,
+            Z=z_dist,
+            ZSQ=ZSQ,
+            RTV1=RTV1,
+            RTV2=RTV2,
+            RO1=R01,
+            RO2=R02,
+            T=t,
+            B2=beta_sq,
+            TOLSQ=tol_sq,
+        )
 
-    # Blend subsonic and supersonic results
-    is_subsonic = beta_sq < 1.0
+        # --- Supersonic Kernel ---
+        U_sup, V_sup, W_sup = supersonic_induction(
+            XSQ1=XSQ1,
+            XSQ2=XSQ2,
+            XTY=x_dist_center,
+            X1=x_dist_left,
+            X2=x_dist_right,
+            Y1=y_dist_left,
+            Y2=y_dist_right,
+            Z=z_dist,
+            ZSQ=ZSQ,
+            RTV1=RTV1,
+            RTV2=RTV2,
+            RO1=R01,
+            RO2=R02,
+            T=t,
+            B2=beta_sq,
+            TOL=tol,
+            TOLSQ=tol_sq,
+            TOLSQ2=tol_sq_scl,
+            CHORD=VD.chord_lengths,
+            RNMAX=VD.panels_per_strip,
+            sonic_mask=sonic_mask,
+            recv_idx=recv_idx
+        )
 
-    U_ind = jnp.where(is_subsonic, U_sub, U_sup)
-    V_ind = jnp.where(is_subsonic, V_sub, V_sup)
-    W_ind = jnp.where(is_subsonic, W_sub, W_sup)
+        # --- Blending ---
+        U_ind = jnp.where(is_subsonic, U_sub, U_sup)
+        V_ind = jnp.where(is_subsonic, V_sub, V_sup)
+        W_ind = jnp.where(is_subsonic, W_sub, W_sup)
 
-    # Set RFLAG to 1 for all subsonic results
-    RFLAG = jnp.where(is_subsonic[:, :, 0], 1, RFLAG)
+        # --- EW Calculation ---
+        # Note: ct_S and st_S are just the global 'costheta' and 'sintheta' arrays
+        COS_RS = ct_R * costheta + st_R * sintheta
+        SIN_RS = st_R * costheta - ct_R * sintheta
 
-    # Local panel downwash using receiver/sender dihedral
-    ct_R = costheta[:, None]
-    ct_S = costheta[None, :]
-    st_R = sintheta[:, None]
-    st_S = sintheta[None, :]
+        EW_row = W_ind * COS_RS[None, :] - V_ind * SIN_RS[None, :]
 
-    COS_RS = (ct_R * ct_S + st_R * st_S)[None, :, :]  # cos(D_receiver - D_sender)
-    SIN_RS = (st_R * ct_S - ct_R * st_S)[None, :, :]  # sin(D_receiver - D_sender)
+        # --- Rotate to Global Frame ---
+        C_mn_row = jnp.stack([
+            U_ind,
+            V_ind * costheta[None, :] - W_ind * sintheta[None, :],
+            V_ind * sintheta[None, :] + W_ind * costheta[None, :]
+        ], axis=-1)
 
-    EW = W_ind * COS_RS - V_ind * SIN_RS  # Local panel downwash projected onto the receiver panel
+        # Return the tuple!
+        return C_mn_row, EW_row
 
-    # Influence Matrix Calculation -------------------------------------------------------------------------------------
+    C_mn_mapped, EW_mapped = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
 
-    # Rotate back into Global Vehicle Frame for C_mn
-    # U, V, W are currently in the Sender's local swept coordinate system.
-    # We rotate them back using the Sender's angle (axis 1)
-    C_mn = jnp.stack([
-        U_ind,
-        V_ind * ct_S[None, :, :] - W_ind * st_S[None, :, :],
-        V_ind * st_S[None, :, :] + W_ind * ct_S[None, :, :]
-    ], axis=-1)
+    C_mn = jnp.swapaxes(C_mn_mapped, 0, 1)
+    EW = jnp.swapaxes(EW_mapped, 0, 1)
 
-    return C_mn, RFLAG, EW
+    return C_mn.astype(jnp.float64), singularity_flag, EW
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -509,14 +512,16 @@ def compute_induced_velocity(state: "State", system: "System", settings: "Settin
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
     
-    C_mn, RFLAG, EW = compute_C_mn(VD, Mach)
+    C_mn, singularity_flag, EW = compute_C_mn(VD, Mach)
     
     updated_analysis_data = system.analysis_data | {
         "AICs": C_mn,
-        "singularities": RFLAG,
+        "singularities": singularity_flag,
         "VORLAX_EW_matrix": EW
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_induced_velocity.prof")
     
     return state, updated_system, settings

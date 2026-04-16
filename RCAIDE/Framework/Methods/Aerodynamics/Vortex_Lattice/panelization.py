@@ -456,6 +456,7 @@ def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine
     
     return eta_vertices, interval_mapping
 
+
 def generate_chordwise_coordinates(le_cut: float, te_cut: float, n_cw: int, cosine_spacing: bool = False) -> jnp.ndarray:
     """
     Generates piecewise chordwise coordinates (0.0 to 1.0) for a single strip.
@@ -550,6 +551,7 @@ def calculate_macro_properties(wing, eta_vertices: jnp.ndarray, semispan: float)
 
     return strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist
 
+
 def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist):
     """
     Morphs the non-dimensional topological grid into a 3D VLM panel mesh.
@@ -629,7 +631,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
     # Pre-Processing ---------------------------------------------------------------------------------------------------
 
     # Unpacking 
-    vlm_settings: VLMSettings = settings.analysis.aerodynamics #type: ignore
+    vlm_settings: VLMSettings = settings.analysis.aerodynamics  # type: ignore
     updated_system = system
     VD_list = []
         
@@ -646,21 +648,24 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
                 if len(segment.control_surfaces) > 0:
                     raise ValueError(f"Found control surfaces on segment '{segment.tag}' of wing '{wing.tag}'. \
                                      Control surfaces must be attributes of the wing itself.")
-    
 
         # Non-Dimensional Panelization ---------------------------------------------------------------------------------
         
         interval_data, strip_interval_map = find_intervals(wing)
         
-        n_sw = vlm_settings.vortices.wing_spanwise_vortices
-        n_cw = vlm_settings.vortices.wing_chordwise_vortices
+        try:
+            n_sw = vlm_settings.vortices.wing_spanwise_vortices[wing_idx]
+            n_cw = vlm_settings.vortices.wing_chordwise_vortices[wing_idx]
+        except TypeError:
+            n_sw = vlm_settings.vortices.wing_spanwise_vortices
+            n_cw = vlm_settings.vortices.wing_chordwise_vortices
         
-        if len(interval_data) > n_sw or n_cw < 3: # type: ignore
+        if len(interval_data) > n_sw or n_cw < 3:  # type: ignore
             warnings.warn(
                 f"Specified number of wing vortices ({n_sw}, {n_cw}) "
                 f"is less than the required spanwise breaks ({len(interval_data)}, 3). "
                 f"Increasing number of wing spanwise vortices to prevent mesh collapse."
-            ) # Handled in generation functions below
+            )  # Handled in generation functions below
         
         # Calculate strip eta (non-dimensional y-coordinate) (Shape: (n_sw +1,))
         eta, strip_interval_map = generate_spanwise_coordinates(
@@ -689,7 +694,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         panel_cs_id = jnp.where(
             xi_mid > strip_te_cuts[:, None],
             strip_te_ids[:, None],
-            panel_cs_id) # If xi > TE cut, assign local TE CS ID
+            panel_cs_id)  # If xi > TE cut, assign local TE CS ID
         
 
         # Geometric Corrections ----------------------------------------------------------------------------------------
@@ -707,7 +712,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         seg_camber_z = jnp.stack([
             seg.airfoil.camber if getattr(seg, 'airfoil', None) else flat_z 
             for seg in wing.segments
-        ]) # type: ignore
+        ])  # type: ignore
 
         strip_camber_x = seg_camber_x[strip_interval_map]
         strip_camber_z = seg_camber_z[strip_interval_map]
@@ -743,7 +748,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
             panel_vertices=flat_vertices,
             camber_slopes=camber_slopes.reshape(-1),
             surface_id=jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32),
-            control_surface_id=panel_cs_id,
+            control_surface_id=panel_cs_id.reshape(-1),
             is_leading_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1),
             is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
         )
@@ -760,6 +765,8 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
     updated_analysis_data = system.analysis_data | {"vortex_distribution": full_VD}
         
     updated_system  = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_discretize_wings.prof")
 
     return state, updated_system, settings
 

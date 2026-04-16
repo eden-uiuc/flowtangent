@@ -8,6 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import jax
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -46,10 +48,10 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     RHS = analysis["boundary_conditions"]
     
     # RFLAG shape: (n_time, receiver_N)
-    RFLAG = analysis["singularities"]
+    singularity_flag = analysis["singularities"]
     
     # Zero out the RHS for supersonic panels swept parallel to the Mach cone
-    RHS = RHS * RFLAG
+    RHS = RHS * singularity_flag
     
     # Build the 'A' matrix via Dot Product: sum(C_mn * n)
     # The normal vector belongs to the RECEIVING panel (dim 1). 
@@ -58,7 +60,7 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     normals_broadcast = VD.normal_vectors[None, :, None, :]
     
     # A shape: (n_time, receiver_N, sender_N)
-    A = jnp.sum(C_mn * normals_broadcast, axis=-1).squeeze(1)
+    A = jnp.sum(C_mn * normals_broadcast, axis=-1)
     
     # Solve the linear system
     # A is (n_time, N, N), RHS is (n_time, N)
@@ -66,10 +68,10 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     GAMMA = jnp.linalg.solve(A, RHS[..., None]).squeeze(-1)
     
     # Pack the results
-    updated_analysis_data = analysis | {
-        "vortex_strengths": GAMMA
-    }
+    updated_analysis_data = analysis | {"vortex_strengths": GAMMA}
     
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
+
+    jax.profiler.save_device_memory_profile("vorjax_memory_vortex_strength.prof")
     
     return state, updated_system, settings

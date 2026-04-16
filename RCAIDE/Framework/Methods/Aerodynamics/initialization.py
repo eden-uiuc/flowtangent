@@ -75,4 +75,6 @@ def expand_component_coefficients(
 
     updated_state = eqx.tree_at(lambda s: s.aerodynamics, state, updated_aero)
 
+    jax.profiler.save_device_memory_profile("vorjax_memory_expand_components.prof")
+
     return updated_state, system, settings
