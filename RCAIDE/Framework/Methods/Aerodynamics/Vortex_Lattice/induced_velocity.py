@@ -181,11 +181,12 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
     T2 = T ** 2
 
     WWAVE_cond = B2 > T2[None, :]
+    WWAVE_output = -0.5 * jnp.sqrt(jnp.where(WWAVE_cond, B2 - T2[None, :], 1.0)) / jnp.maximum(COX, 1e-12)
 
     # Calculate WWAVE for all senders (Shape: n_time, N)
     WWAVE_val = jnp.where(
         WWAVE_cond,
-        -0.5 * jnp.sqrt(jnp.maximum(B2 - T2[None, :], 0.0)) / jnp.maximum(COX, 1e-12),
+        WWAVE_output,
         0.0
     )
 
@@ -521,7 +522,5 @@ def compute_induced_velocity(state: "State", system: "System", settings: "Settin
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
-
-    jax.profiler.save_device_memory_profile("vorjax_memory_induced_velocity.prof")
     
     return state, updated_system, settings

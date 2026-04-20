@@ -8,7 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Process import Process, ProcessStep
+from .Process import Process, ProcessStep, GradientMap
 
 from .State import State
 from .Settings import Settings
