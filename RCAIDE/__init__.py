@@ -8,7 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .utils import inputs, outputs
+import utils
 
 from . import Library
 from . import Framework

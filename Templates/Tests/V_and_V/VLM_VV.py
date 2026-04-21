@@ -288,6 +288,7 @@ if __name__ == "__main__":
     print(f"CL: {CL:.5f}")
     print(f"CD: {CD:.5f}")
     print(f"CM: {CM:.5f}")
+    print(f"Jac: {jac}")
 
 
     # 3. Plot the Vortex Distribution

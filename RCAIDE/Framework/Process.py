@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Self, TYPE_CHECKING, Generator, Tuple
+from typing import TYPE_CHECKING, Optional, Callable, Self, Generator, Tuple
 from functools import reduce
 
 import re
@@ -20,65 +20,22 @@ import jax.numpy as jnp
 import equinox as eqx
 import networkx as nx
 
+import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
+
 from jax.flatten_util import ravel_pytree
 
 # RCAIDE imports
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  Helper Functions
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-def null_step(*args):
-    return args
-
-def get_target(obj, path_tuple):
-    for key in path_tuple:
-        if isinstance(obj, dict):
-            obj = obj[key]
-        else:
-            obj = getattr(obj, key)
-    return obj
-
-def get_all_targets(s, input_map):
-    return tuple(get_target(s, path) for path in input_map)
-
-def compute_tree_delta(old_tree, new_tree):
-    """Find changes between two identically structured PyTrees."""
-    old_leaves, _ = jax.tree_util.tree_flatten(old_tree)
-    new_leaves, _ = jax.tree_util.tree_flatten(new_tree)
-
-    changed_indices = []
-    changed_leaves = []
-
-    for i, (old, new) in enumerate(zip(old_leaves, new_leaves)):
-        # Handle unchanged leaves
-        if old is new: continue
-        if isinstance(old, jnp.ndarray) and isinstance(new, jnp.ndarray):
-            if old.shape == new.shape and jnp.all(old == new): continue
-
-        changed_indices.append(i)
-        changed_leaves.append(new)
-
-    return changed_indices, changed_leaves
-
-
-def apply_tree_delta(base_tree, delta_indices, delta_leaves):
-    """Reconstructs new tree from base tree and delta."""
-    old_leaves, treedef = jax.tree_util.tree_flatten(base_tree)
-    new_leaves = list(old_leaves)
-    for idx, leaf in zip(delta_indices, delta_leaves):
-        new_leaves[idx] = leaf
-
-    return jax.tree_util.tree_unflatten(treedef, new_leaves)
-
+from RCAIDE.utils import Token, PathTuple
+import RCAIDE.utils as ru
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
 
+def null_step(*args):
+    return args
 
 class ProcessStep(eqx.Module):
 
@@ -113,20 +70,132 @@ class ProcessStep(eqx.Module):
         return getattr(self.function, "_outputs", set())
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Process
+#  Gradient Map
 # ----------------------------------------------------------------------------------------------------------------------
 
+class GradientMap:
+    
+    def __init__(
+        self,
+        state_inputs: PathTuple = PathTuple(),
+        state_outputs: PathTuple = PathTuple(),
+        system_inputs: PathTuple = PathTuple(),
+        system_outputs: PathTuple = PathTuple(),
+        settings_inputs: PathTuple = PathTuple(),
+        settings_outputs: PathTuple = PathTuple(),
+    ):
+        
+        self.state_inputs     = state_inputs
+        self.system_inputs    = system_inputs
+        self.settings_inputs  = settings_inputs
 
-class GradientMap(eqx.Module):
-    state_inputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
-    state_outputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
+        self._n_st = len(self.state_inputs)
+        self._n_sys = len(self.system_inputs)
+        self._n_setts = len(self.settings_inputs)
+        
+        self.state_outputs    = state_outputs
+        self.system_outputs   = system_outputs
+        self.settings_outputs = settings_outputs
 
-    system_inputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
-    system_outputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
+        self.unravel_function = null_step  # Default, updates when inputs are grabbed
+        
+    def flatten_inputs(
+            self,
+            base_state: Optional[State] = None,
+            base_system: Optional[System] = None,
+            base_settings: Optional[Settings] =  None,
+        ):
 
-    settings_inputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
-    settings_outputs: tuple[tuple[str, ...], ...] = eqx.field(static=True, default_factory=tuple)
+            inputs = []
+            if len(self.state_inputs) > 0:
+                inputs.extend(ru.get_all_targets(base_state, self.state_inputs))
+            if len(self.system_inputs) > 0:
+                inputs.extend(ru.get_all_targets(base_system, self.system_inputs))
+            if len(self.settings_inputs) > 0:
+                inputs.extend(ru.get_all_targets(base_settings, self.settings_inputs))
 
+            # Flatten inputs for Jacobian calculation
+            flat_input_arrays, self.unravel_function = ravel_pytree(inputs)
+
+            return flat_input_arrays
+    
+    def update_inputs(
+            self,
+            input_array,
+            base_state: Optional[State] = None,
+            base_system: Optional[System] = None,
+            base_settings: Optional[Settings] =  None,
+        ):
+
+        st, sys, setts = base_state, base_system, base_settings
+
+        reshaped_inputs = self.unravel_function(input_array)
+
+        def stitch_parents(base_tree, paths, new_slices):
+            parents = ru.get_all_parents(base_tree, paths)
+            updated_parents = []
+            
+            for parent, new_val, path in zip(parents, new_slices, paths):
+                if path.slice_obj != slice(None):
+                    # Stitch the updated slice into the original parent array
+                    updated_parents.append(parent.at[path.slice_obj].set(new_val))
+                else:
+                    # No slice, just use the whole new value
+                    updated_parents.append(new_val)
+                    
+            return tuple(updated_parents)
+
+        # Inject flat array of inputs into the PyTrees
+        # (Wrapped in lambdas, and replace inputs cast to tuples, slices stiched back into parents)
+        if self._n_st > 0:
+            st_slices = reshaped_inputs[:self._n_st]
+            updated_st_parents = stitch_parents(st, self.state_inputs, st_slices)
+            
+            st = eqx.tree_at(
+                lambda t: ru.get_all_parents(t, self.state_inputs),
+                st,
+                updated_st_parents
+            )
+
+        if self._n_sys > 0:
+            sys_slices = reshaped_inputs[self._n_st: self._n_st + self._n_sys]
+            updated_sys_parents = stitch_parents(sys, self.system_inputs, sys_slices)
+            
+            sys = eqx.tree_at(
+                lambda t: ru.get_all_parents(t, self.system_inputs), 
+                sys,
+                updated_sys_parents
+            )
+
+        if self._n_setts > 0:
+            setts_slices = reshaped_inputs[self._n_st + self._n_sys:]
+            updated_setts_parents = stitch_parents(setts, self.settings_inputs, setts_slices)
+            
+            setts = eqx.tree_at(
+                lambda t: ru.get_all_parents(t, self.settings_inputs), 
+                setts,
+                updated_setts_parents
+            )
+            
+        return st, sys, setts
+    
+    def flatten_outputs(self, f_st, f_sys, f_setts):
+        outputs = []
+        if self.state_outputs:
+            outputs.extend(ru.get_all_targets(f_st, self.state_outputs))
+        if self.system_outputs:
+            outputs.extend(ru.get_all_targets(f_sys, self.system_outputs))
+        if self.settings_outputs:
+            outputs.extend(ru.get_all_targets(f_setts, self.settings_outputs))
+
+        # Convert the list of output scalar arrays into a single flat 1D array
+        out_array = jnp.concatenate([jnp.atleast_1d(out) for out in outputs])
+
+        return out_array
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Process Class
+# ----------------------------------------------------------------------------------------------------------------------
 
 class Process(ProcessStep):
 
@@ -136,9 +205,12 @@ class Process(ProcessStep):
 
     initial_step:       int                     = eqx.field(static=True, default=0)
 
-    initial_state:        State | None     = None
-    initial_system:       System | None    = None
-    initial_settings:     Settings | None  = None
+    initial_state:      Optional[State]     = None
+    initial_system:     Optional[System]    = None
+    initial_settings:   Optional[Settings]  = None
+
+    _val_and_jac_fn:    Optional[Callable]      = eqx.field(static=True, default=None)
+    _cached_grad_map:   Optional[GradientMap]   = eqx.field(static=True, default=None)
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -187,41 +259,11 @@ class Process(ProcessStep):
 
         return state, system, settings, tuple(history)
 
-    def _build_value_and_jacobian(self, grad_map: GradientMap, track_history: bool, unravel_fn: Callable):
+    def _build_value_and_jacobian(self, grad_map: GradientMap, track_history: bool):
         """Compiles closed-form Jacobian for specified input and output paths."""
 
         def objective_fn(input_array, base_state, base_system, base_settings):
-            st, sys, setts = base_state, base_system, base_settings
-
-            reshaped_inputs = unravel_fn(input_array)
-
-            # 1. Calculate slice indices
-            n_st = len(grad_map.state_inputs)
-            n_sys = len(grad_map.system_inputs)
-            n_setts = len(grad_map.settings_inputs)
-
-            # 2. Inject flat array of inputs into the PyTrees
-            # (Wrapped in lambdas, and replace inputs cast to tuples)
-            if n_st > 0:
-                st = eqx.tree_at(
-                    lambda t: get_all_targets(t, grad_map.state_inputs),
-                    st,
-                    tuple(reshaped_inputs[:n_st])
-                )
-
-            if n_sys > 0:
-                sys = eqx.tree_at(
-                    lambda t: get_all_targets(t, grad_map.system_inputs),
-                    sys,
-                    tuple(reshaped_inputs[n_st: n_st + n_sys])
-                )
-
-            if n_setts > 0:
-                setts = eqx.tree_at(
-                    lambda t: get_all_targets(t, grad_map.settings_inputs),
-                    setts,
-                    tuple(reshaped_inputs[n_st + n_sys: n_st + n_sys + n_setts])
-                )
+            st, sys, setts = grad_map.update_inputs(input_array, base_state, base_system, base_settings)
 
             if track_history:
                 f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(st, sys, setts)
@@ -230,16 +272,8 @@ class Process(ProcessStep):
                 f_st, f_sys, f_setts = self(st, sys, setts)
                 aux = (f_st, f_sys, f_setts, None)
 
-            outputs = []
-            if grad_map.state_outputs:
-                outputs.extend(get_all_targets(f_st, grad_map.state_outputs))
-            if grad_map.system_outputs:
-                outputs.extend(get_all_targets(f_sys, grad_map.system_outputs))
-            if grad_map.settings_outputs:
-                outputs.extend(get_all_targets(f_setts, grad_map.settings_outputs))
-
             # Convert the list of output scalar arrays into a single flat 1D array
-            out_array = jnp.concatenate([jnp.atleast_1d(out) for out in outputs])
+            out_array = grad_map.flatten_outputs(f_st, f_sys, f_setts)
 
             return out_array, aux
 
@@ -260,34 +294,38 @@ class Process(ProcessStep):
 
         return jax.tree_util.tree_map(_to_array, tree)
 
-    def run(self, state, system, settings, track_history: bool=False, grad_map: GradientMap=None):
+    def run(self,
+            state, system, settings,
+            grad_map: Optional[GradientMap]=None,
+            track_history: bool=False) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
 
         # Sanitize inputs (map floats/ints to JAX arrays)
         state = self._sanitize_inputs(state)
         system = self._sanitize_inputs(system)
         settings = self._sanitize_inputs(settings)
 
-        original_state = state
-        original_system = system
-        original_settings = settings
+        # Save original/intial state
+        initial_state = state
+        initial_system = system
+        initial_settings = settings
 
+        # Prep for gradient calcuation/history tracking
         jacobian_matrix = None
         raw_hist = None
 
+        # Grad map acts as flag to get gradients
         if grad_map is not None:
-            inputs = []
-            if grad_map.state_inputs:
-                inputs.extend(get_all_targets(state, grad_map.state_inputs))
-            if grad_map.system_inputs:
-                inputs.extend(get_all_targets(system, grad_map.system_inputs))
-            if grad_map.settings_inputs:
-                inputs.extend(get_all_targets(settings, grad_map.settings_inputs))
 
-            flat_input_arrays, unravel_fn = ravel_pytree(inputs)
+            # Flatten inputs for Jacobian calculation
+            flat_input_array = grad_map.flatten_inputs(state, system, settings)
 
-            val_and_jac_fn = self._build_value_and_jacobian(grad_map, track_history, unravel_fn)
+            # Build Value and Jacobian function only if it doesn't exist or the cached grad_map is outdated
+            if self._val_and_jac_fn is None or self._cached_grad_map != grad_map:
 
-            jacobian_matrix, aux = val_and_jac_fn(flat_input_arrays, state, system, settings)
+                self._val_and_jac_fn = self._build_value_and_jacobian(grad_map, track_history)
+                object.__setattr__(self, '_cached_grad_map', grad_map)
+
+            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings)
             f_st, f_sys, f_setts, raw_hist = aux
 
         else:
@@ -301,9 +339,9 @@ class Process(ProcessStep):
             logged_steps = []
             for i, step in enumerate(self.steps[self.initial_step:]):
                 logged_step = eqx.tree_at(lambda s: (s.state_delta, s.system_delta, s.settings_delta), step,
-                                          (compute_tree_delta(raw_hist[i+1][0], raw_hist[i][0]),
-                                           compute_tree_delta(raw_hist[i+1][1], raw_hist[i][1]),
-                                           compute_tree_delta(raw_hist[i+1][2], raw_hist[i][2])
+                                          (ru.compute_tree_delta(raw_hist[i+1][0], raw_hist[i][0]),
+                                           ru.compute_tree_delta(raw_hist[i+1][1], raw_hist[i][1]),
+                                           ru.compute_tree_delta(raw_hist[i+1][2], raw_hist[i][2])
                                            ))
                 logged_steps.append(logged_step)
 
@@ -316,70 +354,22 @@ class Process(ProcessStep):
                 self,
                 (
                     tuple(logged_steps),
-                    original_state, original_system, original_settings,
-                    compute_tree_delta(state, original_state),
-                    compute_tree_delta(system, original_system),
-                    compute_tree_delta(settings, original_settings)
+                    initial_state, initial_system, initial_settings,
+                    ru.compute_tree_delta(state, initial_state),
+                    ru.compute_tree_delta(system, initial_system),
+                    ru.compute_tree_delta(settings, initial_settings)
                 ),
                 is_leaf=lambda x: x is None
             )
 
+        # Always return final State, System, Settings, optionally return Jacobian matrix and logged Process
         out_vals = (f_st, f_sys, f_setts)
         if jacobian_matrix is not None:
             out_vals += (jacobian_matrix,)
         if logged_process is not None:
             out_vals += (logged_process,)
 
-        return out_vals
-
-
-    def _run_with_history(self, state, system, settings):
-        if settings.DEBUG_MODE: print(f"Beginning Process: '{self.tag}'")
-
-        original_state = state
-        original_system = system
-        original_settings = settings
-
-        logged_steps = []
-
-        for step in self.steps:
-            # 1. Run the step
-            new_state, new_system, new_settings, history = step._run_with_history(state, system, settings)
-            
-            # 2. Record the pre-step (or post-step) conditions into the history
-            if not history:  # Single Process Step
-                logged_step = eqx.tree_at(lambda s: (s.state_delta, s.system_delta, s.settings_delta), step,
-                                          (compute_tree_delta(new_state, state),
-                                           compute_tree_delta(new_system, system),
-                                           compute_tree_delta(new_settings, settings)))
-
-                logged_steps.append(logged_step)
-            else:  # Multi-Step Process
-                logged_steps.append(history)
-            
-            # 3. Advance to next step
-            state, system, settings = new_state, new_system, new_settings
-
-        # Return the final states AND the structurally new, logged Process
-        logged_process = eqx.tree_at(
-            lambda p: (
-                p.steps, 
-                p.initial_state, p.initial_system, p.initial_settings,
-                p.state_delta, p.system_delta, p.settings_delta
-            ),
-            self,
-            (
-                tuple(logged_steps),
-                original_state, original_system, original_settings,
-                compute_tree_delta(state, original_state),
-                compute_tree_delta(system, original_system),
-                compute_tree_delta(settings, original_settings)
-            ),
-            is_leaf=lambda x: x is None
-        )
-        if settings.DEBUG_MODE: print(f"Process '{self.tag}' Complete.")
-        
-        return state, system, settings, logged_process
+        return out_vals # type: ignore
 
     def append(self, step: ProcessStep | Self):
         new_steps = self.steps + (step,)
@@ -460,7 +450,7 @@ class Process(ProcessStep):
             # Check if this step is itself a nested Process containing other steps
             if hasattr(step, "steps") and step.steps is not None:
                 # Recursively yield its internal steps
-                yield from step._get_flattened_steps(prefix=f"{node_name}.")
+                yield from step._get_flattened_steps(prefix=f"{prefix}{node_name}.")
             else:
                 yield node_name, step
 
@@ -668,48 +658,50 @@ class Process(ProcessStep):
 
         return process_str
 
-
-if __name__ == "__main__":
-
-    def lib_sq_func(x):
-        return x**2
-
-    def fw_sq_func(state, system, settings):
-        x = state.x
-        results = lib_sq_func(x)
-        state.x = results
-
-        return state, system, settings
+# ----------------------------------------------------------------------------------------------------------------------
+#  Legacy Optimizer Interface
+# ----------------------------------------------------------------------------------------------------------------------
 
 
-    def lib_add_func(x, y):
-        return x + y
+class OptimizerInterface:
+    """Interface with legacy optimizers to separate value and gradient function for RCAIDE Processes."""
 
-    def fw_add_func(state, system, settings):
-        x = state.x
-        y = state.y
-        results = lib_add_func(x, y)
-        state.x = results
+    def __init__(self, process: Process,
+                 base_state: State, base_system: System, base_settings: Settings,
+                 grad_map: GradientMap, objective_path: PathTuple, 
+                 **kwargs):
+        
+        self.process = process
+    
+        self.base_state = base_state
+        self.base_system = base_system
+        self.base_settings = base_settings
 
-        return state, system, settings
+        self.grad_map = grad_map
+        self.objective_path = objective_path
 
-    square_and_add = Process(
-        steps=(ProcessStep(function=fw_sq_func), ProcessStep(function=fw_add_func)),
-        initial_step=0
-    )
+        self.last_x = None
+        self.last_val = None
+        self.last_jac = None
 
-    def sq_add_func(x, y):
-        square_and_add.initial_state.x = x
-        square_and_add.initial_state.y = y
-        st, set, sys = square_and_add.run(State(), System(), Settings())
-        return st.x
-
-    from jax import value_and_grad
-
-    sq_grad = value_and_grad(sq_add_func)
-
-    results = sq_grad(3., 6.)
-
-    print(square_and_add.details)
-    print(results)
-
+        # Store additonal optimizer-specific settings
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+    
+    def _update_cache(self, x):
+        if self.last_x is None or not np.allclose(x, self.last_x):
+            state, system, settings = self.grad_map.update_inputs(x, self.base_state, self.base_system, self.base_settings)
+            f_st, f_sys, f_setts, jac = self.process.run(state, system, settings, grad_map=self.grad_map)
+            token = Token(state=f_st, system=f_sys, settings=f_setts)
+            
+            self.last_val = ru.get_target(token, self.objective_path)
+            self.last_jac = np.array(jac)
+            self.last_x = x
+        
+    def fun(self, x):
+        self._update_cache(x)
+        return self.last_val
+    
+    def jac(self, x):
+        self._update_cache(x)
+        return self.last_jac

@@ -1,4 +1,34 @@
-from typing import Callable
+from typing import Callable, Iterable, Optional
+
+# RCAIDE/utils.py
+# (c) Copyright 2026 Aerospace Research Community LLC
+#
+# Created: Apr 2026, J. Smart
+# Modified: Apr 2026, J. Smart
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  IMPORT
+# ----------------------------------------------------------------------------------------------------------------------
+from typing import TYPE_CHECKING
+from dataclasses import dataclass
+
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+
+# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
+if TYPE_CHECKING:
+    from RCAIDE.Framework.State import State
+    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Settings import Settings
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Utility Functions
+# ----------------------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------
+# Input/Output Function Decorators
+# ---------------------------------------------------------
 
 def inputs(*dependencies: str):
     def decorator(func: Callable):
@@ -12,3 +42,85 @@ def outputs(*outputs: str):
         func._outputs = set(outputs)
         return func
     return decorator
+
+# ---------------------------------------------------------
+# Find Targets from Path in PyTrees
+# ---------------------------------------------------------
+
+class Token(eqx.Module):
+
+    state: State
+    system: System
+    settings: Settings
+
+@dataclass(frozen=True)
+class PathTuple:
+    
+    path: tuple
+    slice_obj: slice
+
+    def __init__(self, path: tuple = (slice(None),)):
+        if isinstance(path[-1], slice):
+            object.__setattr__(self, 'path', path[:-1])
+            object.__setattr__(self, 'slice_obj', path[-1])
+        else:
+            object.__setattr__(self, 'path', path)
+            object.__setattr__(self, 'slice_obj', slice(None))
+
+    def __len__(self):
+        return len(self.path)
+
+def get_parent_target(obj, path_tuple: PathTuple):
+    """Gets the full PyTree leaf, ignoring the slice."""
+    for key in path_tuple.path:
+        if isinstance(obj, dict):
+            obj = obj[key]
+        else:
+            obj = getattr(obj, key)
+    return obj
+
+def get_target(obj, path_tuple: PathTuple):
+    """Gets the target and applies the slice if one exists."""
+    parent = get_parent_target(obj, path_tuple)
+    if hasattr(parent, "__getitem__") and path_tuple.slice_obj != slice(None):
+        return parent[path_tuple.slice_obj]
+    return parent
+
+def get_all_parents(s, input_map):
+    return tuple(get_parent_target(s, path) for path in input_map)
+
+def get_all_targets(s, input_map):
+    return tuple(get_target(s, path) for path in input_map)
+
+# ---------------------------------------------------------
+# PyTree Deltas
+# ---------------------------------------------------------
+
+def compute_tree_delta(old_tree, new_tree):
+    """Find changes between two identically structured PyTrees."""
+    old_leaves, _ = jax.tree_util.tree_flatten(old_tree)
+    new_leaves, _ = jax.tree_util.tree_flatten(new_tree)
+
+    changed_indices = []
+    changed_leaves = []
+
+    for i, (old, new) in enumerate(zip(old_leaves, new_leaves)):
+        # Handle unchanged leaves
+        if old is new: continue
+        if isinstance(old, jnp.ndarray) and isinstance(new, jnp.ndarray):
+            if old.shape == new.shape and jnp.all(old == new): continue
+
+        changed_indices.append(i)
+        changed_leaves.append(new)
+
+    return changed_indices, changed_leaves
+
+
+def apply_tree_delta(base_tree, delta_indices, delta_leaves):
+    """Reconstructs new tree from base tree and delta."""
+    old_leaves, treedef = jax.tree_util.tree_flatten(base_tree)
+    new_leaves = list(old_leaves)
+    for idx, leaf in zip(delta_indices, delta_leaves):
+        new_leaves[idx] = leaf
+
+    return jax.tree_util.tree_unflatten(treedef, new_leaves)
