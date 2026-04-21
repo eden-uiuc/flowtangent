@@ -8,6 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -209,133 +210,6 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
     return U, V, W
 
 @jax.jit
-def compute_induced_velocity_matrix(VD, mach_array):
-    """
-    Computes the Aerodynamic Influence Coefficient matrix C_mn.
-    Output Shape: (n_time, N, N, 3)
-    """
-
-    # 1. Coordinate Symmetry Flip
-    flip = VD.bound_vortex_left[:, 1] > VD.bound_vortex_right[:, 1]
-    
-    xa = jnp.where(flip, VD.bound_vortex_right[:, 0], VD.bound_vortex_left[:, 0])
-    ya = jnp.where(flip, VD.bound_vortex_right[:, 1], VD.bound_vortex_left[:, 1])
-    za = jnp.where(flip, VD.bound_vortex_right[:, 2], VD.bound_vortex_left[:, 2])
-    
-    xb = jnp.where(flip, VD.bound_vortex_left[:, 0], VD.bound_vortex_right[:, 0])
-    yb = jnp.where(flip, VD.bound_vortex_left[:, 1], VD.bound_vortex_right[:, 1])
-    zb = jnp.where(flip, VD.bound_vortex_left[:, 2], VD.bound_vortex_right[:, 2])
-    
-    xc = 0.5 * (xa + xb)
-    yc = 0.5 * (ya + yb)
-    zc = 0.5 * (za + zb)
-    
-    xo = VD.collocation_points[:, 0]
-    yo = VD.collocation_points[:, 1]
-    zo = VD.collocation_points[:, 2]
-    
-    theta = jnp.arctan2(zb - za, yb - ya)
-    costheta = jnp.cos(theta)
-    sintheta = jnp.sin(theta)
-    
-    # 2. Broadcasting Spatial Distances to (N, N)
-    xobar = xo[:, None] - xc[None, :]
-    y_diff = yo[:, None] - yc[None, :]
-    z_diff = zo[:, None] - zc[None, :]
-    
-    ct = costheta[None, :]
-    st = sintheta[None, :]
-    
-    yobar = y_diff * ct + z_diff * st
-    zobar = -y_diff * st + z_diff * ct
-    
-    x1bar = xb - xc
-    y1bar = (yb - yc) * costheta + (zb - zc) * sintheta
-    
-    s = jnp.abs(y1bar)[None, :]
-    t = (x1bar / y1bar)[None, :]
-    
-    X1 = xobar + t * s 
-    Y1 = yobar + s   
-    X2 = xobar - t * s 
-    Y2 = yobar - s   
-    XTY = xobar - t * yobar
-    
-    # 3. Setup broadcasted tolerances (N, N)
-    TOL = s / 500.0
-    TOLSQ = TOL * TOL
-    TOLSQ2 = 2500.0 * TOLSQ
-    ZSQ = zobar * zobar
-    YSQ1 = Y1 * Y1
-    YSQ2 = Y2 * Y2
-    RTV1 = YSQ1 + ZSQ
-    RTV2 = YSQ2 + ZSQ
-    XSQ1 = X1 * X1
-    XSQ2 = X2 * X2
-    
-    # 4. Temporal Mach Broadcasting to (n_time, N, N)
-    mach = mach_array[:, None, None]
-    B2 = jnp.square(mach) - 1.0
-    RO1 = B2 * RTV1[None, :, :]
-    RO2 = B2 * RTV2[None, :, :]
-    
-    # 5. Evaluate Full Subsonic and Supersonic Regimes
-    U_sub, V_sub, W_sub = subsonic_induction(
-        zobar[None, :, :], XSQ1[None, :, :], RO1, XSQ2[None, :, :], RO2, 
-        XTY[None, :, :], t[None, :, :], B2, ZSQ[None, :, :], TOLSQ[None, :, :], 
-        X1[None, :, :], Y1[None, :, :], X2[None, :, :], Y2[None, :, :], 
-        RTV1[None, :, :], RTV2[None, :, :]
-    )
-    
-    U_sup, V_sup, W_sup, RFLAG = supersonic_induction(
-        zobar[None, :, :], XSQ1[None, :, :], RO1, XSQ2[None, :, :], RO2, 
-        XTY[None, :, :], t[None, :, :], B2, ZSQ[None, :, :], TOLSQ[None, :, :], TOL[None, :, :], TOLSQ2[None, :, :], 
-        X1[None, :, :], Y1[None, :, :], X2[None, :, :], Y2[None, :, :], 
-        RTV1[None, :, :], RTV2[None, :, :], 
-        VD.chord_lengths, VD.panels_per_strip, VD.is_trailing_edge, VD.is_leading_edge
-    )
-    
-    # 6. Blend based on Compressibility Condition
-    is_subsonic = (B2 < 0)[:, :, :]
-    
-    U = jnp.where(is_subsonic, U_sub, U_sup)
-    V = jnp.where(is_subsonic, V_sub, V_sup)
-    W = jnp.where(is_subsonic, W_sub, W_sup)
-    
-    # Fix RFLAG (Subsonic is always 1)
-    RFLAG = jnp.where(is_subsonic[:, :, 0], 1, RFLAG)
-    
-    # Legacy VORLAX downwash calcuation
-    
-    # Panel Dihedral Angle (DL) using bound vortex nodes (AH and BH)
-    # Original: D = sqrt((YAH-YBH)**2 + (ZAH-ZBH)**2)
-    dy_h = VD.bound_vortex_right[:, 1] - VD.bound_vortex_left[:, 1]
-    dz_h = VD.bound_vortex_right[:, 2] - VD.bound_vortex_left[:, 2]
-
-    DL = jnp.arctan2(dz_h, dy_h)
-    DL = jnp.where(DL > jnp.pi / 2.0, DL - jnp.pi, DL)
-    DL = jnp.where(DL < -jnp.pi / 2.0, DL + jnp.pi, DL)
-
-    # Broadcast the relative dihedral: DL.T - DL -> DL_receiver - DL_sender
-    DL_diff = DL[:, None] - DL[None, :]
-    
-    # Broadcast over the time dimension (n_time, N, N)
-    COS1 = jnp.cos(DL_diff)[None, :, :]
-    SIN1 = jnp.sin(DL_diff)[None, :, :]
-    
-    # Calculate EW
-    EW = W * COS1 - V * SIN1
-
-    # Rotate back into Vehicle Frame for C_mn
-    C_mn = jnp.stack([
-        U, 
-        V * costheta[None, None, :] - W * sintheta[None, None, :], 
-        V * sintheta[None, None, :] + W * costheta[None, None, :]
-    ], axis=-1)
-    
-    return C_mn, RFLAG, EW
-
-
 def compute_C_mn(VD, Mach):
     """
     Computes the Aerodynamic Influence Coefficient matrix C_mn.
@@ -521,7 +395,5 @@ def compute_induced_velocity(state: "State", system: "System", settings: "Settin
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
-
-    jax.profiler.save_device_memory_profile("vorjax_memory_induced_velocity.prof")
     
     return state, updated_system, settings

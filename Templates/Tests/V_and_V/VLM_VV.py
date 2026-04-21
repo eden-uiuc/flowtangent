@@ -8,6 +8,7 @@ import re
 
 from pathlib import Path
 
+import jax
 import jax.numpy as jnp
 import equinox as eqx
 import plotly.graph_objects as go
@@ -251,15 +252,21 @@ def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0,
 
 if __name__ == "__main__":
 
-    geometry_file = './AVL Test Cases/b737_wings_flat.avl'
+    geometry_file = '/home/jordan/dev/RCAIDE/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
 
-    avl_b737_data = parse_avl_file(Path('./AVL Test Cases/b737_wings_flat.avl'))
+    avl_b737_data = parse_avl_file(Path(geometry_file))
     vehicle = convert_to_RCAIDE(avl_b737_data)
     # vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
 
-    AVL_basic_test(geometry_file, oper_mode="st")
+    # AVL_basic_test(geometry_file, oper_mode="st")
 
-    alpha, CL, CD, CM, data = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, debug_mode=True)
+    # Warm-up Run
+    alpha, CL, CD, CM, data = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, debug_mode=False)
+
+    new_vehicle = convert_to_RCAIDE(avl_b737_data)
+    with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
+        results = VORJAX_test_run(new_vehicle, alpha=3.0, Mach=0.00, debug_mode=False)
+        jax.tree.map(lambda x: x.block_until_ready() if isinstance(x, jax.Array) else x, results)
 
     print(f"\n--- Extracted VORJAX Results ---")
     print(f"Alpha: {alpha}")

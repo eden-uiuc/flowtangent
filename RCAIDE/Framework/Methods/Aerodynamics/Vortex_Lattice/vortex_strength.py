@@ -72,6 +72,4 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_vortex_strength.prof")
-    
     return state, updated_system, settings

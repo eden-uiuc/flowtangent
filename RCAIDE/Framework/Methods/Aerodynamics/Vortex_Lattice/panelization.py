@@ -766,8 +766,6 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         
     updated_system  = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_discretize_wings.prof")
-
     return state, updated_system, settings
 
 

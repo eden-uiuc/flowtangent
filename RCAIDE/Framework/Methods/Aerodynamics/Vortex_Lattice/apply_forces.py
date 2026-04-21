@@ -55,6 +55,4 @@ def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settin
 
     state = eqx.tree_at(lambda s: s.frames.wind.total_force_vector, state, wind_forces)
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_apply_forces.prof")
-
     return state, system, settings

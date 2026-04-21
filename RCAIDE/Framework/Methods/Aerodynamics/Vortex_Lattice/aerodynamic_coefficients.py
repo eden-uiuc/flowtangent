@@ -346,6 +346,4 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.roll,  state, Cl_roll[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.yaw,   state, Cn_yaw[:, None])
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_compute_coefficients.prof")
-
     return state, system, settings

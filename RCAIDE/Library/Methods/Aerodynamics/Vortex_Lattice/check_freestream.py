@@ -54,7 +54,5 @@ def check_freestream_stateful(state: "State", system: "System", settings: "Setti
     safe_velocity, safe_speed = func_check_freestream(velocity)
     
     current_state = eqx.tree_at(lambda s: (s.frames.inertial.velocity_vector, s.freestream.speed), state, (safe_velocity, safe_speed))
-
-    jax.profiler.save_device_memory_profile("vorjax_memory_check_freestream.prof")
     
     return current_state, system, settings

@@ -117,12 +117,8 @@ def compute_panel_pressures(state: "State", system: "System", settings: "Setting
     
     DCP = compute_pressure_coefficients(VD, v_total, GAMMA, v_inf)
     
-    updated_analysis_data = analysis | {
-        "pressure_coefficients": DCP
-    }
+    updated_analysis_data = analysis | {"pressure_coefficients": DCP}
     
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_panel_pressures.prof")
-    
     return state, updated_system, settings

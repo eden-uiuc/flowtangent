@@ -10,7 +10,6 @@ import RCAIDE.Framework as rcf
 import RCAIDE.Library as rcl
 from RCAIDE.Library import Units
 
-#import numpy as np
 import jax.numpy as np
 
 #-------------------------------------------------------------------------------

@@ -11,7 +11,6 @@
 import RCAIDE.Framework as rcf
 from RCAIDE.Library import Units
 
-#import numpy as np
 import jax.numpy as np
 
 # -----------------------------------------------------------------------

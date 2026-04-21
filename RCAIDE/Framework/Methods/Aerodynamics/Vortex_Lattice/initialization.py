@@ -113,6 +113,4 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
         (new_ref_geom, initial_analysis_data)
     )
 
-    jax.profiler.save_device_memory_profile("vorjax_memory_initialize_geometry.prof")
-
     return state, updated_system, settings

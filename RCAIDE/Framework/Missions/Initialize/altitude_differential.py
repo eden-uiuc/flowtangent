@@ -8,8 +8,7 @@
 
 # Package Imports
 
-#import numpy as np
-import jax.numpy as np
+import jax.numpy as jnp
 
 # RCAIDE Imports
 
@@ -42,7 +41,7 @@ def initialize_altitude_differential(
 
     # Get altitude and time step
     dz = r[-1,2] - r[0,2]
-    dt = np.dot(I[-1, :] * dz, 1/v[:, 2])
+    dt = jnp.dot(I[-1, :] * dz, 1/v[:, 2])
 
     # Rescale operator
     t = t * dt

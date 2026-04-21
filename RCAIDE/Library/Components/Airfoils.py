@@ -11,7 +11,6 @@ from decimal import Decimal
 from pathlib import Path
 
 # package imports
-import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
@@ -190,7 +189,7 @@ class Airfoil(Component):
                 except ValueError:
                     continue
 
-        raw_coords = np.array(raw_coords)
+        raw_coords = jnp.array(raw_coords)
         x_raw, y_raw = raw_coords[:, 0], raw_coords[:, 1]
 
         # 4. Surface Splitting & Orientation (Force LE -> TE)
@@ -201,7 +200,7 @@ class Airfoil(Component):
 
         else:
             # Selig: TE -> Upper -> LE -> Lower -> TE
-            le_idx = np.argmin(x_raw)
+            le_idx = jnp.argmin(x_raw)
 
             x_up, y_up = x_raw[:le_idx + 1], y_raw[:le_idx + 1]
             x_lo, y_lo = x_raw[le_idx:], y_raw[le_idx:]
@@ -212,15 +211,15 @@ class Airfoil(Component):
         # 5. Clean Duplicates and Enforce Strict Monotonicity for Interpolation
         def make_monotonic(x, y):
             # Finds unique X values and sorts them. (Since they go LE->TE, sorting is safe)
-            x_unique, idx = np.unique(x, return_index=True)
+            x_unique, idx = jnp.unique(x, return_index=True)
             return x_unique, y[idx]
 
         x_up_clean, y_up_clean = make_monotonic(x_up, y_up)
         x_lo_clean, y_lo_clean = make_monotonic(x_lo, y_lo)
 
         # 6. Create Common X-Grid (Cosine Spacing for clustering at LE/TE)
-        beta = np.linspace(0, np.pi, n_pts)
-        common_x = 0.5 * (1.0 - np.cos(beta))
+        beta = jnp.linspace(0, jnp.pi, n_pts)
+        common_x = 0.5 * (1.0 - jnp.cos(beta))
 
         # 7. Interpolate onto the Common Grid
         # We use PCHIP (Shape-preserving piecewise cubic) because standard cubic splines
@@ -235,12 +234,12 @@ class Airfoil(Component):
         # 8. Calculate Aerodynamic Properties
         camber = (y_up_interp + y_lo_interp) / 2.0
         thickness = y_up_interp - y_lo_interp
-        max_t = np.max(thickness)
+        max_t = jnp.max(thickness)
         t_c = max_t / 1.0
 
         # 9. Reconstruct the continuous loop for standard plotting (TE -> LE -> TE)
-        x_loop = np.concatenate((common_x[::-1], common_x[1:]))
-        y_loop = np.concatenate((y_up_interp[::-1], y_lo_interp[1:]))
+        x_loop = jnp.concatenate((common_x[::-1], common_x[1:]))
+        y_loop = jnp.concatenate((y_up_interp[::-1], y_lo_interp[1:]))
 
         # 10. Cast back to JAX arrays and return the initialized class
         return cls(

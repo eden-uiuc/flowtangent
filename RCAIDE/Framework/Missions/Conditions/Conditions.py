@@ -11,7 +11,6 @@
 
 # package imports
 import jax
-import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
 
@@ -44,26 +43,29 @@ class Conditions(eqx.Module):
         CLASSES_TO_SKIP = (
             'AtmosphericBreakpoints',
             'SolverConditions'
-            # Add any future classes to skip here
         )
 
         def _expand(leaf):
-            if isinstance(leaf, (jnp.ndarray, np.ndarray)):
+            if isinstance(leaf, (jnp.ndarray)):
                 
-                # 1. Intercept the empty placeholders we created to avoid 'None'
+                # 1. Intercept the empty placeholders
                 if leaf.size == 0:
                     if leaf.ndim == 1:
-                        # jnp.empty(0) -> shape (n, 1)
-                        return jnp.zeros((n, 1), dtype=leaf.dtype)
+                        # Create a single zero, then broadcast it to (n, 1)
+                        base = jnp.zeros((1, 1), dtype=leaf.dtype)
+                        return jnp.broadcast_to(base, (n, 1))
                     elif leaf.ndim == 2:
-                        # jnp.empty((0, 3)) -> shape (n, 3)
-                        return jnp.zeros((n, leaf.shape[1]), dtype=leaf.dtype)
+                        base = jnp.zeros((1, leaf.shape[1]), dtype=leaf.dtype)
+                        return jnp.broadcast_to(base, (n, leaf.shape[1]))
                 
-                # 2. Standard expansion for actual data
+                # 2. Zero-copy expansion for actual data
                 if leaf.ndim == 1:
-                    return jnp.tile(leaf, (n, 1))
+                    # e.g., Shape (X,) -> Shape (n, X)
+                    return jnp.broadcast_to(leaf, (n,) + leaf.shape)
+                
                 elif leaf.ndim == 2 and leaf.shape[0] == 1:
-                    return jnp.repeat(leaf, n, axis=0)
+                    # e.g., Shape (1, X) -> Shape (n, X)
+                    return jnp.broadcast_to(leaf, (n, leaf.shape[1]))
                     
             return leaf
         

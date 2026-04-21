@@ -74,4 +74,8 @@ class Settings(eqx.Module):
         if self.DEBUG_MODE:
             jax.config.update("jax_disable_jit", True)
             jax.config.update("jax_debug_nans", True)
+        else:
+            # Manually reset flags just in case
+            jax.config.update("jax_disable_jit", False)
+            jax.config.update("jax_debug_nans", False)
 
