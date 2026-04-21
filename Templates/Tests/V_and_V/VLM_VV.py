@@ -17,7 +17,7 @@ import numpy as np
 from RCAIDE.Library.Components import ComponentAreas
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions
 
-from RCAIDE.Framework import Process, State, Settings
+from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
@@ -26,6 +26,16 @@ from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeV
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
+# JAX Helper Functions -------------------------------------------------------------------------------------------------
+
+def f2arr(tree):
+
+    def _to_array(leaf):
+        if isinstance(leaf, (float, int)):
+            return jnp.array(leaf, dtype=jnp.float64)
+        return leaf
+
+    return jax.tree_util.tree_map(_to_array, tree)
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -176,7 +186,7 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
     return system
 
 
-def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
+def VORJAX_test_run(vehicle, alpha, Mach, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -209,6 +219,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
+        tag="VORJAX Test Run",
         steps=(
             InitializeVLM(),
             VLM()
@@ -218,7 +229,10 @@ def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
         initial_settings=initial_settings
     )
 
-    final_state, final_system, final_settings = analysis.run(initial_state, initial_system, initial_settings)
+    final_state, final_system, final_settings, jac = analysis.run(initial_state,
+                                                             initial_system,
+                                                             initial_settings,
+                                                             grad_map=grad_map)
 
     analysis_data = final_system.analysis_data
     alpha = jnp.rad2deg(final_state.aerodynamics.angles.alpha).item(0)
@@ -226,8 +240,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, debug_mode=False):
     CD = final_state.aerodynamics.coefficients.drag.induced.inviscid.total.item(0)
     CM = final_state.aerodynamics.coefficients.moments.pitch.item(0)
 
-    return alpha, CL, CD, CM, analysis_data
-
+    return CL, CD, CM, alpha, analysis_data, jac
 
 
 def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0, span=10.0, chord=1.0):
@@ -252,21 +265,23 @@ def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0,
 
 if __name__ == "__main__":
 
-    geometry_file = '/home/jordan/dev/RCAIDE/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
 
-    avl_b737_data = parse_avl_file(Path(geometry_file))
-    vehicle = convert_to_RCAIDE(avl_b737_data)
-    # vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
+    # geometry_file = '/home/jordan/dev/RCAIDE/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
+
+    # avl_b737_data = parse_avl_file(Path(geometry_file))
+    # vehicle = convert_to_RCAIDE(avl_b737_data)
+    vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
-    # Warm-up Run
-    alpha, CL, CD, CM, data = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, debug_mode=False)
+    grad_map = GradientMap(
+        state_inputs=(("aerodynamics", "angles", "alpha"), ("freestream", "mach_number")),
+        system_inputs=(("wings", "wing", "spans", "projected"), ("wings", "wing", "chords", "root")),
+        state_outputs=(("aerodynamics", "coefficients", "lift", "total"), ("aerodynamics", "coefficients", "drag", "total"))
+    )
 
-    new_vehicle = convert_to_RCAIDE(avl_b737_data)
-    with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-        results = VORJAX_test_run(new_vehicle, alpha=3.0, Mach=0.00, debug_mode=False)
-        jax.tree.map(lambda x: x.block_until_ready() if isinstance(x, jax.Array) else x, results)
+    results = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, grad_map=grad_map, debug_mode=True)
+    CL, CD, CM, alpha, analysis_data, jac = results
 
     print(f"\n--- Extracted VORJAX Results ---")
     print(f"Alpha: {alpha}")
@@ -274,9 +289,10 @@ if __name__ == "__main__":
     print(f"CD: {CD:.5f}")
     print(f"CM: {CM:.5f}")
 
+
     # 3. Plot the Vortex Distribution
-    VD = data['vortex_distribution']
-    fig = plot_vlm_panels(VD, panel_values=np.asarray(data['pressure_coefficients'].squeeze(0)))
-    fig.show()
+    # VD = data['vortex_distribution']
+    # fig = plot_vlm_panels(VD, panel_values=np.asarray(data['pressure_coefficients'].squeeze(0)))
+    # fig.show()
 
     print("Done!")

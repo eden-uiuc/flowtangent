@@ -7,8 +7,8 @@ def inputs(*dependencies: str):
     return decorator
 
 
-def outputs(*results: str):
+def outputs(*outputs: str):
     def decorator(func: Callable):
-        func._results = set(results)
+        func._outputs = set(outputs)
         return func
     return decorator

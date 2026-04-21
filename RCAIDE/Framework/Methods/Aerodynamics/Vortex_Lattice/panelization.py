@@ -515,13 +515,13 @@ def calculate_macro_properties(wing, eta_vertices: jnp.ndarray, semispan: float)
     Vectorized lofting of the structural wing, directly evaluated at the computational grid.
     """
     # 1. Extract Structural Nodes (Assuming len(segments) == N_nodes)
-    seg_etas = jnp.array([seg.percent_span_location for seg in wing.segments])
-    seg_c_fracs = jnp.array([seg.root_chord_percent for seg in wing.segments])
-    seg_twists = jnp.array([seg.twist for seg in wing.segments])
+    seg_etas = jnp.stack([seg.percent_span_location for seg in wing.segments])
+    seg_c_fracs = jnp.stack([seg.root_chord_percent for seg in wing.segments])
+    seg_twists = jnp.stack([seg.twist for seg in wing.segments])
     
     # Sweeps and dihedrals dictate the interval outboard of the node
-    qc_sweeps = jnp.array([seg.sweeps.quarter_chord for seg in wing.segments])[:-1]
-    dihedrals = jnp.array([seg.dihedral_outboard for seg in wing.segments])[:-1]
+    qc_sweeps = jnp.stack([seg.sweeps.quarter_chord for seg in wing.segments])[:-1]
+    dihedrals = jnp.stack([seg.dihedral_outboard for seg in wing.segments])[:-1]
 
     # 2. Calculate Physical Geometry at the Nodes
     seg_Y = seg_etas * semispan
