@@ -18,16 +18,13 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
+    
+    from RCAIDE.Library.Components.Wings import Wing
 
 from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
 # ----------------------------------------------------------------------------------------------------------------------
-
-# ---------------------------------------------------------
-# Geometry Initialization
-# ---------------------------------------------------------
-
 
 @inputs(
     "settings.analysis.aerodynamics: VLMSettings",
@@ -52,17 +49,18 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     # Standard Python Control Flow (Safe outside of @jax.jit)
     wings = system.wings
     
-    main_wing = None
+    ref_wing = None
     if hasattr(wings, 'main_wing'):
-        main_wing = wings.main_wing
-    elif len(wings) == 1:
-        main_wing = wings[0]
+        ref_wing = wings.main_wing
+    elif len(wings) > 0:
+        ref_wing = wings[0]
     
-    if main_wing is not None:
-        c_bar = main_wing.chords.mean_aerodynamic
-        x_mac = main_wing.aerodynamic_center[0] + main_wing.origin[0][0]
-        z_mac = main_wing.aerodynamic_center[2] + main_wing.origin[0][2]
-        b_ref = main_wing.spans.projected
+    if ref_wing is not None:
+        ref_wing: Wing
+        c_bar = ref_wing.chords.mean_aerodynamic
+        x_mac = ref_wing.aerodynamic_center[0] + ref_wing.origin[0][0]
+        z_mac = ref_wing.aerodynamic_center[2] + ref_wing.origin[0][2]
+        b_ref = ref_wing.spans.projected
     else:
         c_bar = 0.0
         x_mac = 0.0
