@@ -87,7 +87,7 @@ class Numerics(Conditions):
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
-        if self.number_of_control_points <= 0:
+        if self.number_of_control_points <= 1:
             return
 
         # Calculate the matrices (finite-difference psudospectral operators)

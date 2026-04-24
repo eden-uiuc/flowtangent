@@ -2,14 +2,10 @@ import numpy as np
 import jax.numpy as jnp
 import plotly.graph_objects as go
 
-def plot_vlm_panels(VD, panel_values=None, title="VLM Aerodynamic Distribution"):
+def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
     """
     Plots a 3D interactive mesh of the VLM panels with an optional heatmap.
-
-    Args:
-        VD: VortexDistribution object containing the VLM panel vertices and normals.
-        panel_values: ndarray of shape (N_panels,)
-                      representing the heatmap value (e.g., Cp, Gamma) for each panel.
+    If no panel_values are provided, displays light grey panels with black edges.
     """
     panel_vertices = np.asarray(VD.panel_vertices)
 
@@ -19,11 +15,14 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Aerodynamic Distribution")
     x, y, z = [], [], []
     i_idx, j_idx, k_idx = [], [], []
     facecolor_intensities = []
+    
+    # Lists to hold the wireframe boundary lines
+    edge_x, edge_y, edge_z = [], [], []
 
     v_count = 0
-    # Iterate through each panel to build the vertex and triangle arrays
+    # Iterate through each panel to build the vertex, triangle, and edge arrays
     for idx, panel in enumerate(panel_vertices):
-        # Flatten the coordinates for Plotly
+        # Flatten the coordinates for the Mesh3d
         x.extend(panel[:, 0])
         y.extend(panel[:, 1])
         z.extend(panel[:, 2])
@@ -42,39 +41,58 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Aerodynamic Distribution")
             # Both triangles making up this panel get the same intensity value
             facecolor_intensities.extend([panel_values[idx], panel_values[idx]])
 
+        # Build the black boundary lines (close the loop by returning to vertex 0)
+        # Adding None at the end breaks the line before the next panel begins
+        edge_x.extend([panel[0, 0], panel[1, 0], panel[2, 0], panel[3, 0], panel[0, 0], None])
+        edge_y.extend([panel[0, 1], panel[1, 1], panel[2, 1], panel[3, 1], panel[0, 1], None])
+        edge_z.extend([panel[0, 2], panel[1, 2], panel[2, 2], panel[3, 2], panel[0, 2], None])
+
         # Increment vertex counter by 4 for the next panel
         v_count += 4
 
     # Build the 3D Mesh
-    fig = go.Figure(data=[
-        go.Mesh3d(
-            x=x, y=y, z=z,
-            i=i_idx, j=j_idx, k=k_idx,
-            intensity=facecolor_intensities if panel_values is not None else None,
-            intensitymode='cell',
-            colorscale='Plasma',  # Deep purple to bright orange/yellow
-            color='black',  # Fallback color if no panel_values are provided
-            showscale=panel_values is not None,
-            flatshading=True,
-            name='VLM Mesh',
-            hovertemplate='Value: %{intensity:.5f}<extra></extra>' if panel_values is not None else None
+    mesh_trace = go.Mesh3d(
+        x=x, y=y, z=z,
+        i=i_idx, j=j_idx, k=k_idx,
+        intensity=facecolor_intensities if panel_values is not None else None,
+        intensitymode='cell',
+        colorscale='Plasma',  
+        color='lightgrey',  # Fallback color changed to light grey
+        showscale=panel_values is not None,
+        flatshading=True,
+        name='VLM Mesh',
+        hovertemplate='Value: %{intensity:.5f}<extra></extra>' if panel_values is not None else None
+    )
+    
+    data = [mesh_trace]
+
+    # If no values are passed, overlay the black wireframe
+    if panel_values is None:
+        edge_trace = go.Scatter3d(
+            x=edge_x, y=edge_y, z=edge_z,
+            mode='lines',
+            line=dict(color='black', width=2),
+            name='Panel Edges',
+            hoverinfo='skip'  # Don't clutter the hover box with line coordinates
         )
-    ])
+        data.append(edge_trace)
+
+    fig = go.Figure(data=data)
 
     # Define the isometric camera
     isometric_camera = dict(
-        up=dict(x=0, y=0, z=1),  # Z is pointing up
-        center=dict(x=0, y=0, z=0),  # Look at the origin
-        eye=dict(x=1.5, y=-1.5, z=1.5),  # Positioned diagonally (Rear-Right-Up)
-        projection=dict(type='orthographic')  # Removes perspective distortion for true isometric
+        up=dict(x=0, y=0, z=1),  
+        center=dict(x=0, y=0, z=0),  
+        eye=dict(x=1.5, y=-1.5, z=1.5),  
+        projection=dict(type='orthographic')  
     )
 
     # Apply the styling and camera to the layout
     fig.update_layout(
         title=title,
-        template='plotly_white',  # Stark white background with black text/axes
+        template='plotly_white',  
         scene=dict(
-            aspectmode='data',  # Locks true 1:1:1 geometry proportions
+            aspectmode='data',  
             camera=isometric_camera,
             xaxis=dict(title='X (Streamwise)', showbackground=False),
             yaxis=dict(title='Y (Spanwise)', showbackground=False),

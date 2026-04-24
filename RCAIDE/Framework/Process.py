@@ -77,25 +77,27 @@ class GradientMap:
     
     def __init__(
         self,
-        state_inputs: PathTuple = PathTuple(),
-        state_outputs: PathTuple = PathTuple(),
-        system_inputs: PathTuple = PathTuple(),
-        system_outputs: PathTuple = PathTuple(),
-        settings_inputs: PathTuple = PathTuple(),
-        settings_outputs: PathTuple = PathTuple(),
+        state_inputs:       tuple = (),
+        state_outputs:      tuple = (),
+        system_inputs:      tuple = (),
+        system_outputs:     tuple = (),
+        settings_inputs:    tuple = (),
+        settings_outputs:   tuple = (),
     ):
-        
-        self.state_inputs     = state_inputs
-        self.system_inputs    = system_inputs
-        self.settings_inputs  = settings_inputs
 
+        # Sanitize inputs/oututs to PathTuples  
+        self.state_inputs     = tuple(PathTuple(p) for p in state_inputs)
+        self.system_inputs    = tuple(PathTuple(p) for p in system_inputs)
+        self.settings_inputs  = tuple(PathTuple(p) for p in settings_inputs)
+        
+        self.state_outputs    = tuple(PathTuple(p) for p in state_outputs)
+        self.system_outputs   = tuple(PathTuple(p) for p in system_outputs)
+        self.settings_outputs = tuple(PathTuple(p) for p in settings_outputs)
+
+        # Count inputs
         self._n_st = len(self.state_inputs)
         self._n_sys = len(self.system_inputs)
         self._n_setts = len(self.settings_inputs)
-        
-        self.state_outputs    = state_outputs
-        self.system_outputs   = system_outputs
-        self.settings_outputs = settings_outputs
 
         self.unravel_function = null_step  # Default, updates when inputs are grabbed
         
@@ -277,7 +279,7 @@ class Process(ProcessStep):
 
             return out_array, aux
 
-        return eqx.filter_jit(jax.jacrev(objective_fn, argnums=0, has_aux=True))
+        return jax.jacrev(objective_fn, argnums=0, has_aux=True)
 
     @staticmethod
     def _sanitize_inputs(tree):
@@ -322,10 +324,10 @@ class Process(ProcessStep):
             # Build Value and Jacobian function only if it doesn't exist or the cached grad_map is outdated
             if self._val_and_jac_fn is None or self._cached_grad_map != grad_map:
 
-                self._val_and_jac_fn = self._build_value_and_jacobian(grad_map, track_history)
+                object.__setattr__(self, '_val_and_jac_fn', self._build_value_and_jacobian(grad_map, track_history))
                 object.__setattr__(self, '_cached_grad_map', grad_map)
 
-            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings)
+            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings) # type: ignore
             f_st, f_sys, f_setts, raw_hist = aux
 
         else:

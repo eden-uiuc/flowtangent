@@ -14,8 +14,14 @@ import equinox as eqx
 import plotly.graph_objects as go
 import numpy as np
 
+from tqdm import trange
+from plotly.subplots import make_subplots
+
+import RCAIDE.utils as ru
+
+from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions
+from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.System import Aircraft
@@ -25,17 +31,6 @@ from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeV
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
-
-# JAX Helper Functions -------------------------------------------------------------------------------------------------
-
-def f2arr(tree):
-
-    def _to_array(leaf):
-        if isinstance(leaf, (float, int)):
-            return jnp.array(leaf, dtype=jnp.float64)
-        return leaf
-
-    return jax.tree_util.tree_map(_to_array, tree)
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -161,8 +156,28 @@ def parse_avl_stability(stab_file_path):
 
     return results
 
+def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0, span=10.0, chord=1.0):
+    # 1. Generate the geometry file
+    if geometry_file is None:
+        AVL_straight_wing(geometry_file, span=span, chord=chord)
+        geometry_file = f"{run_name}.avl"
+
+    if run_name is None:
+        run_name = Path(geometry_file).stem
+
+    run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
+
+    if oper_mode == "st":
+        parsed_data = parse_avl_stability(f"{run_name}_{oper_mode}.txt")
+
+        print("\n--- Extracted AVL Results ---")
+        for k, v in parsed_data.items():
+            print(f"{k}: {v}")
+        print("\n")
+
 
 # VORJAX Helper Functions ----------------------------------------------------------------------------------------------
+
 def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     wing_spans = WingDimensions(projected=span)
@@ -185,8 +200,113 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     return system
 
+def VORJAX_elliptical_wing(AR=10., n_segments=1):
 
-def VORJAX_test_run(vehicle, alpha, Mach, grad_map=None, debug_mode=False):
+    span = AR
+    c_root = (4.0 * span) / (jnp.pi * AR)
+    S_ref = span**2 / AR
+
+    def chord_frac_at_eta(eta):
+        # Using 0.99999 to prevent divide-by-zero or NaNs at the absolute tip
+        return jnp.sqrt(1.0 - jnp.clip(eta, 0.0, 0.99999)**2)
+    
+    segments = ()
+    eta = jnp.cos(jnp.linspace(jnp.pi/2, 0, n_segments + 1))
+    
+    for i in range(n_segments):
+        eta_start = eta[i]
+        eta_end   = eta[i+1]
+        
+        chord_frac_start = chord_frac_at_eta(eta_start)
+        chord_frac_end   = chord_frac_at_eta(eta_end)
+
+        # 1. Calculate the required setback of the quarter-chord
+        # (Positive delta_x means the c/4 line is moving backward/sweeping aft)
+        delta_x_c4 = 0.25 * 1.0 * (chord_frac_start - chord_frac_end) 
+        
+        # 2. Calculate the spanwise distance of this segment
+        delta_y = 0.5 * AR * (eta_end - eta_start)
+        
+        # 3. Get the sweep angle
+        sweep_c4 = jnp.arctan2(delta_x_c4, delta_y)
+
+        segments += (WingSegment(
+            tag=f"{i}", 
+            percent_span_location=eta_start, 
+            root_chord_percent=chord_frac_start,
+            sweeps=WingSweeps(quarter_chord=sweep_c4)  # Inject sweep here!
+        ),)
+
+    # Tip segment doesn't need a sweep since there's no geometry after it
+    segments += (WingSegment(
+        tag="Tip", 
+        percent_span_location=1.0, 
+        root_chord_percent=0.01
+    ),)
+
+    wing_areas = ComponentAreas(reference=S_ref, wetted=2.0 * S_ref)
+
+    wing = Wing(tag=f"Elliptical {n_segments}",
+                segments=segments,
+                symmetric=True,
+                spans=WingDimensions(projected=span),
+                chords=WingChords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
+                areas=wing_areas,
+                taper=0.01,
+                origin=jnp.array([[0.0, 0.0, 0.0]]),
+                aerodynamic_center=jnp.array([0.0, 0.0, 0.0])).update_geometry()
+    
+    system = Aircraft(tag='Test Aircraft', areas=wing_areas).add_subcomponent(wing)
+    system = eqx.tree_at(lambda s: s.mass_properties.center_of_gravity, system, jnp.array([[0.0, 0.0, 0.0]]))
+
+    return system  
+
+def VORJAX_delta_wing(AR=2.0):
+    
+    # Define a fixed span, calculate the rest
+    span = 10.0
+    S_ref = span**2 / AR
+    c_root = 2.0 * S_ref / span
+    
+    # Prevent divide-by-zero singularities at the tip
+    c_tip_ratio = 0.001 
+    
+    # Calculate Quarter-Chord Sweep for a straight trailing edge
+    # tan(sweep) = (0.75 * c_root) / (span / 2)
+    sweep_c4 = jnp.arctan((0.75 * c_root) / (span / 2.0))
+    
+    segments = (
+        WingSegment(
+            tag="Root_to_Tip",
+            percent_span_location=0.0,
+            root_chord_percent=1.0,
+            sweeps=WingSweeps(quarter_chord=sweep_c4)
+        ),
+        WingSegment(
+            tag="Tip",
+            percent_span_location=1.0,
+            root_chord_percent=c_tip_ratio
+        )
+    )
+
+    wing_areas = ComponentAreas(reference=S_ref, wetted=2.0 * S_ref)
+
+    wing = Wing(tag=f"Delta_AR_{AR}",
+                segments=segments,
+                symmetric=True,
+                spans=WingDimensions(projected=span),
+                chords=WingChords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
+                areas=wing_areas,
+                taper=c_tip_ratio,
+                origin=jnp.array([[0.0, 0.0, 0.0]]),
+                aerodynamic_center=jnp.array([0.0, 0.0, 0.0])).update_geometry()
+    
+    system = Aircraft(tag='Delta Aircraft', areas=wing_areas).add_subcomponent(wing)
+    system = eqx.tree_at(lambda s: s.mass_properties.center_of_gravity, system, jnp.array([[0.0, 0.0, 0.0]]))
+
+    return system
+
+def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -204,18 +324,19 @@ def VORJAX_test_run(vehicle, alpha, Mach, grad_map=None, debug_mode=False):
     initial_state = eqx.tree_at(lambda s: s.freestream.density, initial_state, jnp.array([1.0]))
     initial_state = eqx.tree_at(lambda s: s.freestream.temperature, initial_state, jnp.array([273.15]))
     initial_state = eqx.tree_at(lambda s: s.frames.inertial.velocity_vector, initial_state, jnp.array([100.0, 0., 0.]))
-    initial_state = eqx.tree_at(lambda s: s.aerodynamics.angles.alpha, initial_state, jnp.deg2rad(alpha) * jnp.ones(1))
+    initial_state = eqx.tree_at(lambda s: s.aerodynamics.angles.alpha, initial_state, alpha * jnp.ones(1))
 
     initial_state = initial_state.expand_rows(1)
 
     initial_system = vehicle
 
     vortices = VLMVortices(
-        spanwise_cosine_spacing=False,
-        spanwise_vortices=(26, 5, 5),
-        chordwise_vortices=(12, 3, 3)
+        spanwise_cosine_spacing=True,
+        spanwise_vortices=n_sw,
+        chordwise_vortices=n_cw
     )
-    aero_settings = VLMSettings(vortices=vortices)
+    
+    aero_settings = VLMSettings(vortices=vortices, VORLAX_empirical_corrections=False)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -229,39 +350,454 @@ def VORJAX_test_run(vehicle, alpha, Mach, grad_map=None, debug_mode=False):
         initial_settings=initial_settings
     )
 
-    final_state, final_system, final_settings, jac = analysis.run(initial_state,
-                                                             initial_system,
-                                                             initial_settings,
-                                                             grad_map=grad_map)
+    results = analysis.run(
+        initial_state,
+        initial_system,
+        initial_settings,
+        grad_map=grad_map
+    )
 
-    analysis_data = final_system.analysis_data
-    alpha = jnp.rad2deg(final_state.aerodynamics.angles.alpha).item(0)
-    CL = final_state.aerodynamics.coefficients.lift.total.item(0)
-    CD = final_state.aerodynamics.coefficients.drag.induced.inviscid.total.item(0)
-    CM = final_state.aerodynamics.coefficients.moments.pitch.item(0)
+    return results
 
-    return CL, CD, CM, alpha, analysis_data, jac
+# Plotting Helper Functions ----------------------------------------------------------------------------------------------
 
+def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
+    
+    # 1. Initialize figure with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0, span=10.0, chord=1.0):
-    # 1. Generate the geometry file
-    if geometry_file is None:
-        AVL_straight_wing(geometry_file, span=span, chord=chord)
-        geometry_file = f"{run_name}.avl"
+    # Convert error to a percentage for cleaner reading
+    error_percent = np.array(error) * 100.0
 
-    if run_name is None:
-        run_name = Path(geometry_file).stem
+    # 2. Add Trace: AD Gradient (Primary Y)
+    fig.add_trace(
+        go.Scatter(
+            x=n_segments, 
+            y=grad_AD, 
+            name="VORJAX AD Gradient",
+            mode="lines+markers",
+            line=dict(color="#1f77b4", width=3),
+            marker=dict(size=8)
+        ),
+        secondary_y=False,
+    )
 
-    run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
+    # 3. Add Trace: Analytical Truth (Primary Y)
+    # Drawing a line from the first to the last x-coordinate
+    fig.add_trace(
+        go.Scatter(
+            x=[n_segments[0], n_segments[-1]],
+            y=[grad_truth, grad_truth],
+            name="Analytical Truth",
+            mode="lines",
+            line=dict(color="black", width=3, dash="dash")
+        ),
+        secondary_y=False,
+    )
 
-    if oper_mode == "st":
-        parsed_data = parse_avl_stability(f"{run_name}_{oper_mode}.txt")
+    # 4. Add Trace: Relative Error (Secondary Y)
+    fig.add_trace(
+        go.Scatter(
+            x=n_segments, 
+            y=error_percent, 
+            name="Relative Error",
+            mode="lines+markers",
+            line=dict(color="#d62728", width=3),
+            marker=dict(symbol="square", size=8)
+        ),
+        secondary_y=True,
+    )
 
-        print("\n--- Extracted AVL Results ---")
-        for k, v in parsed_data.items():
-            print(f"{k}: {v}")
-        print("\n")
+    # 5. Styling and Layout
+    fig.update_layout(
+        title_text="<b>Elliptical Wing Grid Convergence: VORJAX vs. Lifting-Line Theory</b>",
+        title_x=0.5,
+        template="plotly_white",
+        hovermode="x unified", # Combines all hover info into one box
+        legend=dict(
+            x=0.75,
+            y=0.5,
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="black",
+            borderwidth=1
+        ),
+        margin=dict(l=60, r=60, t=80, b=60)
+    )
 
+    # Format X-axis (Force integer ticks)
+    fig.update_xaxes(
+        title_text="<b>Number of Spanwise Segments</b>", 
+        tickmode="linear", 
+        tick0=0, 
+        dtick=2,
+        showgrid=True,
+        gridcolor="lightgrey"
+    )
+
+    # Format Primary Y-axis
+    fig.update_yaxes(
+        title_text="<b>Autodiff Gradient (C<sub>L&alpha;</sub>) [rad<sup>-1</sup>]</b>", 
+        color="#1f77b4",
+        secondary_y=False,
+        showgrid=True,
+        gridcolor="lightgrey",
+        zeroline=False,
+        rangemode="tozero"
+
+    )
+
+    # Format Secondary Y-axis
+    fig.update_yaxes(
+        title_text="<b>Relative Error [%]</b>", 
+        color="#d62728",
+        secondary_y=True,
+        showgrid=False, # Disabled to prevent clashing with primary gridlines
+        zeroline=False,
+        rangemode="tozero"
+    )
+
+    fig.show()
+
+def plot_fd_v_curve_plotly(step_sizes, fd_errors):
+    
+    fig = go.Figure()
+
+    # 1. Add Trace: FD Absolute Error
+    fig.add_trace(
+        go.Scatter(
+            x=step_sizes, 
+            y=fd_errors, 
+            name="Central Difference Error",
+            mode="lines+markers",
+            line=dict(color="#9467bd", width=3),  # Muted purple
+            marker=dict(symbol="circle", size=8),
+            hovertemplate='Step Size (h): %{x:.1e}<br>Absolute Error: %{y:.1e}<extra></extra>'
+        )
+    )
+
+    # 2. Add an invisible "floor" trace just to show where AD lives (machine zero)
+    # This emphasizes that AD doesn't have a step size; it just sits at ~0 error.
+    fig.add_trace(
+        go.Scatter(
+            x=[min(step_sizes), max(step_sizes)],
+            y=[1e-16, 1e-16],
+            name="VORJAX AD Error Bound (Machine Zero)",
+            mode="lines",
+            line=dict(color="black", width=2, dash="dot"),
+            hoverinfo="skip"
+        )
+    )
+
+    # 3. Styling and Layout
+    fig.update_layout(
+        title_text="<b>Finite Difference vs. Autodiff: The Step-Size Dilemma</b>",
+        title_x=0.5,
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(
+            x=0.5,
+            y=1.05,
+            xanchor="center",
+            yanchor="bottom",
+            orientation="h",
+            bgcolor="rgba(255, 255, 255, 0.9)"
+        ),
+        margin=dict(l=60, r=60, t=100, b=60)
+    )
+
+    # 4. Format X-axis (Log Scale)
+    fig.update_xaxes(
+        title_text="<b>Finite Difference Step Size (h)</b>", 
+        type="log",
+        exponentformat="e",
+        showgrid=True,
+        gridcolor="lightgrey",
+        # Ascending order is standard (1e-15 -> 1e-1)
+        autorange="reversed" if step_sizes[0] > step_sizes[-1] else True 
+    )
+
+    # 5. Format Y-axis (Log Scale)
+    fig.update_yaxes(
+        title_text="<b>Absolute Error vs. AD Gradient</b>", 
+        type="log",
+        exponentformat="e",
+        showgrid=True,
+        gridcolor="lightgrey"
+    )
+
+    # 6. Educational Annotations
+    # Floating on the left side (Round-off region)
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.05, y=0.85,
+        text="<b>Round-off Error</b><br>Dominates",
+        showarrow=False,
+        font=dict(color="#d62728", size=13),
+        bgcolor="rgba(255, 255, 255, 0.9)",
+        bordercolor="#d62728",
+        borderwidth=1
+    )
+
+    # Floating on the right side (Truncation region)
+    fig.add_annotation(
+        xref="paper", yref="paper",
+        x=0.95, y=0.85,
+        text="<b>Truncation Error</b><br>Dominates",
+        showarrow=False,
+        font=dict(color="#1f77b4", size=13),
+        bgcolor="rgba(255, 255, 255, 0.9)",
+        bordercolor="#1f77b4",
+        borderwidth=1
+    )
+
+    fig.show()
+
+def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, grad_truth):
+    
+    # Calculate Relative Errors against Lifting-Line Theory
+    fd_rel_errors = np.abs((np.array(fd_grads) - grad_truth) / grad_truth)
+    ad_rel_error = float(np.abs((np.asarray(exact_grad) - grad_truth) / grad_truth))
+
+    fig = go.Figure()
+
+    # 1. Add Trace: FD Relative Error vs Theory
+    fig.add_trace(
+        go.Scatter(
+            x=step_sizes, 
+            y=fd_rel_errors, 
+            name="Finite Difference Error",
+            mode="lines+markers",
+            line=dict(color="#d62728", width=3),  # Red
+            marker=dict(symbol="circle", size=8),
+            hovertemplate='Step Size (h): %{x:.1e}<br>FD Rel Error: %{y:.2e}<extra></extra>'
+        )
+    )
+
+    # 2. Add Trace: AD Relative Error vs Theory (Flat Line)
+    fig.add_trace(
+        go.Scatter(
+            x=[min(step_sizes), max(step_sizes)],
+            y=[ad_rel_error, ad_rel_error],
+            name=f"Autodiff Error Floor (Grid Limit)",
+            mode="lines",
+            line=dict(color="#1f77b4", width=3, dash="dash"), # Blue dashed
+            hovertemplate=f'AD Rel Error (No Step Size): {ad_rel_error:.2e}<extra></extra>'
+        )
+    )
+
+    # 3. Styling and Layout
+    fig.update_layout(
+        title_text="<b>Gradient Accuracy vs. Lifting-Line Theory</b>",
+        title_x=0.5,
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(
+            x=0.5,
+            y=1.05,
+            xanchor="center",
+            yanchor="bottom",
+            orientation="h",
+            bgcolor="rgba(255, 255, 255, 0.9)"
+        ),
+        margin=dict(l=60, r=60, t=100, b=60)
+    )
+
+    # 4. Format X-axis (Log Scale)
+    fig.update_xaxes(
+        title_text="<b>Finite Difference Step Size (h)</b>", 
+        type="log",
+        exponentformat="e",
+        showgrid=True,
+        gridcolor="lightgrey",
+        autorange="reversed" if step_sizes[0] > step_sizes[-1] else True 
+    )
+
+    # 5. Format Y-axis (Log Scale)
+    fig.update_yaxes(
+        title_text="<b>Relative Error vs. Theoretical Truth</b>", 
+        type="log",
+        exponentformat="e",
+        showgrid=True,
+        gridcolor="lightgrey"
+    )
+
+    # 6. Annotations
+    fig.add_annotation(
+        x=np.log10(step_sizes[len(step_sizes)//2]), # Middle of the plot
+        y=np.log10(ad_rel_error),
+        text="VLM Grid Discretization Limit",
+        showarrow=True,
+        arrowhead=2,
+        ax=0,
+        ay=-40,
+        font=dict(color="#1f77b4", size=12)
+    )
+
+    fig.show()
+
+def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones, grad_FD=None, error_FD=None):
+    
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # --- Primary Y: Gradients ---
+    fig.add_trace(
+        go.Scatter(
+            x=ARs, y=grad_AD, 
+            name="VORJAX AD Gradient",
+            mode="lines+markers",
+            line=dict(color="#1f77b4", width=3),
+            marker=dict(symbol="circle", size=8)
+        ), secondary_y=False
+    )
+    
+    if grad_FD is not None and len(grad_FD) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=ARs, y=grad_FD, 
+                name="Central Difference (FD)",
+                mode="markers",
+                marker=dict(color="orange", symbol="x", size=8, line=dict(width=2))
+            ), secondary_y=False
+        )
+
+    fig.add_trace(
+        go.Scatter(
+            x=ARs, y=grad_jones, 
+            name="Jones Slender Wing Theory",
+            mode="lines",
+            line=dict(color="black", width=3, dash="dash")
+        ), secondary_y=False
+    )
+
+    # --- Secondary Y: Errors ---
+    error_AD_pct = np.array(error_AD) * 100.0
+    fig.add_trace(
+        go.Scatter(
+            x=ARs, y=error_AD_pct, 
+            name="AD Relative Error vs Jones",
+            mode="lines+markers",
+            line=dict(color="#d62728", width=2, dash="dot"),
+            marker=dict(symbol="square", size=6)
+        ), secondary_y=True
+    )
+
+    if error_FD is not None and len(error_FD) > 0:
+        error_FD_pct = np.array(error_FD) * 100.0
+        fig.add_trace(
+            go.Scatter(
+                x=ARs, y=error_FD_pct, 
+                name="FD Relative Error vs Jones",
+                mode="lines+markers",
+                line=dict(color="orange", width=2, dash="dot"),
+                marker=dict(symbol="x", size=6)
+            ), secondary_y=True
+        )
+
+    # --- Layout & Styling ---
+    fig.update_layout(
+        title_text="<b>Delta Wing Aspect Ratio Sweep: VLM vs. Slender Wing Theory</b>",
+        title_x=0.5,
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(x=0.02, y=0.98, bgcolor="rgba(255, 255, 255, 0.9)", bordercolor="black", borderwidth=1),
+        margin=dict(l=60, r=60, t=80, b=60)
+    )
+
+    fig.update_xaxes(title_text="<b>Aspect Ratio (AR)</b>", showgrid=True, gridcolor="lightgrey")
+    fig.update_yaxes(title_text="<b>Gradient (C<sub>L&alpha;</sub>) [rad<sup>-1</sup>]</b>", 
+                     color="#1f77b4", secondary_y=False, showgrid=True, gridcolor="lightgrey", rangemode="tozero")
+    fig.update_yaxes(title_text="<b>Relative Error [%]</b>", 
+                     color="#d62728", secondary_y=True, showgrid=False, rangemode="tozero")
+
+    return fig
+
+def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_truth):
+    
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    # --- Primary Y: AD Gradient Convergence ---
+    fig.add_trace(
+        go.Scatter(
+            x=n_panels, 
+            y=grad_AD, 
+            name="VORJAX AD Gradient",
+            mode="lines+markers",
+            line=dict(color="#1f77b4", width=3), # Blue
+            marker=dict(size=8),
+            hovertemplate='Panels: %{x}<br>Gradient: %{y:.4f}<extra></extra>'
+        ), secondary_y=False
+    )
+
+    # Primary Y: Truth Line
+    fig.add_trace(
+        go.Scatter(
+            x=[n_panels[0], n_panels[-1]], 
+            y=[grad_truth, grad_truth],
+            name="Jones Theory Truth",
+            mode="lines",
+            line=dict(color="black", width=3, dash="dash"),
+            hoverinfo="skip"
+        ), secondary_y=False
+    )
+
+    # --- Secondary Y: VRAM Memory Usage ---
+    fig.add_trace(
+        go.Scatter(
+            x=n_panels, 
+            y=memory_gb, 
+            name="Peak VRAM Allocation",
+            mode="lines+markers",
+            line=dict(color="#2ca02c", width=3), # Green
+            marker=dict(symbol="square", size=8),
+            hovertemplate='Panels: %{x}<br>VRAM: %{y:.2f} GB<extra></extra>'
+        ), secondary_y=True
+    )
+
+    # --- Layout & Styling ---
+    fig.update_layout(
+        title_text="<b>Delta Wing: Gradient Convergence vs. Memory Cost</b>",
+        title_x=0.5,
+        template="plotly_white",
+        hovermode="x unified",
+        legend=dict(
+            x=0.05, y=0.5, 
+            bgcolor="rgba(255, 255, 255, 0.9)", 
+            bordercolor="black", borderwidth=1
+        ),
+        margin=dict(l=60, r=60, t=80, b=60)
+    )
+
+    # Format X-axis (Log Scale for doubling panels)
+    fig.update_xaxes(
+        title_text="<b>Number of Panels (N)</b>", 
+        type="log",
+        tickvals=n_panels, # Force ticks only on the values you tested
+        ticktext=[str(val) for val in n_panels],
+        showgrid=True, 
+        gridcolor="lightgrey"
+    )
+    
+    # Format Primary Y-axis (Linear for Gradient)
+    fig.update_yaxes(
+        title_text="<b>Gradient (C<sub>L&alpha;</sub>) [rad<sup>-1</sup>]</b>", 
+        color="#1f77b4", 
+        secondary_y=False, 
+        showgrid=True, 
+        gridcolor="lightgrey", 
+    )
+    
+    # Format Secondary Y-axis (Log Scale for O(N^2) memory)
+    fig.update_yaxes(
+        title_text="<b>Peak GPU Memory [GB]</b>", 
+        color="#2ca02c", 
+        type="log",
+        secondary_y=True, 
+        showgrid=False # Disabled to prevent gridline clashing
+    )
+
+    return fig
+
+# Execution ------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
@@ -270,30 +806,140 @@ if __name__ == "__main__":
 
     # avl_b737_data = parse_avl_file(Path(geometry_file))
     # vehicle = convert_to_RCAIDE(avl_b737_data)
-    vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
+    
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
+    alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
+    lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+
     grad_map = GradientMap(
-        state_inputs=(("aerodynamics", "angles", "alpha"), ("freestream", "mach_number")),
-        system_inputs=(("wings", "wing", "spans", "projected"), ("wings", "wing", "chords", "root")),
-        state_outputs=(("aerodynamics", "coefficients", "lift", "total"), ("aerodynamics", "coefficients", "drag", "total"))
+        state_inputs=(alpha_path,),
+        state_outputs=(lift_path,)
     )
 
-    results = VORJAX_test_run(vehicle, alpha=2.0, Mach=0.00, grad_map=grad_map, debug_mode=True)
-    CL, CD, CM, alpha, analysis_data, jac = results
+    TEST_ELLIPTICAL = False
+    TEST_DELTA = True
+    
+    PLOT_WINGS = False
+    
+    DEBUG = False
 
-    print(f"\n--- Extracted VORJAX Results ---")
-    print(f"Alpha: {alpha}")
-    print(f"CL: {CL:.5f}")
-    print(f"CD: {CD:.5f}")
-    print(f"CM: {CM:.5f}")
-    print(f"Jac: {jac}")
+    # Elliptical Wing Test ---------------------------------------------------------------------------------------------
+    if TEST_ELLIPTICAL:
 
+        max_segments = 20
+        AR = 10.0
+        grad_truth = 2.0 * jnp.pi/(1 + 2 / AR)
+        step_sizes = jnp.logspace(-1, -15, 15)
+        
+        CL = []
+        grad_AD = []
+        error_AD = []
+        
+        grad_FD = []
+        error_FD = []
 
-    # 3. Plot the Vortex Distribution
-    # VD = data['vortex_distribution']
-    # fig = plot_vlm_panels(VD, panel_values=np.asarray(data['pressure_coefficients'].squeeze(0)))
-    # fig.show()
+        # vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
+        for n_seg in trange(1, max_segments+1, desc="Running Elliptical Test Cases"):
+            vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=n_seg)
+
+            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            f_st, f_sys, f_setts, jac = results
+
+            CL.append(ru.get_target(f_st, lift_path).item(0))
+            grad_AD.append(jac.item(0))
+            error_AD.append(abs(jac.item(0) - grad_truth)/grad_truth)
+
+            if PLOT_WINGS:
+                if n_seg % 5 == 0:
+                    fig = plot_vlm_panels(VD=f_sys.analysis_data['vortex_distribution'])
+                    fig.show()
+            
+        vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=max_segments)
+        for i in trange(len(step_sizes), desc="Running Elliptical FD Tests"):
+            h = step_sizes[i]
+
+            # Forward Step
+            res_fwd = VORJAX_test_run(vehicle, alpha=(2.0 * Units.deg) + h, Mach=0.00, debug_mode=DEBUG)
+            CL_fwd = ru.get_target(res_fwd[0], lift_path).item(0)
+            
+            # Backward Step
+            res_bwd = VORJAX_test_run(vehicle, alpha=(2.0 * Units.deg) - h, Mach=0.00, debug_mode=DEBUG)
+            CL_bwd = ru.get_target(res_bwd[0], lift_path).item(0)
+            
+            # Central Difference
+            g_FD = (CL_fwd - CL_bwd) / (2 * h)
+            grad_FD.append(g_FD)
+            
+            # Calculate absolute error against JAX
+            error_FD.append(abs(g_FD - grad_AD[-1]))
+
+        n_segments_list = list(range(1, max_segments+1))
+        plot_elliptical_convergence_plotly(n_segments_list, grad_AD, error_AD, grad_truth)
+        plot_fd_v_curve_plotly(step_sizes, error_FD)
+        plot_theoretical_error_comparison_plotly(step_sizes, grad_FD, grad_AD[-1], grad_truth)
+
+    # Delta Wing Test ---------------------------------------------------------------------------------------------
+    if TEST_DELTA:
+        CL = []
+        grad_AD = []
+        error_AD = []
+
+        vram_gb = []
+
+        ARs = jnp.linspace(0.1, 2.5, 25)
+        grad_jones = jnp.pi * ARs / 2.0
+        step_sizes = jnp.logspace(-1, -15, 15)
+
+        n_cws   = [4, 8, 8, 16, 16, 32, 32, 64, 64]
+        n_sws   = [4, 4, 8, 8,  16, 16, 32, 32, 64]
+
+        vehicle = VORJAX_delta_wing(AR=ARs[0])
+        for i in trange(len(n_sws), desc="Running Delta Wing Panelization Tests"):
+            n_sw = n_sws[i]
+            n_cw = n_cws[i]
+
+            # Forward Step
+            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg, Mach=0.00, n_sw=n_sw, n_cw=n_cw, grad_map=grad_map, debug_mode=DEBUG)
+            f_st, f_sys, f_setts, jac = results
+
+            jac.block_until_ready()
+            stats = jax.devices()[0].memory_stats()
+            peak_vram = stats.get('peak_bytes_in_use', 0) / (1024 ** 3)
+            vram_gb.append(peak_vram)
+            
+            CL.append(ru.get_target(f_st, lift_path).item(0))
+            grad_AD.append(jac.item(0))
+            error_AD.append(abs(jac.item(0) - grad_jones[0])/grad_jones[0])
+
+        
+        fig = plot_delta_convergence_and_memory_plotly([s * c for s, c in zip(n_sws, n_cws)], grad_AD, vram_gb, grad_jones[0])
+        fig.show()
+
+        CL = []
+        grad_AD = []
+        error_AD = []
+
+        for i in trange(len(ARs), desc="Running Delta Wing Test Cases"):
+            vehicle = VORJAX_delta_wing(AR=ARs[i])
+            grad_truth = grad_jones[i]
+
+            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            f_st, f_sys, f_setts, jac = results
+
+            CL.append(ru.get_target(f_st, lift_path).item(0))
+            grad_AD.append(jac.item(0))
+            error_AD.append(abs(jac.item(0) - grad_truth)/grad_truth)
+
+            if PLOT_WINGS:
+                if int(i) % 10 == 0:
+                    fig = plot_vlm_panels(f_sys.analysis_data['vortex_distribution'])
+                    fig.show()
+        
+        fig = plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones)
+        fig.show()
+        
+        
 
     print("Done!")

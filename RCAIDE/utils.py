@@ -9,7 +9,7 @@ from typing import Callable, Iterable, Optional
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 from dataclasses import dataclass
 
 import jax
@@ -49,9 +49,9 @@ def outputs(*outputs: str):
 
 class Token(eqx.Module):
 
-    state: State
-    system: System
-    settings: Settings
+    state: eqx.Module
+    system: eqx.Module
+    settings: eqx.Module
 
 @dataclass(frozen=True)
 class PathTuple:
@@ -59,13 +59,18 @@ class PathTuple:
     path: tuple
     slice_obj: slice
 
-    def __init__(self, path: tuple = (slice(None),)):
-        if isinstance(path[-1], slice):
-            object.__setattr__(self, 'path', path[:-1])
-            object.__setattr__(self, 'slice_obj', path[-1])
+    def __init__(self, path: tuple | Self = (slice(None),)):
+        if isinstance(path, PathTuple):
+            object.__setattr__(self, 'path', path.path)
+            object.__setattr__(self, 'slice_obj', path.slice_obj)
+            
         else:
-            object.__setattr__(self, 'path', path)
-            object.__setattr__(self, 'slice_obj', slice(None))
+            if isinstance(path[-1], slice):
+                object.__setattr__(self, 'path', path[:-1])
+                object.__setattr__(self, 'slice_obj', path[-1])
+            else:
+                object.__setattr__(self, 'path', path)
+                object.__setattr__(self, 'slice_obj', slice(None))
 
     def __len__(self):
         return len(self.path)

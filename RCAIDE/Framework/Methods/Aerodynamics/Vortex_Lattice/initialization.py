@@ -52,8 +52,13 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     # Standard Python Control Flow (Safe outside of @jax.jit)
     wings = system.wings
     
+    main_wing = None
     if hasattr(wings, 'main_wing'):
         main_wing = wings.main_wing
+    elif len(wings) == 1:
+        main_wing = wings[0]
+    
+    if main_wing is not None:
         c_bar = main_wing.chords.mean_aerodynamic
         x_mac = main_wing.aerodynamic_center[0] + main_wing.origin[0][0]
         z_mac = main_wing.aerodynamic_center[2] + main_wing.origin[0][2]
@@ -78,12 +83,8 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     x_cg = cg_array[0][0]
     z_cg = cg_array[0][2]
     
-    if x_cg == 0.0:
-        x_m = x_mac
-        z_m = z_mac
-    else:
-        x_m = x_cg
-        z_m = z_cg
+    x_m = jnp.where(x_cg == 0.0, x_mac, x_cg)
+    z_m = jnp.where(x_cg == 0.0, z_mac, z_cg)
 
     # 3. Pack into strict JAX arrays
     # We use jnp.atleast_1d and explicit array shapes to match your jnp.empty structures
