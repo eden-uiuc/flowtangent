@@ -181,17 +181,20 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
         sweep_sq = jnp.square(true_sweep_LE)[None, :]
         subsonic_LE_factor = jnp.where(
             prandtl_glauert_beta_sq < sweep_sq,
-            jnp.sqrt(jnp.maximum(sweep_sq - prandtl_glauert_beta_sq, 0.0)),
+            jnp.sqrt(jnp.maximum(sweep_sq - prandtl_glauert_beta_sq, 1e-16)), 
             0.0
         )
 
-        strip_quarter_chord_offset = jax.ops.segment_sum(quarter_chord_offset * le_mask_float, strip_ids,
-                                                         num_segments=VD.total_strips)
+        strip_quarter_chord_offset = jax.ops.segment_sum(
+            quarter_chord_offset * le_mask_float,
+            strip_ids,
+            num_segments=VD.total_strips
+        )
         strip_DCP = seg_sum(DCP * le_mask_float[None, :])
 
         singularity_strength_LE = jnp.where(
             subsonic_LE_factor > 0,
-            singularity_strength_LE / stripwise_panels[None, :] / subsonic_LE_factor,
+            singularity_strength_LE / stripwise_panels[None, :] / jnp.maximum(subsonic_LE_factor, 1e-16),
             singularity_strength_LE
         )
 

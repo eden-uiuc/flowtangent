@@ -229,7 +229,8 @@ class Airfoil(Component):
 
         # Force LE to exactly (0, 0) and TE to exactly (1, y)
         y_up_interp[0], y_lo_interp[0] = 0.0, 0.0
-        common_x[0], common_x[-1] = 0.0, 1.0
+        common_x = common_x.at[0].set(0.0)
+        common_x = common_x.at[-1].set(1.0)
 
         # 8. Calculate Aerodynamic Properties
         camber = (y_up_interp + y_lo_interp) / 2.0

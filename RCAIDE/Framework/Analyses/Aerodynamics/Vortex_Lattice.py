@@ -37,13 +37,13 @@ from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, expand
 
 class SupersonicSettings(eqx.Module):
 
-    peak_mach_number                        = 1.04
-    begin_drag_rise_mach_number             = 0.95
-    end_drag_rise_mach_number               = 1.2
-    transonic_drag_multiplier               = 1.25
-    volume_wave_drag_scaling                = 3.2
-    begin_blend_mach                        = 0.91
-    end_blend_mach                          = 0.99
+    peak_mach_number: float                        = 1.04
+    begin_drag_rise_mach_number: float             = 0.95
+    end_drag_rise_mach_number: float               = 1.2
+    transonic_drag_multiplier: float               = 1.25
+    volume_wave_drag_scaling: float               = 3.2
+    begin_blend_mach: float                        = 0.91
+    end_blend_mach: float                          = 0.99
     cross_sectional_area_calculation_type:  str = eqx.field(static=True, default='Fixed')
     wave_drag_type:                         str = eqx.field(static=True, default='Raymer')
 

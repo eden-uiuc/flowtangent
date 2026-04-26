@@ -22,12 +22,13 @@ import RCAIDE.utils as ru
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas
 from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from RCAIDE.Library.Components.Airfoils import Airfoil
 
 from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices
+from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices, SupersonicSettings
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -306,6 +307,56 @@ def VORJAX_delta_wing(AR=2.0):
 
     return system
 
+def VORJAX_ONERA_M6():
+    """
+    ONERA M6 Geometry Definition.
+    src: https://www.grc.nasa.gov/www/wind/valid/m6wing/m6wing.html
+    """
+
+    AR = 3.8
+    taper = 0.56
+    
+    sweep_qc = 26.7 * Units.deg
+    sweep_le = 30.0 * Units.deg
+    sweep_te = 15.8 * Units.deg
+
+    c_root = 805.9 * Units.mm
+    semispan = 1196.3 * Units.mm
+
+    mac = 0.64607 * Units.m
+
+    segments = (
+        WingSegment(
+            tag="ONERA M6",
+            percent_span_location=0.0,
+            root_chord_percent=1.0,
+            sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
+            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+        ),
+        WingSegment(
+            tag="Tip",
+            percent_span_location=1.0,
+            root_chord_percent=taper,
+            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+        )
+    )
+    
+    onera_wing = Wing(
+        tag="Main Wing",
+        symmetric=True,
+        segments=segments,
+        aspect_ratio=AR,
+        taper=0.56,
+        origin=jnp.array([[0.0, 0.0, 0.0]]),
+        chords=WingChords(root=c_root, mean_aerodynamic=mac),
+        spans=WingDimensions(projected=2 * semispan),
+    ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
+
+    system = Aircraft(tag='ONERA M6 Container', areas=onera_wing.areas).add_subcomponent(onera_wing)
+    system = eqx.tree_at(lambda s: s.mass_properties.center_of_gravity, system, jnp.array([[0.0, 0.0, 0.0]]))
+
+    return system
+
 def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
@@ -319,14 +370,23 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
         (jnp.zeros((1, 1)), jnp.zeros((1, 1)), jnp.zeros((1, 1)))
     )
 
+    if isinstance(alpha, list | jnp.ndarray) and isinstance(Mach, list | jnp.ndarray):
+        assert len(alpha) == len(Mach)
+        alpha = jnp.array(alpha).reshape(-1, 1)
+        Mach = jnp.array(Mach).reshape(-1, 1)
+    else:
+        alpha = jnp.array([alpha])
+        Mach = jnp.array([Mach])
+    
+    initial_state = eqx.tree_at(lambda s: s.aerodynamics.angles.alpha, initial_state, alpha)
+    initial_state = eqx.tree_at(lambda s: s.freestream.mach_number, initial_state, Mach)
+
     initial_state = eqx.tree_at(lambda s: s.freestream.speed, initial_state, jnp.array([100.0]))
-    initial_state = eqx.tree_at(lambda s: s.freestream.mach_number, initial_state, jnp.array([Mach]))
     initial_state = eqx.tree_at(lambda s: s.freestream.density, initial_state, jnp.array([1.0]))
     initial_state = eqx.tree_at(lambda s: s.freestream.temperature, initial_state, jnp.array([273.15]))
     initial_state = eqx.tree_at(lambda s: s.frames.inertial.velocity_vector, initial_state, jnp.array([100.0, 0., 0.]))
-    initial_state = eqx.tree_at(lambda s: s.aerodynamics.angles.alpha, initial_state, alpha * jnp.ones(1))
 
-    initial_state = initial_state.expand_rows(1)
+    initial_state = initial_state.expand_rows(len(alpha))
 
     initial_system = vehicle
 
@@ -335,8 +395,14 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
         spanwise_vortices=n_sw,
         chordwise_vortices=n_cw
     )
+
+    mach_settings = SupersonicSettings(
+        peak_mach_number = 2.0,
+        begin_blend_mach=0.7,
+        end_blend_mach=1.2
+    )
     
-    aero_settings = VLMSettings(vortices=vortices, VORLAX_empirical_corrections=False)
+    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, VORLAX_empirical_corrections=True)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -819,11 +885,12 @@ if __name__ == "__main__":
     )
 
     TEST_ELLIPTICAL = False
-    TEST_DELTA = True
+    TEST_DELTA = False
+    TEST_ONERA = True
     
-    PLOT_WINGS = False
+    PLOT_WINGS = True
     
-    DEBUG = False
+    DEBUG = True
 
     # Elliptical Wing Test ---------------------------------------------------------------------------------------------
     if TEST_ELLIPTICAL:
@@ -880,7 +947,7 @@ if __name__ == "__main__":
         plot_fd_v_curve_plotly(step_sizes, error_FD)
         plot_theoretical_error_comparison_plotly(step_sizes, grad_FD, grad_AD[-1], grad_truth)
 
-    # Delta Wing Test ---------------------------------------------------------------------------------------------
+    # Delta Wing Test --------------------------------------------------------------------------------------------------
     if TEST_DELTA:
         CL = []
         grad_AD = []
@@ -940,6 +1007,49 @@ if __name__ == "__main__":
         fig = plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones)
         fig.show()
         
+    # ONERA M6 Mach Sweep ----------------------------------------------------------------------------------------------
+    if TEST_ONERA:
         
+        alpha = [3.06 * Units.deg] * 21
+        Mach =  [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+
+        alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
+        lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+
+        grad_map = GradientMap(
+            state_inputs=(alpha_path,),
+            state_outputs=(lift_path,)
+        )
+
+        vehicle = VORJAX_ONERA_M6()
+
+        results = VORJAX_test_run(vehicle, alpha, Mach, n_sw=40, n_cw=12, grad_map=grad_map, debug_mode=DEBUG)
+        f_st, f_sys, f_setts, jac = results
+
+
+        CL = ru.get_target(f_st, lift_path)
+        dCL_dAlpha = jnp.array([jac[i, 0, i] for i in range(21)]).reshape(CL.shape)
+
+        print("\nONERA M6 Mach Sweep\n"+"-"*42)
+        for i in range(CL.shape[0]):
+            print(f"M: {Mach[i]: .2f}, CL: {float(CL[i, 0]):.3e}, dAlpha: {float(dCL_dAlpha[i, 0]):.3e}")
+
+        if PLOT_WINGS:
+            data = f_sys.analysis_data
+            base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
+            base_panels.show()
+
+            # m03 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][0], title="ONERA M6 DCp, M = 0.3")
+            # m03.show()
+
+            m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][11], title="ONERA M6 Flag, M = 1.1")
+            m11_flags.show()
+
+            m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][11], title="ONERA M6 DCp, M = 1.1")
+            m11_dcp.show()
+
+            # m20 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][-1], title="ONERA M6 DCp, M = 2.0")
+            # m20.show()
+
 
     print("Done!")

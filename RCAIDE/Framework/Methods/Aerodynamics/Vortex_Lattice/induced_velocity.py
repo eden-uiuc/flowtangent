@@ -178,7 +178,7 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
 
     # WWAVE: Principal Part of the Integral (Self-Influence / Wave Drag)
     N = U.shape[1]
-    COX = CHORD / RNMAX
+    COX = CHORD # / RNMAX
     T2 = T ** 2
 
     WWAVE_cond = B2 > T2[None, :]
@@ -205,8 +205,10 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
         jnp.where(j_indices == recv_idx + 1, -1.0, 0.0))
     )[None, :]
 
+    is_recv_sonic = sonic_mask[:, recv_idx][:, None]
+
     # Overwrite the influence of sonic sending panels with the smoothing stencil
-    W = jnp.where(sonic_mask, sonic_row, W)
+    W = jnp.where(is_recv_sonic, sonic_row, W)
 
     return U, V, W
 
@@ -243,18 +245,21 @@ def compute_C_mn(VD, Mach):
     # Beta-Squared = Mach^2 - 1.0 --------------------------------------------------------------------------------------
     beta_sq = (Mach.squeeze(1) ** 2 - 1.0).astype(jnp.float32)
     beta_sq_exp = beta_sq[:, None] if beta_sq.ndim == 1 else beta_sq
-    is_subsonic = beta_sq_exp < 1.0
+    is_subsonic = beta_sq_exp < 0.0
 
     # Sonic Mask Pre-Calc ----------------------------------------------------------------------------------------------
     t_sq_fore = jnp.where(VD.is_leading_edge, 0.0, jnp.roll(t_sq, shift=1))
     t_sq_aft = jnp.where(VD.is_trailing_edge, 0.0, jnp.roll(t_sq, shift=-1))
 
     sonic_check = (beta_sq_exp - t_sq_fore[None, :]) * (beta_sq_exp - t_sq_aft[None, :])
-    sonic_mask = (sonic_check < 0)
+    sonic_mask = (sonic_check < 0) & VD.is_leading_edge
 
     # Check for singularity (Mach cone passes through panel)
     singularity_flag = jnp.where(sonic_mask, 0, 1)
     singularity_flag = jnp.where(is_subsonic, 1, singularity_flag)
+
+    safe_beta_sq = jnp.maximum(t_sq_fore[None, :], t_sq_aft[None, :]) + 0.01
+    beta_sq_exp = jnp.where(sonic_mask, safe_beta_sq, beta_sq_exp)
 
     # C_mn Calculation -------------------------------------------------------------------------------------------------
 
@@ -289,8 +294,8 @@ def compute_C_mn(VD, Mach):
         RTV2 = YSQ2 + ZSQ
 
         # Broadcast the Mach/Time dimension here: (n_time, 1) * (N,) -> (n_time, N)
-        R01 = beta_sq * RTV1[None, :]
-        R02 = beta_sq * RTV2[None, :]
+        R01 = beta_sq_exp * RTV1[None, :]
+        R02 = beta_sq_exp * RTV2[None, :]
 
         # --- Subsonic Kernel ---
         U_sub, V_sub, W_sub = subsonic_induction(
@@ -308,7 +313,7 @@ def compute_C_mn(VD, Mach):
             RO1=R01,
             RO2=R02,
             T=t,
-            B2=beta_sq,
+            B2=beta_sq_exp,
             TOLSQ=tol_sq,
         )
 
@@ -328,7 +333,7 @@ def compute_C_mn(VD, Mach):
             RO1=R01,
             RO2=R02,
             T=t,
-            B2=beta_sq,
+            B2=beta_sq_exp,
             TOL=tol,
             TOLSQ=tol_sq,
             TOLSQ2=tol_sq_scl,
