@@ -26,7 +26,7 @@ from RCAIDE.utils import inputs, outputs
 
 
 @jax.jit
-def subsonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, X1, Y1, X2, Y2, RTV1, RTV2):
+def subsonic_induction(z, x1_sq, r_o1, x2_sq, r_o2, x_ty, t, beta_sq, z_sq, tol_sq, x1, y1, x2, y2, r_tv1, r_tv2):
     """
     Pure JAX translation of the VORLAX subsonic Biot-Savart induction.
 
@@ -35,93 +35,92 @@ def subsonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, X1, Y1, 
 
     Variable Glossary (Miranda-Elliott-Baker Local Swept Coordinate System):
     -------------------------------------------------------------------------
-    Z          : Vertical distance from the collocation point to the vortex plane.
-    X1, X2     : Streamwise distances from the collocation pt to vortex endpoints 1 and 2.
-    Y1, Y2     : Spanwise distances from the collocation pt to vortex endpoints 1 and 2.
-    XSQ1, XSQ2 : Squared streamwise distances (X1^2, X2^2).
-    RTV1, RTV2 : Squared transverse distances (Y^2 + Z^2) to endpoints.
-    B2         : Compressibility factor (M^2 - 1). Negative in subsonic flow.
-    RO1, RO2   : Compressibility-scaled transverse distances (B2 * RTV).
-    RAD1, RAD2 : "Effective" compressible distances to endpoints sqrt(X^2 - B^2 * RTV^2).
-    T          : Tangent of the bound vortex sweep angle.
-    XTY        : Cross-term projection mapping the distance along the swept vortex line.
-    TOLSQ      : Squared singularity tolerance (prevents div-by-zero near the filament).
-    FB1, FB2   : Bound vortex influence terms.
-    FT1, FT2   : Trailing vortex influence terms.
-    QB         : Combined bound vortex induction parameter.
+    z               : Vertical distance from the collocation point to the vortex plane.
+    x1, x2          : Streamwise distances from the collocation pt to vortex endpoints 1 and 2.
+    y1, y2          : Spanwise distances from the collocation pt to vortex endpoints 1 and 2.
+    x_sq1, x_sq2    : Squared streamwise distances (X1^2, X2^2).
+    r_tv1, r_tv2    : Squared transverse distances (Y^2 + Z^2) to endpoints.
+    beta_sq         : Compressibility factor (M^2 - 1). Negative in subsonic flow.
+    r_o1, r_o2      : Compressibility-scaled transverse distances (B2 * RTV).
+    r1, r2          : "Effective" compressible distances to endpoints sqrt(X^2 - B^2 * RTV^2).
+    t               : Tangent of the bound vortex sweep angle.
+    x_ty            : Cross-term projection mapping the distance along the swept vortex line.
+    tol_sq          : Squared singularity tolerance (prevents div-by-zero near the filament).
+    F_b2, F_b2      : Bound vortex influence terms.
+    F_t1, F_t2      : Trailing vortex influence terms.
     """
-    CPI = 4.0 * jnp.pi
+    C_pi = 4.0 * jnp.pi
 
     # 1. Effective Compressible Distances
     # Using 1e-16 prevents exact 0.0 which would cause NaN gradients in downstream divisions
-    RAD1 = jnp.sqrt(jnp.maximum(XSQ1 - RO1, 1e-16))
-    RAD2 = jnp.sqrt(jnp.maximum(XSQ2 - RO2, 1e-16))
+    r1 = jnp.sqrt(jnp.maximum(x1_sq - r_o1, 1e-16))
+    r2 = jnp.sqrt(jnp.maximum(x2_sq - r_o2, 1e-16))
 
     # 2. Bound Vortex Denominator
-    TBZ = (jnp.square(T) - B2) * ZSQ
-    DENOM = jnp.maximum(jnp.square(XTY) + TBZ, TOLSQ)
+    t_Bz = (jnp.square(t) - beta_sq) * z_sq
+    safe_denom = jnp.maximum(jnp.square(x_ty) + t_Bz, tol_sq)
 
     # 3. DRY Helper Function with NaN-safe division
-    def calc_F(X, Y, RAD, RTV):
-        # FB: Influence contribution from the bound (swept) segment
-        FB = (T * X - B2 * Y) / RAD
+    def calc_F(x, y, r, r_tv):
+        # F_b: Influence contribution from the bound (swept) segment
+        F_b = (t * x - beta_sq * y) / r
 
-        # FT: Influence contribution from the semi-infinite trailing leg
+        # F_t: Influence contribution from the semi-infinite trailing leg
         # safe_denom prevents divide-by-zero in the unselected jnp.where branch
-        safe_denom = jnp.where(RTV < TOLSQ, 1.0, RAD * RTV)
-        FT = jnp.where(RTV < TOLSQ, 0.0, (X + RAD) / safe_denom)
+        safe_denom = jnp.where(r_tv < tol_sq, 1.0, r * r_tv)
+        F_t = jnp.where(r_tv < tol_sq, 0.0, (x + r) / safe_denom)
 
-        return FB, FT
+        return F_b, F_t
 
     # Evaluate for Endpoint 1 (Left/A) and Endpoint 2 (Right/B)
-    FB1, FT1 = calc_F(X1, Y1, RAD1, RTV1)
-    FB2, FT2 = calc_F(X2, Y2, RAD2, RTV2)
+    F_b1, F_t1 = calc_F(x1, y1, r1, r_tv1)
+    F_b2, F_t2 = calc_F(x2, y2, r2, r_tv2)
 
     # 4. Final Velocity Assembly
-    QB = (FB1 - FB2) / DENOM
-    ZETAPI = Z / CPI
+    Q_b = (F_b1 - F_b2) / safe_denom
+    z_pi = z / C_pi
 
     # U: Streamwise induced velocity (Perturbation velocity)
-    U = jnp.where(ZSQ < TOLSQ, 0.0, ZETAPI * QB)
+    U = jnp.where(z_sq < tol_sq, 0.0, z_pi * Q_b)
 
     # V: Spanwise induced velocity (Sidewash)
-    V = jnp.where(ZSQ < TOLSQ, 0.0, ZETAPI * (FT1 - FT2 - QB * T))
+    V = jnp.where(z_sq < tol_sq, 0.0, z_pi * (F_t1 - F_t2 - Q_b * t))
 
     # W: Normal induced velocity (Downwash)
-    W = -(QB * XTY + FT1 * Y1 - FT2 * Y2) / CPI
+    W = -(Q_b * x_ty + F_t1 * y1 - F_t2 * y2) / C_pi
 
     return U, V, W
 
 
 @jax.jit
-def supersonic_in_plane(RAD1, RAD2, Y1, Y2, TOL, XTY, CPI):
+def supersonic_in_plane(r1, r2, y1, y2, tol, x_ty, C_pi):
     """
     Pure JAX translation of the in-plane supersonic induction.
     Evaluates downwash analytically when the collocation point sits exactly
     in the Z=0 plane of the vortex (where RTV -> 0).
     """
     # AD-Safe Denominators (Prevents NaN gradients in unselected branches)
-    safe_Y1 = jnp.where(jnp.abs(Y1) > TOL, Y1, 1.0)
-    safe_Y2 = jnp.where(jnp.abs(Y2) > TOL, Y2, 1.0)
-    safe_XTY = jnp.where(jnp.abs(XTY) > TOL, XTY, 1.0)
+    safe_Y1 = jnp.where(jnp.abs(y1) > tol, y1, 1.0)
+    safe_Y2 = jnp.where(jnp.abs(y2) > tol, y2, 1.0)
+    safe_XTY = jnp.where(jnp.abs(x_ty) > tol, x_ty, 1.0)
 
-    F1 = jnp.where(jnp.abs(Y1) > TOL, RAD1 / safe_Y1, 0.0)
-    F2 = jnp.where(jnp.abs(Y2) > TOL, RAD2 / safe_Y2, 0.0)
+    F1 = jnp.where(jnp.abs(y1) > tol, r1 / safe_Y1, 0.0)
+    F2 = jnp.where(jnp.abs(y2) > tol, r2 / safe_Y2, 0.0)
 
-    W_in = jnp.where(jnp.abs(XTY) > TOL, (-F1 + F2) / (safe_XTY * CPI), 0.0)
+    W_in = jnp.where(jnp.abs(x_ty) > tol, (-F1 + F2) / (safe_XTY * C_pi), 0.0)
     return W_in
 
 
 @jax.jit
-def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, TOLSQ2, X1, Y1, X2, Y2, RTV1, RTV2,
-                         CHORD, RNMAX, sonic_mask, recv_idx):
+def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, tol_sq, tol, tol_sq2, x1, y1, x2, y2, r_tv1, r_tv2,
+                         c, sonic_mask, recv_idx):
     """
     Pure JAX translation of the VORLAX supersonic Biot-Savart induction.
 
     Variable Glossary (Supersonic Additions):
     -------------------------------------------------------------------------
-    CUTOFF     : Defines the boundary of the Mach cone interaction.
-    REPS       : Mach cone proximity threshold.
+    cutoff     : Defines the boundary of the Mach cone interaction.
+    reps       : Mach cone proximity threshold.
     valid1/2   : Boolean masks. True if the point lies inside the downstream Mach cone.
     WWAVE      : The Principal Part of the singular integral. Represents the 2D wave
                  drag contribution of the panel on itself (self-induction).
@@ -131,46 +130,46 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
     RFLAG      : Subsonic/Supersonic leading edge flag used downstream for LE suction.
     sonic_mask : Identifies panels exhibiting mathematical singularities at Mach=sec(sweep).
     """
-    CPI = 2.0 * jnp.pi
-    T2 = jnp.square(T)
-    ZETAPI = Z / CPI
-    CUTOFF = 0.8
+    C_pi = 2.0 * jnp.pi
+    t_sq = jnp.square(t)
+    z_pi = z / C_pi
+    cutoff = 0.8
 
     # Mach Cone Distances (Real only inside the cone)
-    RAD1 = jnp.where(XSQ1 > RO1, jnp.sqrt(jnp.maximum(XSQ1 - RO1, 1e-16)), 0.0)
-    RAD2 = jnp.where(XSQ2 > RO2, jnp.sqrt(jnp.maximum(XSQ2 - RO2, 1e-16)), 0.0)
+    r1 = jnp.where(x_sq1 > r_o1, jnp.sqrt(jnp.maximum(x_sq1 - r_o1, 1e-16)), 0.0)
+    r2 = jnp.where(x_sq2 > r_o2, jnp.sqrt(jnp.maximum(x_sq2 - r_o2, 1e-16)), 0.0)
 
     # Denominator Setup
-    DENOM = jnp.square(XTY) + (T2 - B2) * ZSQ
-    SIGN = jnp.where(DENOM < 0, -1.0, 1.0)
-    DENOM = jnp.where(jnp.abs(DENOM) < TOLSQ, SIGN * TOLSQ, DENOM)
+    safe_denom = jnp.square(x_ty) + (t_sq - beta_sq) * z_sq
+    sgn = jnp.where(safe_denom < 0, -1.0, 1.0)
+    safe_denom = jnp.where(jnp.abs(safe_denom) < tol_sq, sgn * tol_sq, safe_denom)
 
-    def calc_F(X, Y, XSQ, RO, RAD, RTV):
-        REPS = CUTOFF * XSQ
-        valid = (X >= TOL) & (RAD != 0.0) & (RO <= REPS) & (RTV >= TOLSQ)
+    def calc_F(x, y, x_sq, r_o, r, r_tv):
+        reps = cutoff * x_sq
+        valid = (x >= tol) & (r != 0.0) & (r_o <= reps) & (r_tv >= tol_sq)
 
         # AD-Safe denominators (only applied when 'valid' is True)
-        safe_RAD = jnp.where(valid, RAD, 1.0)
-        safe_RAD_RTV = jnp.where(valid, RAD * RTV, 1.0)
+        safe_r = jnp.where(valid, r, 1.0)
+        safe_rr_tv = jnp.where(valid, r * r_tv, 1.0)
 
         # 1.0 fallback is mathematically required by VORLAX supersonic integration
-        FB = jnp.where(valid, (T * X - B2 * Y) / safe_RAD, 1.0)
-        FT = jnp.where(valid, X / safe_RAD_RTV, 1.0)
+        F_b = jnp.where(valid, (t * x - beta_sq * y) / safe_r, 1.0)
+        F_t = jnp.where(valid, x / safe_rr_tv, 1.0)
 
-        return FB, FT
+        return F_b, F_t
 
-    FB1, FT1 = calc_F(X1, Y1, XSQ1, RO1, RAD1, RTV1)
-    FB2, FT2 = calc_F(X2, Y2, XSQ2, RO2, RAD2, RTV2)
+    F_b1, F_t1 = calc_F(x1, y1, x_sq1, r_o1, r1, r_tv1)
+    F_b2, F_t2 = calc_F(x2, y2, x_sq2, r_o2, r2, r_tv2)
 
     # Global Velocity Assembly
-    QB = (FB1 - FB2) / DENOM
-    U = ZETAPI * QB
-    V = ZETAPI * (FT1 - FT2 - QB * T)
-    W = -(QB * XTY + FT1 * Y1 - FT2 * Y2) / CPI
+    Q_b = (F_b1 - F_b2) / safe_denom
+    U = z_pi * Q_b
+    V = z_pi * (F_t1 - F_t2 - Q_b * t)
+    W = -(Q_b * x_ty + F_t1 * y1 - F_t2 * y2) / C_pi
 
     # In-Plane Singularity Override
-    in_plane = ZSQ < TOLSQ2
-    W_in = supersonic_in_plane(RAD1, RAD2, Y1, Y2, TOL, XTY, CPI)
+    in_plane = z_sq < tol_sq2
+    W_in = supersonic_in_plane(r1, r2, y1, y2, tol, x_ty, C_pi)
 
     U = jnp.where(in_plane, 0.0, U)
     V = jnp.where(in_plane, 0.0, V)
@@ -178,16 +177,15 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
 
     # WWAVE: Principal Part of the Integral (Self-Influence / Wave Drag)
     N = U.shape[1]
-    COX = CHORD # / RNMAX
-    T2 = T ** 2
+    t_sq = t ** 2
 
-    WWAVE_cond = B2 > T2[None, :]
-    WWAVE_output = -0.5 * jnp.sqrt(jnp.where(WWAVE_cond, B2 - T2[None, :], 1.0)) / jnp.maximum(COX, 1e-12)
+    W_wave_cond = beta_sq > t_sq[None, :]
+    W_wave_output = -0.5 * jnp.sqrt(jnp.where(W_wave_cond, beta_sq - t_sq[None, :], 1.0)) / jnp.maximum(c, 1e-12)
 
-    # Calculate WWAVE for all senders (Shape: n_time, N)
-    WWAVE_val = jnp.where(
-        WWAVE_cond,
-        WWAVE_output,
+    # Calculate W_wave for all senders (Shape: n_time, N)
+    W_wave_val = jnp.where(
+        W_wave_cond,
+        W_wave_output,
         0.0
     )
 
@@ -195,8 +193,8 @@ def supersonic_induction(Z, XSQ1, RO1, XSQ2, RO2, XTY, T, B2, ZSQ, TOLSQ, TOL, T
     j_indices = jnp.arange(N)
     is_diag = (j_indices == recv_idx)[None, :]
 
-    # Only add the WWAVE value to the element where sender == receiver
-    W = W + jnp.where(is_diag, WWAVE_val, 0.0)
+    # Only add the W_wave value to the element where sender == receiver
+    W = W + jnp.where(is_diag, W_wave_val, 0.0)
 
     # Build the 1D slice of the Laplacian stencil for THIS receiver row
     sonic_row = jnp.where(
@@ -284,60 +282,60 @@ def compute_C_mn(VD, Mach):
         y_dist_right = y_dist - s
 
         # Arrays are (N,) instead of (N, N)
-        XSQ1 = x_dist_left ** 2
-        XSQ2 = x_dist_right ** 2
-        YSQ1 = y_dist_left ** 2
-        YSQ2 = y_dist_right ** 2
-        ZSQ = z_dist ** 2
+        x_sq1 = x_dist_left ** 2
+        x_sq2 = x_dist_right ** 2
+        y_sq1 = y_dist_left ** 2
+        y_sq2 = y_dist_right ** 2
+        z_sq  = z_dist ** 2
 
-        RTV1 = YSQ1 + ZSQ
-        RTV2 = YSQ2 + ZSQ
+        r_tv1 = y_sq1 + z_sq
+        r_tv2 = y_sq2 + z_sq
 
         # Broadcast the Mach/Time dimension here: (n_time, 1) * (N,) -> (n_time, N)
-        R01 = beta_sq_exp * RTV1[None, :]
-        R02 = beta_sq_exp * RTV2[None, :]
+        r_o1 = beta_sq_exp * r_tv1[None, :]
+        r_o2 = beta_sq_exp * r_tv2[None, :]
 
         # --- Subsonic Kernel ---
         U_sub, V_sub, W_sub = subsonic_induction(
-            XSQ1=XSQ1,
-            XSQ2=XSQ2,
-            XTY=x_dist_center,
-            X1=x_dist_left,
-            X2=x_dist_right,
-            Y1=y_dist_left,
-            Y2=y_dist_right,
-            Z=z_dist,
-            ZSQ=ZSQ,
-            RTV1=RTV1,
-            RTV2=RTV2,
-            RO1=R01,
-            RO2=R02,
-            T=t,
-            B2=beta_sq_exp,
-            TOLSQ=tol_sq,
+            x1_sq=x_sq1,
+            x2_sq=x_sq2,
+            x_ty=x_dist_center,
+            x1=x_dist_left,
+            x2=x_dist_right,
+            y1=y_dist_left,
+            y2=y_dist_right,
+            z=z_dist,
+            z_sq=z_sq,
+            r_tv1=r_tv1,
+            r_tv2=r_tv2,
+            r_o1=r_o1,
+            r_o2=r_o2,
+            t=t,
+            beta_sq=beta_sq_exp,
+            tol_sq=tol_sq,
         )
 
         # --- Supersonic Kernel ---
         U_sup, V_sup, W_sup = supersonic_induction(
-            XSQ1=XSQ1,
-            XSQ2=XSQ2,
-            XTY=x_dist_center,
-            X1=x_dist_left,
-            X2=x_dist_right,
-            Y1=y_dist_left,
-            Y2=y_dist_right,
-            Z=z_dist,
-            ZSQ=ZSQ,
-            RTV1=RTV1,
-            RTV2=RTV2,
-            RO1=R01,
-            RO2=R02,
-            T=t,
-            B2=beta_sq_exp,
-            TOL=tol,
-            TOLSQ=tol_sq,
-            TOLSQ2=tol_sq_scl,
-            CHORD=VD.chord_lengths,
+            x_sq1=x_sq1,
+            x_sq2=x_sq2,
+            x_ty=x_dist_center,
+            x1=x_dist_left,
+            x2=x_dist_right,
+            y1=y_dist_left,
+            y2=y_dist_right,
+            z=z_dist,
+            z_sq=z_sq,
+            r_tv1=r_tv1,
+            r_tv2=r_tv2,
+            r_o1=r_o1,
+            r_o2=r_o2,
+            t=t,
+            beta_sq=beta_sq_exp,
+            tol=tol,
+            tol_sq=tol_sq,
+            tol_sq2=tol_sq_scl,
+            c=VD.chord_lengths,
             RNMAX=VD.panels_per_strip,
             sonic_mask=sonic_mask,
             recv_idx=recv_idx

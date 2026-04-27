@@ -9,4 +9,4 @@
 # ----------------------------------------------------------------------------------------------------------------------
  
 from .TestAero import TestAero
-from .Vortex_Lattice import VLM, VLMSettings, VLMVortices, InitializeVLM, SupersonicSettings
+from .VORJAX import VLM, VLMSettings, VLMVortices, InitializeVLM, SupersonicSettings

@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
-    from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice.vortex_distribution import VortexDistribution
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
+    from RCAIDE.Framework.Methods.Aerodynamics.VORJAX.vortex_distribution import VortexDistribution
 
 from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------

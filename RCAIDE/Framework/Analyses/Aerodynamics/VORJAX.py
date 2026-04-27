@@ -19,13 +19,12 @@ from RCAIDE.Library import Units
 
 from RCAIDE.Framework import Process, ProcessStep
 
-from RCAIDE.Framework.Methods.Aerodynamics.Vortex_Lattice import (check_freestream,
-                                                                  compute_coefficients, compute_induced_velocity, 
-                                                                  compute_panel_pressures, compute_boundary_conditions, 
-                                                                  compute_vortex_strength, update_wing_geometry,
-                                                                  initialize_VLM_geometry, discretize_wings,
-                                                                  generate_full_vortex_distribution,
-                                                                  apply_aerodynamic_forces)
+from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
+                                                          compute_coefficients, compute_induced_velocity,
+                                                          compute_panel_pressures, compute_boundary_conditions,
+                                                          compute_vortex_strength,
+                                                          initialize_VLM_geometry, discretize_wings,
+                                                          apply_aerodynamic_forces)
 
 from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, expand_component_coefficients,
                                                    compute_viscous_induced_drag)

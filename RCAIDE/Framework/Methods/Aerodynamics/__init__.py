@@ -1,5 +1,5 @@
 from . import Test_Aero
-from . import Vortex_Lattice
+from . import VORJAX
 
 from .initialization import expand_component_coefficients
 
