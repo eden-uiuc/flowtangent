@@ -26,7 +26,7 @@ from RCAIDE.utils import inputs, outputs
 
 
 @jax.jit
-def subsonic_induction(z, x1_sq, r_o1, x2_sq, r_o2, x_ty, t, beta_sq, z_sq, tol_sq, x1, y1, x2, y2, r_tv1, r_tv2):
+def subsonic_induction(z, x1_sq, r_o1, x2_sq, r_o2, x_ty, t, B_sq, z_sq, tol_sq, x1, y1, x2, y2, r_tv1, r_tv2):
     """
     Pure JAX translation of the VORLAX subsonic Biot-Savart induction.
 
@@ -57,13 +57,13 @@ def subsonic_induction(z, x1_sq, r_o1, x2_sq, r_o2, x_ty, t, beta_sq, z_sq, tol_
     r2 = jnp.sqrt(jnp.maximum(x2_sq - r_o2, 1e-16))
 
     # 2. Bound Vortex Denominator
-    t_Bz = (jnp.square(t) - beta_sq) * z_sq
+    t_Bz = (jnp.square(t) - B_sq) * z_sq
     safe_denom = jnp.maximum(jnp.square(x_ty) + t_Bz, tol_sq)
 
     # 3. DRY Helper Function with NaN-safe division
     def calc_F(x, y, r, r_tv):
         # F_b: Influence contribution from the bound (swept) segment
-        F_b = (t * x - beta_sq * y) / r
+        F_b = (t * x - B_sq * y) / r
 
         # F_t: Influence contribution from the semi-infinite trailing leg
         # safe_denom prevents divide-by-zero in the unselected jnp.where branch
@@ -112,7 +112,7 @@ def supersonic_in_plane(r1, r2, y1, y2, tol, x_ty, C_pi):
 
 
 @jax.jit
-def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, tol_sq, tol, tol_sq2, x1, y1, x2, y2, r_tv1, r_tv2,
+def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_sq, tol, tol_sq2, x1, y1, x2, y2, r_tv1, r_tv2,
                          c, sonic_mask, recv_idx):
     """
     Pure JAX translation of the VORLAX supersonic Biot-Savart induction.
@@ -140,7 +140,7 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, to
     r2 = jnp.where(x_sq2 > r_o2, jnp.sqrt(jnp.maximum(x_sq2 - r_o2, 1e-16)), 0.0)
 
     # Denominator Setup
-    safe_denom = jnp.square(x_ty) + (t_sq - beta_sq) * z_sq
+    safe_denom = jnp.square(x_ty) + (t_sq - B_sq) * z_sq
     sgn = jnp.where(safe_denom < 0, -1.0, 1.0)
     safe_denom = jnp.where(jnp.abs(safe_denom) < tol_sq, sgn * tol_sq, safe_denom)
 
@@ -153,7 +153,7 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, to
         safe_rr_tv = jnp.where(valid, r * r_tv, 1.0)
 
         # 1.0 fallback is mathematically required by VORLAX supersonic integration
-        F_b = jnp.where(valid, (t * x - beta_sq * y) / safe_r, 1.0)
+        F_b = jnp.where(valid, (t * x - B_sq * y) / safe_r, 1.0)
         F_t = jnp.where(valid, x / safe_rr_tv, 1.0)
 
         return F_b, F_t
@@ -179,8 +179,8 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, to
     N = U.shape[1]
     t_sq = t ** 2
 
-    W_wave_cond = beta_sq > t_sq[None, :]
-    W_wave_output = -0.5 * jnp.sqrt(jnp.where(W_wave_cond, beta_sq - t_sq[None, :], 1.0)) / jnp.maximum(c, 1e-12)
+    W_wave_cond = B_sq > t_sq[None, :]
+    W_wave_output = -0.5 * jnp.sqrt(jnp.where(W_wave_cond, B_sq - t_sq[None, :], 1.0)) / jnp.maximum(c, 1e-12)
 
     # Calculate W_wave for all senders (Shape: n_time, N)
     W_wave_val = jnp.where(
@@ -211,9 +211,9 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, beta_sq, z_sq, to
     return U, V, W
 
 @jax.jit
-def compute_C_mn(VD, Mach):
+def compute_C_ij(VD, Mach):
     """
-    Computes the Aerodynamic Influence Coefficient matrix C_mn.
+    Computes the Aerodynamic Influence Coefficient matrix C_ij.
     Output Shape: (n_time, N, N, 3)
     """
 
@@ -311,7 +311,7 @@ def compute_C_mn(VD, Mach):
             r_o1=r_o1,
             r_o2=r_o2,
             t=t,
-            beta_sq=beta_sq_exp,
+            B_sq=beta_sq_exp,
             tol_sq=tol_sq,
         )
 
@@ -331,7 +331,7 @@ def compute_C_mn(VD, Mach):
             r_o1=r_o1,
             r_o2=r_o2,
             t=t,
-            beta_sq=beta_sq_exp,
+            B_sq=beta_sq_exp,
             tol=tol,
             tol_sq=tol_sq,
             tol_sq2=tol_sq_scl,
@@ -354,18 +354,18 @@ def compute_C_mn(VD, Mach):
         EW_row = W_ind * COS_RS[None, :] - V_ind * SIN_RS[None, :]
 
         # --- Rotate to Global Frame ---
-        C_mn_row = jnp.stack([
+        C_ij_row = jnp.stack([
             U_ind,
             V_ind * costheta[None, :] - W_ind * sintheta[None, :],
             V_ind * sintheta[None, :] + W_ind * costheta[None, :]
         ], axis=-1)
 
         # Return the tuple!
-        return C_mn_row, EW_row
+        return C_ij_row, EW_row
 
-    C_mn_mapped, EW_mapped = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
+    C_ij_mapped, EW_mapped = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
 
-    C_mn = jnp.swapaxes(C_mn_mapped, 0, 1)
+    C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
     EW = jnp.swapaxes(EW_mapped, 0, 1)
 
     return C_mn.astype(jnp.float64), singularity_flag, EW
@@ -390,7 +390,7 @@ def compute_induced_velocity(state: "State", system: "System", settings: "Settin
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
     
-    C_mn, singularity_flag, EW = compute_C_mn(VD, Mach)
+    C_mn, singularity_flag, EW = compute_C_ij(VD, Mach)
     
     updated_analysis_data = system.analysis_data | {
         "AICs": C_mn,
