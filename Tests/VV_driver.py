@@ -28,7 +28,7 @@ from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices, SupersonicSettings
+from RCAIDE.Framework.Analyses.Aerodynamics import VORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -157,14 +157,53 @@ def parse_avl_stability(stab_file_path):
 
     return results
 
+def parse_avl_fe_dcp(filepath):
+    """
+    Parses an AVL 'FE' output file and extracts the panel dCp values.
+    Returns a flattened 1D NumPy array of the dCp values.
+    """
+    dcp_list = []
+    dcp_col_idx = None
+
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+
+    # 1. Dynamically find the column index for dCp
+    for line in lines:
+        if 'dCp' in line:
+            tokens = line.split()
+            try:
+                dcp_col_idx = tokens.index('dCp')
+            except ValueError:
+                continue
+            break
+
+    if dcp_col_idx is None:
+        raise ValueError("Could not find 'dCp' header in the AVL FE file.")
+
+    # 2. Extract the panel data
+    for line in lines:
+        tokens = line.split()
+
+        # A valid panel data line will have enough columns and start with one integer (I)
+        if len(tokens) > dcp_col_idx and tokens[0].isdigit():
+            try:
+                dcp_value = float(tokens[dcp_col_idx])
+                dcp_list.append(dcp_value)
+            except ValueError:
+                # Catch any weird formatting edges where the column isn't a float
+                continue
+
+    return np.array(dcp_list)
+
 def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0, span=10.0, chord=1.0):
     # 1. Generate the geometry file
-    if geometry_file is None:
-        AVL_straight_wing(geometry_file, span=span, chord=chord)
-        geometry_file = f"{run_name}.avl"
-
     if run_name is None:
         run_name = Path(geometry_file).stem
+
+    if geometry_file is None:
+        geometry_file = f"{run_name}.avl"
+        AVL_straight_wing(geometry_file, span=span, chord=chord)
 
     run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
 
@@ -175,7 +214,12 @@ def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0,
         for k, v in parsed_data.items():
             print(f"{k}: {v}")
         print("\n")
+    elif oper_mode == "fe":
+        parsed_data = parse_avl_fe_dcp(f"{run_name}_{oper_mode}.txt")
+    else:
+        parsed_data = None
 
+    return parsed_data
 
 # VORJAX Helper Functions ----------------------------------------------------------------------------------------------
 
@@ -357,7 +401,7 @@ def VORJAX_ONERA_M6():
 
     return system
 
-def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_mode=False):
+def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, lan_correction=True, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -390,26 +434,26 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
 
     initial_system = vehicle
 
-    vortices = VLMVortices(
-        spanwise_cosine_spacing=True,
+    vortices = Vortices(
+        spanwise_cosine_spacing=cosine_spacing,
         spanwise_vortices=n_sw,
         chordwise_vortices=n_cw
     )
 
     mach_settings = SupersonicSettings(
-        peak_mach_number = 2.0,
+        peak_mach_number=2.0,
         begin_blend_mach=0.7,
         end_blend_mach=1.2
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, VORLAX_empirical_corrections=True)
+    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, VORLAX_empirical_corrections=lan_correction)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
         tag="VORJAX Test Run",
         steps=(
-            InitializeVLM(),
-            VLM()
+            InitializeVORJAX(),
+            VORJAX()
         ),
         initial_state=initial_state,
         initial_system=initial_system,
@@ -872,7 +916,6 @@ if __name__ == "__main__":
 
     # avl_b737_data = parse_avl_file(Path(geometry_file))
     # vehicle = convert_to_RCAIDE(avl_b737_data)
-    
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
@@ -884,13 +927,48 @@ if __name__ == "__main__":
         state_outputs=(lift_path,)
     )
 
+
+    TEST_AVL = True
     TEST_ELLIPTICAL = False
     TEST_DELTA = False
-    TEST_ONERA = True
+    TEST_ONERA = False
     
-    PLOT_WINGS = True
+    PLOT_WINGS = False
     
     DEBUG = True
+
+    # AVL Test Cases ---------------------------------------------------------------------------------------------------
+    if TEST_AVL:
+
+        AVL_dCp = AVL_basic_test(run_name="straight_wing", oper_mode="fe", alpha=2.0, span=10.0, chord=1.0)
+        parsed_data = AVL_basic_test(run_name="straight_wing", oper_mode="st", alpha=2.0, span=10.0, chord=1.0)
+
+        vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
+        results = VORJAX_test_run(vehicle,
+                                  alpha=[2.0 * Units.deg] , Mach=[0.00],
+                                  n_sw=20, n_cw=12, cosine_spacing=False,
+                                  lan_correction=False,
+                                  debug_mode=DEBUG)
+
+        f_st, f_sys, f_setts = results
+
+        CL = ru.get_target(f_st, lift_path).item(0)
+        CD = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))).item(0)
+        C_m = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch"))).item(0)
+
+        data = f_sys.analysis_data
+        VORJAX_dCp = np.round(np.asarray(data["pressure_coefficients"]), 5)
+        err_max = np.max((AVL_dCp - VORJAX_dCp) / AVL_dCp)
+
+        print("\n--- Extracted VORJAX Results ---")
+        print(f"CL: {CL:.5f}")
+        print(f"CD: {CD:.5f}")
+        print(f"CM: {C_m:.5f}")
+        print(f"Max dCp Error: {err_max:.5f}")
+
+        if PLOT_WINGS:
+            fig = plot_vlm_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
+            fig.show()
 
     # Elliptical Wing Test ---------------------------------------------------------------------------------------------
     if TEST_ELLIPTICAL:

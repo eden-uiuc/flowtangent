@@ -65,7 +65,7 @@ def _compute_trefftz_drag(tp_y_ctrl, tp_z_ctrl, tp_y_L, tp_y_R, tp_z_L, tp_z_R, 
 @jax.jit
 def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system, settings):
     """
-    Computes CL, CD, C_m, CY, Cl, Cn and induced drag using the unstructured VD mesh.
+    Computes CL, CD, C_m, CY_body, Cl, Cn and induced drag using the unstructured VD mesh.
     """
     alpha = state.aerodynamics.angles.alpha
     beta  = state.aerodynamics.angles.beta
@@ -142,10 +142,10 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     
     # Integrate Panels into Strips
     seg_sum = jax.vmap(lambda arr: jax.ops.segment_sum(arr, strip_ids, num_segments=VD.total_strips))
-    
-    strip_z_coeff    = seg_sum(panel_normal_coeff)    *  stripwise_chords[None, :]
-    strip_x_coeff    = seg_sum(panel_axial_coeff)     *  stripwise_chords[None, :]
-    pitching_moment  = seg_sum(panel_pitching_moment) * (stripwise_chords[None, :] ** 2)
+
+    strip_body_x_coeff  = seg_sum(panel_axial_coeff) * stripwise_chords[None, :]
+    strip_body_z_coeff  = seg_sum(panel_normal_coeff)    *  stripwise_chords[None, :]
+    pitching_moment     = seg_sum(panel_pitching_moment) * (stripwise_chords[None, :] ** 2)
     
     sideslip_couple = seg_sum(panel_sideslip_couple) * stripwise_chords[None, :]
     sideslip_couple = sideslip_couple * (-1.0) * crosswind_factor * cos_dihedral[None, :] * 0.5 
@@ -210,15 +210,15 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
         suction_vector_z = -incidence_LE
 
         # --- Update the strip coefficients from the previous block ---
-        strip_x_coeff = strip_x_coeff - suction_vector_x * suction_coeff_LE
-        strip_z_coeff = strip_z_coeff + suction_coeff_LE * jnp.sqrt(1.0 + sweep_sq) * suction_vector_z
+        strip_body_x_coeff = strip_body_x_coeff - suction_vector_x * suction_coeff_LE
+        strip_body_z_coeff = strip_body_z_coeff + suction_coeff_LE * jnp.sqrt(1.0 + sweep_sq) * suction_vector_z
 
     # ------------------------------------------------------------------
     # Body Axis Transformation & Strips Integration
     # ------------------------------------------------------------------
-    strip_body_force_x =  strip_x_coeff
-    strip_body_force_y = -strip_z_coeff * sin_dihedral[None, :]
-    strip_body_force_z =  strip_z_coeff * cos_dihedral[None, :]
+    strip_body_force_x =  strip_body_x_coeff
+    strip_body_force_y = -strip_body_z_coeff * sin_dihedral[None, :]
+    strip_body_force_z =  strip_body_z_coeff * cos_dihedral[None, :]
     
     colloc_LE = jax.ops.segment_sum(VD.collocation_points * le_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
     colloc_LE_x, colloc_LE_y, colloc_LE_z = colloc_LE[:, 0][None, :], colloc_LE[:, 1][None, :], colloc_LE[:, 2][None, :]
@@ -268,27 +268,24 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     )
 
     # Global Coefficients
-    CX = jnp.sum(force_x, axis=1) / S_ref
-    CY = jnp.sum(force_y, axis=1) / S_ref
-    CZ = jnp.sum(force_z, axis=1) / S_ref
+    CX_body = jnp.sum(force_x, axis=1) / S_ref
+    CY_body = jnp.sum(force_y, axis=1) / S_ref
+    CZ_body = jnp.sum(force_z, axis=1) / S_ref
 
-    CL = jnp.sum(lift, axis=1) / S_ref
-    CD_near = CX * cos_alpha[:, 0] + CZ * sin_alpha[:, 0]
-    CD_trefftz = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)
+    CL_near = jnp.sum(lift, axis=1) / S_ref
+    CD_near = CX_body * cos_alpha[:, 0] + CZ_body * sin_alpha[:, 0]
+
     
     C_l = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref)
     C_m = jnp.sum(moment, axis=1) / (S_ref * c_ref)
     C_n  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)
     
-    # Profile Drag projection
-    cx_denom = cos_alpha[:, 0] - sin_alpha[:, 0] * jnp.tan(alpha[:, 0])
-    safe_cx_denom = jnp.where(jnp.abs(cx_denom) < 1e-8, 1e-8 * jnp.sign(cx_denom + 1e-12), cx_denom)
-    CX = (jnp.tan(alpha[:, 0]) * CL - CD_trefftz) / safe_cx_denom
+    # Drag Projection to Wind Frame
+    CD_trefftz      = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)  # Positive in Body Frame
+    CX_body_Trefftz = CD_trefftz/cos_alpha[:, 0] - CZ_body * jnp.tan(alpha[:, 0])      # (Usually) Negative in Body Frame
+    CL_Trefftz      = CZ_body * cos_alpha[:, 0] - CX_body_Trefftz * sin_alpha[:, 0]
     
-    safe_sinalf = jnp.where(jnp.abs(sin_alpha[:, 0]) < 1e-8, 1e-8 * jnp.sign(sin_alpha[:, 0] + 1e-12), sin_alpha[:, 0])
-    CZ = (CD_trefftz + CX * cos_alpha[:, 0]) / safe_sinalf
-    
-    return CL, CD_trefftz, CD_near, CX, CY, CZ, C_l, C_m, C_n
+    return CL_Trefftz, CD_trefftz, CL_near, CD_near, CX_body, CY_body, CZ_body, C_l, C_m, C_n
 
 @inputs(
     "system.analysis_data['vortex_distribution']",
@@ -323,7 +320,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     
     analysis = system.analysis_data
 
-    CL, CD_trefftz, CD_near, CX, CY, CZ, C_l, C_m, C_n = _compute_aerodynamic_coefficients(
+    CL_trefftz, CD_trefftz, CL_near, CD_near, CX, CY, CZ, C_l, C_m, C_n = _compute_aerodynamic_coefficients(
         analysis["vortex_distribution"],
         analysis["pressure_coefficients"],
         analysis["vortex_strengths"],

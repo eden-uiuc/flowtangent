@@ -336,7 +336,6 @@ def compute_C_ij(VD, Mach):
             tol_sq=tol_sq,
             tol_sq2=tol_sq_scl,
             c=VD.chord_lengths,
-            RNMAX=VD.panels_per_strip,
             sonic_mask=sonic_mask,
             recv_idx=recv_idx
         )

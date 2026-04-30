@@ -23,7 +23,7 @@ from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
                                                           compute_coefficients, compute_induced_velocity,
                                                           compute_panel_pressures, compute_boundary_conditions,
                                                           compute_vortex_strength,
-                                                          initialize_VLM_geometry, discretize_wings,
+                                                          initialize_VLM_geometry, discretize_surfaces,
                                                           apply_aerodynamic_forces)
 
 from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, expand_component_coefficients,
