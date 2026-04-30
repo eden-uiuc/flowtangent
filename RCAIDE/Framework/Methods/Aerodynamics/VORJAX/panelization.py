@@ -626,7 +626,7 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
 @outputs(
     "system.analysis_data['vortex_distribution']",
 )
-def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
+def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"):
     
     # Pre-Processing ---------------------------------------------------------------------------------------------------
 
@@ -758,8 +758,7 @@ def discretize_wings(state: "State", system: "Aircraft", settings: "Settings"):
         if wing.symmetric:
 
             VD_list.append(mirror_distribution(VD))
-        
-        
+           
     full_VD = merge_vortex_distributions(VD_list)    
 
     updated_analysis_data = system.analysis_data | {"vortex_distribution": full_VD}

@@ -91,7 +91,7 @@ class Training(eqx.Module):
     yaw_rate:               jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
 
 
-class VLMVortices(eqx.Module):
+class Vortices(eqx.Module):
     # General Settings
     spanwise_cosine_spacing:    bool = eqx.field(static=True, default=True)
     model_fuselage:             bool = eqx.field(static=True, default=False)
@@ -157,37 +157,36 @@ class VLMSettings(eqx.Module):
     efficiency:     EfficiencyFactors       = eqx.field(default_factory=EfficiencyFactors)
     parasite_drag:  ParasiteDragFormFactors = eqx.field(default_factory=ParasiteDragFormFactors)
     training:       Training                = eqx.field(default_factory=Training)
-    
-    vortices:       VLMVortices             = eqx.field(default_factory=VLMVortices)
+    vortices:       Vortices                = eqx.field(default_factory=Vortices)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def _default_VLM_init_steps():
+def _default_VORJAX_init_steps():
     return(
         ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),
         ProcessStep(initialize_VLM_geometry, "Initialize VLM Geometry"),
-        ProcessStep(discretize_wings, "Discretize VLM Wings"),
+        ProcessStep(discretize_surfaces, "Discretize VLM Surfaces"),
         # ProcessStep(generate_full_vortex_distribution, "Generate Vehicle Mesh"),
     )
 
 
-class InitializeVLM(Process):
+class InitializeVORJAX(Process):
     
     tag: str = eqx.field(static=True, default="Initialize Aerodynamics Analysis")
-    steps: tuple = eqx.field(default_factory=_default_VLM_init_steps)
+    steps: tuple = eqx.field(default_factory=_default_VORJAX_init_steps)
 
 
 # ----------------------------------------------------------
 #  VLM Process
 # ----------------------------------------------------------
 
-def _default_VLM_steps():
+def _default_VORJAX_steps():
     return(
         # Lift and Induced Drag
-        ProcessStep(check_freestream, "Check Freestream"),
+        ProcessStep(check_freestream, "Freestream Validation"),
         ProcessStep(compute_boundary_conditions, "Calculate Boundary Conditions"),
         ProcessStep(compute_induced_velocity, "Calculate AICs"),
         ProcessStep(compute_vortex_strength, "Compute Vortex Strength"),
@@ -202,11 +201,11 @@ def _default_VLM_steps():
     # TODO: Add trimming/stability analysis
 
 
-class VLM(Process):
+class VORJAX(Process):
 
     tag: str = eqx.field(static=True, default="Aerodynamics")
 
-    steps : tuple = eqx.field(default_factory=_default_VLM_steps)
+    steps : tuple = eqx.field(default_factory=_default_VORJAX_steps)
 
 # ----------------------------------------------------------
 #  Surrogate VLM Process
