@@ -382,19 +382,19 @@ def compute_C_ij(VD, Mach):
 @outputs(
     "system.analysis_data['AICs']",
     "system.analysis_data['singularities']",
-    "system.analysis_data['VORLAX_EW_matrix']"
+    "system.analysis_data['effective_wash']"
 )
 def compute_induced_velocity(state: "State", system: "System", settings: "Settings"):
     
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
     
-    C_mn, singularity_flag, EW = compute_C_ij(VD, Mach)
+    C_ij, singularity_flag, EW = compute_C_ij(VD, Mach)
     
     updated_analysis_data = system.analysis_data | {
-        "AICs": C_mn,
+        "AICs": C_ij,
         "singularities": singularity_flag,
-        "VORLAX_EW_matrix": EW
+        "effective_wash": EW
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)

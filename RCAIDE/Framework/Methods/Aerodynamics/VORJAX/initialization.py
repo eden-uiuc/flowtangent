@@ -96,14 +96,14 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     # Add analysis data keys
     initial_analysis_data = {
             "vortex_distribution": None,
+            "AICs": None,
             "induced_wake": None,
             "boundary_conditions": None,
             "relative_velocity": None,
-            "AICs": None,
             "singularities": None,
             "vortex_strengths": None,
-            "pressure_coefficients": None,
-            "VORLAX_EW_Matrix": None,
+            "dCp": None,
+            "effective_wash": None,
         }
         
     updated_system = eqx.tree_at(

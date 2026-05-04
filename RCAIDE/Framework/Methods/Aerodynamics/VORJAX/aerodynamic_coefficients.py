@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
 
 from RCAIDE.utils import inputs, outputs
 # ----------------------------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def _compute_trefftz_drag(tp_y_ctrl, tp_z_ctrl, tp_y_L, tp_y_R, tp_z_L, tp_z_R, 
 # ---------------------------------------------------------
 
 @jax.jit
-def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system, settings):
+def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total, state, system, settings):
     """
     Computes CL, CD, C_m, CY_body, Cl, Cn and induced drag using the unstructured VD mesh.
     """
@@ -117,17 +117,17 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     sin_dihedral = jnp.sign(dy_LE) * dz_LE / dihedral_length_LE  
     
     # Panel Forces
-    quarter_chord_offset = 0.25 * panel_dx_nondim 
-    colloc_offset = 0.75 * panel_dx_nondim 
-    panel_force_mag = panel_dx_nondim[None, :] * DCP
+    quarter_chord_offset    = 0.25 * panel_dx_nondim 
+    colloc_offset           = 0.75 * panel_dx_nondim 
+    panel_force_mag         = panel_dx_nondim[None, :] * dCp
 
-    panel_inc = VD.incidence_angle
-    panel_axial_coeff  = panel_force_mag * jnp.sin(panel_inc)[None, :]
-    panel_normal_coeff = panel_force_mag * jnp.cos(panel_inc)[None, :]  # Z-direction relative to strip
+    panel_inc           = VD.incidence_angle
+    panel_axial_coeff   = panel_force_mag * jnp.sin(panel_inc)[None, :]
+    panel_normal_coeff  = panel_force_mag * jnp.cos(panel_inc)[None, :]
 
-    panel_indices = jnp.arange(VD.total_panels)
+    panel_indices       = jnp.arange(VD.total_panels)
     strip_start_indices = jax.ops.segment_min(panel_indices, strip_ids, num_segments=VD.total_strips)[strip_ids]
-    chordwise_indices = panel_indices - strip_start_indices + 1.0
+    chordwise_indices   = panel_indices - strip_start_indices + 1.0
     
     vortex_x_nondim = (chordwise_indices - 0.75) * panel_dx_nondim
     panel_pitching_moment = (colloc_offset[None, :] - vortex_x_nondim[None, :]) * panel_normal_coeff
@@ -151,9 +151,9 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     sideslip_couple = sideslip_couple * (-1.0) * crosswind_factor * cos_dihedral[None, :] * 0.5 
     
     # ------------------------------------------------------------------
-    # VORLAX LE Suction
+    # Lan's Correction for Leading Edge Suction
     # ------------------------------------------------------------------
-    if settings.analysis.aerodynamics.VORLAX_empirical_corrections:
+    if settings.analysis.aerodynamics.le_suction_correction:
         EW_masked = EW * le_mask_float[None, :, None]
 
         # Add the trailing None to broadcast across the 3 velocity components
@@ -190,7 +190,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
             strip_ids,
             num_segments=VD.total_strips
         )
-        LE_DCP = seg_sum(DCP * le_mask_float[None, :])
+        LE_dCp = seg_sum(dCp * le_mask_float[None, :])
 
         singularity_strength_LE = jnp.where(
             subsonic_LE_factor > 0,
@@ -198,7 +198,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
             singularity_strength_LE
         )
 
-        singularity_strength_LE = singularity_strength_LE + 0.5 * LE_DCP * jnp.sqrt(strip_quarter_chord_offset)[None, :]
+        singularity_strength_LE = singularity_strength_LE + 0.5 * LE_dCp * jnp.sqrt(strip_quarter_chord_offset)[None, :]
         suction_coeff_LE = 0.5 * jnp.pi * jnp.square(singularity_strength_LE) * subsonic_LE_factor
 
         # --- CAMBER CORRECTION 3: True aerodynamic orientation for the suction vector ---
@@ -234,12 +234,12 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     panel_span_LE = jnp.abs(corner_b1_LE[:, 1] - corner_a1_LE[:, 1])
     strip_area = panel_span_LE * stripwise_chords
     
-    lift = (strip_body_force_z * cos_alpha - (strip_body_force_x * cos_beta + strip_body_force_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
-    moment = (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta) * panel_span_LE[None, :]
+    strip_lift              = (strip_body_force_z * cos_alpha - (strip_body_force_x * cos_beta + strip_body_force_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]
+    strip_pitching_moment   = (strip_body_moment_y * cos_beta - strip_body_moment_x * sin_beta) * panel_span_LE[None, :]
 
-    force_x = strip_body_force_x * strip_area[None, :]
+    force_x =  strip_body_force_x * strip_area[None, :]
     force_y = (strip_body_force_y * cos_beta - strip_body_force_x * sin_beta) * strip_area[None, :]
-    force_z = strip_body_force_z * strip_area[None, :]
+    force_z =  strip_body_force_z * strip_area[None, :]
     
     strip_rolling_moment = (strip_body_moment_x * cos_alpha * cos_beta + strip_body_moment_y * cos_alpha * sin_beta + strip_body_moment_z * sin_alpha) * panel_span_LE[None, :]
     strip_yawing_moment  = (strip_body_moment_z * cos_alpha - (strip_body_moment_x * cos_beta + strip_body_moment_y * sin_beta) * sin_alpha) * panel_span_LE[None, :]    
@@ -249,7 +249,7 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
     # ------------------------------------------------------------------
     TE_corner_L = jax.ops.segment_sum(VD.panel_vertices[:, 1, :] * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
     TE_corner_R = jax.ops.segment_sum(VD.panel_vertices[:, 2, :] * te_mask_float[:, None], strip_ids, num_segments=VD.total_strips)
-    TE_mid = (TE_corner_L + TE_corner_R) / 2.0
+    TE_mid      = (TE_corner_L + TE_corner_R) / 2.0
 
     # 2. Project exactly from the TE to infinity
     tp_z_ctrl = TE_mid[:, 2] * cos_alpha - TE_mid[:, 0] * sin_alpha
@@ -267,31 +267,32 @@ def _compute_aerodynamic_coefficients(VD, DCP, GAMMA, EW, v_total, state, system
         rho[:, 0]
     )
 
-    # Global Coefficients
-    CX_body = jnp.sum(force_x, axis=1) / S_ref
-    CY_body = jnp.sum(force_y, axis=1) / S_ref
-    CZ_body = jnp.sum(force_z, axis=1) / S_ref
+    # Wind-Frame Coefficients
+    # Body Frame is Back-Right-Up, Wind-Frame is Front-Right-Down, so CX and CZ are negative
+    CX_body = -jnp.sum(force_x, axis=1) / S_ref
+    CY_body =  jnp.sum(force_y, axis=1) / S_ref
+    CZ_body = -jnp.sum(force_z, axis=1) / S_ref
 
-    CL_near = jnp.sum(lift, axis=1) / S_ref
-    CD_near = CX_body * cos_alpha[:, 0] + CZ_body * sin_alpha[:, 0]
+    CL_near  = jnp.sum(strip_lift, axis=1) / S_ref
+    CDi_near = -CX_body * cos_alpha[:, 0] - CZ_body * sin_alpha[:, 0]
 
     
     C_l = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref)
-    C_m = jnp.sum(moment, axis=1) / (S_ref * c_ref)
-    C_n  = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)
+    C_m =  jnp.sum(strip_pitching_moment, axis=1) / (S_ref * c_ref)
+    C_n = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)
     
-    # Drag Projection to Wind Frame
-    CD_trefftz      = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)  # Positive in Body Frame
-    CX_body_Trefftz = CD_trefftz/cos_alpha[:, 0] - CZ_body * jnp.tan(alpha[:, 0])      # (Usually) Negative in Body Frame
-    CL_Trefftz      = CZ_body * cos_alpha[:, 0] - CX_body_Trefftz * sin_alpha[:, 0]
+    # CD, CX, CL from far-field integration
+    CDi_far     = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)   # Positive in Body Frame
+    CX_body_far = -(CDi_far/cos_alpha[:, 0] - CZ_body * jnp.tan(alpha[:, 0]))       # CX is in Wind Frame, opposite of Body Frame Orientation
+    CL_far      = CZ_body * cos_alpha[:, 0] - CX_body_far * sin_alpha[:, 0]
     
-    return CL_Trefftz, CD_trefftz, CL_near, CD_near, CX_body, CY_body, CZ_body, C_l, C_m, C_n
+    return CL_near, CDi_near, CL_far, CDi_far, CX_body, CX_body_far, CY_body, CZ_body, C_l, C_m, C_n
 
 @inputs(
     "system.analysis_data['vortex_distribution']",
-    "system.analysis_data['pressure_coefficients']",
+    "system.analysis_data[dCp]",
     "system.analysis_data['vortex_strengths']",
-    "system.analysis_data['VORLAX_EW_matrix']",
+    "system.analysis_data['effective_wash']",
     "system.analysis_data['relative_velocity']",
     "state.aerodynamics.angles.alpha",
     "state.aerodynamics.angles.beta",
@@ -320,11 +321,11 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     
     analysis = system.analysis_data
 
-    CL_trefftz, CD_trefftz, CL_near, CD_near, CX, CY, CZ, C_l, C_m, C_n = _compute_aerodynamic_coefficients(
+    CL, CDi, CL_far, CD_far, CX, CX_far, CY, CZ, C_l, C_m, C_n = _compute_aerodynamic_coefficients(
         analysis["vortex_distribution"],
-        analysis["pressure_coefficients"],
+        analysis["dCp"],
         analysis["vortex_strengths"],
-        analysis["VORLAX_EW_matrix"],
+        analysis["effective_wash"],
         analysis["relative_velocity"],
         state,
         system,
@@ -334,21 +335,27 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     # Apply Correction Factors
     vlm_settings: VLMSettings = settings.analysis.aerodynamics  # type: ignore
 
-    if settings.analysis.aerodynamics.model_fuselage:
+    if vlm_settings.far_field:
+        CL  = CL_far
+        CDi = CD_far
+        CX  = CX_far
+    
+    if vlm_settings.model_fuselage:
         CL = CL * vlm_settings.correction.fuselage_lift
 
-    CDi = jnp.where(state.freestream.mach_number > 1.0, CD_near, CD_trefftz)
-    
     # Update the Vehicle/Segment State with the aerodynamic coefficients
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.lift.total, state, CL[:, None])
+    
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.total, state, CDi[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.total, state, CDi[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced.inviscid.total, state, CDi[:, None])
 
+    # Wind-Frame Coefficients
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.X, state, CX[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.Y, state, CY[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.Z, state, CZ[:, None])
 
+    # Moment Coefficients
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.pitch, state, C_m[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.roll,  state, C_l[:, None])
     state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.moments.yaw,   state, C_n[:, None])

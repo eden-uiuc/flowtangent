@@ -141,12 +141,13 @@ class Vortices(eqx.Module):
 
 class VLMSettings(eqx.Module):
 
-    model_fuselage:                 bool    = eqx.field(static=True, default=False)
-    trim_aircraft:                  bool    = eqx.field(static=True, default=False)
+    model_fuselage:             bool    = eqx.field(static=True, default=False)
+    trim_aircraft:              bool    = eqx.field(static=True, default=False)
 
-    recalculate_total_wetted_area:  bool    = eqx.field(static=True, default=False)
-    model_propeller_wake:           bool    = eqx.field(static=True, default=False)
-    VORLAX_empirical_corrections:   bool    = eqx.field(static=True, default=True)
+    le_suction_correction:      bool    = eqx.field(static=True, default=True)
+    recalculate_wetted_area:    bool    = eqx.field(static=True, default=False)
+    model_propeller_wake:       bool    = eqx.field(static=True, default=False)
+    far_field:                  bool    = eqx.field(static=True, default=False)
 
     CL_max:                         float   = jnp.inf
     CD_increment:                   float   = 0.0

@@ -402,7 +402,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
         end_blend_mach=1.2
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, VORLAX_empirical_corrections=True)
+    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, le_suction_correction=True)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(

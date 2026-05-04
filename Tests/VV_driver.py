@@ -401,7 +401,7 @@ def VORJAX_ONERA_M6():
 
     return system
 
-def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, lan_correction=True, grad_map=None, debug_mode=False):
+def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, lan_correction=True, far_field=False, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -446,7 +446,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, 
         end_blend_mach=1.2
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, VORLAX_empirical_corrections=lan_correction)
+    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, le_suction_correction=lan_correction, far_field=far_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -919,8 +919,10 @@ if __name__ == "__main__":
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
-    alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-    lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+    alpha_path  = ru.PathTuple(("aerodynamics", "angles", "alpha"))
+    mach_path   = ru.PathTuple(("freestream", "mach_number"))
+    lift_path   = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+    drag_path   = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
 
     grad_map = GradientMap(
         state_inputs=(alpha_path,),
@@ -928,14 +930,14 @@ if __name__ == "__main__":
     )
 
 
-    TEST_AVL = True
-    TEST_ELLIPTICAL = False
-    TEST_DELTA = False
-    TEST_ONERA = False
+    TEST_AVL        = False
+    TEST_ELLIPTICAL = True
+    TEST_DELTA      = False
+    TEST_ONERA      = False
     
-    PLOT_WINGS = False
+    PLOT_WINGS      = False
     
-    DEBUG = True
+    DEBUG           = False
 
     # AVL Test Cases ---------------------------------------------------------------------------------------------------
     if TEST_AVL:
@@ -989,7 +991,7 @@ if __name__ == "__main__":
         for n_seg in trange(1, max_segments+1, desc="Running Elliptical Test Cases"):
             vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=n_seg)
 
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, lan_correction=False, far_field=True, grad_map=grad_map, debug_mode=DEBUG)
             f_st, f_sys, f_setts, jac = results
 
             CL.append(ru.get_target(f_st, lift_path).item(0))
@@ -1035,7 +1037,6 @@ if __name__ == "__main__":
 
         ARs = jnp.linspace(0.1, 2.5, 25)
         grad_jones = jnp.pi * ARs / 2.0
-        step_sizes = jnp.logspace(-1, -15, 15)
 
         n_cws   = [4, 8, 8, 16, 16, 32, 32, 64, 64]
         n_sws   = [4, 4, 8, 8,  16, 16, 32, 32, 64]
@@ -1046,7 +1047,17 @@ if __name__ == "__main__":
             n_cw = n_cws[i]
 
             # Forward Step
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg, Mach=0.00, n_sw=n_sw, n_cw=n_cw, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(
+                vehicle,
+                alpha=2.0 * Units.deg,
+                Mach=0.00,
+                lan_correction=False,
+                n_sw=n_sw,
+                n_cw=n_cw,
+                grad_map=grad_map,
+                debug_mode=DEBUG
+            )
+            
             f_st, f_sys, f_setts, jac = results
 
             jac.block_until_ready()
@@ -1070,7 +1081,15 @@ if __name__ == "__main__":
             vehicle = VORJAX_delta_wing(AR=ARs[i])
             grad_truth = grad_jones[i]
 
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(
+                vehicle,
+                alpha=2.0 * Units.deg,
+                Mach=0.00,
+                lan_correction=True,
+                grad_map=grad_map,
+                debug_mode=DEBUG
+            )
+            
             f_st, f_sys, f_setts, jac = results
 
             CL.append(ru.get_target(f_st, lift_path).item(0))
@@ -1093,6 +1112,7 @@ if __name__ == "__main__":
 
         alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
         lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+        drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
 
         grad_map = GradientMap(
             state_inputs=(alpha_path,),
@@ -1117,17 +1137,14 @@ if __name__ == "__main__":
             base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
             base_panels.show()
 
-            # m03 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][0], title="ONERA M6 DCp, M = 0.3")
-            # m03.show()
-
             m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][11], title="ONERA M6 Flag, M = 1.1")
             m11_flags.show()
 
             m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][11], title="ONERA M6 DCp, M = 1.1")
             m11_dcp.show()
 
-            # m20 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][-1], title="ONERA M6 DCp, M = 2.0")
-            # m20.show()
+            m20 = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][-1], title="ONERA M6 DCp, M = 2.0")
+            m20.show()
 
 
     print("Done!")
