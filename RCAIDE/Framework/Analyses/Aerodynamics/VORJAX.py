@@ -94,9 +94,10 @@ class Training(eqx.Module):
 class Vortices(eqx.Module):
     # General Settings
     spanwise_cosine_spacing:    bool = eqx.field(static=True, default=True)
+    chordwise_cosine_spacing:   bool = eqx.field(static=True, default=True)
     model_fuselage:             bool = eqx.field(static=True, default=False)
-    floating_point_precision:   str  = eqx.field(static=True, default="float64")
     verbose:                    bool = eqx.field(static=True, default=False)
+    floating_point_precision:   str  = eqx.field(static=True, default="float64")
     
     # Discretization Inputs (Optional, so the user can choose which to define)
     spanwise_vortices:    Optional[Iterable[int] | int] = eqx.field(static=True, default=5)

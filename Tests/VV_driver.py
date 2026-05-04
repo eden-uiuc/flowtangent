@@ -5,6 +5,7 @@
 import subprocess
 import os
 import re
+import json
 
 from pathlib import Path
 
@@ -375,13 +376,13 @@ def VORJAX_ONERA_M6():
             percent_span_location=0.0,
             root_chord_percent=1.0,
             sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("//home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         ),
         WingSegment(
             tag="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         )
     )
     
@@ -436,6 +437,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, 
 
     vortices = Vortices(
         spanwise_cosine_spacing=cosine_spacing,
+        chordwise_cosine_spacing=cosine_spacing,
         spanwise_vortices=n_sw,
         chordwise_vortices=n_cw
     )
@@ -469,7 +471,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, 
 
     return results
 
-# Plotting Helper Functions ----------------------------------------------------------------------------------------------
+# Plotting Helper Functions --------------------------------------------------------------------------------------------
 
 def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     
@@ -924,18 +926,22 @@ if __name__ == "__main__":
     lift_path   = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
     drag_path   = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
 
-    grad_map = GradientMap(
+    GRAD_MAP = GradientMap(
         state_inputs=(alpha_path,),
         state_outputs=(lift_path,)
     )
 
 
     TEST_AVL        = False
-    TEST_ELLIPTICAL = True
+    TEST_ELLIPTICAL = False
+    TEST_METHOD     = False
     TEST_DELTA      = False
-    TEST_ONERA      = False
+    TEST_ONERA      = True
     
-    PLOT_WINGS      = False
+    COSINE_SPC      = True
+    PLOT_WINGS      = True
+    LAN_CORRECTION  = True
+    FAR_FIELD       = False
     
     DEBUG           = False
 
@@ -991,7 +997,14 @@ if __name__ == "__main__":
         for n_seg in trange(1, max_segments+1, desc="Running Elliptical Test Cases"):
             vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=n_seg)
 
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, lan_correction=False, far_field=True, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(
+                vehicle,
+                alpha=2.0 * Units.deg , Mach=0.00,
+                lan_correction=LAN_CORRECTION,
+                far_field=FAR_FIELD,
+                grad_map=GRAD_MAP,
+                debug_mode=DEBUG
+            )
             f_st, f_sys, f_setts, jac = results
 
             CL.append(ru.get_target(f_st, lift_path).item(0))
@@ -1008,7 +1021,12 @@ if __name__ == "__main__":
             h = step_sizes[i]
 
             # Forward Step
-            res_fwd = VORJAX_test_run(vehicle, alpha=(2.0 * Units.deg) + h, Mach=0.00, debug_mode=DEBUG)
+            res_fwd = VORJAX_test_run(
+                vehicle,
+                alpha=(2.0 * Units.deg) + h, Mach=0.00,
+                lan_correction=LAN_CORRECTION,
+                far_field=FAR_FIELD,
+                debug_mode=DEBUG)
             CL_fwd = ru.get_target(res_fwd[0], lift_path).item(0)
             
             # Backward Step
@@ -1026,6 +1044,79 @@ if __name__ == "__main__":
         plot_elliptical_convergence_plotly(n_segments_list, grad_AD, error_AD, grad_truth)
         plot_fd_v_curve_plotly(step_sizes, error_FD)
         plot_theoretical_error_comparison_plotly(step_sizes, grad_FD, grad_AD[-1], grad_truth)
+
+    # Elliptical Methodological Test -----------------------------------------------------------------------------------
+    if TEST_METHOD:
+        vehicle = VORJAX_elliptical_wing(AR=10.0, n_segments=20)
+
+        print("\n--- Elliptical Methodology Test ---")
+        print("Starting far-field test...")
+
+        results_ff = VORJAX_test_run(
+            vehicle,
+            alpha=2.0 * Units.deg, Mach=0.00,
+            lan_correction=False,
+            far_field=True,
+            grad_map=GRAD_MAP,
+            debug_mode=DEBUG
+        )
+
+        print("Far-field test complete. Starting near-field test...")
+
+        results_nf = VORJAX_test_run(
+            vehicle,
+            alpha=2.0 * Units.deg, Mach=0.00,
+            lan_correction=False,
+            far_field=False,
+            grad_map=GRAD_MAP,
+            debug_mode=DEBUG
+        )
+
+        print("Near-field test complete. Starting corrected far-field test...")
+
+        results_ffl = VORJAX_test_run(
+            vehicle,
+            alpha=2.0 * Units.deg, Mach=0.00,
+            lan_correction=True,
+            far_field=True,
+            grad_map=GRAD_MAP,
+            debug_mode=DEBUG
+        )
+
+        print("Corrected far-field test complete. Starting corrected near-field test...")
+
+        results_nfl = VORJAX_test_run(
+            vehicle,
+            alpha=2.0 * Units.deg, Mach=0.00,
+            lan_correction=True,
+            far_field=False,
+            grad_map=GRAD_MAP,
+            debug_mode=DEBUG
+        )
+
+        print("Corrected near-field test complete. All tests complete.")
+        print("\n--- Results ---")
+
+        grad_truth = 2.0 * jnp.pi / (1 + 2 / 10.0)
+
+        results = {
+            "ff": {"CL": ru.get_target(results_ff[0], lift_path).item(0),
+                   "dCL/da": results_ff[3].item(0),
+                   "error": abs(results_ff[3].item(0) - grad_truth) / grad_truth},
+            "ffl": {"CL": ru.get_target(results_ffl[0], lift_path).item(0),
+                    "dCL/da": results_ffl[3].item(0),
+                    "error": abs(results_ffl[3].item(0) - grad_truth) / grad_truth},
+            "nf": {"CL": ru.get_target(results_nf[0], lift_path).item(0),
+                   "dCL/da": results_nf[3].item(0),
+                   "error": abs(results_nf[3].item(0) - grad_truth) / grad_truth},
+
+            "nfl": {"CL": ru.get_target(results_nfl[0], lift_path).item(0),
+                   "dCL/da": results_nfl[3].item(0),
+                   "error": abs(results_nfl[3].item(0) - grad_truth) / grad_truth},
+        }
+
+        from pprint import pprint
+        pprint(results)
 
     # Delta Wing Test --------------------------------------------------------------------------------------------------
     if TEST_DELTA:
@@ -1051,10 +1142,11 @@ if __name__ == "__main__":
                 vehicle,
                 alpha=2.0 * Units.deg,
                 Mach=0.00,
-                lan_correction=False,
+                lan_correction=LAN_CORRECTION,
+                far_field=FAR_FIELD,
                 n_sw=n_sw,
                 n_cw=n_cw,
-                grad_map=grad_map,
+                grad_map=GRAD_MAP,
                 debug_mode=DEBUG
             )
             
@@ -1085,8 +1177,9 @@ if __name__ == "__main__":
                 vehicle,
                 alpha=2.0 * Units.deg,
                 Mach=0.00,
-                lan_correction=True,
-                grad_map=grad_map,
+                lan_correction=LAN_CORRECTION,
+                far_field=FAR_FIELD,
+                grad_map=GRAD_MAP,
                 debug_mode=DEBUG
             )
             
@@ -1106,45 +1199,68 @@ if __name__ == "__main__":
         
     # ONERA M6 Mach Sweep ----------------------------------------------------------------------------------------------
     if TEST_ONERA:
-        
-        alpha = [3.06 * Units.deg] * 21
-        Mach =  [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
+
+        Mach = [
+            0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8,
+        #    0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0
+        ]
+        alpha = [3.06 * Units.deg] * len(Mach)
 
         alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
         lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
         drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
 
-        grad_map = GradientMap(
+        GRAD_MAP = GradientMap(
             state_inputs=(alpha_path,),
             state_outputs=(lift_path,)
         )
 
         vehicle = VORJAX_ONERA_M6()
 
-        results = VORJAX_test_run(vehicle, alpha, Mach, n_sw=40, n_cw=12, grad_map=grad_map, debug_mode=DEBUG)
+        results = VORJAX_test_run(
+            vehicle,
+            alpha, Mach,
+            n_sw=40, n_cw=12,
+            cosine_spacing=COSINE_SPC,
+            lan_correction=LAN_CORRECTION,
+            far_field=FAR_FIELD,
+            grad_map=GRAD_MAP,
+            debug_mode=DEBUG
+        )
         f_st, f_sys, f_setts, jac = results
 
-
         CL = ru.get_target(f_st, lift_path)
-        dCL_dAlpha = jnp.array([jac[i, 0, i] for i in range(21)]).reshape(CL.shape)
+        dCL_dAlpha = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
 
-        print("\nONERA M6 Mach Sweep\n"+"-"*42)
+        with open('/home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/su2_run_cache.json') as f:
+            su2_cache = json.load(f)
+
+        print(f"\nONERA M6 Mach Sweep, Lan={LAN_CORRECTION}, FF={FAR_FIELD}, COS={COSINE_SPC}\n"+"-"*57)
         for i in range(CL.shape[0]):
-            print(f"M: {Mach[i]: .2f}, CL: {float(CL[i, 0]):.3e}, dAlpha: {float(dCL_dAlpha[i, 0]):.3e}")
+            SU2_results = list(su2_cache.values())[i]
+            SU2_CL = float(SU2_results['cl'])
+            SU2_da = float(SU2_results['dcl_dalpha'])
+
+            VJX_CL = float(CL[i, 0])
+            VJX_da = float(dCL_dAlpha[i, 0]) * Units.deg
+
+            CL_err = (VJX_CL - SU2_CL)/SU2_CL * 100
+            da_err = (VJX_da - SU2_da)/SU2_da * 100
+
+            print(f"M: {Mach[i]: .2f}, CL: {VJX_CL:.3e}({CL_err:.1f}%), dAlpha: {VJX_da:.3e}({da_err:.1f}%)")
 
         if PLOT_WINGS:
             data = f_sys.analysis_data
             base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
             base_panels.show()
 
-            m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][11], title="ONERA M6 Flag, M = 1.1")
+            m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
             m11_flags.show()
 
-            m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][11], title="ONERA M6 DCp, M = 1.1")
+            m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
             m11_dcp.show()
 
-            m20 = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][-1], title="ONERA M6 DCp, M = 2.0")
+            m20 = plot_vlm_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
             m20.show()
-
 
     print("Done!")

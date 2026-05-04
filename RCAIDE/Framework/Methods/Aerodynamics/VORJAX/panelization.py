@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.Vortex_Lattice import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
 
 # package imports 
 from RCAIDE.utils import inputs, outputs
@@ -467,7 +467,6 @@ def generate_chordwise_coordinates(le_cut: float, te_cut: float, n_cw: int, cosi
     
     # Calculate physical widths of these sections
     widths = jnp.diff(breaks)
-
     # Safety catch
     n_cw = jnp.maximum(n_cw, 3)
     
@@ -679,7 +678,7 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
         vmap_chordwise = jax.vmap(generate_chordwise_coordinates, in_axes=(0, 0, None, None))
         xi_grid = vmap_chordwise(
             strip_le_cuts, strip_te_cuts, n_cw,
-            vlm_settings.vortices.spanwise_cosine_spacing)
+            vlm_settings.vortices.chordwise_cosine_spacing)
 
         # Map panels to control surfaces
         xi_mid = (xi_grid[:, :-1] + xi_grid[:, 1:]) / 2.0

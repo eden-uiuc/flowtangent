@@ -223,6 +223,10 @@ def compute_C_ij(VD, Mach):
     center = VD.bound_vortex_center.astype(jnp.float32)
     colloc = VD.collocation_points.astype(jnp.float32)
 
+    front_left = VD.panel_vertices[:, 0, :]
+    front_right = VD.panel_vertices[:, 3, :]
+    front_mid = 0.5 * (front_left + front_right)
+
     # Local Panel Orientation ------------------------------------------------------------------------------------------
     dy = vortex_B[:, 1] - vortex_A[:, 1]
     dz = vortex_B[:, 2] - vortex_A[:, 2]
@@ -266,7 +270,7 @@ def compute_C_ij(VD, Mach):
     tol_sq_scl = 2500.0 * tol_sq
 
     # Row-wise vector-mapping to minimize peak memory usage
-    def compute_row(c_pt, ct_R, st_R, recv_idx):
+    def compute_row(c_pt, ct_R, st_R, recv_idx, EW):
         dx = c_pt[0] - center[:, 0]
         dy = c_pt[1] - center[:, 1]
         dz = c_pt[2] - center[:, 2]
@@ -296,7 +300,7 @@ def compute_C_ij(VD, Mach):
         r_o2 = beta_sq_exp * r_tv2[None, :]
 
         # --- Subsonic Kernel ---
-        U_sub, V_sub, W_sub = subsonic_induction(
+        U_ind, V_ind, W_ind = subsonic_induction(
             x1_sq=x_sq1,
             x2_sq=x_sq2,
             x_ty=x_dist_center,
@@ -341,28 +345,30 @@ def compute_C_ij(VD, Mach):
         )
 
         # --- Blending ---
-        U_ind = jnp.where(is_subsonic, U_sub, U_sup)
-        V_ind = jnp.where(is_subsonic, V_sub, V_sup)
-        W_ind = jnp.where(is_subsonic, W_sub, W_sup)
+        U_ind = jnp.where(is_subsonic, U_ind, U_sup)
+        V_ind = jnp.where(is_subsonic, V_ind, V_sup)
+        W_ind = jnp.where(is_subsonic, W_ind, W_sup)
 
         # --- EW Calculation ---
         # Note: ct_S and st_S are just the global 'costheta' and 'sintheta' arrays
         COS_RS = ct_R * costheta + st_R * sintheta
         SIN_RS = st_R * costheta - ct_R * sintheta
 
+
         EW_row = W_ind * COS_RS[None, :] - V_ind * SIN_RS[None, :]
 
         # --- Rotate to Global Frame ---
         C_ij_row = jnp.stack([
-            U_ind,
-            V_ind * costheta[None, :] - W_ind * sintheta[None, :],
-            V_ind * sintheta[None, :] + W_ind * costheta[None, :]
-        ], axis=-1)
+                U_ind,
+                V_ind * costheta[None, :] - W_ind * sintheta[None, :],
+                V_ind * sintheta[None, :] + W_ind * costheta[None, :]
+            ], axis=-1)
 
         # Return the tuple!
         return C_ij_row, EW_row
 
-    C_ij_mapped, EW_mapped = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
+    C_ij_mapped, _ = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels), jnp.zeros_like(costheta, dtype=bool))
+    _, EW_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels), jnp.ones_like(costheta, dtype=bool))
 
     C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
     EW = jnp.swapaxes(EW_mapped, 0, 1)

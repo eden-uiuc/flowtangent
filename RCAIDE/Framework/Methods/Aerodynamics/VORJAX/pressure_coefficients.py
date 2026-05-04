@@ -37,12 +37,11 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
     Vy_local = v_total[:, :, 1] / v_inf
     
     # Local Panel Geometry (Sweep Tangents and Dihedral) ---------------------------------------------------------------
+    dx = VD.chord_lengths
     strip_ids = jnp.cumsum(VD.is_leading_edge) - 1
-    strip_chord_array = jax.ops.segment_sum(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
+    strip_chord_array = jax.ops.segment_sum(dx, strip_ids, num_segments=VD.total_strips)
     strip_chord = strip_chord_array[strip_ids]
-    
-    n_cw = VD.panels_per_strip
-    dx   = 1.0 / n_cw
+
     
     # Front edge sweep (Front-Left [0] to Front-Right [3])
     dx_A = VD.panel_vertices[:, 3, 0] - VD.panel_vertices[:, 0, 0]
@@ -80,7 +79,7 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
     dCp_sideslip    = 2.0 * Vy_local * cos_DL[None, :] * Gamma_lateral / dx[None, :]
     
     # Net Circulation --------------------------------------------------------------------------------------------------
-    Gamma_net = Gamma * Vx_local * n_cw[None, :] / strip_chord[None, :]
+    Gamma_net = Gamma * Vx_local / dx
     
     # Final Delta Cp
     dCp = 2.0 * Gamma_net + dCp_sideslip

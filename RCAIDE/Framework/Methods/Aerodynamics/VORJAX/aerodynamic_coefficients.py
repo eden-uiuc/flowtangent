@@ -63,7 +63,7 @@ def _compute_trefftz_drag(tp_y_ctrl, tp_z_ctrl, tp_y_L, tp_y_R, tp_z_L, tp_z_R, 
 # ---------------------------------------------------------
 
 @jax.jit
-def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total, state, system, settings):
+def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total_norm, state, system, settings):
     """
     Computes CL, CD, C_m, CY_body, Cl, Cn and induced drag using the unstructured VD mesh.
     """
@@ -92,11 +92,9 @@ def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total, state, system
     
     panel_ones = jnp.ones_like(strip_ids, dtype=jnp.float32)
     stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=VD.total_strips)
-    
-    panels_per_strip = stripwise_panels[strip_ids]
-    panel_dx_nondim = 1.0 / panels_per_strip 
 
     stripwise_chords = jax.ops.segment_sum(VD.chord_lengths, strip_ids, num_segments=VD.total_strips)
+    panel_dx_nondim = VD.chord_lengths/stripwise_chords[VD.strip_ids]
     
     # ------------------------------------------------------------------
     # Local Panel Sweep and Dihedral (Using VD.panel_vertices)
@@ -157,7 +155,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total, state, system
         EW_masked = EW * le_mask_float[None, :, None]
 
         # Add the trailing None to broadcast across the 3 velocity components
-        v_total_masked = v_total * le_mask_float[None, :, None]
+        v_total_masked = v_total_norm * le_mask_float[None, :, None]
 
         EW_LE = seg_sum(EW_masked)
         v_total_LE = seg_sum(v_total_masked)
@@ -284,7 +282,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, GAMMA, EW, v_total, state, system
     # CD, CX, CL from far-field integration
     CDi_far     = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)   # Positive in Body Frame
     CX_body_far = -(CDi_far/cos_alpha[:, 0] - CZ_body * jnp.tan(alpha[:, 0]))       # CX is in Wind Frame, opposite of Body Frame Orientation
-    CL_far      = CZ_body * cos_alpha[:, 0] - CX_body_far * sin_alpha[:, 0]
+    CL_far      = -CZ_body * cos_alpha[:, 0] + CX_body_far * sin_alpha[:, 0]
     
     return CL_near, CDi_near, CL_far, CDi_far, CX_body, CX_body_far, CY_body, CZ_body, C_l, C_m, C_n
 
@@ -326,7 +324,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
         analysis["dCp"],
         analysis["vortex_strengths"],
         analysis["effective_wash"],
-        analysis["relative_velocity"],
+        analysis["relative_velocity"]/state.freestream.speed[:, None, :],
         state,
         system,
         settings
