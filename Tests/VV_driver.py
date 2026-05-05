@@ -376,13 +376,13 @@ def VORJAX_ONERA_M6():
             percent_span_location=0.0,
             root_chord_percent=1.0,
             sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file("//home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         ),
         WingSegment(
             tag="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file("/home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         )
     )
     
@@ -925,6 +925,7 @@ if __name__ == "__main__":
     mach_path   = ru.PathTuple(("freestream", "mach_number"))
     lift_path   = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
     drag_path   = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
+    i_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "total"))
 
     GRAD_MAP = GradientMap(
         state_inputs=(alpha_path,),
@@ -939,11 +940,11 @@ if __name__ == "__main__":
     TEST_ONERA      = True
     
     COSINE_SPC      = True
-    PLOT_WINGS      = True
+    PLOT_WINGS      = False
     LAN_CORRECTION  = True
     FAR_FIELD       = False
     
-    DEBUG           = False
+    DEBUG           = True
 
     # AVL Test Cases ---------------------------------------------------------------------------------------------------
     if TEST_AVL:
@@ -1201,14 +1202,12 @@ if __name__ == "__main__":
     if TEST_ONERA:
 
         Mach = [
-            0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8,
+            # 0.3, 
+            0.4, 
+            # 0.5, 0.6, 0.7, 0.75, 0.8,
         #    0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0
         ]
         alpha = [3.06 * Units.deg] * len(Mach)
-
-        alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-        lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
-        drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))
 
         GRAD_MAP = GradientMap(
             state_inputs=(alpha_path,),
@@ -1220,7 +1219,7 @@ if __name__ == "__main__":
         results = VORJAX_test_run(
             vehicle,
             alpha, Mach,
-            n_sw=40, n_cw=12,
+            n_sw=40, n_cw=8,
             cosine_spacing=COSINE_SPC,
             lan_correction=LAN_CORRECTION,
             far_field=FAR_FIELD,
@@ -1229,10 +1228,12 @@ if __name__ == "__main__":
         )
         f_st, f_sys, f_setts, jac = results
 
-        CL = ru.get_target(f_st, lift_path)
+        CL  = ru.get_target(f_st, lift_path)
+        CD  = ru.get_target(f_st, drag_path)
+        CDi = ru.get_target(f_st, i_drag_path)
         dCL_dAlpha = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
 
-        with open('/home/jordan/dev/EDEn/RCAIDE/Tests/VORJAX/SU2_Test_Cases/su2_run_cache.json') as f:
+        with open('/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/su2_run_cache.json') as f:
             su2_cache = json.load(f)
 
         print(f"\nONERA M6 Mach Sweep, Lan={LAN_CORRECTION}, FF={FAR_FIELD}, COS={COSINE_SPC}\n"+"-"*57)
@@ -1247,7 +1248,10 @@ if __name__ == "__main__":
             CL_err = (VJX_CL - SU2_CL)/SU2_CL * 100
             da_err = (VJX_da - SU2_da)/SU2_da * 100
 
-            print(f"M: {Mach[i]: .2f}, CL: {VJX_CL:.3e}({CL_err:.1f}%), dAlpha: {VJX_da:.3e}({da_err:.1f}%)")
+            VJX_CD  = float(CD[i, 0])
+            VJX_CDi = float(CDi[i, 0])
+
+            print(f"M: {Mach[i]:.2f}, CL: {VJX_CL:.3e}({CL_err:>5.1f}%), dAlpha: {VJX_da:.3e}({da_err:>5.1f}%), CD: {VJX_CD:>7.4f}, CDi: {VJX_CDi:>7.4f}")
 
         if PLOT_WINGS:
             data = f_sys.analysis_data
