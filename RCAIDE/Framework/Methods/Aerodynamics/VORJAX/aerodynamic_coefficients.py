@@ -110,7 +110,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, EW, v_rel, state, system, 
     dx_LE = jax.ops.segment_sum(dx_all * le_mask_float, strip_ids, num_segments=VD.total_strips)
     
     dihedral_length_LE = jnp.maximum(jnp.sqrt(dy_LE**2 + dz_LE**2), 1e-12)
-    true_sweep_LE = dx_LE / dihedral_length_LE 
+    tan_sweep_LE = dx_LE / dihedral_length_LE
     cos_dihedral = jnp.abs(dy_LE) / dihedral_length_LE  
     sin_dihedral = jnp.sign(dy_LE) * dz_LE / dihedral_length_LE  
     
@@ -151,7 +151,8 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, EW, v_rel, state, system, 
     # ------------------------------------------------------------------
     # Lan's Correction for Leading Edge Suction
     # ------------------------------------------------------------------
-    if settings.analysis.aerodynamics.le_suction_correction:
+    vlm_settings = settings.analysis.aerodynamics
+    if vlm_settings.le_suction_correction:
         # EW_masked = EW * le_mask_float[None, :, None]
 
         # # Add the trailing None to broadcast across the 3 velocity components
@@ -173,11 +174,11 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, EW, v_rel, state, system, 
         # base_incidence_LE = jnp.sum(v_total_LE * normals_LE[None, :, :], axis=-1)
         # eff_incidence_LE = base_incidence_LE - (v_total_LE[..., 0] * camber_slopes_LE[None, :])
 
-        # singularity_strength_LE = induced_velocity_LE - eff_incidence_LE
+        # A0 = induced_velocity_LE - eff_incidence_LE
 
         # B_sq = jnp.square(mach) - 1.0
-        # sweep_sq = jnp.square(true_sweep_LE)[None, :]
-        # subsonic_LE_factor = jnp.where(
+        # sweep_sq = jnp.square(tan_sweep_LE)[None, :]
+        # L_eff = jnp.where(
         #     B_sq < sweep_sq,
         #     jnp.sqrt(jnp.maximum(sweep_sq - B_sq, 1e-16)),
         #     0.0
@@ -190,51 +191,51 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, EW, v_rel, state, system, 
         # )
         # LE_dCp = seg_sum(dCp * le_mask_float[None, :])
 
-        # singularity_strength_LE = jnp.where(
-        #     subsonic_LE_factor > 0,
-        #     singularity_strength_LE / stripwise_panels[None, :] / jnp.maximum(subsonic_LE_factor, 1e-16),
-        #     singularity_strength_LE
+        # A0 = jnp.where(
+        #     L_eff > 0,
+        #     A0 / stripwise_panels[None, :] / jnp.maximum(L_eff, 1e-16),
+        #     A0
         # )
 
-        # singularity_strength_LE = singularity_strength_LE + 0.5 * LE_dCp * jnp.sqrt(strip_quarter_chord_offset)[None, :]
-        v_inf_batch = state.freestream.speed[:, None, :]
-        normalwash  = jnp.sum(EW * Gamma[:, None, :] / v_inf_batch, axis=-1)
-        
-        v_dot_n     = jnp.sum((v_rel / v_inf_batch) * VD.normal_vectors[None, :, :], axis=-1)
-        v_x_rel     = v_rel[..., 0] / v_inf_batch[..., 0]
-        true_local_incidence = v_dot_n - (v_x_rel * VD.camber_slopes[None, :])
-        
-        strip_normalwash    = strip_sum(normalwash)
-        strip_incidence     = strip_sum(true_local_incidence)
-
-        singularity_strength_LE = (strip_normalwash - strip_incidence) / stripwise_panels[None, :]
-        
+        # A0 = A0 + 0.5 * LE_dCp * jnp.sqrt(strip_quarter_chord_offset)[None, :]
         B_sq = jnp.square(mach) - 1.0
-        sweep_sq = jnp.square(true_sweep_LE)[None, :]
-        subsonic_LE_factor = jnp.where(
-            B_sq < sweep_sq,
-            jnp.sqrt(jnp.maximum(sweep_sq - B_sq, 1e-16)),
-            0.0
-        )
+        t_sq = jnp.square(tan_sweep_LE)[None, :]
 
-        singularity_strength_LE = jnp.where(
-            subsonic_LE_factor > 0,
-            singularity_strength_LE / jnp.maximum(subsonic_LE_factor, 1e-16),
-            singularity_strength_LE
-        )
+        # Double guard statement to avoid singularity at B_sq > t_sq
+        L_eff = jnp.where(B_sq < t_sq, jnp.sqrt(jnp.maximum(t_sq - B_sq, 1e-16)), 0.0)
 
-        singularity_strength_LE = singularity_strength_LE + 0.5 * strip_sum(dCp * le_mask_float[None, :]) * jnp.sqrt(jax.ops.segment_sum(quarter_chord_offset, strip_ids, num_segments=VD.total_strips))[None, :]
-        suction_coeff_LE = 0.5 * jnp.pi * jnp.square(singularity_strength_LE) * subsonic_LE_factor
+        if vlm_settings.vortices.chordwise_cosine_spacing:
+            w0 = jnp.sum(EW * Gamma[:, None, :], axis=-1)
+
+            v_unit = v_rel / state.freestream.speed[:, None, :]
+            v_dot_n         = jnp.sum(v_unit * VD.normal_vectors[None, :, :], axis=-1)
+            local_incidence = v_dot_n - (v_unit[..., 0] * VD.camber_slopes[None, :])
+
+            LE_normalwash = strip_sum(w0 * le_mask_float[None, :])
+            LE_incidence  = strip_sum(local_incidence * le_mask_float[None, :])
+
+            # Leading edge singularity strength
+            A0 = (LE_normalwash + LE_incidence) / stripwise_panels[None, :]
+            A0 = jnp.where(L_eff > 0, A0 / jnp.maximum(L_eff, 1e-16), A0)
+
+        else:
+            # Correct singularity strength using leading edge pressure coefficient
+            le_qc   = jax.ops.segment_sum(quarter_chord_offset * le_mask_float, strip_ids, num_segments=VD.total_strips)[None, :]
+            le_dCp  = strip_sum(dCp * le_mask_float[None, :])
+            A0  = 0.5 * le_dCp * jnp.sqrt(le_qc)
+        
+        # Suction coefficient
+        Cs = 0.5 * jnp.pi * jnp.square(A0) * L_eff
 
         # --- CAMBER CORRECTION 3: True aerodynamic orientation for the suction vector ---
         incidence_LE = jax.ops.segment_sum(VD.incidence_angle * le_mask_float, strip_ids, num_segments=VD.total_strips)[None, :]
 
-        suction_vector_x = jnp.ones_like(suction_coeff_LE)
+        suction_vector_x = jnp.ones_like(Cs)
         suction_vector_z = -incidence_LE
 
         # --- Update the strip coefficients from the previous block ---
-        strip_body_x_coeff = strip_body_x_coeff - suction_vector_x * suction_coeff_LE
-        strip_body_z_coeff = strip_body_z_coeff + suction_coeff_LE * jnp.sqrt(1.0 + sweep_sq) * suction_vector_z
+        strip_body_x_coeff = strip_body_x_coeff - suction_vector_x * Cs
+        strip_body_z_coeff = strip_body_z_coeff + Cs * jnp.sqrt(1.0 + t_sq) * suction_vector_z
 
     # ------------------------------------------------------------------
     # Body Axis Transformation & Strips Integration
@@ -299,7 +300,6 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, EW, v_rel, state, system, 
     CL_near  = jnp.sum(strip_lift, axis=1) / S_ref
     CD_near = -CX_wind * cos_alpha[:, 0] - CZ_wind * sin_alpha[:, 0]
 
-    
     C_l = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref)
     C_m =  jnp.sum(strip_pitching_moment, axis=1) / (S_ref * c_ref)
     C_n = -jnp.sum(strip_yawing_moment, axis=1) / (S_ref * b_ref)

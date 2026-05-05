@@ -376,13 +376,13 @@ def VORJAX_ONERA_M6():
             percent_span_location=0.0,
             root_chord_percent=1.0,
             sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("./VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         ),
         WingSegment(
             tag="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("./VORJAX/SU2_Test_Cases/onera_airfoil.txt")
         )
     )
     
@@ -402,7 +402,7 @@ def VORJAX_ONERA_M6():
 
     return system
 
-def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, lan_correction=True, far_field=False, grad_map=None, debug_mode=False):
+def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cos_sw=True, cos_cw=False, lan_correction=True, far_field=False, grad_map=None, debug_mode=False):
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -436,8 +436,8 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cosine_spacing=True, 
     initial_system = vehicle
 
     vortices = Vortices(
-        spanwise_cosine_spacing=cosine_spacing,
-        chordwise_cosine_spacing=cosine_spacing,
+        spanwise_cosine_spacing=cos_sw,
+        chordwise_cosine_spacing=cos_cw,
         spanwise_vortices=n_sw,
         chordwise_vortices=n_cw
     )
@@ -932,19 +932,19 @@ if __name__ == "__main__":
         state_outputs=(lift_path,)
     )
 
-
     TEST_AVL        = False
     TEST_ELLIPTICAL = False
     TEST_METHOD     = False
     TEST_DELTA      = False
     TEST_ONERA      = True
     
-    COSINE_SPC      = True
+    COSINE_SPC_CW   = False
+    COSINE_SPC_SW   = True
     PLOT_WINGS      = False
     LAN_CORRECTION  = True
     FAR_FIELD       = False
     
-    DEBUG           = True
+    DEBUG           = False
 
     # AVL Test Cases ---------------------------------------------------------------------------------------------------
     if TEST_AVL:
@@ -954,8 +954,8 @@ if __name__ == "__main__":
 
         vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
         results = VORJAX_test_run(vehicle,
-                                  alpha=[2.0 * Units.deg] , Mach=[0.00],
-                                  n_sw=20, n_cw=12, cosine_spacing=False,
+                                  alpha=[2.0 * Units.deg], Mach=[0.00],
+                                  n_sw=20, n_cw=12, cos_sw=False,
                                   lan_correction=False,
                                   debug_mode=DEBUG)
 
@@ -1201,26 +1201,17 @@ if __name__ == "__main__":
     # ONERA M6 Mach Sweep ----------------------------------------------------------------------------------------------
     if TEST_ONERA:
 
-        Mach = [
-            # 0.3, 
-            0.4, 
-            # 0.5, 0.6, 0.7, 0.75, 0.8,
-        #    0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0
-        ]
+        Mach = [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
         alpha = [3.06 * Units.deg] * len(Mach)
-
-        GRAD_MAP = GradientMap(
-            state_inputs=(alpha_path,),
-            state_outputs=(lift_path,)
-        )
 
         vehicle = VORJAX_ONERA_M6()
 
         results = VORJAX_test_run(
             vehicle,
             alpha, Mach,
-            n_sw=40, n_cw=8,
-            cosine_spacing=COSINE_SPC,
+            n_sw=24, n_cw=24,
+            cos_sw=COSINE_SPC_SW,
+            cos_cw=COSINE_SPC_CW,
             lan_correction=LAN_CORRECTION,
             far_field=FAR_FIELD,
             grad_map=GRAD_MAP,
@@ -1233,11 +1224,11 @@ if __name__ == "__main__":
         CDi = ru.get_target(f_st, i_drag_path)
         dCL_dAlpha = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
 
-        with open('/home/jordan/dev/RCAIDE/Tests/VORJAX/SU2_Test_Cases/su2_run_cache.json') as f:
+        with open('./VORJAX/SU2_Test_Cases/su2_run_cache.json') as f:
             su2_cache = json.load(f)
 
-        print(f"\nONERA M6 Mach Sweep, Lan={LAN_CORRECTION}, FF={FAR_FIELD}, COS={COSINE_SPC}\n"+"-"*57)
-        for i in range(CL.shape[0]):
+        print(f"\nONERA M6 Mach Sweep, Lan={LAN_CORRECTION}, FF={FAR_FIELD}, COS_SW={COSINE_SPC_SW}, COS_CW={COSINE_SPC_CW}\n"+"-"*57)
+        for i in range(len(Mach)):
             SU2_results = list(su2_cache.values())[i]
             SU2_CL = float(SU2_results['cl'])
             SU2_da = float(SU2_results['dcl_dalpha'])

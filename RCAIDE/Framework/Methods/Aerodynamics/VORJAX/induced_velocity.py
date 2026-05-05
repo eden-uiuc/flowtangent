@@ -270,7 +270,7 @@ def compute_C_ij(VD, Mach):
     tol_sq_scl = 2500.0 * tol_sq
 
     # Row-wise vector-mapping to minimize peak memory usage
-    def compute_row(c_pt, ct_R, st_R, recv_idx, EW):
+    def compute_row(c_pt, ct_R, st_R, recv_idx):
         dx = c_pt[0] - center[:, 0]
         dy = c_pt[1] - center[:, 1]
         dz = c_pt[2] - center[:, 2]
@@ -367,8 +367,8 @@ def compute_C_ij(VD, Mach):
         # Return the tuple!
         return C_ij_row, EW_row
 
-    C_ij_mapped, _ = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels), jnp.zeros_like(costheta, dtype=bool))
-    _, EW_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels), jnp.ones_like(costheta, dtype=bool))
+    C_ij_mapped, _ = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
+    _, EW_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels))
 
     C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
     EW = jnp.swapaxes(EW_mapped, 0, 1)

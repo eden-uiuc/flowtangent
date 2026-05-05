@@ -66,7 +66,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     v_fs = jnp.concatenate([
         v_inf * jnp.cos(alpha) * jnp.cos(beta),
         v_inf * jnp.cos(alpha) * jnp.sin(beta), 
-        -v_inf * jnp.sin(alpha)
+        v_inf * jnp.sin(alpha)
     ], axis=1)
     
     # Compute Rotational Velocity at every control point: V_rot = -(Omega x r)
@@ -86,8 +86,8 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     # Normalize by V_inf to match the standard VLM coefficient formulation
     v_unit = v_total / v_inf[:, None]
     
-    # Dot product: sum(V * N, axis=1)
-    base_rhs_array = jnp.sum(v_unit * VD.normal_vectors, axis=-1)
+    # Dot product: -sum(V * N, axis=1)
+    base_rhs_array = -jnp.sum(v_unit * VD.normal_vectors, axis=-1)
 
     # Camber correction from thin wing assumption
     v_unit_x = v_unit[..., 0]
