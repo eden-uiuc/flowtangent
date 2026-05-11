@@ -18,10 +18,9 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.System import Aircraft
     from RCAIDE.Framework.Settings import Settings
 
-from .flat_plate_friction import flat_plate_friction
-from RCAIDE.Library.Methods.Utilities import cubic_spline_blender
+from .Flat_Plate import flat_plate_friction
 
-from RCAIDE.utils import inputs, outputs
+from RCAIDE.utils import inputs, outputs, cubic_spline_blender
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Parasite Drag Methods

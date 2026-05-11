@@ -57,6 +57,8 @@ class InducedDrag(Conditions):
 
     inviscid:     ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Inviscid Induced Drag'))
     viscous:      ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Viscous Induced Drag'))
+    near_field:   ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Near-Field Induced Drag'))
+    far_field:    ComponentCoefficients = eqx.field(default_factory=lambda: ComponentCoefficients(tag='Far-Field Induced Drag'))
 
 
 class DragCoefficients(Conditions):

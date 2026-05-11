@@ -36,7 +36,7 @@ from RCAIDE.utils import inputs, outputs
     "system.reference_geometry",
     "system.analysis_data"
 )
-def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Settings"):
+def initialize_VLM_data(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Parses the vehicle geometry to find the primary reference parameters 
     and packs them into JAX arrays for the VLM solver.
@@ -96,14 +96,13 @@ def initialize_VLM_geometry(state: "State", system: "Aircraft", settings: "Setti
     # Add analysis data keys
     initial_analysis_data = {
             "vortex_distribution": None,
-            "AICs": None,
+            "VICs": None,
             "induced_wake": None,
             "boundary_conditions": None,
             "relative_velocity": None,
             "singularities": None,
             "vortex_strengths": None,
             "dCp": None,
-            "effective_wash": None,
         }
         
     updated_system = eqx.tree_at(

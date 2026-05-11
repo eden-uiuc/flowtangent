@@ -63,10 +63,10 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     omega = jnp.concatenate([p, q, r], axis=1)
     
     # Build Freestream Velocity Vector (Wind Speed in Body Frame)
-    v_fs = jnp.concatenate([
-        v_inf * jnp.cos(alpha) * jnp.cos(beta),
-        v_inf * jnp.cos(alpha) * jnp.sin(beta), 
-        v_inf * jnp.sin(alpha)
+    v_fs = v_inf * jnp.concatenate([
+        jnp.cos(alpha) * jnp.cos(beta),
+        jnp.sin(beta), 
+        jnp.sin(alpha) * jnp.cos(beta)
     ], axis=1)
     
     # Compute Rotational Velocity at every control point: V_rot = -(Omega x r)

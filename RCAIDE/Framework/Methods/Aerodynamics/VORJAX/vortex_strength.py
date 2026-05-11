@@ -26,7 +26,7 @@ from RCAIDE.utils import inputs, outputs
 
 @inputs(
     "system.analysis_data['vortex_distribution']",
-    "system.analysis_data['AICs']",
+    "system.analysis_data['VICs']",
     "system.analysis_data['boundary_conditions']",
     "system.analysis_data['singularities']",
 )
@@ -41,7 +41,7 @@ def compute_vortex_strength(state: "State", system: "System", settings: "Setting
     
     # Extract the arrays we built in previous steps
     # C_mn shape: (n_time, receiver_N, sender_N, 3)
-    C_mn = analysis["AICs"]
+    C_mn = analysis["VICs"]
     
     # RHS shape: (n_time, receiver_N)
     RHS = analysis["boundary_conditions"]

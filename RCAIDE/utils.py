@@ -120,8 +120,8 @@ def compute_tree_delta(old_tree, new_tree):
 
     return changed_indices, changed_leaves
 
-
 def apply_tree_delta(base_tree, delta_indices, delta_leaves):
+
     """Reconstructs new tree from base tree and delta."""
     old_leaves, treedef = jax.tree_util.tree_flatten(base_tree)
     new_leaves = list(old_leaves)
@@ -129,3 +129,15 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
         new_leaves[idx] = leaf
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
+
+# ---------------------------------------------------------
+# General Mathematical Utilities
+# ---------------------------------------------------------
+
+@jax.jit
+def cubic_spline_blender(x, start, end):
+
+    eta = (x - start) / (end - start)
+    eta_clamped = jnp.clip(eta, 0.1, 1.0)
+    y = -2.0 * eta_clamped ** 3 + 3.0 * eta_clamped ** 2
+    return y

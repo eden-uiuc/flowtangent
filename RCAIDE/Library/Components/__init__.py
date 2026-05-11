@@ -10,7 +10,6 @@
 
 from os import path
 from pathlib import Path
-Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
 # Component Types
 

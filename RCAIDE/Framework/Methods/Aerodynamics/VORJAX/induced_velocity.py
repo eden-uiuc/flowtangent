@@ -175,9 +175,10 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_s
     V = jnp.where(in_plane, 0.0, V)
     W = jnp.where(in_plane, W_in, W)
 
-    # WWAVE: Principal Part of the Integral (Self-Influence / Wave Drag)
+    # W_wave: Principal Part of the Integral (Self-Influence / Wave Drag)
     N = U.shape[1]
     t_sq = t ** 2
+    cos_sweep = 1.0 / jnp.sqrt(1.0 + t_sq[None, :])
 
     W_wave_cond = B_sq > t_sq[None, :]
     W_wave_output = -0.5 * jnp.sqrt(jnp.where(W_wave_cond, B_sq - t_sq[None, :], 1.0)) / jnp.maximum(c, 1e-12)
@@ -222,10 +223,6 @@ def compute_C_ij(VD, Mach):
     vortex_B = VD.bound_vortex_B.astype(jnp.float32)
     center = VD.bound_vortex_center.astype(jnp.float32)
     colloc = VD.collocation_points.astype(jnp.float32)
-
-    front_left = VD.panel_vertices[:, 0, :]
-    front_right = VD.panel_vertices[:, 3, :]
-    front_mid = 0.5 * (front_left + front_right)
 
     # Local Panel Orientation ------------------------------------------------------------------------------------------
     dy = vortex_B[:, 1] - vortex_A[:, 1]
@@ -368,14 +365,21 @@ def compute_C_ij(VD, Mach):
         return C_ij_row, EW_row
 
     C_ij_mapped, _ = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
-    _, EW_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels))
-
     C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
-    EW = jnp.swapaxes(EW_mapped, 0, 1)
+    
+    # If using chordwise cosine spacing, compute leading edge normalwash for Lan's method
+    # (Currently unsupported, commented out to minimize memory footprint)
 
-    return C_mn.astype(jnp.float64), singularity_flag, EW
+    # front_left = VD.panel_vertices[:, 0, :]
+    # front_right = VD.panel_vertices[:, 3, :]
+    # front_mid = 0.5 * (front_left + front_right)
 
+    # _, LN_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels))
+    # LN = jnp.swapaxes(LN_mapped, 0, 1)
 
+    return C_mn.astype(jnp.float64), singularity_flag
+
+    
 # ----------------------------------------------------------------------------------------------------------------------
 #  Wing Induced Velocity Calculation
 # ----------------------------------------------------------------------------------------------------------------------
@@ -386,21 +390,20 @@ def compute_C_ij(VD, Mach):
     "state.freestream.mach_number"
 )
 @outputs(
-    "system.analysis_data['AICs']",
+    "system.analysis_data['VICs']",
     "system.analysis_data['singularities']",
-    "system.analysis_data['effective_wash']"
+    "system.analysis_data['le_normalwash']"
 )
 def compute_induced_velocity(state: "State", system: "System", settings: "Settings"):
     
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
     
-    C_ij, singularity_flag, EW = compute_C_ij(VD, Mach)
+    C_ij, singularity_flag, = compute_C_ij(VD, Mach)
     
     updated_analysis_data = system.analysis_data | {
-        "AICs": C_ij,
+        "VICs": C_ij,
         "singularities": singularity_flag,
-        "effective_wash": EW
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)

@@ -9,6 +9,7 @@
 
 from decimal import Decimal
 from pathlib import Path
+from os import path
 
 # package imports
 import equinox as eqx
@@ -17,6 +18,12 @@ from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
 from RCAIDE.Library import Component
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Airfoil Data Locator
+# ----------------------------------------------------------------------------------------------------------------------
+
+Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -28,6 +35,7 @@ class Airfoil(Component):
 
     thickness_to_chord: float = 0.0
     max_thickness:      float = 0.0
+    wedge_angle:        float = 0.0
 
     coordinates:        jnp.ndarray = eqx.field(default_factory=jnp.empty((0, 2)))
 

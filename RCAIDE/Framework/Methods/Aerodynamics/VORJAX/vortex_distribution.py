@@ -638,7 +638,7 @@ def generate_full_vortex_distribution(state: "State", system: "Aircraft", settin
         "vortex_distribution": VD,
         "boundary_conditions": jnp.zeros((n_time, n_panels)),
         "relative_velocity": jnp.zeros((n_time, n_panels, 3)),
-        "AICs": jnp.zeros((n_time, n_panels, n_panels, 3)),
+        "VICs": jnp.zeros((n_time, n_panels, n_panels, 3)),
         "singularities": jnp.zeros((n_time, n_panels)),
         "vortex_strengths": jnp.zeros((n_time, n_panels)),
         "pressure_coefficients": jnp.zeros((n_time, n_panels)),
