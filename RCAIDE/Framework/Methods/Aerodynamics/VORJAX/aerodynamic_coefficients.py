@@ -127,6 +127,9 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     panel_inc           = VD.incidence_angle
     panel_axial_coeff   = panel_force_mag * jnp.sin(panel_inc)[None, :]
     panel_normal_coeff  = panel_force_mag * jnp.cos(panel_inc)[None, :]
+    le_inc              = jax.ops.segment_sum(panel_inc * le_mask_float,
+                                              strip_ids,
+                                              num_segments=VD.total_strips)[None, :]
 
     panel_indices       = jnp.arange(VD.total_panels)
     strip_start_indices = jax.ops.segment_min(panel_indices, strip_ids, num_segments=VD.total_strips)[strip_ids]
@@ -171,36 +174,43 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     # Suction coefficient
     Cs = 0.5 * jnp.pi * jnp.square(A0) * L_eff
 
-    # Leading edge geometry
-    suction_vector_x = jnp.ones_like(Cs)
-    suction_vector_z = -jax.ops.segment_sum(VD.incidence_angle * le_mask_float, strip_ids, num_segments=VD.total_strips)[None, :]
-
-    # Update the strip coefficients
-    strip_body_x_coeff = strip_body_x_coeff - suction_vector_x * Cs
-    strip_body_z_coeff = strip_body_z_coeff + Cs * jnp.sqrt(1.0 + t_sq) * suction_vector_z
+    # Update the strip coefficients w/ leading edge geometry
+    strip_body_x_coeff = jnp.where(vlm_settings.corrections.suction,
+                                   strip_body_x_coeff - Cs, strip_body_x_coeff)
+    strip_body_z_coeff = jnp.where(vlm_settings.corrections.suction,
+                                   strip_body_z_coeff + Cs * jnp.sqrt(1.0 + t_sq) * le_inc, strip_body_z_coeff)
 
     # ------------------------------------------------------------------
     # Supersonic Shock Pressure Correction
     # ------------------------------------------------------------------
-    thetas = VD.wedge_angles
+    theta_w = VD.wedge_angles
+    a_local = alpha + le_inc
+    theta_u = jnp.where(theta_w > 0, theta_w - a_local, theta_w)
+    theta_l = jnp.where(theta_w > 0, theta_w + a_local, theta_w)
+
     flow_g = state.freestream.gamma 
 
     cos_sweep_LE = 1.0 / jnp.sqrt(1.0 + tan_sweep_LE ** 2)
     m_normal = mach * cos_sweep_LE
 
     def compute_strip_shock(m, t, g):
-        b = theta_beta_mach(m, t, g) # Calculate beta
-        M1, Pr, Tr, Ptr = oblique_shock(m, t, b, g) # Calculate the shock properties
-        return M1, Pr, Tr, Ptr
+        b = jnp.where(t > 0, theta_beta_mach(m, t, g), jnp.pi/2) # Calculate beta
+        _, _, _, Ptr_s = oblique_shock(m, t, b, g) # Shock pressure recovery
+        Ptr = jnp.where(t >= 0, Ptr_s, 1.0)
+        return Ptr
     
     vmap_strips = jax.vmap(compute_strip_shock, in_axes=(0, 0, None))
-    vmap_machs_and_strips = jax.vmap(vmap_strips, in_axes=(0, None, 0))
+    vmap_machs_and_strips = jax.vmap(vmap_strips, in_axes=(0, 0, 0))
 
-    strip_M1, strip_Pr, strip_Tr, strip_Ptr = vmap_machs_and_strips(m_normal, thetas, flow_g)
-    strip_Ptr = jnp.squeeze(strip_Ptr, axis=-1)
+    # Compute upper and lower shock pressure recovery
+    strip_Ptr_u = vmap_machs_and_strips(m_normal, theta_u, flow_g)
+    strip_Ptr_l = vmap_machs_and_strips(m_normal, theta_l, flow_g)
+
+    # Average shock pressure recovery factor
+    strip_Ptr = jnp.squeeze((strip_Ptr_u + strip_Ptr_l)/2.0, axis=-1)
 
     effective_Ptr = jnp.where(m_normal > 1.0, strip_Ptr, 1.0)
-    effective_Ptr = jnp.where(vlm_settings.supersonic.shock_correction, effective_Ptr, 1.0)
+    effective_Ptr = jnp.where(vlm_settings.corrections.shock, effective_Ptr, 1.0)
     
     # ------------------------------------------------------------------
     # Body Axis Transformation & Strips Integration

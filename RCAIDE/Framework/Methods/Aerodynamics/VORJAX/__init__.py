@@ -1,6 +1,5 @@
 from .initialization import initialize_VLM_data
 from .panelization import discretize_surfaces
-from .vortex_distribution import generate_full_vortex_distribution
 from .boundary_conditions import compute_boundary_conditions
 from .induced_velocity import compute_induced_velocity
 from .vortex_strength import compute_vortex_strength

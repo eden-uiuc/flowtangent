@@ -1,5 +1,3 @@
-from typing import Callable, Iterable, Optional
-
 # RCAIDE/utils.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
@@ -9,8 +7,12 @@ from typing import Callable, Iterable, Optional
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING, Self
+
+import os
+
+from typing import TYPE_CHECKING, Self, Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -25,6 +27,13 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------------------------------------------------------
 #  Utility Functions
 # ----------------------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------
+# Programmatic Helpers
+#----------------------------------------------------------
+
+def get_RCAIDE_root():
+    return Path(os.path.dirname(os.path.abspath(__file__))).parents[0].resolve()
 
 # ---------------------------------------------------------
 # Input/Output Function Decorators
@@ -141,3 +150,7 @@ def cubic_spline_blender(x, start, end):
     eta_clamped = jnp.clip(eta, 0.1, 1.0)
     y = -2.0 * eta_clamped ** 3 + 3.0 * eta_clamped ** 2
     return y
+
+
+if __name__ == '__main__':
+    print(get_RCAIDE_root())

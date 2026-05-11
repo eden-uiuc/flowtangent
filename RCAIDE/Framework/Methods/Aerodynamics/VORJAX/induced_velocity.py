@@ -212,6 +212,7 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_s
     return U, V, W
 
 @jax.jit
+@jax.checkpoint
 def compute_C_ij(VD, Mach):
     """
     Computes the Aerodynamic Influence Coefficient matrix C_ij.

@@ -100,7 +100,7 @@ def peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, val_peak=0.0, pe
     return jnp.where(M <= M_peak, spline_up, spline_down)
 
 @jax.jit
-def ensemble_CL_spline(M, M_sub, _M_peak, M_sup, val_sub, val_sup, peak_multiplier=1.15):
+def ensemble_CL_spline(M, M_sub, M_sup, val_sub, val_sup, peak_multiplier=1.15):
     """
     Analytically finds the peak of a wide Hermite spline, boosts it, 
     and bridges the transonic gap using a 3-node spline.
@@ -136,7 +136,7 @@ def ensemble_CL_spline(M, M_sub, _M_peak, M_sup, val_sub, val_sup, peak_multipli
     # Convert t_peak back to physical Mach number
     M_peak = M_sub + t_peak * delta_M_wide
 
-    return peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, peak_multiplier=1.15)
+    return peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, peak_multiplier=peak_multiplier)
     
     # 4. Evaluate the wide spline exactly at t_peak to get our baseline height
     h00_w = 2.0 * t_peak**3 - 3.0 * t_peak**2 + 1.0

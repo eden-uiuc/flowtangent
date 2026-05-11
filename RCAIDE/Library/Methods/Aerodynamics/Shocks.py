@@ -97,3 +97,7 @@ def shock_train(M0, thetas, gamma=1.4, weak_shock=True):
     final_carry, _ = scan(shock_step, init_carry, thetas)
 
     return final_carry  #(Mf, Pr, Tr, Ptr)
+
+if __name__ == '__main__':
+    beta = theta_beta_mach(1.5, -jnp.pi/4)
+    print(oblique_shock(1.5, -jnp.pi/4, beta))

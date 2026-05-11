@@ -56,7 +56,6 @@ class SupersonicSettings(eqx.Module):
     
     cross_section_type:             str  = eqx.field(static=True, default='Fixed')
     wave_drag_type:                 str  = eqx.field(static=True, default='Raymer')
-    shock_correction:               bool = eqx.field(static=True, default=True)
 
     def __post_init__(self):
         if self.peak_mach_number is not None:
@@ -73,6 +72,9 @@ class SupersonicSettings(eqx.Module):
             )
 
 class CorrectionFactors(eqx.Module):
+
+    suction:    bool = eqx.field(static=True, default=True)
+    shock:      bool = eqx.field(static=True, default=True)
 
     fuselage_lift: float = 1.14
     trim_drag: float = 1.02

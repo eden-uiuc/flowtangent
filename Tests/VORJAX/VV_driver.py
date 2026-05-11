@@ -2,8 +2,12 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-import subprocess
 import os
+os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+
+import pynvml
+import subprocess
+import gc
 import re
 import json
 
@@ -16,6 +20,7 @@ import plotly.graph_objects as go
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from jax import Array
 
 from tqdm import trange
 from plotly.subplots import make_subplots
@@ -29,11 +34,11 @@ from RCAIDE.Library.Components.Airfoils import Airfoil, Airfoil_Data
 
 from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
 
-from RCAIDE.Framework import Process, State, Settings, GradientMap
+from RCAIDE.Framework import Process, State, Settings, GradientMap, System
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -83,51 +88,60 @@ SECTION
     with open(filename, 'w') as f:
         f.write(avl_text)
 
+
 def run_AVL_alpha_sweep(avl_file, alpha, run_name, oper_mode="st"):
     """Executes AVL silently using subprocess and a keystroke macro."""
 
-    file_name = f"{run_name}_{oper_mode}.txt"
-
-    # This string represents the EXACT keystrokes you would type in the terminal
-    keystrokes = f"""load {avl_file}
-oper
-a
-a
-{alpha}
-x
-{oper_mode}
-{file_name}
-O
-
-quit
-"""
-    # The 'O' above tells AVL to Overwrite the file if it already exists
-    # The '\n' drops us out of the OPER menu back to the main menu
+    # Ensure alphas is an iterable list
+    if isinstance(alpha, jnp.ndarray):
+        alphas = alpha.tolist()
+    elif not isinstance(alpha, list):
+        alphas = [alpha]
 
     avl_exe = os.path.expanduser("~/.local/bin/avl")
-    print(f"\nRunning AVL for {avl_file} at Alpha = {alpha}...")
+    print(f"\nRunning AVL for {avl_file} over {len(alpha)} angles of attack...")
 
-    # Call AVL natively from your PATH, piping the keystrokes in
+    # 1. Start the macro
+    keystrokes = f"load {avl_file}\noper\n"
+    output_files = []
+
+    # 2. Loop through each alpha and build the execution sequence
+    for i, a in enumerate(alpha):
+        file_name = f"./Tests/VORJAX/AVL Test Cases/{run_name}_{oper_mode}_a{i}.txt"
+        output_files.append(file_name)
+
+        # CRITICAL: Pre-delete the file so AVL never throws an overwrite prompt
+        if os.path.exists(file_name):
+            os.remove(file_name)
+
+        # a -> a -> [value] -> x (execute) -> st -> [filename]
+        keystrokes += f"a\na\n{a}\nx\n{oper_mode}\n{file_name}\n"
+
+    # 3. Drop out of OPER menu and quit
+    keystrokes += "\nquit\n"
+
+    # 4. Execute the subprocess
     try:
         result = subprocess.run(
             [avl_exe],
             input=keystrokes,
             text=True,
             capture_output=True,
-            timeout=5.0
+            timeout=10.0  # Slightly longer timeout for multi-alpha sweeps
         )
     except subprocess.TimeoutExpired:
         print("CRITICAL: AVL hung in an infinite loop and was terminated.")
-        # You can optionally run a system kill command here just to be safe
         os.system("pkill -9 avl")
-        return
+        return []
 
-    # Optional: Check if AVL crashed or threw a Fortran error
     if "Stop" in result.stdout or result.returncode != 0:
         print("AVL encountered an error!")
         print(result.stdout)
 
-    print(f"Done. Saved stability data to {file_name}")
+    print(f"Done. Saved stability data to {len(output_files)} individual files.")
+
+    # Return the filenames so your Python parser can easily loop over them
+    return output_files
 
 def parse_avl_stability(stab_file_path):
     """
@@ -205,22 +219,23 @@ def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0,
         run_name = Path(geometry_file).stem
 
     if geometry_file is None:
-        geometry_file = f"{run_name}.avl"
+        geometry_file = f"./Tests/VORJAX/AVL Test Cases/{run_name}.avl"
         AVL_straight_wing(geometry_file, span=span, chord=chord)
 
-    run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
+    output_files = run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
 
-    if oper_mode == "st":
-        parsed_data = parse_avl_stability(f"{run_name}_{oper_mode}.txt")
+    parsed_data = []
+    for file in output_files:
+        if oper_mode == "st":
+            parsed_data.append(parse_avl_stability(file))
+        elif oper_mode == "fe":
+            parsed_data.append(parse_avl_fe_dcp(file))
 
+    if len(parsed_data) == 1:
         print("\n--- Extracted AVL Results ---")
-        for k, v in parsed_data.items():
+        for k, v in parsed_data[0].items():
             print(f"{k}: {v}")
         print("\n")
-    elif oper_mode == "fe":
-        parsed_data = parse_avl_fe_dcp(f"{run_name}_{oper_mode}.txt")
-    else:
-        parsed_data = None
 
     return parsed_data
 
@@ -404,7 +419,17 @@ def VORJAX_ONERA_M6():
 
     return system
 
-def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cos_sw=True, shock=False, grad_map=None, near_field=False, debug_mode=False):
+def VORJAX_test_run(
+    vehicle,
+    alpha, Mach,
+    n_sw=20, n_cw=6,
+    cos_sw=True,
+    shock=False,
+    grad_map=None,
+    suction=True,
+    near_field=False,
+    debug_mode=False
+) -> tuple[State, System, Settings, Array | None, Process | None]:
 
     state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
     frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
@@ -448,10 +473,14 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, cos_sw=True, shock=Fa
         peak_mach_number=2.0,
         begin_blend_mach=0.7,
         end_blend_mach=1.2,
-        shock_correction=shock
+    )
+
+    corr = CorrectionFactors(
+        shock=shock,
+        suction=suction,
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, near_field_drag=near_field)
+    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -509,6 +538,85 @@ def load_plot_cache(key, filepath="./Tests/VORJAX/plotting.json"):
         return json.load(f)[key]
 
 # Plotting Functions ---------------------------------------------------------------------------------------------------
+
+def plot_avl_validation_mpl(alpha, cl_vjx, cd_vjx, cm_vjx, cl_avl, cd_avl, cm_avl):
+    # Set global font to match LaTeX standard
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+    plt.rcParams['font.size'] = 10
+
+    # Trace styling
+    avl_style = dict(color='black', linestyle='-', linewidth=1.5, label='AVL (Baseline)')
+    vjx_style = dict(color='black', linestyle='None', marker='o', markersize=5,
+                     markerfacecolor='none', markeredgecolor='black', label='VORJAX')
+
+    def create_single_plot(x_avl, y_avl, x_vjx, y_vjx, xlabel, ylabel, filename,
+                           legend_loc='best', text_loc=(0.95, 0.05)):
+        # Ensure arrays for math
+        y_avl_arr = np.array(y_avl).reshape(-1)
+        y_vjx_arr = np.array(np.round(y_vjx, 5)).reshape(-1)
+
+        # Calculate Mean Absolute Error
+        # Using raw delta since coefficients often cross zero (making percentage error unstable)
+        mean_error = np.mean(np.abs(y_vjx_arr - y_avl_arr))
+
+        # 3.5 inches is the standard AIAA single-column width
+        fig, ax = plt.subplots(figsize=(3.5, 2.6))
+
+        # Plot data
+        ax.plot(x_avl, y_avl, **avl_style)
+        ax.plot(x_vjx, y_vjx, **vjx_style)
+
+        # Formatting
+        ax.set_xlabel(xlabel, fontweight='bold')
+        ax.set_ylabel(ylabel, fontweight='bold')
+        ax.tick_params(axis='both', direction='in', top=True, right=True)
+        ax.grid(True, linestyle='-', color='#E5E5E5', alpha=0.7)
+
+        # Legend
+        ax.legend(loc=legend_loc, frameon=True, edgecolor='black', fancybox=False, fontsize=8)
+
+        # Add Error Callout Box
+        # Dynamically align text based on where it is placed
+        ha = 'right' if text_loc[0] > 0.5 else 'left'
+        va = 'top' if text_loc[1] > 0.5 else 'bottom'
+
+        bbox_props = dict(boxstyle="square,pad=0.4", fc="white", ec="black", lw=0.7)
+        ax.text(text_loc[0], text_loc[1], f"Mean Error: {mean_error:.2e}",
+                transform=ax.transAxes, fontsize=8,
+                verticalalignment=va, horizontalalignment=ha,
+                bbox=bbox_props)
+
+        # Save and close to prevent memory leaks
+        plt.tight_layout()
+        plt.savefig("./Tests/VORJAX/plots/"+filename, format='pdf', bbox_inches='tight')
+        plt.close(fig)
+        print(f"Saved {filename}")
+
+    # 1. CL vs Alpha
+    # Data goes bottom-left to top-right. Legend upper left, box bottom right.
+    create_single_plot(alpha, cl_avl, alpha, cl_vjx,
+                       r"Angle of Attack ($\alpha$) [deg]", r"Lift Coefficient ($C_L$)",
+                       "avl_val_cl_alpha.pdf", legend_loc='upper left', text_loc=(0.95, 0.05))
+
+    # 2. CD vs Alpha
+    # Data is a parabola. Legend upper center/left, box bottom center/right.
+    create_single_plot(alpha, cd_avl, alpha, cd_vjx,
+                       r"Angle of Attack ($\alpha$) [deg]", r"Drag Coefficient ($C_D$)",
+                       "avl_val_cd_alpha.pdf", legend_loc='upper center', text_loc=(0.95, 0.05))
+
+    # 3. Cm vs Alpha
+    # Data usually goes top-left to bottom-right for stable aircraft.
+    # Legend upper right, box bottom left.
+    create_single_plot(alpha, cm_avl, alpha, cm_vjx,
+                       r"Angle of Attack ($\alpha$) [deg]", r"Pitching Moment ($C_m$)",
+                       "avl_val_cm_alpha.pdf", legend_loc='upper right', text_loc=(0.05, 0.05))
+
+    # 4. Drag Polar (CL vs CD)
+    # Data is sideways parabola. Legend upper left, box bottom right.
+    create_single_plot(cd_avl, cl_avl, cd_vjx, cl_vjx,
+                       r"Drag Coefficient ($C_D$)", r"Lift Coefficient ($C_L$)",
+                       "avl_val_polar.pdf", legend_loc='upper left', text_loc=(0.95, 0.05))
 
 def plot_spanwise_loading_mpl(eta, gamma, CL, b, AR, v_inf):
     # Set global font to match LaTeX standard
@@ -887,7 +995,7 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     fig, ax = plt.subplots(figsize=(3.5, 2.6))
 
     # 2. Add Trace: FD Absolute Error (Solid line, filled circles)
-    ax.loglog(step_sizes, fd_errors, color='black', linestyle='-', linewidth=1.2, 
+    ax.loglog(step_sizes, fd_errors, color='black', linestyle='-', linewidth=1.2,
               marker='o', markersize=4, markerfacecolor='black', 
               label='Central Difference Error')
 
@@ -932,7 +1040,7 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     # Note: You can comment this title out for the final LaTeX export 
     # to let the \caption{} handle it.
     plt.title("Central Difference Accuracy vs Step Size ", 
-              fontweight='bold', pad=35) # Pad to make room for legend
+              fontweight='bold', pad=35)  # Pad to make room for legend
     
     # 7. Export to native PDF vector graphic
     plt.tight_layout()
@@ -1021,7 +1129,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
 
     fig.show()
 
-def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones, grad_FD=None, error_FD=None):
+def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones):
     
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
@@ -1035,16 +1143,6 @@ def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones, grad_FD=None,
             marker=dict(symbol="circle", size=8)
         ), secondary_y=False
     )
-    
-    if grad_FD is not None and len(grad_FD) > 0:
-        fig.add_trace(
-            go.Scatter(
-                x=ARs, y=grad_FD, 
-                name="Central Difference (FD)",
-                mode="markers",
-                marker=dict(color="orange", symbol="x", size=8, line=dict(width=2))
-            ), secondary_y=False
-        )
 
     fig.add_trace(
         go.Scatter(
@@ -1067,18 +1165,6 @@ def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones, grad_FD=None,
         ), secondary_y=True
     )
 
-    if error_FD is not None and len(error_FD) > 0:
-        error_FD_pct = np.array(error_FD) * 100.0
-        fig.add_trace(
-            go.Scatter(
-                x=ARs, y=error_FD_pct, 
-                name="FD Relative Error vs Jones",
-                mode="lines+markers",
-                line=dict(color="orange", width=2, dash="dot"),
-                marker=dict(symbol="x", size=6)
-            ), secondary_y=True
-        )
-
     # --- Layout & Styling ---
     fig.update_layout(
         title_text="<b>Delta Wing Aspect Ratio Sweep: VLM vs. Slender Wing Theory</b>",
@@ -1096,6 +1182,91 @@ def plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones, grad_FD=None,
                      color="#d62728", secondary_y=True, showgrid=False, rangemode="tozero")
 
     return fig
+
+def plot_delta_log_sweep_mpl(ARs, grad_AD):
+    # Set global font to match LaTeX standard
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+    plt.rcParams['font.size'] = 8  # Slightly smaller to accommodate the larger legend
+
+    ARs = np.array(ARs)
+    grad_AD = np.array(grad_AD)
+
+    # 1. Calculate Dense Theoretical Curves (using logspace for smooth curves)
+    AR_dense = np.logspace(np.log10(min(ARs)), np.log10(max(ARs)), 500)
+
+    # Jones Slender Wing Theory
+    jones_dense = (np.pi / 2.0) * AR_dense
+
+    # Diederich Sweep-Corrected Theory
+    diederich_dense = (2.0 * np.pi * AR_dense) / (2.0 + np.sqrt(AR_dense ** 2 + 8.0))
+
+    # 2. Calculate Discrete Errors against BOTH theories
+    jones_discrete = (np.pi / 2.0) * ARs
+    diederich_discrete = (2.0 * np.pi * ARs) / (2.0 + np.sqrt(ARs ** 2 + 8.0))
+
+    error_jones_pct = np.abs(grad_AD - jones_discrete) / jones_discrete * 100.0
+    error_diederich_pct = np.abs(grad_AD - diederich_discrete) / diederich_discrete * 100.0
+
+    # 3. Initialize Figure
+    fig, ax1 = plt.subplots(figsize=(3.5, 2.8))  # Slightly taller for the legend
+
+    # 4. Primary Y: Gradients (Semi-Log X)
+    ax1.semilogx(ARs, grad_AD, color='black', linestyle='None', marker='o',
+                 markersize=5, markerfacecolor='black', label='VORJAX Gradient')
+
+    ax1.semilogx(AR_dense, jones_dense, color='black', linestyle='-.', linewidth=1.5,
+                 label='Jones Theory')
+
+    ax1.semilogx(AR_dense, diederich_dense, color='black', linestyle='-', linewidth=1.5,
+                 label='Diederich Theory')
+
+    # 5. Secondary Y: Relative Errors (Semi-Log X)
+    ax2 = ax1.twinx()
+
+    # Error vs Jones: Open Triangles
+    ax2.semilogx(ARs, error_jones_pct, color='black', linestyle=':', linewidth=1.2,
+                 marker='^', markersize=5, markerfacecolor='none', markeredgecolor='black',
+                 label='Error vs. Jones')
+
+    # Error vs Diederich: Open Squares
+    ax2.semilogx(ARs, error_diederich_pct, color='gray', linestyle=':', linewidth=1.2,
+                 marker='s', markersize=5, markerfacecolor='none', markeredgecolor='gray',
+                 label='Error vs. Diederich')
+
+    # 6. Formatting
+    ax1.set_xlabel("Aspect Ratio ($AR$)", fontweight='bold')
+    ax1.set_xlim(left=min(ARs), right=max(ARs))
+
+    # Format X-axis ticks for log scale
+    ax1.xaxis.set_major_formatter(ticker.FuncFormatter(lambda y, _: '{:g}'.format(y)))
+
+    # Restrict Y-axis so Jones doesn't blow out the top of the chart at AR=20
+    ax1.set_ylabel(r"Gradient ($C_{L_\alpha}$) [rad$^{-1}$]", fontweight='bold')
+    ax1.set_ylim(bottom=0, top=max(diederich_dense) * 1.3)
+
+    ax2.set_ylabel("Relative Error [%]", fontweight='bold')
+    ax2.set_ylim(bottom=0, top=max(max(error_jones_pct), max(error_diederich_pct)) * 1.1)
+
+    ax1.tick_params(axis='both', direction='in', top=True, which='both')
+    ax2.tick_params(axis='y', direction='in', which='both')
+
+    # Only show major gridlines for clean look
+    ax1.grid(True, which='major', linestyle='-', color='#E5E5E5', alpha=0.7)
+
+    # 7. Combine Legends
+    lines_1, labels_1 = ax1.get_legend_handles_labels()
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+
+    # Place legend in upper left, 1 column
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left',
+               fontsize=7, frameon=True, edgecolor='black', fancybox=False)
+
+    plt.title(r"Log-AR vs $\partial C_L/\partial \alpha$, Err.",
+              fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig("./Tests/VORJAX/plots/delta_wing_ar_sweep.pdf", format='pdf', bbox_inches='tight')
 
 def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_truth):
     
@@ -1183,43 +1354,96 @@ def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_
 
     return fig
 
+def plot_delta_convergence_and_memory_mpl(n_panels, grad_AD, memory_gb):
+    # Set global font to match LaTeX standard
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+    plt.rcParams['font.size'] = 8
+
+    n_panels = np.array(n_panels)
+    grad_AD = np.array(grad_AD)
+    memory_gb = np.array(memory_gb)
+
+    # 1. Initialize Figure
+    fig, ax1 = plt.subplots(figsize=(3.5, 2.8))
+
+    # 2. Primary Y: Gradient Convergence (Semi-Log X)
+    # Scatter for VORJAX
+    ax1.plot(n_panels, grad_AD, color='black', linestyle='-', linewidth=1.5,
+             marker='o', markersize=5, markerfacecolor='black',
+             label='VORJAX AD')
+
+    # Truth Line for Jones Limit
+    grad_truth = 0.157
+    ax1.axhline(y=grad_truth, color='black', linestyle='-.', linewidth=1.5,
+                label='Jones Theory')
+
+    # 3. Secondary Y: Peak VRAM (Log-Log)
+    ax2 = ax1.twinx()
+    # Dashed line, open squares
+    ax2.plot(n_panels, memory_gb, color='black', linestyle='--', linewidth=1.5,
+             marker='s', markersize=5, markerfacecolor='none', markeredgecolor='black',
+             label='Peak VRAM')
+
+    # 4. Formatting X-axis (Log Scale)
+    # ax1.set_xscale('log')
+    ax1.set_xlabel("Total Number of Panels ($N$)", fontweight='bold')
+
+    # Remove the forced ticks to prevent crowding; let Matplotlib handle standard log spacing (10^2, 10^3, etc.)
+
+    # 5. Formatting Y-axes
+    ax1.set_ylabel(r"Gradient ($C_{L_\alpha}$) [rad$^{-1}$]", fontweight='bold')
+    # ax2.set_yscale('log')
+    ax2.set_ylabel("Peak GPU Memory [GB]", fontweight='bold')
+
+    # 6. Styling
+    ax1.tick_params(axis='both', direction='in', top=True, which='both')
+    ax2.tick_params(axis='y', direction='in', which='both')
+
+    # Restrict grid to primary Y-axis major ticks
+    ax1.grid(True, which='major', linestyle='-', color='#E5E5E5', alpha=0.7)
+
+    # 7. Legends
+    lines_1, labels_1 = ax1.get_legend_handles_labels()
+    lines_2, labels_2 = ax2.get_legend_handles_labels()
+
+    # Place legend center-right to avoid the memory line shooting up the right side,
+    # or center-left depending on where the empty space falls.
+    ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='lower center', bbox_to_anchor=(0.4, 0.6),
+               fontsize=8, frameon=True, edgecolor='black', fancybox=False)
+
+    plt.title(r"Delta Wing Convergence and VRAM", fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig("./Tests/VORJAX/plots/delta_convergence_memory.pdf", format='pdf', bbox_inches='tight')
+
 def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
     """
     Plots SU2 data against raw VORJAX and a dynamically calculated Hermite spline.
     Includes a hidden trace to display the % Error in the unified hover menu.
     """
     
-    # 1. Find VORJAX boundary values
+    # Find VORJAX boundary values
+    mach = np.asarray(mach)
+    cl_su2 = np.asarray(cl_su2)
+    cl_vorjax = np.asarray(cl_vorjax)
+
     idx_sub = np.argmin(np.abs(mach - M_sub))
     idx_sup = np.argmin(np.abs(mach - M_sup))
     val_sub = cl_vorjax[idx_sub]
     val_sup = cl_vorjax[idx_sup]
-    
-    # 2. Boundary Gradients
-    grad_sub = val_sub * (M_sub / (1.0 - M_sub**2))
-    grad_sup = -val_sup * (M_sup / (M_sup**2 - 1.0))
-    delta_M = M_sup - M_sub
-    
-    # --- Helper to evaluate the spline at any Mach array ---
-    def eval_spline(m_array):
-        t = (m_array - M_sub) / delta_M
-        h00 = 2.0 * t**3 - 3.0 * t**2 + 1.0
-        h10 = t**3 - 2.0 * t**2 + t
-        h01 = -2.0 * t**3 + 3.0 * t**2
-        h11 = t**3 - t**2
-        return (val_sub * h00) + (val_sup * h01) + (grad_sub * delta_M * h10) + (grad_sup * delta_M * h11)
 
-    # 3. Generate High-Res Spline for the visible line
+    # Generate High-Res Spline for the visible line
     mach_spline = np.linspace(M_sub, M_sup, 100)
-    cl_spline = ensemble_CL_spline(mach_spline, M_sub, M_sup, val_sub, val_sup)
+    cl_spline = ensemble_CL_spline(mach_spline, M_sub, M_sup, val_sub, val_sup, 1.25)
                 
-    # 4. Calculate Error exactly at SU2 points
+    # Calculate Error exactly at SU2 points
     # (We only care about the error where SU2 overlaps with the spline bounds)
     mask = (mach >= M_sub) & (mach <= M_sup)
     mach_su2_masked = mach[mask]
     cl_su2_masked = cl_su2[mask]
     
-    spline_at_su2 = ensemble_CL_spline(mach_su2_masked, M_sub, M_sup, val_sub, val_sup)
+    spline_at_su2 = ensemble_CL_spline(mach_su2_masked, M_sub, M_sup, val_sub, val_sup, 1.25)
     error_pct = ((spline_at_su2 - cl_su2_masked) / cl_su2_masked) * 100.0
 
     # 5. Build the Plotly Figure
@@ -1273,17 +1497,100 @@ def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
     
     return fig
 
+def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
+    # Set global font to match LaTeX standard
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
+    plt.rcParams['font.size'] = 8
+
+    mach = np.array(mach)
+    cl_su2 = np.array(cl_su2)
+    cl_vorjax = np.array(cl_vorjax)
+
+    # 1. Find VORJAX boundary values
+    idx_sub = np.argmin(np.abs(mach - M_sub))
+    idx_sup = np.argmin(np.abs(mach - M_sup))
+    val_sub = cl_vorjax[idx_sub]
+    val_sup = cl_vorjax[idx_sup]
+
+    # 2. Generate High-Res Spline for the visible line
+    mach_spline = np.linspace(M_sub, M_sup, 100)
+    # Note: Assuming ensemble_CL_spline is available in your namespace
+    cl_spline = ensemble_CL_spline(mach_spline, M_sub, M_sup, val_sub, val_sup)
+
+    # 3. Calculate Mean Error in the Transonic Region
+    mask = (mach < 0.8) | (mach > 1.0)
+    in_mask = (mach >= 0.8) | (mach <= 1.0)
+
+    mach_su2_masked = mach[mask]
+    cl_su2_masked = cl_su2[mask]
+    in_mach_su2_masked =  mach[in_mask]
+    in_cl_su2_masked = cl_su2[in_mask]
+
+
+    spline_at_su2 = ensemble_CL_spline(mach_su2_masked, M_sub, M_sup, val_sub, val_sup)
+    in_spline_at_su2 = ensemble_CL_spline(in_mach_su2_masked, M_sub, M_sup, val_sub, val_sup)
+
+    # Calculate Mean Relative Error (Percentage)
+    mean_spline_error = np.mean(np.abs((spline_at_su2 - cl_su2_masked) / cl_su2_masked)) * 100.0
+    in_mean_spline_error = np.mean(np.abs((in_spline_at_su2 - in_cl_su2_masked) / in_cl_su2_masked)) * 100.0
+
+    # 4. Initialize Figure (Standard AIAA single-column width)
+    fig, ax = plt.subplots(figsize=(3.5, 2.6))
+
+    # Raw VORJAX (Gray, Dashed)
+    ax.plot(mach, cl_vorjax, color='gray', linestyle='--', linewidth=1.5,
+            label='Raw VORJAX')
+
+    # Transonic Spline (Black, Thick Solid)
+    ax.plot(mach_spline, cl_spline, color='black', linestyle='-', linewidth=2.0,
+            label=f'Transonic Spline')
+
+    # SU2 Data (Black Diamonds)
+    ax.plot(mach, cl_su2, color='black', linestyle='None', marker='D', markersize=4,
+            markerfacecolor='none', markeredgecolor='black', label='SU2 (Euler)')
+
+    # Vertical bounds for the spline region
+    ax.axvline(x=M_sub, color='black', linestyle=':', linewidth=1.0)
+    ax.axvline(x=M_sup, color='black', linestyle=':', linewidth=1.0)
+
+    # Add textual labels for the bounds near the bottom axis
+    ax.text(M_sub, ax.get_ylim()[0] + 0.02 * (ax.get_ylim()[1] - ax.get_ylim()[0]),
+            r'$M_{sub}$', ha='right', va='bottom', fontsize=9, fontweight='bold')
+    ax.text(M_sup, ax.get_ylim()[0] + 0.12 * (ax.get_ylim()[1] - ax.get_ylim()[0]),
+            r'$M_{sup}$', ha='right', va='bottom', fontsize=9, fontweight='bold')
+
+    # 5. Formatting
+    ax.set_xlabel("Mach Number ($M$)", fontweight='bold')
+    ax.set_ylabel(r"Lift Coefficient ($C_L$)", fontweight='bold')
+
+    # Adjust Y-limits to fit the legend and spline nicely
+    y_max = np.max(cl_su2)
+    ax.set_ylim(bottom=0, top=y_max * 1.5)
+    ax.set_xlim(left=min(mach), right=max(mach))
+
+    ax.tick_params(axis='both', direction='in', top=True, right=True)
+    ax.grid(True, linestyle='-', color='#E5E5E5', alpha=0.7)
+
+    # 6. Legend and Callout Box
+    ax.legend(loc='lower center', frameon=True, edgecolor='black', fancybox=False, fontsize=8,
+              bbox_to_anchor=(0.4, 0.01))
+
+    bbox_props = dict(boxstyle="square,pad=0.4", fc="white", ec="black", lw=0.7)
+    ax.text(0.95, 0.95, "Spline Error: " + r"$0.8>M>1.0$"f": {mean_spline_error:.2f}%\n"+" "*15+r"$0.8\leq M\leq 1.0$"f": {in_mean_spline_error:.2f}%",
+            transform=ax.transAxes, fontsize=8,
+            verticalalignment='top', horizontalalignment='right',
+            # bbox=bbox_props,
+            zorder=2)
+
+    # 7. Export
+    plt.tight_layout()
+    plt.savefig("./Tests/VORJAX/plots/onera_transonic_spline.pdf", format='pdf', bbox_inches='tight')
 # Execution ------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
-
-    # geometry_file = '/home/jordan/dev/RCAIDE/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
-
-    # avl_b737_data = parse_avl_file(Path(geometry_file))
-    # vehicle = convert_to_RCAIDE(avl_b737_data)
-
-    # AVL_basic_test(geometry_file, oper_mode="st")
+    os.chdir(ru.get_RCAIDE_root())
 
     alpha_path  = ru.PathTuple(("aerodynamics", "angles", "alpha"))
     mach_path   = ru.PathTuple(("freestream", "mach_number"))
@@ -1302,53 +1609,69 @@ if __name__ == "__main__":
     TEST_ELLIPTICAL = False
     TEST_FD         = False
     TEST_METHOD     = False
-    TEST_DELTA      = True
-    TEST_ONERA      = False
+    TEST_DELTA_CONV = False
+    TEST_DELTA_AR   = False
+    TEST_ONERA      = True
     
     COSINE_SPC_SW   = True
     PLOT_WINGS      = False
-    SHOCK           = False
+    SHOCK           = True
     
     DEBUG           = False
-    NEW_DATA        = True
+    NEW_DATA        = False
 
     # AVL Test Cases ---------------------------------------------------------------------------------------------------
     if TEST_AVL:
+        print("\n--- AVL Primal Test ---")
+        if NEW_DATA:
+            alpha = jnp.linspace(-5.0, 15.0, 41)
 
-        AVL_dCp = AVL_basic_test(run_name="straight_wing", oper_mode="fe", alpha=2.0, span=10.0, chord=1.0)
-        parsed_data = AVL_basic_test(run_name="straight_wing", oper_mode="st", alpha=2.0, span=10.0, chord=1.0)
+            # AVL_dCp     = AVL_basic_test(run_name="straight_wing", oper_mode="fe", alpha=alpha, span=10.0, chord=1.0)
+            parsed_data = AVL_basic_test(run_name="straight_wing", oper_mode="st", alpha=alpha, span=10.0, chord=1.0)
 
-        vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
-        results = VORJAX_test_run(vehicle,
-                                  alpha=[2.0 * Units.deg], Mach=[0.00],
-                                  n_sw=20, n_cw=12, cos_sw=False,
-                                  debug_mode=DEBUG)
+            vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
+            results = VORJAX_test_run(vehicle,
+                                      alpha=alpha * Units.deg, Mach=jnp.zeros_like(alpha),
+                                      n_sw=20, n_cw=12, cos_sw=False,
+                                      suction=True, shock=False,
+                                      debug_mode=DEBUG)
 
-        f_st, f_sys, f_setts = results
+            f_st, f_sys, f_setts = results
 
-        CL = ru.get_target(f_st, lift_path).item(0)
-        CD = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"))).item(0)
-        C_m = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch"))).item(0)
+            CL = ru.get_target(f_st, lift_path)
+            CD = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "drag", "total")))
+            C_m = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch")))
 
-        data = f_sys.analysis_data
-        VORJAX_dCp = np.round(np.asarray(data["pressure_coefficients"]), 5)
-        err_max = np.max((AVL_dCp - VORJAX_dCp) / AVL_dCp)
+            data = f_sys.analysis_data
+            # VORJAX_dCp = np.round(np.asarray(data["dCp"]), 5)
+            # err_max = np.max((AVL_dCp - VORJAX_dCp) / AVL_dCp)
 
-        print("\n--- Extracted VORJAX Results ---")
-        print(f"CL: {CL:.5f}")
-        print(f"CD: {CD:.5f}")
-        print(f"CM: {C_m:.5f}")
-        print(f"Max dCp Error: {err_max:.5f}")
+            # print("\n--- Extracted VORJAX Results ---")
+            # print(f"CL: {CL:.5f}")
+            # print(f"CD: {CD:.5f}")
+            # print(f"CM: {C_m:.5f}")
+            # print(f"Max dCp Error: {err_max:.5f}")
 
-        if PLOT_WINGS:
-            fig = plot_vlm_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
-            fig.show()
+            if PLOT_WINGS:
+                fig = plot_vlm_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
+                fig.show()
+
+            save_plot_cache(
+                "avl_polars",
+                alpha=alpha,
+                cl_vjx=CL,
+                cd_vjx=CD,
+                cm_vjx=C_m,
+                cl_avl=[d['CLtot'] for d in parsed_data],
+                cd_avl=[d['CDtot'] for d in parsed_data],
+                cm_avl=[d['Cmtot'] for d in parsed_data],
+            )
+
+        plot_avl_validation_mpl(**load_plot_cache("avl_polars"))
 
     # Elliptical Wing Test ---------------------------------------------------------------------------------------------
     if TEST_ELLIPTICAL:
-        
         print("\n--- Elliptical Gradients Test ---")
-
         if NEW_DATA:
             max_segments = 20
             AR = 8.0
@@ -1442,12 +1765,6 @@ if __name__ == "__main__":
                         fd_errors=error_FD
                     )
 
-            
-
-            
-            
-            
-        
         # plot_elliptical_convergence_plotly(n_segments_list, grad_AD, error_AD, grad_truth)
         # plot_fd_v_curve_plotly(step_sizes, error_FD)
         
@@ -1457,9 +1774,7 @@ if __name__ == "__main__":
 
     # Elliptical Methodological Test -----------------------------------------------------------------------------------
     if TEST_METHOD:
-        
         print("\n--- Elliptical Drag Methodology Test ---")
-
         if NEW_DATA:
             max_segments = 20
             AR = 8.0
@@ -1512,141 +1827,172 @@ if __name__ == "__main__":
         plot_elliptical_drag_mpl(**load_plot_cache('elliptical_drag_ff'))
 
     # Delta Wing Test --------------------------------------------------------------------------------------------------
-    if TEST_DELTA:
-        CL = []
-        grad_AD = []
-        error_AD = []
+    if TEST_DELTA_CONV:
+        print("\n--- Delta Wing Memory/Convergence Test ---")
+        if NEW_DATA:
 
-        vram_gb = []
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
-        ARs = jnp.linspace(0.1, 2.5, 25)
-        grad_jones = jnp.pi * ARs / 2.0
+            CL = []
+            grad_AD = []
+            error_AD = []
+            vram_gb = []
 
-        n_cws   = [4, 8, 8, 16, 16, 32, 32, 64, 64]
-        n_sws   = [4, 4, 8, 8,  16, 16, 32, 32, 64]
+            grad_jones = jnp.pi * 0.1 / 2.0
 
-        vehicle = VORJAX_delta_wing(AR=ARs[0])
-        for i in trange(len(n_sws), desc="Running Delta Wing Panelization Tests"):
-            n_sw = n_sws[i]
-            n_cw = n_cws[i]
+            n_sws  = jnp.array([4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64])
+            n_cws  = jnp.ceil(1.33 * n_sws)
 
-            # Forward Step
-            results = VORJAX_test_run(
-                vehicle,
-                alpha=2.0 * Units.deg,
-                Mach=0.00,
-                n_sw=n_sw,
-                n_cw=n_cw,
-                grad_map=GRAD_MAP,
-                debug_mode=DEBUG
+            vehicle = VORJAX_delta_wing(AR=0.1)
+            for i in trange(len(n_sws), desc="Running Delta Wing Panelization Tests"):
+                n_sw = int(n_sws[i])
+                n_cw = int(n_cws[i])
+
+                # Forward Step
+                f_st, f_sys, f_setts, jac = VORJAX_test_run(
+                    vehicle,
+                    alpha=2.0 * Units.deg,
+                    Mach=0.00,
+                    n_sw=n_sw,
+                    n_cw=n_cw,
+                    grad_map=GRAD_MAP,
+                    debug_mode=DEBUG
+                )
+
+                jac.block_until_ready()
+                info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                peak_vram = info.used / (1024 ** 3)
+                vram_gb.append(peak_vram)
+
+                CL.append(ru.get_target(f_st, lift_path).item(0))
+                grad_AD.append(jac.item(0))
+                error_AD.append(abs(jac.item(0) - grad_jones)/grad_jones)
+
+                del f_st, f_sys, f_setts, jac
+                gc.collect()
+                jax.clear_caches()
+
+            save_plot_cache(
+                "delta_panels",
+                n_panels=2 * n_sws * n_cws,
+                grad_AD=grad_AD,
+                memory_gb=vram_gb,
             )
-            
-            f_st, f_sys, f_setts, jac = results
 
-            jac.block_until_ready()
-            stats = jax.devices()[0].memory_stats()
-            peak_vram = stats.get('peak_bytes_in_use', 0) / (1024 ** 3)
-            vram_gb.append(peak_vram)
-            
-            CL.append(ru.get_target(f_st, lift_path).item(0))
-            grad_AD.append(jac.item(0))
-            error_AD.append(abs(jac.item(0) - grad_jones[0])/grad_jones[0])
+        fig = plot_delta_convergence_and_memory_mpl(**load_plot_cache('delta_panels'))
 
-        
-        fig = plot_delta_convergence_and_memory_plotly([s * c for s, c in zip(n_sws, n_cws)], grad_AD, vram_gb, grad_jones[0])
-        fig.show()
+    if TEST_DELTA_AR:
+        print("\n--- Delta Wing AR Sweep Test ---")
+        if NEW_DATA:
+            CL = []
+            grad_AD = []
 
-        CL = []
-        grad_AD = []
-        error_AD = []
+            ARs = jnp.geomspace(0.1, 20.0, 20)
 
-        for i in trange(len(ARs), desc="Running Delta Wing AR Sweep"):
-            vehicle = VORJAX_delta_wing(AR=ARs[i])
-            grad_truth = grad_jones[i]
+            for i in trange(len(ARs), desc="Running Delta Wing AR Sweep"):
 
-            results = VORJAX_test_run(
-                vehicle,
-                alpha=2.0 * Units.deg,
-                Mach=0.00,
-                grad_map=GRAD_MAP,
-                debug_mode=DEBUG
+                f_st, f_sys, f_setts, jac = VORJAX_test_run(
+                    VORJAX_delta_wing(AR=ARs[i]),
+                    alpha=2.0 * Units.deg,
+                    Mach=0.00,
+                    grad_map=GRAD_MAP,
+                    n_sw=32,
+                    n_cw=64,
+                    debug_mode=DEBUG
+                )
+
+                CL.append(ru.get_target(f_st, lift_path).item(0))
+                grad_AD.append(jac.item(0))
+
+                if PLOT_WINGS:
+                    if int(i) % 10 == 0:
+                        fig = plot_vlm_panels(f_sys.analysis_data['vortex_distribution'])
+                        fig.show()
+
+            save_plot_cache(
+                "delta_ar_sweep",
+                ARs=ARs,
+                grad_AD=grad_AD,
             )
-            
-            f_st, f_sys, f_setts, jac = results
-
-            CL.append(ru.get_target(f_st, lift_path).item(0))
-            grad_AD.append(jac.item(0))
-            error_AD.append(abs(jac.item(0) - grad_truth)/grad_truth)
-
-            if PLOT_WINGS:
-                if int(i) % 10 == 0:
-                    fig = plot_vlm_panels(f_sys.analysis_data['vortex_distribution'])
-                    fig.show()
         
-        fig = plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones)
-        fig.show()
+        fig = plot_delta_log_sweep_mpl(**load_plot_cache('delta_ar_sweep'))
         
     # ONERA M6 Mach Sweep ----------------------------------------------------------------------------------------------
     if TEST_ONERA:
+        print("\n--- ONERA M6 Transonic Test ---")
+        if NEW_DATA:
+            Mach = [
+                0.3, 0.4, 0.5, 0.6, 0.7,  # Subsonic
+                0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, # Transonic
+                1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0  # Supersonic
+                ]
+            alpha = [3.06 * Units.deg] * len(Mach)
 
-        Mach = [
-            0.3, 0.4, 0.5, 0.6, 0.7,  # Subsonic
-            0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, # Transonic
-            1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0 # Supersonic
-            ]
-        alpha = [3.06 * Units.deg] * len(Mach)
+            vehicle = VORJAX_ONERA_M6()
 
-        vehicle = VORJAX_ONERA_M6()
+            results = VORJAX_test_run(
+                vehicle,
+                alpha, Mach,
+                n_sw=24, n_cw=12,
+                cos_sw=COSINE_SPC_SW,
+                shock=SHOCK,
+                grad_map=GRAD_MAP,
+                debug_mode=DEBUG
+            )
+            f_st, f_sys, f_setts, jac = results
 
-        results = VORJAX_test_run(
-            vehicle,
-            alpha, Mach,
-            n_sw=24, n_cw=12,
-            cos_sw=COSINE_SPC_SW,
-            shock=SHOCK,
-            grad_map=GRAD_MAP,
-            debug_mode=DEBUG
-        )
-        f_st, f_sys, f_setts, jac = results
+            CL  = ru.get_target(f_st, lift_path)
+            CDi = ru.get_target(f_st, i_drag_path)
+            dCL_dMach = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
 
-        CL  = ru.get_target(f_st, lift_path)
-        CDi = ru.get_target(f_st, i_drag_path)
-        dCL_dMach = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
+            cache_path = Path(os.path.join(os.path.dirname(__file__), 'SU2_Test_Cases/su2_run_cache.json'))
+            with open(cache_path) as f:
+                su2_cache = json.load(f)
 
-        cache_path = Path(os.path.join(os.path.dirname(__file__), 'VORJAX/SU2_Test_Cases/su2_run_cache.json'))
-        with open(cache_path) as f:
-            su2_cache = json.load(f)
+            SU2_CLs = jnp.array([v['cl'] for v in su2_cache.values()])
 
-        SU2_CLs = jnp.array([v['cl'] for v in su2_cache.values()])
+            print(f"\nONERA M6 Mach Sweep - SHOCK: {SHOCK}\n"+"-"*70)
+            for i in range(len(Mach)):
+                SU2_results = list(su2_cache.values())[i]
+                SU2_CL = float(SU2_results['cl'])
+                SU2_da = float(SU2_results['dcl_dalpha'])
 
-        print(f"\nONERA M6 Mach Sweep - SHOCK: {SHOCK}\n"+"-"*70)
-        for i in range(len(Mach)):
-            SU2_results = list(su2_cache.values())[i]
-            SU2_CL = float(SU2_results['cl'])
-            SU2_da = float(SU2_results['dcl_dalpha'])
+                VJX_CL = float(CL[i, 0])
+                VJX_da = float(dCL_dMach[i, 0]) * Units.deg
 
-            VJX_CL = float(CL[i, 0])
-            VJX_da = float(dCL_dMach[i, 0]) * Units.deg
+                CL_err = (VJX_CL - SU2_CL)/SU2_CL * 100
+                da_err = (VJX_da - SU2_da)/SU2_da * 100
 
-            CL_err = (VJX_CL - SU2_CL)/SU2_CL * 100
-            da_err = (VJX_da - SU2_da)/SU2_da * 100
+                VJX_CDi = float(CDi[i, 0])
 
-            VJX_CDi = float(CDi[i, 0])
+                print(f"M: {Mach[i]:.2f}, CL: {VJX_CL:.3e}({CL_err:>5.1f}%), dAlpha: {VJX_da:.3e}({da_err:>5.1f}%), CDi: {VJX_CDi:>7.4f}")
 
-            print(f"M: {Mach[i]:.2f}, CL: {VJX_CL:.3e}({CL_err:>5.1f}%), dAlpha: {VJX_da:.3e}({da_err:>5.1f}%), CDi: {VJX_CDi:>7.4f}")
+            if PLOT_WINGS:
+                data = f_sys.analysis_data
+                base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
+                base_panels.show()
 
-        if PLOT_WINGS:
-            data = f_sys.analysis_data
-            base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
-            base_panels.show()
+                m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
+                m11_flags.show()
 
-            m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
-            m11_flags.show()
+                m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
+                m11_dcp.show()
 
-            m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
-            m11_dcp.show()
+                m20 = plot_vlm_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
+                m20.show()
 
-            m20 = plot_vlm_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
-            m20.show()
+            save_plot_cache(
+                "onera_mach_sweep",
+                mach=Mach,
+                cl_su2=SU2_CLs,
+                cl_vorjax=CL[:, 0],
+                M_sub=0.5,
+                M_sup=2.0
+            )
+
+        # plot_transonic_tuning(**load_plot_cache('onera_mach_sweep')).show()
+        plot_transonic_tuning_mpl(**load_plot_cache('onera_mach_sweep'))
+
 
     print("\nAll tests complete.")
