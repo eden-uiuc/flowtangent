@@ -7,21 +7,41 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
+from __future__ import annotations
+from typing import TYPE_CHECKING, Callable, Optional, Iterable, Any, Literal
+
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 
 import warnings
-
-from typing import Callable, Optional, Iterable, Any
+from pathlib import Path
 
 # package imports
-import equinox as eqx
+import jax
 import jax.numpy as jnp
+import equinox as eqx
+
+import numpy as np  # Strictly for database serialization
+
 import sklearn
+import zarr
+
+from tqdm import trange
+
+try:
+    import pynvml
+    HAS_NVML = True
+except ImportError:
+    HAS_NVML = False
 
 # RCAIDE imports
-from RCAIDE.Library import Units
-from RCAIDE.Library.Methods.Aerodynamics.Transonic import transonic_spline, peaked_CL_spline, ensemble_CL_spline
+import RCAIDE.utils as ru
 
-from RCAIDE.Framework import Process, ProcessStep
+from RCAIDE.Library import Units
+from RCAIDE.Library.Methods.Aerodynamics.Transonic import peaked_CL_spline, ensemble_CL_spline
+
+from RCAIDE.Framework import State, Process, ProcessStep, Aircraft
+from RCAIDE.Framework.Missions.Conditions import Numerics
 
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
                                                           compute_coefficients, compute_induced_velocity,
@@ -129,14 +149,13 @@ class Vortices(eqx.Module):
 
     model_fuselage:             bool = eqx.field(static=True, default=False)
     verbose:                    bool = eqx.field(static=True, default=False)
-    floating_point_precision:   str  = eqx.field(static=True, default="float64")
     
     # Discretization Inputs (Optional, so the user can choose which to define)
     spanwise_cosine:    bool = eqx.field(static=True, default=True)
     chordwise_cosine:   bool = eqx.field(static=True, default=False) # Currently unsupported
 
-    n_spanwise:         Optional[Iterable[int] | int] = eqx.field(static=True, default=8) # Min value is number of wing segments (possibly more for control surfaces)
-    n_chordwise:        Optional[Iterable[int] | int] = eqx.field(static=True, default=3) # Min value 3 to allow front and rear control surfaces
+    n_spanwise:         Optional[Iterable[int] | int] = eqx.field(static=True, default=8)  # Min value is number of wing segments (possibly more for control surfaces)
+    n_chordwise:        Optional[Iterable[int] | int] = eqx.field(static=True, default=3)  # Min value 3 to allow front and rear control surfaces
     
     # Can set separate values for each wing/fuselage (ex. [8, 4] for [wing, stab] and [4, 2] for [fuselage, nacelle]), else uses global value above
     wings_n_spanwise:   Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
@@ -220,10 +239,10 @@ class InitializeVORJAX(Process):
     steps: tuple = eqx.field(default_factory=_default_VORJAX_init_steps)
 
 # ----------------------------------------------------------
-#  VLM Process
+#  VORJAX Compute Process
 # ----------------------------------------------------------
 
-def _default_VORJAX_steps():
+def _default_VORJAX_compute_steps():
     return(
         # Lift and Induced Drag
         ProcessStep(check_freestream, "Freestream Validation"),
@@ -233,18 +252,199 @@ def _default_VORJAX_steps():
         ProcessStep(compute_panel_pressures, "Compute Pressure Coefficients"),
         ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients"),
         ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
-
-        # Full Drag Buildup
-        # ProcessStep(compute_parasite_drag, "Compute Parasite Drag"),
-        # ProcessStep(compute_viscous_induced_drag, "Compute Viscous Induced Drag"),
     )
-    # TODO: Add trimming/stability analysis
+
+
+class ComputeVORJAX(Process):
+
+    tag: str = eqx.field(static=True, default="Compute VORJAX")
+
+    steps: tuple = eqx.field(default_factory=_default_VORJAX_compute_steps)
+
 
 class VORJAX(Process):
-
     tag: str = eqx.field(static=True, default="Aerodynamics")
+    steps: tuple = eqx.field(default_factory=lambda: (InitializeVORJAX(), ComputeVORJAX()))
 
-    steps : tuple = eqx.field(default_factory=_default_VORJAX_steps)
+    # TODO: Add full drag, trimming, stability analysis
+
+
+#-----------------------------------------------------------
+# Batch VORJAX Analysis
+#-----------------------------------------------------------
+
+class BatchVORJAX:
+
+    def __init__(self):
+        # Path mapping and default settings.
+        self._INPUT_MAPPINGS = {
+            "mach":         (ru.PathTuple(("freestream", "mach_number")), [0.0]),
+            "alpha":        (ru.PathTuple(("aerodynamics", "angles", "alpha")), [0.0]),
+            "beta":         (ru.PathTuple(("aerodynamics", "angles", "beta")), [0.0]),
+            "roll_rate":    (ru.PathTuple(("stability", "static", "roll_rate")), [0.0]),
+            "pitch_rate":   (ru.PathTuple(("stability", "static", "pitch_rate")), [0.0]),
+            "yaw_rate":     (ru.PathTuple(("stability", "static", "yaw_rate")), [0.0]),
+            "density":      (ru.PathTuple(("freestream", "density")), [1.225]),
+            "gamma":        (ru.PathTuple(("freestream", "gamma")), [1.4]),
+            "temperature":  (ru.PathTuple(("freestream", "temperature")), [288.15]),
+        }
+
+        self._OUTPUT_MAPPINGS = {
+            "CL":           ru.PathTuple(("aerodynamics", "coefficients", "lift", "total")),
+            "CD":           ru.PathTuple(("aerodynamics", "coefficients", "drag", "total")),
+            "CX":           ru.PathTuple(("aerodynamics", "coefficients", "X",)),
+            "CY":           ru.PathTuple(("aerodynamics", "coefficients", "Y",)),
+            "CZ":           ru.PathTuple(("aerodynamics", "coefficients", "Z",)),
+            "C_l":          ru.PathTuple(("aerodynamics", "coefficients", "moments", "roll")),
+            "C_m":          ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch")),
+            "C_n":          ru.PathTuple(("aerodynamics", "coefficients", "moments", "yaw")),
+        }
+
+        self._compute_process = ComputeVORJAX()
+        self._compiled_step = eqx.filter_jit(self._compute_process.run)
+
+    def run(
+        self,
+        system: Aircraft,
+        settings: Settings,
+        mode="zip",
+        batch_size: Optional[int]=None,
+        db_path: Optional[str | Path] = None,
+        **kwargs
+    ):
+
+        # Set up base state
+        state       = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
+        initials    = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
+        base_state  = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
+
+        active_keys = []
+        target_map = []
+        raw_arrays = []
+
+        # Validate inputs, convert to JAX arrays
+        for k, v in kwargs.items():
+            if k.lower() not in self._INPUT_MAPPINGS:
+                warnings.warn(f"Unrecognized variable {k} ignored. "
+                              f"Allowed variables: {list(self._INPUT_MAPPINGS.keys())}")
+            else:
+                active_keys.append(k.lower())
+                target_map.append(self._INPUT_MAPPINGS[k.lower()][0])
+                raw_arrays.append(jnp.atleast_1d(v))
+
+        if len(active_keys) == 0:
+            raise ValueError("No valid inputs provided.")
+        for k, v in self._INPUT_MAPPINGS.items():
+            if k not in active_keys:
+                active_keys.append(k)
+                target_map.append(v[0])
+                raw_arrays.append(jnp.atleast_1d(v[1]))
+
+        # Get all flight states
+        if mode == "zip":
+            processed_arrays = jnp.broadcast_arrays(*raw_arrays)
+        elif mode == "mesh":
+            grids = jnp.meshgrid(*raw_arrays, indexing="ij")
+            processed_arrays = [g.ravel().reshape(-1, 1) for g in grids]
+        else:
+            raise ValueError(f"Invalid mode {mode}. Supported modes: 'zip', 'mesh'.")
+
+        # Set batch size if not provided
+        total_states = len(processed_arrays[0])
+        if settings.verbose:
+            print(f"Total states for VORJAX analysis: {total_states}.")
+
+
+        if batch_size is None:
+            n_s = settings.analysis.aerodynamics.vortices.n_spanwise
+            n_c = settings.analysis.aerodynamics.vortices.n_chordwise
+            n_panels = n_s * n_c
+
+            # 1 kB per AIC coefficient is a rough multiplier estimate for peak memory footprint
+            bytes_per_state = 1024 * n_panels ** 2
+
+            if HAS_NVML:
+                pynvml.nvmlInit()
+                handle = pynvml.nvmlDeviceGetHandleByIndex(settings.JAX_device_index)
+                info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+                total_vram_bytes = info.total
+                pynvml.nvmlShutdown()
+            else:
+                warnings.warn("VORJAX batch size undefined, but unable to check GPU memory. "
+                              "Please install pynvml for GPU memory monitoring or set batch size manually. "
+                              "Defaulting to 8 GB assumption.", category=UserWarning)
+                total_vram_bytes = 8 * 1024 ** 3  # Assuming 8 GB of VRAM
+
+            # Calculate batch size
+            jax_usable_vram = total_vram_bytes * 0.90  # JAX defaults to 90% pre-allocation
+            target_vram = jax_usable_vram * 0.75  # Allocate 75% of usable VRAM for batch
+            max_batch_size = int(target_vram // bytes_per_state)
+            hw_batch_size = 2 ** int(jnp.log2(max_batch_size))
+
+            if total_states <= hw_batch_size:
+                batch_size = int(2 ** jnp.ceil(jnp.log2(total_states)))
+            else:
+                batch_size = hw_batch_size
+            if settings.verbose:
+                print(f"Optimal batch size for VORJAX analysis: {batch_size}.")
+
+        # Prepare database if provided
+        if db_path is not None:
+            db_root = zarr.open_group(db_path, mode='a')
+
+        all_coeffs = {k: [] for k in self._OUTPUT_MAPPINGS.keys()}
+        jac_arr = None
+
+        # Initialize VORJAX once
+        init_results = InitializeVORJAX().run(base_state.expand_rows(batch_size), system, settings)
+        state = init_results[0]
+        system = init_results[1]
+        settings = init_results[2]
+
+        # Batch over computation
+        for i in trange(0, total_states, batch_size, desc="Running VORJAX Analysis"):
+            batch_arrays = tuple(arr[i:i+batch_size] for arr in processed_arrays)
+            actual_size  = len(batch_arrays[0])
+
+            if actual_size < batch_size:
+                pad_length = ((0, batch_size - actual_size), (0, 0))
+                batch_arrays = tuple(jnp.pad(arr, pad_length, mode="edge") for arr in batch_arrays)
+
+            batch_state = eqx.tree_at(lambda s: ru.get_all_targets(s, target_map), state, batch_arrays)
+            res = self._compiled_step(batch_state, system, settings)
+
+            coeff_arrs = ru.get_all_targets(res[0], self._OUTPUT_MAPPINGS.values())
+            coeff_arrs = jax.tree.map(lambda x: x[:actual_size], coeff_arrs)
+
+            if settings.analysis.gradient_map is not None:
+                jac_arr = res[3]
+
+            for j, key in enumerate(self._OUTPUT_MAPPINGS.keys()):
+                if db_path is not None:
+                    v_np = np.asarray(coeff_arrs[j])    # Convert to numpy array for serialization
+                    if key not in db_root:              # Handle new keys
+                        shape = (0,) + v_np.shape[1:]
+                        chunk = (batch_size,) + v_np.shape[1:]
+
+                        db_root.create_array(
+                            name=key,
+                            shape=shape,
+                            chunks=chunk,
+                            dtype=v_np.dtype
+                        )
+
+                    db_root[key].append(v_np, axis=0)   # Append to existing key
+
+                all_coeffs[key].append(coeff_arrs[j])
+
+        return_val = (all_coeffs,)
+        if jac_arr is not None:
+            return_val += (jac_arr,)
+        if db_path is not None:
+            return_val += (db_root,)
+
+        return return_val
+
 
 # ----------------------------------------------------------
 #  Surrogate VLM Process

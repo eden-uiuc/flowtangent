@@ -10,6 +10,7 @@ import subprocess
 import gc
 import re
 import json
+import zarr
 
 from pathlib import Path
 
@@ -18,8 +19,10 @@ import jax.numpy as jnp
 import equinox as eqx
 import plotly.graph_objects as go
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+
 from jax import Array
 
 from tqdm import trange
@@ -34,11 +37,11 @@ from RCAIDE.Library.Components.Airfoils import Airfoil, Airfoil_Data
 
 from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
 
-from RCAIDE.Framework import Process, State, Settings, GradientMap, System
-from RCAIDE.Framework.System import Aircraft
+from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, System
+from RCAIDE.Framework.Settings import AnalysisSettings
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -487,7 +490,7 @@ def VORJAX_test_run(
         tag="VORJAX Test Run",
         steps=(
             InitializeVORJAX(),
-            VORJAX()
+            ComputeVORJAX()
         ),
         initial_state=initial_state,
         initial_system=initial_system,
@@ -1601,8 +1604,14 @@ if __name__ == "__main__":
     ff_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
 
     GRAD_MAP = GradientMap(
-        state_inputs=(alpha_path,),
-        state_outputs=(lift_path,)
+        state_inputs=(
+            alpha_path,
+            mach_path
+        ),
+        state_outputs=(
+            lift_path,
+            drag_path
+        )
     )
 
     TEST_AVL        = False
@@ -1611,14 +1620,15 @@ if __name__ == "__main__":
     TEST_METHOD     = False
     TEST_DELTA_CONV = False
     TEST_DELTA_AR   = False
-    TEST_ONERA      = True
+    TEST_ONERA      = False
+    TEST_BATCH      = True
     
     COSINE_SPC_SW   = True
     PLOT_WINGS      = False
     SHOCK           = True
     
     DEBUG           = False
-    NEW_DATA        = False
+    NEW_DATA        = True
 
     # AVL Test Cases ---------------------------------------------------------------------------------------------------
     if TEST_AVL:
@@ -1994,5 +2004,43 @@ if __name__ == "__main__":
         # plot_transonic_tuning(**load_plot_cache('onera_mach_sweep')).show()
         plot_transonic_tuning_mpl(**load_plot_cache('onera_mach_sweep'))
 
+    # Batch Analysis Test ----------------------------------------------------------------------------------------------
+    if TEST_BATCH:
+        print("\n--- Batch Analysis Test ---")
+        if NEW_DATA:
+            alpha = jnp.linspace(0.0, 5.0, 11)
+            mach = jnp.linspace(0.0, 0.7, 8)
+
+            batch_run = BatchVORJAX()
+
+            system = VORJAX_straight_wing(10.0, 1.0)
+
+            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=24, n_chordwise=24))
+            analysis_settings = AnalysisSettings(
+                aerodynamics=aero_settings,
+                gradient_map=GRAD_MAP
+            )
+            settings = Settings(analysis=analysis_settings, DEBUG_MODE=DEBUG)
+
+            db_path = "./Tests/VORJAX/batch_test"
+
+            results = batch_run.run(
+                system=system,
+                settings=settings,
+                mode="mesh",
+                alpha=alpha,
+                mach=mach,
+                batch_size=4,
+                db_path=db_path
+            )
+
+            print(f"Jacobian Shape: {results[1].shape}")
+            # print(f"Jacobian Array:\n{results[1]}")
+
+            db = zarr.open(db_path, mode='r')
+            data_dict = {key: db[key][:].reshape(-1) for key in db.array_keys()}
+            df = pd.DataFrame(data_dict)
+
+            print(df.head(10))
 
     print("\nAll tests complete.")

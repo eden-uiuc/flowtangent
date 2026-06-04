@@ -9,4 +9,4 @@
 # ----------------------------------------------------------------------------------------------------------------------
  
 from .TestAero import TestAero
-from .VORJAX import VORJAX, VLMSettings, Vortices, InitializeVORJAX, SupersonicSettings
+from .VORJAX import InitializeVORJAX, ComputeVORJAX, VORJAX, BatchVORJAX, VLMSettings, Vortices, SupersonicSettings

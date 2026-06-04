@@ -62,7 +62,6 @@ class Conditions(eqx.Module):
                 if leaf.ndim == 1:
                     # e.g., Shape (X,) -> Shape (n, X)
                     return jnp.broadcast_to(leaf, (n,) + leaf.shape)
-                
                 elif leaf.ndim == 2 and leaf.shape[0] == 1:
                     # e.g., Shape (1, X) -> Shape (n, X)
                     return jnp.broadcast_to(leaf, (n, leaf.shape[1]))

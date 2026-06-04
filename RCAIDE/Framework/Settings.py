@@ -6,15 +6,16 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
+from typing import Optional
 
 import jax
 import equinox as eqx
-from typing import Callable, Optional
 
 # package imports
 from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 # RCAIDE imports
+from RCAIDE.Framework import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings
@@ -45,6 +46,8 @@ class AnalysisSettings(eqx.Module):
     aerodynamics: Optional[eqx.Module] = None
     mass: Optional[MassAnalysisSettings] = eqx.field(default_factory=MassAnalysisSettings)
 
+    gradient_map: Optional[GradientMap] = eqx.field(static=True, default=None)
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mission Settings
 # ----------------------------------------------------------------------------------------------------------------------
@@ -62,20 +65,23 @@ class MissionSettings(eqx.Module):
 
 class Settings(eqx.Module):
 
-    tag: str                            = eqx.field(static=True, default='Settings')
-    root_finder:    Callable            = eqx.field(static=True, default=ScipyRootFinding)
+    tag:                str                 = eqx.field(static=True, default='Settings')
 
-    analysis:       AnalysisSettings    = eqx.field(default_factory=AnalysisSettings)
-    mission:        MissionSettings     = eqx.field(default_factory=MissionSettings)
+    analysis:           AnalysisSettings    = eqx.field(default_factory=AnalysisSettings)
+    mission:            MissionSettings     = eqx.field(default_factory=MissionSettings)
 
-    DEBUG_MODE:     bool                = eqx.field(static=True, default=False)
+    DEBUG_MODE:         bool                = eqx.field(static=True, default=False)
+    verbose:            bool                = eqx.field(static=True, default=False)
+    JAX_device_index:   int                 = eqx.field(static=True, default=0)
+
 
     def __post_init__(self):
         if self.DEBUG_MODE:
             jax.config.update("jax_disable_jit", True)
             jax.config.update("jax_debug_nans", True)
+            object.__setattr__(self, "verbose", True)
         else:
-            # Manually reset flags just in case
+            # Manually reset flags
             jax.config.update("jax_disable_jit", False)
             jax.config.update("jax_debug_nans", False)
 

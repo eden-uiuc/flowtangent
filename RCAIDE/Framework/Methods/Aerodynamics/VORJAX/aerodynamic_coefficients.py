@@ -194,8 +194,8 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     m_normal = mach * cos_sweep_LE
 
     def compute_strip_shock(m, t, g):
-        b = jnp.where(t > 0, theta_beta_mach(m, t, g), jnp.pi/2) # Calculate beta
-        _, _, _, Ptr_s = oblique_shock(m, t, b, g) # Shock pressure recovery
+        b = jnp.where(t > 0, theta_beta_mach(m, t, g), jnp.pi/2)  # Calculate beta
+        _, _, _, Ptr_s = oblique_shock(m, t, b, g)  # Shock pressure recovery
         Ptr = jnp.where(t >= 0, Ptr_s, 1.0)
         return Ptr
     
@@ -276,7 +276,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     
     CL_near  = jnp.sum(strip_lift, axis=1) / S_ref
 
-    CDi_far  = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref) # Far-Field (Trefftz plane wake integral)
+    CDi_far  = D_trefftz / (0.5 * rho[:, 0] * jnp.square(v_inf[:, 0]) * S_ref)  # Far-Field (Trefftz plane wake integral)
     CDi_near = -CX_wind * cos_alpha[:, 0] - CZ_wind * sin_alpha[:, 0]  # Near-field (direct force integration)
     
     C_l = -jnp.sum(strip_rolling_moment, axis=1) / (S_ref * b_ref)

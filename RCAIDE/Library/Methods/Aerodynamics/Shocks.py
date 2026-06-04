@@ -30,17 +30,15 @@ def theta_beta_mach(M0, theta, gamma=1.4, weak_shock=True):
     """
     Computes shock angle (beta) of an oblique shock.
     """
-    # Protect against subsonic inputs breaking the arcsin
-    M0_safe = jnp.maximum(M0, 1.0 + 1e-8)
-    
-    # Calculate wave angle
-    mu = jnp.arcsin(1.0 / M0_safe)
-    c  = jnp.square(jnp.tan(mu))
-    
+    # Protect against broken inputs
+    M0_safe = jnp.maximum(M0, 1.0 + 1e-3)
+    theta_safe = jnp.where(jnp.abs(theta) < 1e-5, 1e-5, theta)
+
     # Calculate shock angle coefficients
-    a = ((gamma - 1.0) / 2.0 + (gamma + 1.0) * c / 2.0) * jnp.tan(theta)
-    b = ((gamma + 1.0) / 2.0 + (gamma + 3.0) * c / 2.0) * jnp.tan(theta)
-    
+    c = 1.0 / (jnp.square(M0_safe) - 1.0)
+    a = ((gamma - 1.0) / 2.0 + (gamma + 1.0) * c / 2.0) * jnp.tan(theta_safe)
+    b = ((gamma + 1.0) / 2.0 + (gamma + 3.0) * c / 2.0) * jnp.tan(theta_safe)
+
     # Protect the square root from negative values if theta > theta_max 
     inner_d = (4.0 * (1.0 - 3.0 * a * b)**3) / jnp.square(27.0 * a**2 * c + 9.0 * a * b - 2.0) - 1.0
     d = jnp.sqrt(jnp.maximum(inner_d, 1e-8))
@@ -51,9 +49,10 @@ def theta_beta_mach(M0, theta, gamma=1.4, weak_shock=True):
     atan_term = jnp.arctan(1.0 / d)
     
     beta = jnp.arctan((b + 9.0 * a * c) / (2.0 * (1.0 - 3.0 * a * b)) - 
-                      (d * (27.0 * a**2 * c + 9.0 * a * b - 2.0)) / (6.0 * a * (1.0 - 3.0 * a * b)) * jnp.tan(n * jnp.pi / 3.0 + 1.0 / 3.0 * atan_term))
+                      (d * (27.0 * a**2 * c + 9.0 * a * b - 2.0)) / (6.0 * a * (1.0 - 3.0 * a * b)) *
+                      jnp.tan(n * jnp.pi / 3.0 + 1.0 / 3.0 * atan_term))
     
-    return beta
+    return jnp.where(M0 > 1.0, beta, 0.0)
 
 @jax.jit
 def oblique_shock(M0, theta, beta, gamma=1.4):

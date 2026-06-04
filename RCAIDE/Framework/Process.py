@@ -100,26 +100,46 @@ class GradientMap:
         self._n_setts = len(self.settings_inputs)
 
         self.unravel_function = null_step  # Default, updates when inputs are grabbed
-        
+
     def flatten_inputs(
-            self,
-            base_state: Optional[State] = None,
-            base_system: Optional[System] = None,
-            base_settings: Optional[Settings] =  None,
-        ):
+        self,
+        base_state,
+        base_system,
+        base_settings,
+    ):
+        import numpy as np  # Standard numpy for calculating split indices during tracing
 
-            inputs = []
-            if len(self.state_inputs) > 0:
-                inputs.extend(ru.get_all_targets(base_state, self.state_inputs))
-            if len(self.system_inputs) > 0:
-                inputs.extend(ru.get_all_targets(base_system, self.system_inputs))
-            if len(self.settings_inputs) > 0:
-                inputs.extend(ru.get_all_targets(base_settings, self.settings_inputs))
+        inputs = []
+        if len(self.state_inputs) > 0:
+            inputs.extend(ru.get_all_targets(base_state, self.state_inputs))
+        if len(self.system_inputs) > 0:
+            inputs.extend(ru.get_all_targets(base_system, self.system_inputs))
+        if len(self.settings_inputs) > 0:
+            inputs.extend(ru.get_all_targets(base_settings, self.settings_inputs))
 
-            # Flatten inputs for Jacobian calculation
-            flat_input_arrays, self.unravel_function = ravel_pytree(inputs)
+        # 1. Dynamically read the batch size from the first array
+        B = inputs[0].shape[0]
 
-            return flat_input_arrays
+        # 2. Record the inner shapes and sizes for unraveling later
+        shapes = [inp.shape[1:] for inp in inputs]
+        sizes = [int(np.prod(s)) if s else 1 for s in shapes]
+
+        # 3. Reshape all arrays to strictly (Batch, Features) and concatenate
+        # E.g., a (4,) array becomes (4, 1). A (4, 3, 3) matrix becomes (4, 9).
+        flat_inputs = [inp.reshape(B, -1) for inp in inputs]
+        flat_input_array = jnp.concatenate(flat_inputs, axis=-1)
+
+        # 4. Create a custom unravel function that acts on axis=-1
+        def unravel_function(flat_array):
+            # flat_array shape is (Batch, Total_N_i)
+            split_indices = np.cumsum(sizes)[:-1]
+            splits = jnp.split(flat_array, split_indices, axis=-1)
+
+            # Restore to original shapes, preserving the leading Batch dimension
+            return [s.reshape((B,) + shape) for s, shape in zip(splits, shapes)]
+
+        self.unravel_function = unravel_function
+        return flat_input_array
     
     def update_inputs(
             self,
@@ -190,8 +210,9 @@ class GradientMap:
         if self.settings_outputs:
             outputs.extend(ru.get_all_targets(f_setts, self.settings_outputs))
 
-        # Convert the list of output scalar arrays into a single flat 1D array
-        out_array = jnp.concatenate([jnp.atleast_1d(out) for out in outputs])
+        # Preserve Batch, flatten the inner features
+        B = outputs[0].shape[0]
+        out_array = jnp.concatenate([out.reshape(B, -1) for out in outputs], axis=-1)
 
         return out_array
 
@@ -274,12 +295,32 @@ class Process(ProcessStep):
                 f_st, f_sys, f_setts = self(st, sys, setts)
                 aux = (f_st, f_sys, f_setts, None)
 
-            # Convert the list of output scalar arrays into a single flat 1D array
             out_array = grad_map.flatten_outputs(f_st, f_sys, f_setts)
-
             return out_array, aux
 
-        return jax.jacrev(objective_fn, argnums=0, has_aux=True)
+        def batched_jacrev_fn(input_array, base_state, base_system, base_settings):
+            # 1. Forward pass + VJP function generation
+            out_array, vjp_fn, aux = jax.vjp(
+                objective_fn,
+                input_array, base_state, base_system, base_settings,
+                has_aux=True
+            )
+            B, N_o = out_array.shape
+
+            # 2. Build batched cotangent basis: (N_o, B, N_o)
+            basis = jnp.broadcast_to(jnp.eye(N_o)[:, None, :], (N_o, B, N_o))
+
+            # 3. Pullback through vmap
+            # vjp_fn receives (B, N_o) cotangents and outputs (B, N_i) gradients.
+            # out_axes=(1, 0, 0, 0) stacks the target gradient natively to (B, N_o, N_i)
+            jac_tuple = jax.vmap(vjp_fn, out_axes=(1, 0, 0, 0))(basis)
+
+            # 4. Extract target gradient
+            batched_jacobian = jac_tuple[0]
+
+            return batched_jacobian, aux
+
+        return batched_jacrev_fn
 
     @staticmethod
     def _sanitize_inputs(tree):
@@ -298,7 +339,6 @@ class Process(ProcessStep):
 
     def run(self,
             state, system, settings,
-            grad_map: Optional[GradientMap]=None,
             track_history: bool=False) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
 
         # Sanitize inputs (map floats/ints to JAX arrays)
@@ -316,6 +356,7 @@ class Process(ProcessStep):
         raw_hist = None
 
         # Grad map acts as flag to get gradients
+        grad_map = settings.analysis.gradient_map
         if grad_map is not None:
 
             # Flatten inputs for Jacobian calculation
@@ -327,7 +368,7 @@ class Process(ProcessStep):
                 object.__setattr__(self, '_val_and_jac_fn', self._build_value_and_jacobian(grad_map, track_history))
                 object.__setattr__(self, '_cached_grad_map', grad_map)
 
-            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings) # type: ignore
+            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings)  # type: ignore
             f_st, f_sys, f_setts, raw_hist = aux
 
         else:

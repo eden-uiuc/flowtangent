@@ -352,7 +352,6 @@ def compute_C_ij(VD, Mach):
         COS_RS = ct_R * costheta + st_R * sintheta
         SIN_RS = st_R * costheta - ct_R * sintheta
 
-
         EW_row = W_ind * COS_RS[None, :] - V_ind * SIN_RS[None, :]
 
         # --- Rotate to Global Frame ---
@@ -365,8 +364,8 @@ def compute_C_ij(VD, Mach):
         # Return the tuple!
         return C_ij_row, EW_row
 
-    C_ij_mapped, _ = jax.vmap(compute_row)(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
-    C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
+    C_ij, _ = jax.vmap(compute_row, out_axes=(1, 0))(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
+    # C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
     
     # If using chordwise cosine spacing, compute leading edge normalwash for Lan's method
     # (Currently unsupported, commented out to minimize memory footprint)
@@ -378,7 +377,7 @@ def compute_C_ij(VD, Mach):
     # _, LN_mapped = jax.vmap(compute_row)(front_mid, costheta, sintheta, jnp.arange(VD.total_panels))
     # LN = jnp.swapaxes(LN_mapped, 0, 1)
 
-    return C_mn.astype(jnp.float64), singularity_flag
+    return C_ij.astype(jnp.float64), singularity_flag
 
     
 # ----------------------------------------------------------------------------------------------------------------------
