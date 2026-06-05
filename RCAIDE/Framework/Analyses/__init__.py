@@ -8,8 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from .Batched import ShardedDatasetGenerator, BatchAnalysis
+
 from . import Aerodynamics
 from . import Energy
 from . import Mass
-
-from .Batched import ShardedDatasetGenerator

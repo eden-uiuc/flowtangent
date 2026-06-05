@@ -1633,8 +1633,8 @@ if __name__ == "__main__":
     TEST_DELTA_CONV = False
     TEST_DELTA_AR   = False
     TEST_ONERA      = False
-    TEST_BATCH      = False
-    TEST_SHARD      = True
+    TEST_BATCH      = True
+    TEST_SHARD      = False
     
     COSINE_SPC_SW   = True
     PLOT_WINGS      = False
@@ -2026,11 +2026,11 @@ if __name__ == "__main__":
             alpha = jnp.linspace(0.0, 5.0, 51) * Units.deg
             mach = jnp.linspace(0.0, 0.7, 71)
 
-            solver = BatchVORJAX()
+            solver = BatchVORJAX(db_path=db_path)
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
+            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP
@@ -2043,8 +2043,7 @@ if __name__ == "__main__":
                 mode="mesh",
                 alpha=alpha,
                 mach=mach,
-                batch_size=256,
-                db_path=db_path
+                batch_size=1024,
             )
 
             # print(f"Jacobian Shape: {results[1].shape}")
@@ -2054,7 +2053,7 @@ if __name__ == "__main__":
         data_dict = {key: db[key][:].reshape(-1) for key in db.array_keys()}
         df = pd.DataFrame(data_dict)
 
-        print(df.head(10))
+        print(df.head(50))
     
     if TEST_SHARD:
         print("\n--- Sharded Dataset Test ---")
@@ -2072,20 +2071,20 @@ if __name__ == "__main__":
             settings = Settings(analysis=analysis_settings, DEBUG_MODE=DEBUG)
 
             generator = ShardedDatasetGenerator(
-                batch_process=solver,
-                local_dir="./Tests/VORJAX/shard_test",
+                batch_analysis=solver,
+                cache_dir="./Tests/VORJAX/shard_test",
                 storage_dir="/media/jordan/Ashley_Backup/shard_test",
-                epoch_size=3_000_000,
+                shard_size=3_000_000,
                 tag="Rectangle AR 10"
             )
 
             generator.run(
                 system=system,
                 settings=settings,
-                mode="mesh",
-                Mach=np.linspace(0.0, 2.0, 201),
-                alpha=np.linspace(-5.0, 15.0, 201),
-                beta=np.linspace(-10.0, 10.0, 201),
+                state_mode="mesh",
+                Mach=np.linspace(0.0, 2.0, 101),
+                alpha=np.linspace(-5.0, 15.0, 101),
+                beta=np.linspace(-10.0, 10.0, 101),
                 batch_size=256
             )
 

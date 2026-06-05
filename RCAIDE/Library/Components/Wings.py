@@ -327,15 +327,63 @@ class Wing(Component):
             wing_le_sweep, wing_ac, wing_ss_ac, wing_total_length
         ) # type: ignore
     
+    def convert_to_segmented_wing(self):
+        """ Returns a tuple of (root_segment, tip_segment) for unsegmented wings. """
+        
+        # If it already has segments, just return them as-is
+        if hasattr(self, 'segments') and len(self.segments) > 0:
+            return self.segments
+
+        # 1. Build Root Segment
+        root_sweeps = WingSweeps(
+            quarter_chord=self.sweeps.quarter_chord,
+            leading_edge=self.sweeps.leading_edge
+        )
+
+        root_segment = WingSegment(
+            tag='root_segment',
+            percent_span_location=0.0,
+            twist=self.twists.root,
+            root_chord_percent=1.0,
+            dihedral_outboard=self.dihedral,
+            sweeps=root_sweeps,
+            thickness_to_chord=self.thickness_to_chord,
+        )
+        if hasattr(self, 'airfoil') and self.airfoil is not None:
+            root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, self.airfoil)
+
+        # 2. Build Tip Segment
+        tip_sweeps = WingSweeps(
+            quarter_chord=0.0,
+            leading_edge=1e-8,
+        )
+
+        tip_segment = WingSegment(
+            tag='tip_segment',
+            percent_span_location=1.0,
+            twist=self.twists.tip,
+            root_chord_percent=self.taper,
+            dihedral_outboard=0.0,
+            sweeps=tip_sweeps,
+            thickness_to_chord=self.thickness_to_chord,
+        )
+        
+        if hasattr(self, 'airfoil') and self.airfoil is not None:
+            tip_segment = eqx.tree_at(lambda s: s.airfoil, tip_segment, self.airfoil)
+
+        return (root_segment, tip_segment)
+
     def update_geometry(self, calculate_reference_area=False, calculate_wetted_area=False):
         """Returns a new Wing instance with all geometric properties calculated and populated."""
         
+        new_segments = self.convert_to_segmented_wing()
+
         # 1. Extract Arrays, add ghost tip segment
-        span_locs = jnp.array([seg.percent_span_location for seg in self.segments] + [1.0])
-        root_chords_pct = jnp.array([seg.root_chord_percent for seg in self.segments] + [self.taper])
-        sweeps = jnp.array([seg.sweeps.quarter_chord for seg in self.segments])
-        dihedrals = jnp.array([seg.dihedral_outboard for seg in self.segments] + [0.0])
-        t_cs = jnp.array([seg.thickness_to_chord for seg in self.segments])
+        span_locs = jnp.array([seg.percent_span_location for seg in new_segments] + [1.0])
+        root_chords_pct = jnp.array([seg.root_chord_percent for seg in new_segments] + [self.taper])
+        sweeps = jnp.array([seg.sweeps.quarter_chord for seg in new_segments])
+        dihedrals = jnp.array([seg.dihedral_outboard for seg in new_segments] + [0.0])
+        t_cs = jnp.array([seg.thickness_to_chord for seg in new_segments])
         
         symm = float(self.symmetric)
         
@@ -358,8 +406,8 @@ class Wing(Component):
         
         # 4. Create updated segments (Pure functional update)
         updated_segments = []
-        for i in range(len(self.segments) - 1):
-            seg = self.segments[i]
+        for i in range(len(new_segments) - 1):
+            seg = new_segments[i]
             # Assuming you have an immutable dataclass or tree update method here
             new_seg = eqx.tree_at(
                 lambda s: (s.chords.mean_aerodynamic, s.areas.reference, s.areas.exposed, s.areas.wetted),
@@ -367,7 +415,7 @@ class Wing(Component):
                 (macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i])
             )
             updated_segments.append(new_seg)
-        updated_segments.append(self.segments[-1]) # Append the tip node unaltered
+        updated_segments.append(new_segments[-1]) # Append the tip node unaltered
         
         # 5. Create and return the updated wing
         return eqx.tree_at(
