@@ -67,12 +67,15 @@ class PathTuple:
     
     path: tuple
     slice_obj: slice
+    tag: str = "Variable Path"
 
-    def __init__(self, path: tuple | Self = (slice(None),)):
+    def __init__(self, path: tuple | Self = (slice(None),), tag="Variable Path"):
+        
         if isinstance(path, PathTuple):
             object.__setattr__(self, 'path', path.path)
             object.__setattr__(self, 'slice_obj', path.slice_obj)
-            
+            object.__setattr__(self, 'tag', path.tag)
+        
         else:
             if isinstance(path[-1], slice):
                 object.__setattr__(self, 'path', path[:-1])
@@ -80,6 +83,8 @@ class PathTuple:
             else:
                 object.__setattr__(self, 'path', path)
                 object.__setattr__(self, 'slice_obj', slice(None))
+        
+            object.__setattr__(self, 'tag', tag)
 
     def __len__(self):
         return len(self.path)

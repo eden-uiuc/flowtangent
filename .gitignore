@@ -54,6 +54,7 @@ nosetests.xml
 *.gz
 *.zip
 *.tar
+*.zarr*
 
 # Mac
 .DS_Store
@@ -83,3 +84,5 @@ nosetests.xml
 /docs/_modules/
 /docs/_sources/
 /docs/_static/
+
+

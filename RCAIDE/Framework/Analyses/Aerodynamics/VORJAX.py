@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 import warnings
 from pathlib import Path
+from itertools import product
+from collections import defaultdict
 
 # package imports
 import jax
@@ -390,7 +392,20 @@ class BatchVORJAX:
 
         # Prepare database if provided
         if db_path is not None:
+            
             db_root = zarr.open_group(db_path, mode='a')
+            
+            def create_db_key(key: str, v_np):
+                shape = (0,) + v_np.shape[1:]
+                chunk = (batch_size,) + v_np.shape[1:]
+
+                db_root.create_array(
+                    name=key,
+                    shape=shape,
+                    chunks=chunk,
+                    dtype=v_np.dtype
+                )
+
 
         all_coeffs = {k: [] for k in self._OUTPUT_MAPPINGS.keys()}
         jac_arr = None
@@ -403,7 +418,7 @@ class BatchVORJAX:
 
         # Batch over computation
         for i in trange(0, total_states, batch_size, desc="Running VORJAX Analysis"):
-            batch_arrays = tuple(arr[i:i+batch_size] for arr in processed_arrays)
+            batch_arrays = tuple(arr[i:i+batch_size].reshape(-1, 1) for arr in processed_arrays)
             actual_size  = len(batch_arrays[0])
 
             if actual_size < batch_size:
@@ -416,30 +431,33 @@ class BatchVORJAX:
             coeff_arrs = ru.get_all_targets(res[0], self._OUTPUT_MAPPINGS.values())
             coeff_arrs = jax.tree.map(lambda x: x[:actual_size], coeff_arrs)
 
-            if settings.analysis.gradient_map is not None:
-                jac_arr = res[3]
-
             for j, key in enumerate(self._OUTPUT_MAPPINGS.keys()):
+                v_np = np.asarray(coeff_arrs[j])                    # Convert to numpy array for serialization
                 if db_path is not None:
-                    v_np = np.asarray(coeff_arrs[j])    # Convert to numpy array for serialization
-                    if key not in db_root:              # Handle new keys
-                        shape = (0,) + v_np.shape[1:]
-                        chunk = (batch_size,) + v_np.shape[1:]
+                    if key not in db_root: create_db_key(key, v_np) # Handle new keys
+                    db_root[key].append(v_np, axis=0)               # Append to existing key
 
-                        db_root.create_array(
-                            name=key,
-                            shape=shape,
-                            chunks=chunk,
-                            dtype=v_np.dtype
-                        )
+                all_coeffs[key].append(v_np)
+            
+            if settings.analysis.gradient_map is not None:
+                g_map = settings.analysis.gradient_map
+                jac_arr : jnp.ndarray = res[3]  #type: ignore
+                all_grads = defaultdict(list)
+                for out_i, output in enumerate(g_map.state_outputs):
+                    for inp_i, input in enumerate(g_map.state_inputs):
+                        key = f"d{output.tag}_d{input.tag}"
+                        v_np = np.asarray(jac_arr[:actual_size, out_i, inp_i])         # Convert to numpy array for serialization
+                        if db_path is not None:
+                            if key not in db_root: create_db_key(key, v_np) # Handle new keys
+                            db_root[key].append(v_np, axis=0)               # Append to existing key
+                        
+                        all_grads[key].append(v_np)
 
-                    db_root[key].append(v_np, axis=0)   # Append to existing key
 
-                all_coeffs[key].append(coeff_arrs[j])
-
-        return_val = (all_coeffs,)
         if jac_arr is not None:
-            return_val += (jac_arr,)
+            return_val = (all_coeffs | all_grads,)
+        else:
+            return_val = (all_coeffs,)
         if db_path is not None:
             return_val += (db_root,)
 
