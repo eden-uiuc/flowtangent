@@ -19,13 +19,13 @@ from collections import defaultdict
 from itertools import product
 
 import os
-import shutil
+import jax
 import zarr
 import time
+import shutil
 import tempfile
 import logging
 
-import jax
 import numpy as np
 import pandas as pd
 import equinox as eqx

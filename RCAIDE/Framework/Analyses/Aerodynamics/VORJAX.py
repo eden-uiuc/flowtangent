@@ -121,7 +121,7 @@ class Surrogate(eqx.Module):
 
     angle_of_attack:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(-5., 15., 40) * Units.deg)
     sideslip_angle:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0.0, 15., 30) * Units.deg)
-    Mach:                   jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0., 0.85, 20))
+    mach:                   jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0., 0.85, 20))
     
     aileron_deflection:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
     elevator_deflection:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
