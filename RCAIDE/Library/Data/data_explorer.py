@@ -5,15 +5,25 @@ import glob
 import numpy as np
 import pandas as pd
 import numexpr as ne
+import equinox as eqx
 import streamlit as st
 
+import jax.numpy as jnp
 import dask.array as da
 import plotly.express as px
 import plotly.graph_objects as go
 
+from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
+
+from RCAIDE.Framework import Aircraft, State, Settings
+from RCAIDE.Framework.Settings import AnalysisSettings
+from RCAIDE.Framework.Plotting import plot_vlm_panels
+
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings, Vortices
+from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
 
 #-----------------------------------------------------------------------------------------------------------------------
-# Helper Functions
+# Filter Functions
 #-----------------------------------------------------------------------------------------------------------------------
 
 def filter_widget(
@@ -85,15 +95,43 @@ def apply_filters(data, ar, sweep, taper, mach, alpha):
     return {key: val[mask] for key, val in data.items()}
 
 #-----------------------------------------------------------------------------------------------------------------------
-# Streamlit App
+# Wing Functions
 #-----------------------------------------------------------------------------------------------------------------------
 
-# Set layout to wide mode to comfortably fit the three-frame grid
-st.set_page_config(layout="wide", page_title="Aero Data Explorer")
+def wing_generator(AR, taper, QC, d):
 
-# ==========================================
-# 0. MOCK DATA GENERATION (A few dozen points)
-# ==========================================
+    wing = Wing(
+        tag=f"W1",
+        symmetric=True,
+        taper=taper,
+        dihedral=d,
+        sweeps=WingSweeps(quarter_chord=QC),
+        chords=WingChords(root=1.0),
+        spans=WingDimensions(projected=AR),
+        origin=jnp.array([[0., 0., 0.]]),
+    ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
+
+    system = Aircraft(tag="W1 System", areas=wing.areas).add_subcomponent(wing)
+    system = eqx.tree_at(lambda s: s.mass_properties.center_of_gravity, system, jnp.array([[0.0, 0.0, 0.0]]))
+
+    return system, {"AR":AR, "taper":taper, "QC_Sweep":QC, "Dihedral":d}
+
+def wing_renderer(wing_system):
+
+    aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+    analysis_settings = AnalysisSettings(
+        aerodynamics=aero_settings,
+    )
+    settings = Settings(analysis=analysis_settings, DEBUG_MODE=False)
+
+    _, full_system, _ = discretize_surfaces(State(), wing_system, settings)
+
+    return plot_vlm_panels(full_system.analysis_data["vortex_distribution"])
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Data Functions
+#-----------------------------------------------------------------------------------------------------------------------
+
 @st.cache_data
 def load_mock_data():
     np.random.seed(42)
@@ -193,6 +231,69 @@ def load_exploration_sample(sample_size=50000):
     
     return df_clean
 
+@st.cache_data
+def get_states_per_wing():
+    """Dynamically calculates how many flight states exist per geometry."""
+    root = get_zarr_root()
+    
+    # Grab a slice large enough to contain at least one full wing's states
+    chunk_size = min(20000, root["AR"].shape[0])
+    ar_chunk = root["AR"][:chunk_size].compute()
+    
+    # Find all indices where the Aspect Ratio differs from row 0
+    changes = np.where(ar_chunk != ar_chunk[0])[0]
+    
+    if len(changes) > 0:
+        return int(changes[0])
+    else:
+        # Fallback in case your states_per_wing is unusually massive
+        return 1
+
+@st.cache_data
+def fetch_wing_polars(wing_id, states_per_wing):
+    """Fetches all flight states for a specific wing ID."""
+    root = get_zarr_root()
+    
+    start_row = wing_id * states_per_wing
+    end_row = start_row + states_per_wing
+    
+    cols_to_fetch = ["alpha", "mach", "CL", "CD"]
+    
+    data = {}
+    for col in cols_to_fetch:
+        # Pull only this wing's specific flight state block
+        data[col] = root[col][start_row:end_row].compute().ravel()
+        
+    df = pd.DataFrame(data)
+    
+    # Rough outlier rejection for stability
+    valid_aero = (df["CL"] > -5.0) & (df["CL"] < 5.0) & (df["CD"] > -0.1) & (df["CD"] < 2.0)
+    return df[valid_aero]
+
+def fetch_wing_metadata(wing_id, states_per_wing):
+    """Pulls the exact geometric metadata for a manually entered Wing ID."""
+    root = get_zarr_root()
+    
+    # Calculate the exact row index where this wing's flight states begin
+    start_row = wing_id * states_per_wing
+    
+    # Ensure the ID actually exists in the database
+    if start_row >= root["AR"].shape[0]:
+        return None
+        
+    wing_data = {"Wing_ID": wing_id, "Row_ID": start_row}
+    # We only need the geometric parameters to render VORJAX
+    for col in ["AR", "taper", "QC_Sweep", "Dihedral"]:
+        wing_data[col] = float(root[col][start_row].compute().ravel()[0])
+        
+    return wing_data
+
+#-----------------------------------------------------------------------------------------------------------------------
+# Streamlit App
+#-----------------------------------------------------------------------------------------------------------------------
+
+# Set layout to wide mode to comfortably fit the three-frame grid
+st.set_page_config(layout="wide", page_title="Aero Data Explorer")
 # Initialize the baseline data for the app
 raw_data = load_exploration_sample(sample_size=50000)
 
@@ -203,6 +304,9 @@ raw_data = load_exploration_sample(sample_size=50000)
 if "active_data" not in st.session_state:
     st.session_state.active_data = raw_data
 
+if "hangar" not in st.session_state:
+    st.session_state.hangar = {}
+
 # ==========================================
 # TOP ROW: MAIN VISUALIZATION & POLARS
 # ==========================================
@@ -211,7 +315,11 @@ top_left_col, top_right_col = st.columns([0.7, 0.3])
 
 with top_left_col:
     st.subheader("📊 Primary Visualization Canvas")
-    viz_tab1, viz_tab2 = st.tabs(["🚀 Design Space Exploration", "📈 Data Distributions"])
+    viz_tab1, viz_tab2, viz_tab3 = st.tabs([
+        "🚀 Design Space Exploration",
+        "📈 Data Distributions",
+        "✈️ Hangar"
+    ])
     
     # Notice we are passing st.session_state.active_data to Plotly instead of raw_data!
     available_cols = list(st.session_state.active_data.keys())
@@ -337,59 +445,126 @@ with top_left_col:
                         st.plotly_chart(fig_hist, width='stretch', key=f"hist_chart_{idx}")
         else:
             st.warning("No data points match the current filter criteria!")
+    
+    with viz_tab3:
+        if not st.session_state.hangar:
+            st.info("✈️ Your hangar is empty! Select wings from the Leaderboard below to add them here.")
+        else:
+            # Layout the Garage Controls
+            g_col1, g_col2 = st.columns([0.7, 0.3])
+            with g_col1:
+                wing_ids = list(st.session_state.hangar.keys())
+                selected_id = selected_id = st.selectbox("Select Wing to Analyze", wing_ids, format_func=lambda x: f"Wing ID: {x}", key="active_hangar_id")
+            with g_col2:
+                # Vertical spacer to align the button with the dropdown
+                st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+                if st.button("🗑️ Remove Wing", width='stretch'):
+                    del st.session_state.hangar[selected_id]
+                    st.rerun()
+
+            if selected_id in st.session_state.hangar:
+                wing = st.session_state.hangar[selected_id]
+                
+                # Display the precise geometric metadata
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Aspect Ratio", f"{wing['AR']:.3f}")
+                m2.metric("Taper Ratio", f"{wing['taper']:.3f}")
+                m3.metric("QC Sweep", f"{wing['QC_Sweep']:.2f}°")
+                m4.metric("Dihedral", f"{wing['Dihedral']:.2f}°")
+
+                
+                st.markdown("---")
+                st.markdown("#### 🔹 VORJAX 3D Geometry Viewer")
+                wing_fig = wing_renderer(wing_generator(wing['AR'], wing['taper'], wing['QC_Sweep'], wing['Dihedral'])[0])
+                st.plotly_chart(wing_fig, width='stretch', key="wing_fig")
 
 with top_right_col:
     st.subheader("🎯 Aero Performance Polars")
     
-    if len(st.session_state.active_data["AR"]) > 0:
-        
-        defaults = [
-            {"x": "CD", "y": "CL", "color": "None"},     
-            {"x": "alpha", "y": "CL", "color": "None"},   
-            {"x": "alpha", "y": "CD", "color": "None"}    
-        ]
-        
-        color_options = ["None"] + available_cols
-        
-        for i in range(3):
-            # 6 micro-columns: [Label, Box, Label, Box, Label, Box]
-            # Streamlit automatically normalizes these ratios!
-            c_lx, cx, c_ly, cy, c_lc, cc = st.columns([1, 4, 1, 4, 1, 4])
+    polar_tab1, polar_tab2 = st.tabs(["🌐 Dataset", "✈️ Selected Wing"])
+    
+    # --- TAB 1: GLOBAL DATASET POLARS ---
+    with polar_tab1:
+        if len(st.session_state.active_data["AR"]) > 0:
+            defaults = [
+                {"x": "CD", "y": "CL", "color": "alpha"},     
+                {"x": "alpha", "y": "CL", "color": "mach"},   
+                {"x": "mach", "y": "CD", "color": "alpha"}    
+            ]
+            color_options = ["None"] + available_cols
             
-            # Use a tiny bit of HTML to vertically center the text with the dropdown
-            with c_lx: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
-            with cx: px_x = st.selectbox(f"X{i}", available_cols, index=available_cols.index(defaults[i]["x"]), key=f"px_{i}", label_visibility="collapsed")
-            
-            with c_ly: st.markdown("<div style='margin-top:8px;'><b>Y:</b></div>", unsafe_allow_html=True)
-            with cy: px_y = st.selectbox(f"Y{i}", available_cols, index=available_cols.index(defaults[i]["y"]), key=f"py_{i}", label_visibility="collapsed")
-            
-            with c_lc: st.markdown("<div style='margin-top:8px;'><b>🎨</b></div>", unsafe_allow_html=True)
-            with cc: px_c = st.selectbox(f"C{i}", color_options, index=color_options.index(defaults[i]["color"]), key=f"pc_{i}", label_visibility="collapsed")
-            
-            actual_color = None if px_c == "None" else px_c
-            
-            hover_dict = {px_x: ':.3f', px_y: ':.3f'}
-            if actual_color:
-                hover_dict[actual_color] = ':.3f'
-            
-            fig_2d = px.scatter(
-                st.session_state.active_data, 
-                x=px_x, y=px_y, color=actual_color,
-                hover_data=hover_dict
-            )
-            
-            # Strip the redundant axis titles to save massive amounts of space
-            fig_2d.update_xaxes(title_text='')
-            fig_2d.update_yaxes(title_text='')
-            
-            # With labels gone, we can compress the margins even tighter and drop the height to 250!
-            fig_2d.update_layout(margin=dict(l=5, r=5, b=5, t=5), height=200)
-            st.plotly_chart(fig_2d, width='stretch', key=f"polar_chart_{i}")
-            
-    else:
-        st.warning("No data points match the current filter criteria!")
+            for i in range(3):
+                c_lx, cx, c_ly, cy, c_lc, cc = st.columns([1, 4, 1, 4, 1, 4])
+                with c_lx: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
+                with cx: px_x = st.selectbox(f"X{i}", available_cols, index=available_cols.index(defaults[i]["x"]), key=f"px_{i}", label_visibility="collapsed")
+                with c_ly: st.markdown("<div style='margin-top:8px;'><b>Y:</b></div>", unsafe_allow_html=True)
+                with cy: px_y = st.selectbox(f"Y{i}", available_cols, index=available_cols.index(defaults[i]["y"]), key=f"py_{i}", label_visibility="collapsed")
+                with c_lc: st.markdown("<div style='margin-top:8px;'><b>🎨:</b></div>", unsafe_allow_html=True)
+                with cc: px_c = st.selectbox(f"C{i}", color_options, index=color_options.index(defaults[i]["color"]), key=f"pc_{i}", label_visibility="collapsed")
+                
+                actual_color = None if px_c == "None" else px_c
+                hover_dict = {px_x: ':.3f', px_y: ':.3f'}
+                if actual_color: hover_dict[actual_color] = ':.3f'
+                
+                fig_2d = px.scatter(
+                    st.session_state.active_data, 
+                    x=px_x, y=px_y, color=actual_color, hover_data=hover_dict
+                )
+                fig_2d.update_xaxes(title_text='')
+                fig_2d.update_yaxes(title_text='')
+                fig_2d.update_layout(margin=dict(l=20, r=10, b=20, t=10), height=200)
+                st.plotly_chart(fig_2d, width='stretch', key=f"global_polar_{i}")
+        else:
+            st.warning("No data points match the current filter criteria!")
 
-st.markdown("---")
+    # --- TAB 2: SPECIFIC WING POLARS ---
+    with polar_tab2:
+        # Check if they actually have a wing selected in the Garage
+        active_wing = st.session_state.get("active_hangar_id")
+        
+        if active_wing is not None:
+            # Fetch the isolated data for just this wing
+            states_per_wing = get_states_per_wing()
+            wing_df = fetch_wing_polars(active_wing, states_per_wing)
+            
+            if len(wing_df) > 0:
+                # We restrict the options here to Flow variables since Geometry is constant
+                flow_cols = ["alpha", "mach", "CL", "CD"]
+                color_opts_wing = ["None"] + flow_cols
+                
+                defaults_wing = [
+                    {"x": "CD", "y": "CL", "color": "None"},     
+                    {"x": "alpha", "y": "CL", "color": "None"},   
+                    {"x": "mach", "y": "CD", "color": "None"}    
+                ]
+                
+                for i in range(3):
+                    c_lx, cx, c_ly, cy, c_lc, cc = st.columns([1, 4, 1, 4, 1, 4])
+                    with c_lx: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
+                    with cx: wx_x = st.selectbox(f"wX{i}", flow_cols, index=flow_cols.index(defaults_wing[i]["x"]), key=f"wx_{i}", label_visibility="collapsed")
+                    with c_ly: st.markdown("<div style='margin-top:8px;'><b>Y:</b></div>", unsafe_allow_html=True)
+                    with cy: wx_y = st.selectbox(f"wY{i}", flow_cols, index=flow_cols.index(defaults_wing[i]["y"]), key=f"wy_{i}", label_visibility="collapsed")
+                    with c_lc: st.markdown("<div style='margin-top:8px;'><b>🎨:</b></div>", unsafe_allow_html=True)
+                    with cc: wx_c = st.selectbox(f"wC{i}", color_opts_wing, index=color_opts_wing.index(defaults_wing[i]["color"]), key=f"wc_{i}", label_visibility="collapsed")
+                    
+                    actual_wc = None if wx_c == "None" else wx_c
+                    hover_w = {wx_x: ':.3f', wx_y: ':.3f'}
+                    if actual_wc: hover_w[actual_wc] = ':.3f'
+                    
+                    fig_w = px.scatter(
+                        wing_df, 
+                        x=wx_x, y=wx_y, color=actual_wc, hover_data=hover_w
+                    )
+                    fig_w.update_xaxes(title_text='')
+                    fig_w.update_yaxes(title_text='')
+                    fig_w.update_layout(margin=dict(l=0, r=0, b=0, t=00), height=200)
+                    st.plotly_chart(fig_w, width='stretch', key=f"wing_polar_{i}")
+            else:
+                st.error("No valid aerodynamic data found for this wing.")
+        else:
+            st.info("Add and select a wing in your Garage to view its specific aerodynamic polars here.")
+
+st.markdown('---')
 
 # ==========================================
 # BOTTOM ROW: INPUT & CONTROL DASHBOARD
@@ -492,18 +667,57 @@ with ctrl_col3:
 # ==========================================
 # BOTTOM TIER: OPTIMIZATION RESULTS
 # ==========================================
-if "top_results" in st.session_state:
+if "top_results" in st.session_state and st.session_state.top_results is not None:
     st.markdown("---")
+    st.subheader(f"🏆 Top {len(st.session_state.top_results)} Results for: `{user_expr}`")
     
-    if st.session_state.top_results is not None:
-        st.subheader(f"🏆 Top {len(st.session_state.top_results)} Results for: `{user_expr}`")
+    selection_event = st.dataframe(
+        st.session_state.top_results, 
+        width='stretch',
+        hide_index=True,
+        on_select="rerun",           
+        selection_mode="single-row"  
+    )
+    
+    # Garage Addition Interface
+    c_add1, c_add2 = st.columns(2)
+    
+    with c_add1:
+        st.markdown("#### Leaderboard Selection")
+        selected_rows = selection_event.selection.rows
         
-        # Display the dataframe. It will automatically span the wide layout.
-        st.dataframe(
-            st.session_state.top_results, 
-            width='stretch',
-            hide_index=True # Hides the arbitrary row numbers for a cleaner look
-        )
-        
-    elif st.session_state.expr_error:
-        st.error(f"Sweep Error: {st.session_state.expr_error}")
+        if len(selected_rows) > 0:
+            row_idx = selected_rows[0]
+            selected_wing = st.session_state.top_results.iloc[row_idx]
+            selected_wing_id = row_idx // get_states_per_wing()
+            w_id = int(selected_wing_id)
+            
+            if w_id in st.session_state.hangar:
+                st.success(f"✅ Wing {w_id} is already in your Hangar!")
+            else:
+                if st.button(f"📥 Add Wing {w_id} to Hangar", type="primary", width='stretch'):
+                    # Save the row dictionary to the collection and rerun to update the Top Tabs
+                    st.session_state.hangar[w_id] = selected_wing.to_dict()
+                    st.rerun()
+        else:
+            st.info("Click a row in the table above to save it.")
+            
+    with c_add2:
+        st.markdown("#### Manual Addition")
+        m_col1, m_col2 = st.columns([0.7, 0.3])
+        with m_col1:
+            manual_id = st.number_input("Target Wing ID", min_value=0, step=1, label_visibility="collapsed")
+        with m_col2:
+            if st.button("Add ID", width='stretch'):
+                if manual_id in st.session_state.hangar:
+                    st.warning("Already in Hangar!")
+                else:
+                    new_wing = fetch_wing_metadata(manual_id, get_states_per_wing())
+                    if new_wing is not None:
+                        st.session_state.hangar[manual_id] = new_wing
+                        st.rerun()
+                    else:
+                        st.error("ID out of bounds.")
+
+elif st.session_state.get("expr_error"):
+    st.error(f"Sweep Error: {st.session_state.expr_error}")

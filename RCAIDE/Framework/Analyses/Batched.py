@@ -334,15 +334,6 @@ class ShardedDatasetGenerator:
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
 
-    # def _finalize_and_offload(self, cache_db: Path, storage_db: Path):
-    #         """Seals the Zarr database and moves it to slower storage."""
-    #         self.logger.info(f"Consolidating metadata for {cache_db.name}...")
-    #         zarr.consolidate_metadata(str(cache_db))
-            
-    #         self.logger.info(f"Offloading to storage: {storage_db}...")
-    #         shutil.move(str(cache_db), str(storage_db))
-    #         self.logger.info("Offload complete.")
-
     def run(
         self, 
         settings,
@@ -405,58 +396,8 @@ class ShardedDatasetGenerator:
                 continue
         
         self.shard_manager.offload_and_rollover()
+        shutil.rmtree(self.cache_dir)
         self.logger.info(f"{self.tag} Complete.")
-
-            #     for shard_idx, start_idx in enumerate(range(0, states_per_system, self.shard_size)):
-            #         end_idx = min(start_idx + self.shard_size, states_per_system)
-                    
-            #         # Define temporary cache path and final storage path
-            #         shard_name = f"{self.dataset_prefix}_shard_{shard_idx:04d}.zarr"
-            #         cache_db = self.cache_dir / shard_name
-            #         storage_db = self.storage_dir / shard_name
-
-            #         # Check if run is resuming
-            #         if storage_db.exists():
-            #             self.logger.info(f"Shard {shard_idx:,} exists in storage directory. Skipping...")
-            #             continue
-
-            #         if cache_db.exists():
-            #             self.logger.warning(f"Found incomplete local Shard {shard_idx:,}. Removing and restarting.")
-            #             shutil.rmtree(cache_db)
-                    
-            #         self.logger.info(f"Generating Shard {shard_idx:,}, states {start_idx:,} to {end_idx:,}")
-                    
-            #         # Slice kwargs specifically for this shard
-            #         shard_kwargs = {}
-            #         for key, arr in zip(state_keys, proc_states):
-            #             shard_kwargs[key] = arr[start_idx:end_idx]
-
-            #         # Hand off to the RCAIDE Batched Process
-            #         # Pass mode="zip" here - mesh was expanded above, now zipping over processed arrays
-            #         try:
-            #             self.batch_process.run(
-            #                 system=system,
-            #                 settings=settings,
-            #                 mode="zip", 
-            #                 batch_size=batch_size,
-            #                 logger_handle=self.logger_handle,
-            #                 **shard_kwargs
-            #             )
-            #             # Consolidate metadata and offload
-            #             self._finalize_and_offload(cache_db, storage_db)
-                    
-            #         except Exception as e:
-            #             self.logger.error(f"Generation of Shard {shard_idx:,} failed. Skipping...", exc_info=True)
-            #             if cache_db.exists():
-            #                 self.logger.info(f"Removing corrupted cache for Shard {shard_idx}...")
-            #                 shutil.rmtree(cache_db)
-            #             continue
-                
-            #     self.logger.info("Generation complete. All epochs processed and offloaded.")
-            
-            # except Exception as e:
-            #     self.logger.critical("Fatal error durring generation.", exc_info=True)
-            #     raise
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Compression Benchmarking
