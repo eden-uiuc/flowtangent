@@ -98,23 +98,23 @@ def apply_filters(data, ar, sweep, taper, mach, alpha):
 # Wing Functions
 #-----------------------------------------------------------------------------------------------------------------------
 
-def wing_generator(AR, taper, QC, d):
+def wing_generator(aspect_ratio, taper, sweep, dihedral, twist):
 
     wing = Wing(
         tag=f"W1",
         symmetric=True,
         taper=taper,
-        dihedral=d,
-        sweeps=WingSweeps(quarter_chord=QC),
+        dihedral=dihedral,
+        sweeps=WingSweeps(quarter_chord=sweep),
         chords=WingChords(root=1.0),
-        spans=WingDimensions(projected=AR),
+        spans=WingDimensions(projected=aspect_ratio),
         origin=jnp.array([[0., 0., 0.]]),
     ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
     system = Aircraft(tag="W1 System", areas=wing.areas).add_subcomponent(wing)
     system = eqx.tree_at(lambda s: s.mass_properties.center_of_gravity, system, jnp.array([[0.0, 0.0, 0.0]]))
 
-    return system, {"AR":AR, "taper":taper, "QC_Sweep":QC, "Dihedral":d}
+    return system, {"AR":aspect_ratio, "taper":taper, "QC_Sweep":sweep, "Dihedral":dihedral}
 
 def wing_renderer(wing_system):
 
@@ -203,7 +203,7 @@ def get_zarr_root():
     return stitched_data
 
 @st.cache_data
-def load_exploration_sample(sample_size=50000):
+def load_exploration_sample(sample_size=5000):
     """Pulls a randomized downsample into a Pandas DataFrame for the UI."""
     root = get_zarr_root()
     total_rows = root["alpha"].shape[0]

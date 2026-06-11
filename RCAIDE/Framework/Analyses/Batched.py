@@ -19,6 +19,8 @@ from collections import defaultdict
 from itertools import product
 
 import os
+import re
+import gc
 import jax
 import zarr
 import time
@@ -217,6 +219,38 @@ class BatchAnalysis:
 #  Sharded Dataset Generator
 # ----------------------------------------------------------------------------------------------------------------------
 
+class JAXCompileFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+
+        # 1. Identify if this is a compilation/tracing log
+        is_compile_log = any(keyword in msg for keyword in [
+            "Compiling",
+            "tracing + transforming",
+            "Finished jaxpr to MLIR",
+            "Finished XLA compilation"
+        ])
+
+        # 2. If it IS a compile log, apply our strict whitelist & formatting
+        if is_compile_log:
+            # Block it if it's not the main VLM solve
+            if "jit(run)" not in msg:
+                return False
+                
+            # If it is the main solve, truncate the massive PyTree dump
+            if "with global shapes and types" in msg:
+                parts = msg.split("with global shapes and types")
+                prefix = parts[0] + "with global shapes and types"
+                suffix = parts[1][:30] if len(parts) > 1 else ""
+                
+                record.msg = f"{prefix} {suffix} ... [PyTree Truncated]"
+                record.args = () 
+
+            return True
+
+        # 3. If it's NOT a compile log (e.g., GPU memory warning), let it through untouched
+        return True
+
 class ShardManager:
     def __init__(
             self,
@@ -295,7 +329,7 @@ class ShardedDatasetGenerator:
         cache_dir: str | Path, 
         storage_dir: str | Path, 
         shard_size: int = 3_000_000,
-        tag: str = "DataGenerator"
+        tag: str = "DataGenerator",
     ):
         
         self.cache_dir = Path(cache_dir)
@@ -333,6 +367,21 @@ class ShardedDatasetGenerator:
 
             self.logger.addHandler(fh)
             self.logger.addHandler(ch)
+        
+        jax_logger = logging.getLogger("jax")
+        jax_logger.propagate = False
+        jax_logger.handlers.clear()
+        
+        jax_filter = JAXCompileFilter()
+        for handler in self.logger.handlers:
+            handler.addFilter(jax_filter)
+            jax_logger.addHandler(handler)
+
+        if getattr(jax.config, "jax_log_compiles", False):
+            jax_logger.setLevel(logging.INFO)
+        else:
+            jax_logger.setLevel(logging.WARNING)
+        
 
     def run(
         self, 
@@ -364,36 +413,44 @@ class ShardedDatasetGenerator:
                 raise ValueError("Must provide either 'system' or 'system_iter'.")
             system_iter = [(system, {})]
         
+        if getattr(jax.config, "jax_log_compiles", False):
+            os.system('cls' if os.name == 'nt' else 'clear')
+        
         self.logger.info("=== INITIALIZING SHARDED GENERATION ===")
         self.logger.info(f"Initialized Generalized Generator. {states_per_system} states per geometry.")
 
         # System Loop
-        for s_idx, (sys, meta) in enumerate(tqdm(system_iter, desc="Processing Systems", total=total_systems)):
-            try:
-                res = self.batch_process.run(
-                    system=sys,
-                    settings=settings,
-                    mode="zip",
-                    batch_size=batch_size,
-                    handle=self.dataset_prefix+".analysis",
-                    **flat_state_kwargs
-                )
+        with tqdm(desc="Processing Systems", total=total_systems) as pbar:
+            for s_idx, (sys, meta) in enumerate(system_iter):
+                try:
+                    res = self.batch_process.run(
+                        system=sys,
+                        settings=settings,
+                        mode="zip",
+                        batch_size=batch_size,
+                        handle=self.dataset_prefix+".analysis",
+                        **flat_state_kwargs)
 
-                for k, v in meta.items():
-                    res[k] = np.full((states_per_system, 1), v, dtype=np.float64)
+                    for k, v in meta.items():
+                        res[k] = np.full((states_per_system, 1), v, dtype=np.float64)
+                    
+                    conformed_dict = {}
+                    for key, val in res.items():
+                        if isinstance(val, list):
+                            conformed_dict[key] = np.concatenate(val, axis=0)
+                        else:
+                            conformed_dict[key] = np.asarray(val)
+                    
+                    self.shard_manager.append_data(conformed_dict)
                 
-                conformed_dict = {}
-                for key, val in res.items():
-                    if isinstance(val, list):
-                        conformed_dict[key] = np.concatenate(val, axis=0)
-                    else:
-                        conformed_dict[key] = np.asarray(val)
-                
-                self.shard_manager.append_data(conformed_dict)
-            
-            except Exception as e:
-                self.logger.error(f"Failuire on system {s_idx}. Skipping.", exc_info=True)
-                continue
+                except Exception as e:
+                    self.logger.error(f"Failuire on system {s_idx}. Skipping.", exc_info=True)
+                    continue
+
+                pbar.update(1)
+                if s_idx == 0:
+                    pbar.start_t = time.time()
+                    pbar.last_print_t = time.time()
         
         self.shard_manager.offload_and_rollover()
         shutil.rmtree(self.cache_dir)

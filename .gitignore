@@ -59,7 +59,7 @@ nosetests.xml
 # Mac
 .DS_Store
 
-
+*.csv
 *.dat
 
 # Geometry
@@ -84,5 +84,6 @@ nosetests.xml
 /docs/_modules/
 /docs/_sources/
 /docs/_static/
+
 
 
