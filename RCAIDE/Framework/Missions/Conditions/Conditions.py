@@ -7,6 +7,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from dataclasses import fields
+
 # package imports
 import jax
 import equinox as eqx
@@ -25,7 +27,15 @@ class Conditions(eqx.Module):
 
     subconditions: tuple = init_field(tuple)
 
-
+    def __post_init__(self):
+        subcons = tuple(
+            getattr(self, f.name) 
+            for f in fields(self) 
+            if f.name != "subconditions" and isinstance(getattr(self, f.name), Conditions)
+        )
+        
+        object.__setattr__(self, "subconditions", subcons)
+    
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
             return self.subconditions[item]

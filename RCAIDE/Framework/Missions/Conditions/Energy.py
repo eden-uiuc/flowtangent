@@ -16,39 +16,83 @@ from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Framework.Missions.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Energy Networks and Stores
+#  Energy Interfaces
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class EnergyStoreConditions(Conditions):
+class MechanicalOutputs(Conditions):
+    tag = "Mechanical Interface Conditions"
 
-    # Attribute         Type        Default Value
-    tag:                str         = init_field('Energy Store', static=True)
+    work: jnp.ndarray  = empty_array(0)
 
-    total_energy:       jnp.ndarray = empty_array(0)
+class ElectricalOutputs(Conditions):
+    tag = "Electrical Interface Conditions"
 
+class FuelOutputs(Conditions):
+    tag = "Fuel Interface Conditions"
 
-class EnergyConverterConditions(Conditions):
+    demand: jnp.ndarray = empty_array(0)
 
-    # Attribute         Type        Default Value
-    tag:                str         = init_field('Energy Converter', static=True)
+class FlowOutputs(Conditions):
+    tag = "Flow Interface Conditions"
 
-    efficiency:         jnp.ndarray  = empty_array(0)
-    power:              jnp.ndarray  = empty_array(0)
+    speed:                  jnp.ndarray  = empty_array(0)
+    speed_of_sound:         jnp.ndarray  = empty_array(0)
+    pressure:               jnp.ndarray  = empty_array(0)
+    temperature:            jnp.ndarray  = empty_array(0)
+    density:                jnp.ndarray  = empty_array(0)
+    enthalpy:               jnp.ndarray  = empty_array(0)
 
-    thrust_vector:      jnp.ndarray  = init_field(lambda: jnp.zeros((1, 3)))
+    dynamic_viscosity:      jnp.ndarray  = empty_array(0)
+    dynamic_pressure:       jnp.ndarray  = empty_array(0)
 
-    x_axis_rotation:    jnp.ndarray  = empty_array(0)
-    y_axis_rotation:    jnp.ndarray  = empty_array(0)
-    z_axis_rotation:    jnp.ndarray  = empty_array(0)
+    stagnation_pressure:    jnp.ndarray  = empty_array(0)
+    stagnation_temperature: jnp.ndarray  = empty_array(0)
+    stagnation_enthalpy:    jnp.ndarray  = empty_array(0)
 
-    inputs:             Conditions  = init_field(lambda: Conditions(tag='Energy Converter Inputs'))
-    outputs:            Conditions  = init_field(lambda: Conditions(tag='Energy Converter Outputs'))
+    mach_number:            jnp.ndarray  = empty_array(0)
+    reynolds_number:        jnp.ndarray  = empty_array(0)
+
+    gamma:                  jnp.ndarray  = empty_array(0)
+    Cp:                     jnp.ndarray  = empty_array(0)
+    R:                      jnp.ndarray  = empty_array(0)
+
+class ForceOutputs(Conditions):
+    tag = "Force Interface Conditions"
+
+    total_force_vector: jnp.ndarray = empty_array((0, 3))
+
+class OutputConditions(Conditions):
+
+    tag = "Energy Interface Conditons"
+    
+    mechanical : MechanicalOutputs  = init_field(MechanicalOutputs)
+    electrical : ElectricalOutputs  = init_field(ElectricalOutputs)
+    fuel       : FuelOutputs        = init_field(FuelOutputs)
+    flow       : FlowOutputs        = init_field(FlowOutputs)
+    force      : ForceOutputs       = init_field(ForceOutputs)
+
+class EnergyNodeConditions(Conditions):
+
+    # Attribute         Type         Default Value
+    tag:                str          = init_field('Energy Node Conditions', static=True)
+
+    outputs:            OutputConditions  = init_field(lambda: OutputConditions)
+
+    def __post_init__(self):
+        object.__setattr__(self.outputs, "tag", f"{self.tag} Outputs")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Battery Stores
 # ----------------------------------------------------------------------------------------------------------------------
+class EnergyStoreConditions(Conditions):
+
+    # Attribute             Type        Default Value
+    tag:                    str         = init_field('Energy Store', static=True)
+
+    total_energy:           jnp.ndarray = empty_array(0)
+    total_change_rate:      jnp.ndarray = empty_array(0)
 
 
 class BatteryCellConditions(EnergyStoreConditions):
@@ -103,6 +147,8 @@ class EnergyNetworkConditions(Conditions):
     # Attribute             Type        Default Value
     tag:                    str         = init_field('Energy Network', static=True)
 
+    nodes:                  dict        = init_field(dict)
+
     total_energy:           jnp.ndarray = empty_array(0)
     total_efficiency:       jnp.ndarray = empty_array(0)
     
@@ -112,4 +158,3 @@ class EnergyNetworkConditions(Conditions):
     total_force_vector:     jnp.ndarray = empty_array((0, 3))
     total_moment_vector:    jnp.ndarray = empty_array((0, 3))
 
-    lines:                  Conditions  = init_field(lambda: Conditions(tag='Energy Network Lines'))

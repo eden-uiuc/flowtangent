@@ -15,7 +15,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
-from RCAIDE.Library.Methods.Energy.Converters.Turbofans import thrust_and_power
+from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import thrust_and_power
 
 
 from typing import TYPE_CHECKING

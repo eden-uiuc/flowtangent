@@ -17,7 +17,7 @@ import jax.numpy as np
 
 # RCAIDE imports
 
-from RCAIDE.Library.Methods.Energy.Converters import fM, Rayleigh
+from RCAIDE.Library.Methods.Energy.Transmission import fM, Rayleigh
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Combustor Performance
@@ -43,7 +43,7 @@ def func_combustor_performance(
     return P_t_out, T_t_out, h_t_out, f
 
 
-def turbojet_combustor_performance(
+def jet_combustor_transmission(
     state: State,
     system: Aircraft,
     settings: Settings

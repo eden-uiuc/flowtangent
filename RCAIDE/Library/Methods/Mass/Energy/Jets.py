@@ -11,7 +11,7 @@
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine
 import RCAIDE.Framework as rcf
 
-from RCAIDE.Library.Methods.Energy.Converters.Turbofans import func_sea_level_static_thrust
+from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import func_sea_level_static_thrust
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

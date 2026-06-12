@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def func_fan_compressor_performance(
-        g,
+        gamma,
         Cp,
         T_t,
         P_t,
@@ -27,7 +27,7 @@ def func_fan_compressor_performance(
         n_p
 ):
 
-    T_t_out = T_t * (PR ** ((g - 1.) / (g * n_p)))
+    T_t_out = T_t * (PR ** ((gamma - 1.) / (gamma * n_p)))
 
     h_t     = T_t * Cp
     h_t_out = T_t_out * Cp

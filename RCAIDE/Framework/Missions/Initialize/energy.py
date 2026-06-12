@@ -11,67 +11,85 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE Imports
+from RCAIDE.Library.Components.Energy.Stores import FuelTank
+from RCAIDE.Library.Components.Energy.Nodes import EnergyInterface
+
 import RCAIDE.Framework as rcf
-from RCAIDE.Framework.Missions.Conditions import Conditions
-from RCAIDE.Framework.Missions.Conditions.Energy import EnergyLineConditions as Line
-from RCAIDE.Framework.Missions.Conditions.Energy import EnergyStoreConditions as Store
-from RCAIDE.Framework.Missions.Conditions.Energy import EnergyConverterConditions as Converter
+from RCAIDE.Framework.Missions.Conditions.Energy import *
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _build_converter_tree(system_converter) -> "Converter":
-    """Recursively builds the state Conditions tree to mirror the system structure."""
+
+def _resolve_namespaces(node, parent_prefix=""):
+    """
+    Recursively generates absolute paths for nodes and resolves local connections.
+    """
+    # Define this node's absolute ID
+    absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
     
-    # 1. Base Case: Create the state object for the current level
-    # (Assuming 'Converter' is the correct state class here based on your snippet)
-    state_node = Converter(tag=system_converter.tag)
+    # Resolve the input/output connection strings
+    # We rebuild the interfaces so they point to the absolute paths
+    new_inputs = EnergyInterface(
+        mechanical=[f"{parent_prefix}.{port}" for port in node.inputs.mechanical],
+        electrical=[f"{parent_prefix}.{port}" for port in node.inputs.electrical],
+        flow=[f"{parent_prefix}.{port}" for port in node.inputs.flow],
+        force=[f"{parent_prefix}.{port}" for port in node.inputs.force]
+    )
     
-    # 2. Recursive Step: Does this system component have sub-converters?
-    if hasattr(system_converter, 'converters') and system_converter.converters:
-        for sub_sys_conv in system_converter.converters:
-            
-            # Recurse down to build the child's entire tree
-            built_child_state = _build_converter_tree(sub_sys_conv)
-            
-            # Attach the fully built child to the current node
-            state_node = state_node.add_subcondition(built_child_state)
-            
-    return state_node
+    new_outputs = EnergyInterface(
+        mechanical=[f"{parent_prefix}.{port}" for port in node.outputs.mechanical],
+        electrical=[f"{parent_prefix}.{port}" for port in node.outputs.electrical],
+        flow=[f"{parent_prefix}.{port}" for port in node.outputs.flow],
+        force=[f"{parent_prefix}.{port}" for port in node.outputs.force]
+    )
+    
+    # Update the node itself (using eqx.tree_at since it's immutable)
+    node = eqx.tree_at(lambda n: n.tag, node, absolute_id)
+    node = eqx.tree_at(lambda n: n.inputs, node, new_inputs)
+    node = eqx.tree_at(lambda n: n.outputs, node, new_outputs)
+    
+    # Recurse through any subcomponents
+    if hasattr(node, 'subcomponents') and node.subcomponents:
+        resolved_children = tuple(
+            _resolve_namespaces(child, parent_prefix=absolute_id) 
+            for child in node.subcomponents
+        )
+        node = eqx.tree_at(lambda n: n.subcomponents, node, resolved_children)
+        
+    return node
 
+def initialize_energy(state: "rcf.State", system: "rcf.Aircraft", settings: "rcf.Settings"):
+    
+    flat_state_nodes = {}
+    resolved_lines = []
 
-def initialize_energy(state: "rcf.State",
-                      system: "rcf.Aircraft",
-                      settings: "rcf.Settings",
-                      ):
-
+    conditions_map = {
+        FuelTank: FuelConditions
+    }
+    
     for l_idx, line in enumerate(system.energy.lines):
         
-        state = eqx.tree_at(lambda s: s.energy.lines, state, state.energy.lines.add_subcondition(Line(tag=line.tag)))
+        # Resolve the namespace for this entire line and all its nested children
+        resolved_line = _resolve_namespaces(line, parent_prefix=f"line_{l_idx}")
+        resolved_lines.append(resolved_line)
         
-        # Grab the current, empty state container for this line's converters
-        line_converters_state = state.energy.lines[l_idx].converters
-        
-        # Build each root converter's tree and attach it
-        for root_sys_converter in line.converters:
-            
+        # Helper function to extract all nodes into our flat dict
+        def _extract_to_flat_state(n):
+            flat_state_nodes[n.tag] = conditions_map[n.__class__](tag=n.tag) # Initialize the state
+            if hasattr(n, 'subcomponents'):
+                for child in n.subcomponents:
+                    _extract_to_flat_state(child)
+                    
+        _extract_to_flat_state(resolved_line)
 
-            fully_built_root_state = _build_converter_tree(root_sys_converter)
-            
-            # Add the finished tree to the line's state container
-            line_converters_state = line_converters_state.add_subcondition(fully_built_root_state)
-
-        state = eqx.tree_at(
-            lambda s: s.energy.lines[l_idx].converters, 
-            state, 
-            line_converters_state
-        )
-
-        for store in line.stores:
-            state = eqx.tree_at(lambda s: s.energy.lines[l_idx].stores, state, state.energy.lines[l_idx].stores.add_subcondition(Store(tag=store.tag)))
-        
-        state = eqx.tree_at(lambda s: s.energy.lines[l_idx], state, state.energy.lines[l_idx].expand_rows(state.numerics.number_of_control_points))
-
+    # Update the System with the newly resolved absolute-path nodes
+    updated_network = eqx.tree_at(lambda e: e.lines, system.energy, tuple(resolved_lines)).sort_network_topology()
+    system = eqx.tree_at(lambda s: s.energy, system, updated_network)
+    
+    # Update the State with the flat dictionary
+    state = eqx.tree_at(lambda s: s.energy.nodes, state, flat_state_nodes)
+    
     return state, system, settings

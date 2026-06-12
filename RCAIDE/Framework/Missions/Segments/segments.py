@@ -35,7 +35,7 @@ from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 from .Profiles import *
 
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, PathTuple
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import null_step
 from RCAIDE.Framework.Missions.Initialize import *

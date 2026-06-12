@@ -49,22 +49,22 @@ def func_compression_nozzle_performance(
     P0,
     M0,
     Cp,
-    g,
+    gamma,
     PR,
     n_r,
     n_p
 ):
 
-    P_t_out, T_t_out, T_out, M_out = func_isentropic_nozzle_performance(T_t, P_t, P0, g, PR, n_r, n_p)
+    P_t_out, T_t_out, T_out, M_out = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, n_r, n_p)
 
     # Normal Shock Outputs
 
-    ns_M    = np.sqrt((1. + (g - 1.) / 2. * M0 ** 2.) / (g * M0 ** 2 - (g - 1.) / 2.))
-    ns_T    = T_t_out / (1. + (g - 1.) / 2 * ns_M ** 2)
+    ns_M    = np.sqrt((1. + (gamma - 1.) / 2. * M0 ** 2.) / (gamma * M0 ** 2 - (gamma - 1.) / 2.))
+    ns_T    = T_t_out / (1. + (gamma - 1.) / 2 * ns_M ** 2)
     ns_P_t  = (PR *
                P_t *
-               ((((g + 1.) * (M0 ** 2.)) / ((g - 1.) * M0 ** 2. + 2.)) ** (g / (g - 1.))) *
-               ((g + 1.) / (2. * g * M0 ** 2.-(g - 1.))) ** (1./(g - 1.))
+               ((((gamma + 1.) * (M0 ** 2.)) / ((gamma - 1.) * M0 ** 2. + 2.)) ** (gamma / (gamma - 1.))) *
+               ((gamma + 1.) / (2. * gamma * M0 ** 2.-(gamma - 1.))) ** (1./(gamma - 1.))
                )
 
     # Combine Outputs
@@ -120,70 +120,6 @@ def func_expansion_nozzle_performance(
     AR      = (fm(M0, g) / fm(M, g) * (1 / (P_t_out / P_t0)) * (np.sqrt(T_t_out / T_t0)))
 
     return AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
-
-
-def inlet_nozzle_performance(
-    state: "rcf.State",
-    system: "rcf.Aircraft",
-    settings: "rcf.Settings"
-):
-
-    # Get inputs
-
-    fs = state.freestream
-    T_t = fs.stagnation_temperature
-    P_t = fs.stagnation_pressure
-    P0  = fs.pressure
-    M0  = fs.mach_number
-    Cp  = fs.Cp
-    g   = fs.gamma
-
-    for l_idx, line in enumerate(system.energy.lines):
-        for p_idx, propulsor in enumerate(line.propulsors):
-
-            nozzle = propulsor.converters.inlet_nozzle
-            PR  = nozzle.pressure_ratio
-            n_r = nozzle.pressure_recovery
-            n_p = nozzle.polytropic_efficiency
-
-            # Call function
-            M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out = func_compression_nozzle_performance(T_t,
-                                                                                                        P_t,
-                                                                                                        P0,
-                                                                                                        M0,
-                                                                                                        Cp,
-                                                                                                        g,
-                                                                                                        PR,
-                                                                                                        n_r,
-                                                                                                        n_p)
-
-            # Set Input State
-            nozzle_state = state.energy.lines[l_idx].propulsors[p_idx].converters.inlet_nozzle
-
-            inputs = nozzle_state.inputs
-
-            inputs.stagnation_temperature = T_t
-            inputs.stagnation_pressure    = P_t
-            inputs.freestream_pressure    = P0
-            inputs.freestream_mach_number = M0
-            inputs.freestream_Cp          = Cp
-            inputs.freestream_gamma       = g
-
-            # Set Output State
-            outputs = nozzle_state.outputs
-
-            outputs.mach_number             = M_out
-            outputs.velocity                = u_out
-
-            outputs.stagnation_pressure     = P_t_out
-
-            outputs.stagnation_temperature  = T_t_out
-            outputs.static_temperature      = T_out
-
-            outputs.stagnation_enthalpy     = h_t_out
-            outputs.static_enthalpy         = h_out
-
-    return state, system, settings
 
 
 def _expansion_nozzle_performance(

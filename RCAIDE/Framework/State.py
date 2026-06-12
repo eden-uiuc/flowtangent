@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 import RCAIDE.Library.Components
 
-from RCAIDE.utils import empty_array, init_field
+from RCAIDE.utils import empty_array, init_field, get_all_targets
 from RCAIDE.Framework.Missions.Conditions import (
     Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
     AerodynamicsConditions, StabilityConditions, ControlsConditions, DynamicsConditions)
@@ -92,13 +92,13 @@ class State(Conditions):
         routing_table = self.controls.active_routing_table
 
         # 2. Extract all targets in one shot
-        def get_all_targets(s):
+        def get_unknown_targets(s):
             targets = []
             for path, _ in routing_table:
                 targets.append(reduce(getattr, path, s))
             return tuple(targets)
 
-        current_targets = get_all_targets(self)
+        current_targets = get_unknown_targets(self)
         new_arrays = []
         control_idx = 0
 
@@ -113,7 +113,7 @@ class State(Conditions):
             control_idx += n_points
 
         # 4. Swap all arrays in a single JAX graph node
-        return eqx.tree_at(get_all_targets, self, tuple(new_arrays))
+        return eqx.tree_at(get_unknown_targets, self, tuple(new_arrays))
 
     def pack_residuals(self):
         """
