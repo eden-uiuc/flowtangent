@@ -9,6 +9,8 @@
 
 import equinox as eqx
 
+from RCAIDE.utils import init_field
+
 from RCAIDE.Framework import Process, ProcessStep
 
 from RCAIDE.Library.Methods.Energy.Converters.Nozzles import *
@@ -37,9 +39,9 @@ def _build_turbofan_steps() -> tuple[ProcessStep, ...]:
     )
 
 class TurbofanPerformance(Process):
-    tag: str = eqx.field(static=True, default='Turbofan Performance')
+    tag: str = init_field('Turbofan Performance', static=True)
     
     # Hand the builder function directly to the factory
-    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_build_turbofan_steps)
+    steps: tuple[ProcessStep, ...] = init_field(_build_turbofan_steps)
 
 

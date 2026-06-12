@@ -16,6 +16,8 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import empty_array, init_field
+
 from RCAIDE.Library import Component, MassProperties
 from RCAIDE.Library.Attributes import AircraftClass, MediumRange
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
@@ -41,9 +43,9 @@ class VehicleEnvelope(eqx.Module):
 
 class System(Component):
 
-    tag: str = eqx.field(static=True, default='System')
+    tag: str = init_field('System', static=True)
 
-    configurations: Component = eqx.field(default_factory=lambda: Component(tag='Configurations'))
+    configurations: Component = init_field(lambda: Component(tag='Configurations'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Aircraft
@@ -51,10 +53,10 @@ class System(Component):
 
 class AircraftReferenceGeometry(eqx.Module):
     
-    mean_aerodynamic_chord: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    projected_span: jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    aerodynamic_center: jnp.ndarray     = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
-    center_of_gravity: jnp.ndarray      = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    mean_aerodynamic_chord: jnp.ndarray = empty_array(0)
+    projected_span: jnp.ndarray         = empty_array(0)
+    aerodynamic_center: jnp.ndarray     = empty_array((0, 3))
+    center_of_gravity: jnp.ndarray      = empty_array((0, 3))
 
 
 class AircraftMassProperties(MassProperties):
@@ -67,27 +69,27 @@ class AircraftMassProperties(MassProperties):
 
 class Aircraft(System):
 
-    tag:                str = eqx.field(static=True, default='Aircraft')
+    tag:                str = init_field('Aircraft', static=True)
     
-    ac_class:           AircraftClass = eqx.field(static=True, default_factory=MediumRange)
-    envelope:           VehicleEnvelope = eqx.field(static=True, default_factory=VehicleEnvelope)
-    mass_properties:    AircraftMassProperties = eqx.field(default_factory=AircraftMassProperties) #type: ignore
+    ac_class:           AircraftClass = init_field(MediumRange, static=True)
+    envelope:           VehicleEnvelope = init_field(VehicleEnvelope, static=True)
+    mass_properties:    AircraftMassProperties = init_field(AircraftMassProperties) #type: ignore
 
-    passengers:         int     = eqx.field(static=True, default=0)
+    passengers:         int     = init_field(0, static=True)
     
-    design_mach_number: float   = eqx.field(static=True, default=0.)
-    design_range:       float   = eqx.field(static=True, default=0.)
-    design_cruise_alt:  float   = eqx.field(static=True, default=0.)
+    design_mach_number: float   = init_field(0., static=True)
+    design_range:       float   = init_field(0., static=True)
+    design_cruise_alt:  float   = init_field(0., static=True)
 
-    energy:         EnergyNetwork = eqx.field(default_factory=lambda: EnergyNetwork(tag="Energy"))
+    energy:         EnergyNetwork = init_field(lambda: EnergyNetwork(tag="Energy"))
     
-    wings:          Component = eqx.field(default_factory=lambda: Component(tag='Wings'))
-    fuselages:      Component = eqx.field(default_factory=lambda: Component(tag='Fuselages'))
-    nacelles:       Component = eqx.field(default_factory=lambda: Component(tag='Nacelles'))
-    landing_gear:   Component = eqx.field(default_factory=lambda: Component(tag='Landing Gear'))
+    wings:          Component = init_field(lambda: Component(tag='Wings'))
+    fuselages:      Component = init_field(lambda: Component(tag='Fuselages'))
+    nacelles:       Component = init_field(lambda: Component(tag='Nacelles'))
+    landing_gear:   Component = init_field(lambda: Component(tag='Landing Gear'))
 
-    reference_geometry:  AircraftReferenceGeometry = eqx.field(default_factory=AircraftReferenceGeometry)
-    analysis_data:      dict = eqx.field(default_factory=dict)
+    reference_geometry:  AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
+    analysis_data:      dict = init_field(dict)
 
     def add_subcomponent(
             self,

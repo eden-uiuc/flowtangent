@@ -14,6 +14,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -31,13 +32,13 @@ class AtmosphericBreakpoints(eqx.Module):
 
 class Atmosphere(eqx.Module):
 
-    tag: str = eqx.field(static=True, default="Atmosphere")
+    tag: str = init_field("Atmosphere", static=True)
 
-    fluid: rcl.Gases.Gas = eqx.field(default_factory=rcl.Gases.Air)
+    fluid: rcl.Gases.Gas = init_field(rcl.Gases.Air)
 
-    planet: rcl.Planets.Planet = eqx.field(default_factory=rcl.Planets.Earth)
+    planet: rcl.Planets.Planet = init_field(rcl.Planets.Earth)
 
-    breaks: AtmosphericBreakpoints = eqx.field(default_factory=AtmosphericBreakpoints)
+    breaks: AtmosphericBreakpoints = init_field(AtmosphericBreakpoints)
 
     def __repr__(self):
         return self.tag
@@ -95,8 +96,8 @@ def _USStandardBreaks():
 
 class USStandard1976(Atmosphere):
 
-    tag:    str                     = eqx.field(static=True, default="US Standard Atmosphere, 1976")
-    breaks: AtmosphericBreakpoints  = eqx.field(default_factory=_USStandardBreaks)
+    tag:    str                     = init_field("US Standard Atmosphere, 1976", static=True)
+    breaks: AtmosphericBreakpoints  = init_field(_USStandardBreaks)
 
 def _ConstantTempBreaks(self):
     return AtmosphericBreakpoints(
@@ -108,5 +109,5 @@ def _ConstantTempBreaks(self):
 
 class ConstantTemperature(Atmosphere):
 
-    tag:    str                     = eqx.field(static=True, default="Constant Temprerature Atmosphere")
-    breaks: AtmosphericBreakpoints  = eqx.field(default_factory=_USStandardBreaks)
+    tag:    str                     = init_field("Constant Temprerature Atmosphere", static=True)
+    breaks: AtmosphericBreakpoints  = init_field(_USStandardBreaks)

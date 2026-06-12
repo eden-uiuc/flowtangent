@@ -20,7 +20,7 @@ from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, Altit
                                                          ConstantAltitudeChangeRate,  # Velocity Profiles
                                                          FixedDistance, FixedTime,)  # Duration Profiles
 from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VLM, VLMSettings, VLMVortices, InitializeVLM
+from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VORJAX, VORJAX_Settings, Vortices, InitializeVORJAX
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
@@ -354,7 +354,7 @@ def vehicle_setup():
         bypass_ratio=5.4,
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
-        design_thrust_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
+        design_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
     )
 
     # Converters -------------------------------------------------------------------------------------------------------
@@ -478,8 +478,8 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
 
     residuals = ("force_x", "force_z")
 
-    vortex_settings = VLMVortices(spanwise_vortices=20, chordwise_vortices=12)
-    aero_settings = VLMSettings(vortices=vortex_settings)
+    vortex_settings = Vortices(n_spanwise=20, n_chordwise=12)
+    aero_settings = VORJAX_Settings(vortices=vortex_settings)
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
@@ -533,10 +533,10 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
     final_segments = []
     
     for segment in mission.steps:
-        aero_analysis = VLM()
+        aero_analysis = VORJAX()
         seg_w_analysis = eqx.tree_at(lambda s: s.analyze.aerodynamics, segment, aero_analysis)
         
-        aero_init = InitializeVLM()
+        aero_init = InitializeVORJAX()
         updated_init_steps = segment.initialize.steps + (aero_init,)
         final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analysis, updated_init_steps)
         

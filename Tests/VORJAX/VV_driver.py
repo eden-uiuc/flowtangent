@@ -41,7 +41,7 @@ from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, Sy
 from RCAIDE.Framework.Settings import AnalysisSettings
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
@@ -484,7 +484,7 @@ def VORJAX_test_run(
         suction=suction,
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
+    aero_settings = VORJAX_Settings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -2030,7 +2030,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP
@@ -2063,7 +2063,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
+            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP

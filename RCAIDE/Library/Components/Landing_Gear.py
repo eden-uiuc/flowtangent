@@ -11,6 +11,7 @@
 import equinox as eqx
 
 # RCAIDE imports  
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,12 +21,12 @@ from RCAIDE.Library import Component
 
 class LandingGear(Component):
 
-    tag:                str     = eqx.field(static=True, default='Landing Gear')
+    tag:                str     = init_field('Landing Gear', static=True)
 
     deployed:           bool    = False
 
-    number_of_units:    int     = eqx.field(static=True, default=1)
-    number_of_wheels:   int     = eqx.field(static=True, default=0)
+    number_of_units:    int     = init_field(1, static=True)
+    number_of_wheels:   int     = init_field(0, static=True)
 
     strut_length:       float   = 0.
     tire_diameter:      float   = 0.

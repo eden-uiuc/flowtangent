@@ -33,7 +33,7 @@ from tqdm import trange
 from numcodecs import Blosc
 
 # RCAIDE imports
-from RCAIDE.utils import PathTuple
+from RCAIDE.utils import PathTuple, init_field
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Methods.Aerodynamics.Transonic import peaked_CL_spline, ensemble_CL_spline
@@ -65,7 +65,7 @@ class SupersonicSettings(eqx.Module):
     
     peak_CL_multiplier:             float = 1.15
     peak_mach_number:               Optional[float] = None
-    _transonic_CL_blender:          Callable = eqx.field(static=True, default=ensemble_CL_spline)
+    _transonic_CL_blender:          Callable = init_field(ensemble_CL_spline, static=True)
     
     begin_drag_rise_mach_number:    float = 0.95
     end_drag_rise_mach_number:      float = 1.2
@@ -73,8 +73,8 @@ class SupersonicSettings(eqx.Module):
     transonic_drag_multiplier:      float = 1.25
     volume_wave_drag_scaling:       float = 3.2
     
-    cross_section_type:             str  = eqx.field(static=True, default='Fixed')
-    wave_drag_type:                 str  = eqx.field(static=True, default='Raymer')
+    cross_section_type:             str  = init_field('Fixed', static=True)
+    wave_drag_type:                 str  = init_field('Raymer', static=True)
 
     def __post_init__(self):
         if self.peak_mach_number is not None:
@@ -92,8 +92,8 @@ class SupersonicSettings(eqx.Module):
 
 class CorrectionFactors(eqx.Module):
 
-    suction:    bool = eqx.field(static=True, default=True)
-    shock:      bool = eqx.field(static=True, default=True)
+    suction:    bool = init_field(True, static=True)
+    shock:      bool = init_field(True, static=True)
 
     fuselage_lift: float = 1.14
     trim_drag: float = 1.02
@@ -115,27 +115,27 @@ class FormFactors(eqx.Module):
 
 class Surrogate(eqx.Module):
 
-    surrogate:              Optional[Any] = eqx.field(static=True, default_factory=sklearn.gaussian_process.GaussianProcessRegressor)
+    surrogate:              Optional[Any] = init_field(sklearn.gaussian_process.GaussianProcessRegressor, static=True)
     
     blend_transonic:        bool          = True
 
-    angle_of_attack:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(-5., 15., 40) * Units.deg)
-    sideslip_angle:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0.0, 15., 30) * Units.deg)
-    mach:                   jnp.ndarray  = eqx.field(default_factory=lambda: jnp.linspace(0., 0.85, 20))
+    angle_of_attack:        jnp.ndarray  = init_field(lambda: jnp.linspace(-5., 15., 40) * Units.deg)
+    sideslip_angle:         jnp.ndarray  = init_field(lambda: jnp.linspace(0.0, 15., 30) * Units.deg)
+    mach:                   jnp.ndarray  = init_field(lambda: jnp.linspace(0., 0.85, 20))
     
-    aileron_deflection:     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
-    elevator_deflection:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
-    rudder_deflection:      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
-    flap_deflection:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
-    slat_deflection:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    aileron_deflection:     jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    elevator_deflection:    jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    rudder_deflection:      jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    flap_deflection:        jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
+    slat_deflection:        jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
 
-    u:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
-    v:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
-    w:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.array([0.2, 0.1, 1E-12]))
+    u:                      jnp.ndarray  = init_field(lambda: jnp.array([0.2, 0.1, 1E-12]))
+    v:                      jnp.ndarray  = init_field(lambda: jnp.array([0.2, 0.1, 1E-12]))
+    w:                      jnp.ndarray  = init_field(lambda: jnp.array([0.2, 0.1, 1E-12]))
 
-    pitch_rate:             jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
-    roll_rate:              jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
-    yaw_rate:               jnp.ndarray  = eqx.field(default_factory=lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
+    pitch_rate:             jnp.ndarray  = init_field(lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
+    roll_rate:              jnp.ndarray  = init_field(lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
+    yaw_rate:               jnp.ndarray  = init_field(lambda:jnp.array([0.3, 0.15, 0.0])  * Units.rad / Units.s)
 
     def fit(self, *args, **kwargs):
         return self.surrogate.fit(*args, **kwargs)
@@ -146,22 +146,22 @@ class Surrogate(eqx.Module):
 
 class Vortices(eqx.Module):
 
-    model_fuselage:             bool = eqx.field(static=True, default=False)
-    verbose:                    bool = eqx.field(static=True, default=False)
+    model_fuselage:             bool = init_field(False, static=True)
+    verbose:                    bool = init_field(False, static=True)
     
     # Discretization Inputs (Optional, so the user can choose which to define)
-    spanwise_cosine:    bool = eqx.field(static=True, default=True)
-    chordwise_cosine:   bool = eqx.field(static=True, default=False) # Currently unsupported
+    spanwise_cosine:    bool = init_field(True, static=True)
+    chordwise_cosine:   bool = init_field(False, static=True) # Currently unsupported
 
-    n_spanwise:         Optional[Iterable[int] | int] = eqx.field(static=True, default=8)  # Min value is number of wing segments (possibly more for control surfaces)
-    n_chordwise:        Optional[Iterable[int] | int] = eqx.field(static=True, default=3)  # Min value 3 to allow front and rear control surfaces
+    n_spanwise:         Optional[Iterable[int] | int] = init_field(8, static=True)  # Min value is number of wing segments (possibly more for control surfaces)
+    n_chordwise:        Optional[Iterable[int] | int] = init_field(3, static=True)  # Min value 3 to allow front and rear control surfaces
     
     # Can set separate values for each wing/fuselage (ex. [8, 4] for [wing, stab] and [4, 2] for [fuselage, nacelle]), else uses global value above
-    wings_n_spanwise:   Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
-    wings_n_chordwise:  Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
+    wings_n_spanwise:   Optional[Iterable[int] | int] = init_field(None, static=True)
+    wings_n_chordwise:  Optional[Iterable[int] | int] = init_field(None, static=True)
 
-    bodies_n_spanwise:  Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
-    bodies_n_chordwise: Optional[Iterable[int] | int] = eqx.field(static=True, default=None)
+    bodies_n_spanwise:  Optional[Iterable[int] | int] = init_field(None, static=True)
+    bodies_n_chordwise: Optional[Iterable[int] | int] = init_field(None, static=True)
 
     def __post_init__(self):
         """Validates discretization inputs and resolves global vs separate routing."""
@@ -199,14 +199,14 @@ class Vortices(eqx.Module):
             object.__setattr__(self, 'bodies_n_chordwise', self.n_chordwise)
 
 
-class VLMSettings(eqx.Module):
+class VORJAX_Settings(eqx.Module):
 
-    model_fuselage:             bool    = eqx.field(static=True, default=False)
-    trim_aircraft:              bool    = eqx.field(static=True, default=False)
+    model_fuselage:             bool    = init_field(False, static=True)
+    trim_aircraft:              bool    = init_field(False, static=True)
 
-    recalculate_wetted_area:    bool    = eqx.field(static=True, default=False)
-    model_propeller_wake:       bool    = eqx.field(static=True, default=False)
-    near_field_drag:            bool    = eqx.field(static=True, default=False)
+    recalculate_wetted_area:    bool    = init_field(False, static=True)
+    model_propeller_wake:       bool    = init_field(False, static=True)
+    near_field_drag:            bool    = init_field(False, static=True)
 
     CL_max:                     float   = jnp.inf
     CD_increment:               float   = 0.0
@@ -214,12 +214,12 @@ class VLMSettings(eqx.Module):
 
     # Sub-Settings
 
-    vortices:       Vortices                = eqx.field(default_factory=Vortices)
+    vortices:       Vortices                = init_field(Vortices)
 
-    supersonic:     SupersonicSettings      = eqx.field(default_factory=SupersonicSettings)
-    corrections:    CorrectionFactors       = eqx.field(default_factory=CorrectionFactors)
-    form_factors:   FormFactors             = eqx.field(default_factory=FormFactors)
-    surrogate:      Surrogate               = eqx.field(default_factory=Surrogate)
+    supersonic:     SupersonicSettings      = init_field(SupersonicSettings)
+    corrections:    CorrectionFactors       = init_field(CorrectionFactors)
+    form_factors:   FormFactors             = init_field(FormFactors)
+    surrogate:      Surrogate               = init_field(Surrogate)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
@@ -234,8 +234,8 @@ def _default_VORJAX_init_steps():
 
 class InitializeVORJAX(Process):
     
-    tag: str = eqx.field(static=True, default="Initialize VORJAX")
-    steps: tuple = eqx.field(default_factory=_default_VORJAX_init_steps)
+    tag: str = init_field("Initialize VORJAX", static=True)
+    steps: tuple = init_field(_default_VORJAX_init_steps)
 
 # ----------------------------------------------------------
 #  VORJAX Compute Process
@@ -256,14 +256,14 @@ def _default_VORJAX_compute_steps():
 
 class ComputeVORJAX(Process):
 
-    tag: str = eqx.field(static=True, default="Compute VORJAX")
+    tag: str = init_field("Compute VORJAX", static=True)
 
-    steps: tuple = eqx.field(default_factory=_default_VORJAX_compute_steps)
+    steps: tuple = init_field(_default_VORJAX_compute_steps)
 
 
 class VORJAX(Process):
-    tag: str = eqx.field(static=True, default="Aerodynamics")
-    steps: tuple = eqx.field(default_factory=lambda: (InitializeVORJAX(), ComputeVORJAX()))
+    tag: str = init_field("Aerodynamics", static=True)
+    steps: tuple = init_field(lambda: (InitializeVORJAX(), ComputeVORJAX()))
 
     # TODO: Add full drag, trimming, stability analysis
 

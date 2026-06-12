@@ -21,7 +21,7 @@ from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, Wi
 from RCAIDE.Framework import Aircraft, Settings, GradientMap
 from RCAIDE.Framework.Settings import AnalysisSettings
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings, Vortices, BatchVORJAX
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data
@@ -257,7 +257,7 @@ if __name__ == "__main__":
                 drag_path
             ))
 
-        aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+        aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
         analysis_settings = AnalysisSettings(
             aerodynamics=aero_settings,
             gradient_map=GRAD_MAP

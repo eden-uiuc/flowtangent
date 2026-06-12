@@ -11,7 +11,8 @@
 import jax.numpy as jnp
 import equinox as eqx
 
-# RCAIDE imports  
+# RCAIDE imports
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library import Component, ComponentDimensions, ComponentFineness, ComponentAreas
  
 # ---------------------------------------------------------------------------------------------------------------------- 
@@ -33,7 +34,7 @@ class FuselageLengths(ComponentDimensions):
     cabin: float                = 0.0
     fore_space: float           = 0.0
     aft_space: float            = 0.0
-    ordinal_direction: bool     = eqx.field(static=True, default=True)
+    ordinal_direction: bool     = init_field(True, static=True)
 
 class FuselageSegment(Component):
 
@@ -42,18 +43,18 @@ class FuselageSegment(Component):
 
 class Fuselage(Component):
 
-    aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
-    number_of_seats:        int     = eqx.field(static=True, default=1)
-    seats_abreast:          int     = eqx.field(static=True, default=0)
-    seat_pitch:             float   = eqx.field(static=True, default=0.0)
-    differential_pressure:  float   = eqx.field(static=True, default=0.0)
+    number_of_seats:        int     = init_field(1, static=True)
+    seats_abreast:          int     = init_field(0, static=True)
+    seat_pitch:             float   = init_field(0.0, static=True)
+    differential_pressure:  float   = init_field(0.0, static=True)
 
-    heights: ComponentDimensions    = eqx.field(default_factory=FuselageHeights)
-    lengths: ComponentDimensions    = eqx.field(default_factory=FuselageLengths)
+    heights: ComponentDimensions    = init_field(FuselageHeights)
+    lengths: ComponentDimensions    = init_field(FuselageLengths)
 
-    diameters:  ComponentDimensions = eqx.field(default_factory=ComponentDimensions)
-    fineness:   ComponentFineness   = eqx.field(default_factory=ComponentFineness)
+    diameters:  ComponentDimensions = init_field(ComponentDimensions)
+    fineness:   ComponentFineness   = init_field(ComponentFineness)
 
 # ---------------------------------------------------------------------------------------------------------------------- 
 #  BWB Fuselage
@@ -65,8 +66,8 @@ class BWBAreas(ComponentAreas):
 
 class BWBFuselage(Fuselage):
 
-    tag: str = eqx.field(static=True, default="BWB Fuselage")
+    tag: str = init_field("BWB Fuselage", static=True)
 
-    aft_centerbody_taper: float = eqx.field(static=True, default=0.0)
+    aft_centerbody_taper: float = init_field(0.0, static=True)
 
-    areas: BWBAreas = eqx.field(default_factory=BWBAreas) # type: ignore
+    areas: BWBAreas = init_field(BWBAreas) # type: ignore

@@ -12,7 +12,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-
+from RCAIDE.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Gases
@@ -20,24 +20,24 @@ import jax.numpy as jnp
 
 class GasComposition(eqx.Module):
 
-    elements: tuple[str]            = eqx.field(default_factory=tuple)
-    mass_fractions: tuple[float]    = eqx.field(default_factory=tuple)
+    elements: tuple[str]            = init_field(tuple)
+    mass_fractions: tuple[float]    = init_field(tuple)
 
 
 class Gas(eqx.Module):
 
-    tag:                    str     = eqx.field(static=True, default='Gas')
-    molecular_mass:         float   = eqx.field(static=True, default=0.0)
-    molar_mass:             float   = eqx.field(static=True, default=0.0)
-    R:                      float   = eqx.field(static=True, default=8.314462)  # ideal gas constant (J/(mol·K))
-    R_specific:             float   = eqx.field(static=True, default=0.0)
-    specific_heat_capacity: float   = eqx.field(static=True, default=0.0)
+    tag:                    str     = init_field('Gas', static=True)
+    molecular_mass:         float   = init_field(0.0, static=True)
+    molar_mass:             float   = init_field(0.0, static=True)
+    R:                      float   = init_field(8.314462, static=True)  # ideal gas constant (J/(mol·K))
+    R_specific:             float   = init_field(0.0, static=True)
+    specific_heat_capacity: float   = init_field(0.0, static=True)
 
-    gamma_coefficients:     tuple = eqx.field(default_factory=tuple)
-    Cp_coefficients:        tuple = eqx.field(default_factory=tuple)
-    thermal_coefficients:   tuple = eqx.field(default_factory=tuple)
+    gamma_coefficients:     tuple = init_field(tuple)
+    Cp_coefficients:        tuple = init_field(tuple)
+    thermal_coefficients:   tuple = init_field(tuple)
 
-    composition:            GasComposition = eqx.field(default_factory=GasComposition)
+    composition:            GasComposition = init_field(GasComposition)
 
     def __post_init__(self):
         self.molar_mass = self.R / self.R_specific
@@ -72,15 +72,15 @@ def _air_composition():
 
 class Air(Gas):
 
-    name                   : str = eqx.field(static=True, default='Air')
-    molecular_mass         : float = eqx.field(static=True, default=28.96442)
-    R_specific             : float = eqx.field(static=True, default=287.0528742)
-    specific_heat_capacity : float = eqx.field(static=True, default=1006.)
-    Cp_coefficients        : tuple[float] = eqx.field(static=True, default=(-7.357e-7, 0.001307, -0.5558, 1074.0))
-    gamma_coefficients     : tuple[float] = eqx.field(static=True, default=(1.629e-10, -3.588e-7, 0.0001418, 1.386))
-    thermal_coefficients   : tuple[float] = eqx.field(static=True, default=(1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4))
+    name                   : str = init_field('Air', static=True)
+    molecular_mass         : float = init_field(28.96442, static=True)
+    R_specific             : float = init_field(287.0528742, static=True)
+    specific_heat_capacity : float = init_field(1006., static=True)
+    Cp_coefficients        : tuple[float] = init_field((-7.357e-7, 0.001307, -0.5558, 1074.0), static=True)
+    gamma_coefficients     : tuple[float] = init_field((1.629e-10, -3.588e-7, 0.0001418, 1.386), static=True)
+    thermal_coefficients   : tuple[float] = init_field((1.4e-11, -4.57e-8, 9.89e-5, 3.99e-4), static=True)
 
-    composition:            GasComposition  = eqx.field(static=True, default_factory=_air_composition)
+    composition:            GasComposition  = init_field(_air_composition, static=True)
 
     def compute_absolute_viscosity(self, T: float|jnp.ndarray=298.):
         return 1.458e-6 * (T ** 1.5) / (T + 110.4)
@@ -93,13 +93,13 @@ def _steam_composition():
 
 class Steam(Gas):
 
-    name                : str            = eqx.field(static=True, default='Steam')
-    molecular_mass      : float          = eqx.field(static=True, default=18.0)
-    R_specific          : float          = eqx.field(static=True, default=461.889)
-    gamma_coefficients  : tuple[float]   = eqx.field(static=True, default=(1.33))
-    Cp_coefficients     : tuple[float]   = eqx.field(static=True, default=(5e-9, 1e-4, .9202, 1524.7))
+    name                : str            = init_field('Steam', static=True)
+    molecular_mass      : float          = init_field(18.0, static=True)
+    R_specific          : float          = init_field(461.889, static=True)
+    gamma_coefficients  : tuple[float]   = init_field((1.33), static=True)
+    Cp_coefficients     : tuple[float]   = init_field((5e-9, 1e-4, .9202, 1524.7), static=True)
 
-    composition         : GasComposition = eqx.field(static=True, default_factory=_steam_composition)
+    composition         : GasComposition = init_field(_steam_composition, static=True)
 
     def compute_absolute_viscosity(self, T=298.):
 
@@ -116,12 +116,12 @@ def _C02_composition():
 
 class CO2(Gas):
 
-    name                    : str   = eqx.field(static=True, default='Carbon Dioxide')
-    molecular_mass          : float = eqx.field(static=True, default=44.01)
-    R_specific              : float = eqx.field(static=True, default=188.9)
-    specific_heat_capacity  : float = eqx.field(static=True, default=839.)
+    name                    : str   = init_field('Carbon Dioxide', static=True)
+    molecular_mass          : float = init_field(44.01, static=True)
+    R_specific              : float = init_field(188.9, static=True)
+    specific_heat_capacity  : float = init_field(839., static=True)
 
-    composition              : GasComposition = eqx.field(static=True, default_factory=_C02_composition)
+    composition              : GasComposition = init_field(_C02_composition, static=True)
 
     def compute_gamma(self, T=298.15):
         raise NotImplementedError('Compute gamma not implemented for carbon dioxide.')
@@ -143,10 +143,10 @@ class CO2(Gas):
 
 class O2(Gas):
 
-    name                    : str   = eqx.field(static=True, default='Oxygen')
-    molecular_mass          : float = eqx.field(static=True, default=32.00)
-    R_specific              : float = eqx.field(static=True, default=259.84)
-    specific_heat_capacity  : float = eqx.field(static=True, default=918.)
+    name                    : str   = init_field('Oxygen', static=True)
+    molecular_mass          : float = init_field(32.00, static=True)
+    R_specific              : float = init_field(259.84, static=True)
+    specific_heat_capacity  : float = init_field(918., static=True)
 
 
 

@@ -15,6 +15,7 @@ import equinox as eqx
 from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Framework import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -39,14 +40,14 @@ class SizingFractions(eqx.Module):
 
 class MassAnalysisSettings(eqx.Module):
 
-    reduction_factors: ReductionFactors = eqx.field(default_factory=ReductionFactors)
+    reduction_factors: ReductionFactors = init_field(ReductionFactors)
 
 class AnalysisSettings(eqx.Module):
 
     aerodynamics: Optional[eqx.Module] = None
-    mass: Optional[MassAnalysisSettings] = eqx.field(default_factory=MassAnalysisSettings)
+    mass: Optional[MassAnalysisSettings] = init_field(MassAnalysisSettings)
 
-    gradient_map: Optional[GradientMap] = eqx.field(static=True, default=None)
+    gradient_map: Optional[GradientMap] = init_field(None, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mission Settings
@@ -57,7 +58,7 @@ RootFinders = ScipyRootFinding | Broyden | GaussNewton
 
 class MissionSettings(eqx.Module):
 
-    root_finder:    RootFinders         = eqx.field(static=True, default=GaussNewton)
+    root_finder:    RootFinders         = init_field(GaussNewton, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Full Settings
@@ -65,14 +66,14 @@ class MissionSettings(eqx.Module):
 
 class Settings(eqx.Module):
 
-    tag:                str                 = eqx.field(static=True, default='Settings')
+    tag:                str                 = init_field('Settings', static=True)
 
-    analysis:           AnalysisSettings    = eqx.field(default_factory=AnalysisSettings)
-    mission:            MissionSettings     = eqx.field(default_factory=MissionSettings)
+    analysis:           AnalysisSettings    = init_field(AnalysisSettings)
+    mission:            MissionSettings     = init_field(MissionSettings)
 
-    DEBUG_MODE:         bool                = eqx.field(static=True, default=False)
-    verbose:            bool                = eqx.field(static=True, default=False)
-    JAX_device_index:   int                 = eqx.field(static=True, default=0)
+    DEBUG_MODE:         bool                = init_field(False, static=True)
+    verbose:            bool                = init_field(False, static=True)
+    JAX_device_index:   int                 = init_field(0, static=True)
 
 
     def __post_init__(self):

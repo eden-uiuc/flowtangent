@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 from RCAIDE.Library.Components.Energy.Converters import EnergyConverter
@@ -28,9 +29,9 @@ if TYPE_CHECKING:
 
 class EnergyLine(Component):
 
-    propulsors:     Component = eqx.field(default_factory=lambda: Component(tag='Propulsors'))
-    converters:     Component = eqx.field(default_factory=lambda: Component(tag='Converters'))
-    stores:         Component = eqx.field(default_factory=lambda: Component(tag='Stores'))
+    propulsors:     Component = init_field(lambda: Component(tag='Propulsors'))
+    converters:     Component = init_field(lambda: Component(tag='Converters'))
+    stores:         Component = init_field(lambda: Component(tag='Stores'))
 
     def add_subcomponent(
             self,
@@ -61,11 +62,11 @@ class EnergyLine(Component):
 
 class EnergyNetwork(Component):
 
-    tag: str = eqx.field(static=True, default='Energy Network')
+    tag: str = init_field('Energy Network', static=True)
 
     efficiency: float = 1.0
 
-    lines: Component = eqx.field(default_factory=lambda: Component(tag='Lines'))
+    lines: Component = init_field(lambda: Component(tag='Lines'))
 
 
     @staticmethod

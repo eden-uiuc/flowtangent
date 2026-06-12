@@ -11,7 +11,9 @@
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Converter
@@ -21,6 +23,8 @@ from RCAIDE.Library import Component
 class EnergyConverter(Component):
 
     efficiency:                 float = 1.0
+
+class EnergySplitter()
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsor Subcomponents
@@ -40,10 +44,13 @@ class FlowConverter(EnergyConverter):
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
 
+    def convert(self, *args, **kwargs):
+        return 
+
 
 class OfftakeShaft(EnergyConverter):
 
-    tag: str = eqx.field(static=True, default="Offtake Shaft")
+    tag: str = init_field("Offtake Shaft", static=True)
 
     power_draw:             float = 0.0
     reference_temperature:  float = 298.15      # Kelvin

@@ -14,6 +14,7 @@ from typing import Literal
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Units
 
 #-------------------------------------------------------------------------------
@@ -24,29 +25,29 @@ ControlType = Literal["full_powered", "partially_powered", "full_aerodynamic"]
 
 class FixedMasses(eqx.Module):
 
-    flight_crew_mass            : float = eqx.field(static=True, default=0.)
-    flight_attendants_mass      : float = eqx.field(static=True, default=0.)
-    instruments_mass            : float = eqx.field(static=True, default=0.)
-    avionics_mass               : float = eqx.field(static=True, default=0.)
-    apu_mass                    : float = eqx.field(static=True, default=0.)
-    flight_control_mass         : float = eqx.field(static=True, default=0.)
-    hyd_pnu_mass                : float = eqx.field(static=True, default=0.)
+    flight_crew_mass            : float = init_field(0., static=True)
+    flight_attendants_mass      : float = init_field(0., static=True)
+    instruments_mass            : float = init_field(0., static=True)
+    avionics_mass               : float = init_field(0., static=True)
+    apu_mass                    : float = init_field(0., static=True)
+    flight_control_mass         : float = init_field(0., static=True)
+    hyd_pnu_mass                : float = init_field(0., static=True)
 
 class PerSeatMasses(eqx.Module):
 
-    operating_items_mass        : float = eqx.field(static=True, default=0.)
-    electrical_equipment_mass   : float = eqx.field(static=True, default=0.)
-    environmental_mass          : float = eqx.field(static=True, default=0.)
-    furnishings_mass            : float = eqx.field(static=True, default=0.)
+    operating_items_mass        : float = init_field(0., static=True)
+    electrical_equipment_mass   : float = init_field(0., static=True)
+    environmental_mass          : float = init_field(0., static=True)
+    furnishings_mass            : float = init_field(0., static=True)
 
 class AircraftClass(eqx.Module):
 
-    tag             : str           = eqx.field(static=True, default="Aircraft Class")
+    tag             : str           = init_field("Aircraft Class", static=True)
 
-    control_type    : ControlType   = eqx.field(static=True, default="full_powered")
+    control_type    : ControlType   = init_field("full_powered", static=True)
 
-    fixed_masses    : FixedMasses   = eqx.field(static=True, default_factory=FixedMasses)
-    per_seat_masses : PerSeatMasses = eqx.field(static=True, default_factory=PerSeatMasses)
+    fixed_masses    : FixedMasses   = init_field(FixedMasses, static=True)
+    per_seat_masses : PerSeatMasses = init_field(PerSeatMasses, static=True)
 
 #-------------------------------------------------------------------------------
 # Business Jet
@@ -73,10 +74,10 @@ def _BizJetPer():
 
 class BusinessJet(AircraftClass):
 
-    tag             : str           = eqx.field(static=True, default="Business Jet")
+    tag             : str           = init_field("Business Jet", static=True)
 
-    fixed_masses    : FixedMasses   = eqx.field(static=True, default_factory=_BizJetFixed)
-    per_seat_masses : PerSeatMasses = eqx.field(static=True, default_factory=_BizJetPer)
+    fixed_masses    : FixedMasses   = init_field(_BizJetFixed, static=True)
+    per_seat_masses : PerSeatMasses = init_field(_BizJetPer, static=True)
 
 #-------------------------------------------------------------------------------
 # Medium Range
@@ -103,7 +104,7 @@ def _MRPer():
 
 class MediumRange(AircraftClass):
 
-    tag             : str           = eqx.field(static=True, default="Medium Range Jet")
+    tag             : str           = init_field("Medium Range Jet", static=True)
 
-    fixed_masses    : FixedMasses   = eqx.field(static=True, default_factory=_MRFixed)
-    per_seat_masses : PerSeatMasses = eqx.field(static=True, default_factory=_MRPer)
+    fixed_masses    : FixedMasses   = init_field(_MRFixed, static=True)
+    per_seat_masses : PerSeatMasses = init_field(_MRPer, static=True)

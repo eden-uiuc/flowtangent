@@ -15,12 +15,14 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
+# RCAIDE imports
 if TYPE_CHECKING:
     from RCAIDE.Framework import System
     from RCAIDE.Library import Component
 
 import RCAIDE.Library.Components
-# RCAIDE imports
+
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Framework.Missions.Conditions import (
     Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
     AerodynamicsConditions, StabilityConditions, ControlsConditions, DynamicsConditions)
@@ -31,32 +33,32 @@ from RCAIDE.Framework.Missions.Conditions import (
 
 class SolverConditions(Conditions):
 
-    tag: str = eqx.field(static=True, default='Solver Conditions')
+    tag: str = init_field('Solver Conditions', static=True)
 
-    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
-    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    unknowns:           jnp.ndarray                 = empty_array(0)
+    residuals:          jnp.ndarray                 = empty_array(0)
     
 
 class State(Conditions):
 
     # Attribute         Type                        Default Value
-    tag:                str                         = eqx.field(static=True, default='State')
+    tag:                str                         = init_field('State', static=True)
     
     initials:           eqx.Module | None           = None
-    numerics:           Numerics                    = eqx.field(default_factory=Numerics)
+    numerics:           Numerics                    = init_field(Numerics)
 
-    frames:             FrameConditions             = eqx.field(default_factory=FrameConditions)
-    freestream:         FreestreamConditions        = eqx.field(default_factory=FreestreamConditions)
+    frames:             FrameConditions             = init_field(FrameConditions)
+    freestream:         FreestreamConditions        = init_field(FreestreamConditions)
 
-    mass:               MassConditions              = eqx.field(default_factory=MassConditions)
-    energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
-    aerodynamics:       AerodynamicsConditions      = eqx.field(default_factory=AerodynamicsConditions)
-    stability:          StabilityConditions         = eqx.field(default_factory=StabilityConditions)
+    mass:               MassConditions              = init_field(MassConditions)
+    energy:             EnergyNetworkConditions     = init_field(EnergyNetworkConditions)
+    aerodynamics:       AerodynamicsConditions      = init_field(AerodynamicsConditions)
+    stability:          StabilityConditions         = init_field(StabilityConditions)
 
-    controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
-    dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
+    controls:           ControlsConditions          = init_field(ControlsConditions)
+    dynamics:           DynamicsConditions          = init_field(DynamicsConditions)
 
-    solver:             SolverConditions            = eqx.field(default_factory=SolverConditions)
+    solver:             SolverConditions            = init_field(SolverConditions)
 
     
 

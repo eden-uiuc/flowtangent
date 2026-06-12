@@ -32,7 +32,7 @@ from numcodecs import Blosc
 from tqdm import trange
 
 # RCAIDE imports
-from RCAIDE.utils import Token, PathTuple
+from RCAIDE.utils import Token, PathTuple, init_field
 import RCAIDE.utils as ru
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
@@ -43,8 +43,8 @@ def null_step(*args):
 
 class ProcessStep(eqx.Module):
 
-    function:       Callable | str     = eqx.field(static=True, default=null_step)
-    tag:            str                = eqx.field(static=True, default="Process Step")
+    function:       Callable | str     = init_field(null_step, static=True)
+    tag:            str                = init_field("Process Step", static=True)
 
     state_delta:          State | None     = None
     system_delta:         System | None    = None
@@ -226,18 +226,18 @@ class GradientMap:
 
 class Process(ProcessStep):
 
-    tag:                str                     = eqx.field(static=True, default="Process")
+    tag:                str                     = init_field("Process", static=True)
 
-    steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
+    steps:              tuple[ProcessStep, ...] = init_field(tuple)
 
-    initial_step:       int                     = eqx.field(static=True, default=0)
+    initial_step:       int                     = init_field(0, static=True)
 
     initial_state:      Optional[State]     = None
     initial_system:     Optional[System]    = None
     initial_settings:   Optional[Settings]  = None
 
-    _val_and_jac_fn:    Optional[Callable]      = eqx.field(static=True, default=None)
-    _cached_grad_map:   Optional[GradientMap]   = eqx.field(static=True, default=None)
+    _val_and_jac_fn:    Optional[Callable]      = init_field(None, static=True)
+    _cached_grad_map:   Optional[GradientMap]   = init_field(None, static=True)
 
     def __getitem__(self, item):
         if isinstance(item, str):

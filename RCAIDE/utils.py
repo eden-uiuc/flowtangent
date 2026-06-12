@@ -10,7 +10,7 @@
 
 import os
 
-from typing import TYPE_CHECKING, Self, Callable
+from typing import TYPE_CHECKING, Self, Callable, Any
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +27,33 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------------------------------------------------------
 #  Utility Functions
 # ----------------------------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------
+# Syntax Helpers
+#----------------------------------------------------------
+
+def init_field(initializer: Any, **kwargs):
+    """
+    Smart wrapper for eqx.field that automatically routes the initializer 
+    to `default` (for immutables) or `default_factory` (for classes/callables).
+    """
+    # Handle factories and classes (e.g., list, dict, MediumRange)
+    if callable(initializer):
+        return eqx.field(default_factory=initializer, **kwargs)
+    
+    # Guardrail: Catch accidentally instantiated mutable defaults
+    if isinstance(initializer, (list, dict, set)):
+        raise ValueError(
+            f"Mutable instance {initializer} passed to init_field. "
+            "Pass the uninstantiated class (e.g., list) or a lambda instead."
+        )
+        
+    # Handle static/immutable defaults (e.g., 'Aircraft', 0.0, (1, 2))
+    return eqx.field(default=initializer, **kwargs)
+
+def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
+    """Syntactic sugar for an empty JAX array in an Equinox module."""
+    return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
 # ---------------------------------------------------------
 # Programmatic Helpers

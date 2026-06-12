@@ -10,9 +10,9 @@
 import jax.numpy as jnp
 import equinox as eqx
 
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library import Component, ComponentDimensions, ComponentAreas
 from RCAIDE.Library.Components.Airfoils import Airfoil
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing
@@ -38,9 +38,9 @@ class WingChords(WingDimensions):
 
 class WingSegment(Component):
 
-    tag: str = eqx.field(static=True, default='Wing Segment')
+    tag: str = init_field('Wing Segment', static=True)
     airfoil: Airfoil | None = None
-    control_surfaces: tuple = eqx.field(default_factory=tuple)
+    control_surfaces: tuple = init_field(tuple)
 
     # Specialty Attributes
 
@@ -50,8 +50,8 @@ class WingSegment(Component):
     twist: float = 0.0
     dihedral_outboard: float = 0.0
 
-    sweeps: WingSweeps = eqx.field(default_factory=WingSweeps)
-    chords: WingChords = eqx.field(default_factory=WingChords)
+    sweeps: WingSweeps = init_field(WingSweeps)
+    chords: WingChords = init_field(WingChords)
 
     @property
     def taper(self):
@@ -68,7 +68,7 @@ class WingSegment(Component):
 
 class WingControlSurface(Component):
 
-    tag: str = eqx.field(static=True, default='Wing Control Surface')
+    tag: str = init_field('Wing Control Surface', static=True)
 
     span_fraction_start: float  = 0.0
     span_fraction_end: float    = 0.0
@@ -81,7 +81,7 @@ class WingControlSurface(Component):
 
     sign_duplicate: float       = 1.0
     deflection: float           = 0.0
-    configuration_type: str     = eqx.field(static=True, default='single_slotted')
+    configuration_type: str     = init_field('single_slotted', static=True)
 
     gain: float                 = 1.0  # deflection multiplier used only for AVL
 
@@ -93,19 +93,19 @@ class WingControlSurface(Component):
 
 class Wing(Component):
 
-    tag:                str             = eqx.field(static=True, default='Wing')
+    tag:                str             = init_field('Wing', static=True)
     airfoil:            Airfoil | None  = None
-    control_surfaces:   Component       = eqx.field(default_factory=lambda: Component(tag='Control Surfaces'))
+    control_surfaces:   Component       = init_field(lambda: Component(tag='Control Surfaces'))
 
     # Specialty Attributes
 
-    symmetric: bool     = eqx.field(static=True, default=True)
-    vertical: bool      = eqx.field(static=True, default=False)
-    t_tail: bool        = eqx.field(static=True, default=False)
-    high_lift: bool     = eqx.field(static=True, default=False)
-    symbolic: bool      = eqx.field(static=True, default=False)
-    high_mach: bool     = eqx.field(static=True, default=False)
-    vortex_lift: bool   = eqx.field(static=True, default=False)
+    symmetric: bool     = init_field(True, static=True)
+    vertical: bool      = init_field(False, static=True)
+    t_tail: bool        = init_field(False, static=True)
+    high_lift: bool     = init_field(False, static=True)
+    symbolic: bool      = init_field(False, static=True)
+    high_mach: bool     = init_field(False, static=True)
+    vortex_lift: bool   = init_field(False, static=True)
 
     taper:                      float   = 0.0
     dihedral:                   float   = 0.0
@@ -113,19 +113,19 @@ class Wing(Component):
     thickness_to_chord:         float   = 0.0
     exposed_root_chord_offset:  float   = 0.0
 
-    single_side_aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    single_side_aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
     transition_x_upper: float = 0.0
     transition_x_lower: float = 0.0
 
     dynamic_pressure_ratio: float = 0.0
 
-    aerodynamic_center: jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
-    spans:  WingDimensions  = eqx.field(default_factory=lambda: WingDimensions(ordinal_direction=True))
-    twists: WingDimensions  = eqx.field(default_factory=WingDimensions)
-    chords: WingChords      = eqx.field(default_factory=WingDimensions)
-    sweeps: WingSweeps      = eqx.field(default_factory=WingSweeps)
+    spans:  WingDimensions  = init_field(lambda: WingDimensions(ordinal_direction=True))
+    twists: WingDimensions  = init_field(WingDimensions)
+    chords: WingChords      = init_field(WingDimensions)
+    sweeps: WingSweeps      = init_field(WingSweeps)
 
     def __post_init__(self):
         new_taper, new_chords = self.validate_chords()

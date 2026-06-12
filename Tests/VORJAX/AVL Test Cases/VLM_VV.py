@@ -28,7 +28,7 @@ from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.System import Aircraft
 from RCAIDE.Framework.Missions.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices, SupersonicSettings
+from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -402,7 +402,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
         end_blend_mach=1.2
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, le_suction_correction=True)
+    aero_settings = VORJAX_Settings(vortices=vortices, supersonic=mach_settings, le_suction_correction=True)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(

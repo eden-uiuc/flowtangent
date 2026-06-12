@@ -7,6 +7,7 @@
 
 # package imports
 import equinox as eqx
+from RCAIDE.utils import init_field
 
 #-------------------------------------------------------------------------------
 # Solid Data Class
@@ -15,14 +16,14 @@ import equinox as eqx
 
 class Solid(eqx.Module):
 
-    ultimate_tensile_strength:  float | None = eqx.field(static=True, default=None)
-    ultimate_shear_strength:    float | None = eqx.field(static=True, default=None)
-    ultimate_bearing_strength:  float | None = eqx.field(static=True, default=None)
-    yield_tensile_strength:     float | None = eqx.field(static=True, default=None)
-    yield_shear_strength:       float | None = eqx.field(static=True, default=None)
-    yield_bearing_strength:     float | None = eqx.field(static=True, default=None)
-    minimum_gage_thickness:     float | None = eqx.field(static=True, default=None)
-    density:                    float | None = eqx.field(static=True, default=None)
+    ultimate_tensile_strength:  float | None = init_field(None, static=True)
+    ultimate_shear_strength:    float | None = init_field(None, static=True)
+    ultimate_bearing_strength:  float | None = init_field(None, static=True)
+    yield_tensile_strength:     float | None = init_field(None, static=True)
+    yield_shear_strength:       float | None = init_field(None, static=True)
+    yield_bearing_strength:     float | None = init_field(None, static=True)
+    minimum_gage_thickness:     float | None = init_field(None, static=True)
+    density:                    float | None = init_field(None, static=True)
 
 class Aluminum(Solid):
     """
@@ -33,6 +34,6 @@ class Aluminum(Solid):
             by channeled liquid flow[J]. International journal of heat and mass transfer, 2019, 138: 1178-1187.
     """
 
-    density                    : float | None = eqx.field(static=True, default=2719)
-    thermal_conductivity       : float | None = eqx.field(static=True, default=202.4)
-    specific_heat_capacity     : float | None = eqx.field(static=True, default=871)
+    density                    : float | None = init_field(2719, static=True)
+    thermal_conductivity       : float | None = init_field(202.4, static=True)
+    specific_heat_capacity     : float | None = init_field(871, static=True)

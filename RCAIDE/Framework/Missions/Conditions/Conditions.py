@@ -7,12 +7,12 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-
 # package imports
 import jax
 import equinox as eqx
 import jax.numpy as jnp
+
+from RCAIDE.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions
@@ -21,9 +21,9 @@ import jax.numpy as jnp
 
 class Conditions(eqx.Module):
 
-    tag: str = eqx.field(static=True, default='Conditions')
+    tag: str = init_field('Conditions', static=True)
 
-    subconditions: tuple = eqx.field(default_factory=tuple)
+    subconditions: tuple = init_field(tuple)
 
 
     def __getitem__(self, item):

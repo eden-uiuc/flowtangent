@@ -11,6 +11,7 @@
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Component, MassProperties
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,7 +21,7 @@ from RCAIDE.Library import Component, MassProperties
 
 class EnergyStore(Component):
 
-    name: str = eqx.field(static=True, default='Energy Store')
+    name: str = init_field('Energy Store', static=True)
 
     max_energy: float = 0.0
 
@@ -43,7 +44,7 @@ class FuelTank(EnergyStore):
     fuel_selector_ratio: float = 1.0
     secondary_fuel_flow: float = 0.0
 
-    mass_properties: FuelTankMass = eqx.field(default_factory=FuelTankMass) #type: ignore
+    mass_properties: FuelTankMass = init_field(FuelTankMass) #type: ignore
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Battery
@@ -60,7 +61,7 @@ class BatteryRagoneParameters(eqx.Module):
 
 class Battery(EnergyStore):
 
-    tag: str = eqx.field(static=True, default='Battery')
+    tag: str = init_field('Battery', static=True)
 
     max_energy:     float = 0.0
     max_power:      float = 0.0
@@ -68,4 +69,4 @@ class Battery(EnergyStore):
 
     resistance:     float = 0.0
 
-    ragone: BatteryRagoneParameters = eqx.field(default_factory=BatteryRagoneParameters)
+    ragone: BatteryRagoneParameters = init_field(BatteryRagoneParameters)

@@ -12,7 +12,9 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
+from RCAIDE.utils import empty_array
 from RCAIDE.Library import Component, ComponentDimensions
+from RCAIDE.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Nacelle
@@ -26,15 +28,15 @@ class NacelleDiameters(ComponentDimensions):
 
 class Nacelle(Component):
 
-    tag:                        str     = eqx.field(static=True, default='Nacelle')
-    flow_through:               bool    = eqx.field(static=True, default=False)
-    fuselage_integrated:        bool    = eqx.field(static=True, default=False)
-    has_pylon:                  bool    = eqx.field(default=True)
+    tag:                        str     = init_field('Nacelle', static=True)
+    flow_through:               bool    = init_field(False, static=True)
+    fuselage_integrated:        bool    = init_field(False, static=True)
+    has_pylon:                  bool    = init_field(True)
 
-    aerodynamic_center:         jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
-    orientation_euler_angles:   jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty((0, 3)))
+    aerodynamic_center:         jnp.ndarray         = empty_array((0, 3))
+    orientation_euler_angles:   jnp.ndarray         = empty_array((0, 3))
 
     airfoil:                    Component | None    = None
     cowling_airfoil_angle:      float               = 0.0
 
-    diameters:                  NacelleDiameters = eqx.field(default_factory=NacelleDiameters) #type: ignore
+    diameters:                  NacelleDiameters = init_field(NacelleDiameters) #type: ignore

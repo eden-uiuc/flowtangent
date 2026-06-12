@@ -34,7 +34,7 @@ from Boeing_737 import vehicle_setup, configs_setup
 
 
 
-from Legacy.trunk.S.Input_Output.Results import  print_parasite_drag,  \
+from Legacy.trunk.S.Input_Output.Results import print_parasite_drag,  \
      print_compress_drag, \
      print_engine_data,   \
      print_mission_breakdown, \

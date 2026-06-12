@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.System import System
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 
 from RCAIDE.utils import inputs, outputs
 from RCAIDE.Library.Methods.Aerodynamics.Shocks import theta_beta_mach, oblique_shock
@@ -327,7 +327,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     )
 
     # Apply Correction Factors
-    vlm_settings: VLMSettings = settings.analysis.aerodynamics  # type: ignore
+    vlm_settings: VORJAX_Settings = settings.analysis.aerodynamics  # type: ignore
 
     CDi = jnp.where(vlm_settings.near_field_drag, CDi_near, CDi_far)
     CL = jnp.where(vlm_settings.model_fuselage, CL * vlm_settings.corrections.fuselage_lift, CL)

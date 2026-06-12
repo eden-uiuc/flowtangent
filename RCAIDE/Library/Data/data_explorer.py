@@ -19,7 +19,7 @@ from RCAIDE.Framework import Aircraft, State, Settings
 from RCAIDE.Framework.Settings import AnalysisSettings
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings, Vortices
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -118,7 +118,7 @@ def wing_generator(aspect_ratio, taper, sweep, dihedral, twist):
 
 def wing_renderer(wing_system):
 
-    aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+    aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
     analysis_settings = AnalysisSettings(
         aerodynamics=aero_settings,
     )

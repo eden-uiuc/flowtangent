@@ -13,10 +13,13 @@ import dataclasses as dc
 import equinox as eqx
 
 # RCAIDE imports
+from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
 from RCAIDE.Library.Propellants import Propellant, JetA
 from RCAIDE.Library.Gases import Gas, Air
 from RCAIDE.Library.Components.Energy.Converters import EnergyConverter, FlowConverter, OfftakeShaft
+
+from RCAIDE.Library.Methods.Energy.Converters.Turbofans import func_sea_level_static_thrust
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors
@@ -26,9 +29,15 @@ from RCAIDE.Library.Components.Energy.Converters import EnergyConverter, FlowCon
 class DesignParameters(eqx.Module):
 
     total_thrust:           float = 0.0
+    delta_SFC:              float = 0.0
 
     altitude:               float = 0.0
-    mach_number:            float = 0.0
+    mach_number:            float = 0.01
+    temperature:            float   = 288.15      # Kelvin
+    total_temperature:      float   = 298.15      # Kelvin
+    pressure:               float   = 101325.0    # Pascal
+    total_pressure:         float   = 101325.0    # Pascal
+    
     isa_deviation:          float = 0.0
 
     SLS_thrust:             float = 0.0
@@ -39,9 +48,9 @@ class DesignParameters(eqx.Module):
 
 class Propulsor(EnergyConverter):
 
-    converters:                 Component           = eqx.field(default_factory=lambda: Component(tag='Propulsor Converters'))
+    converters:         Component           = init_field(lambda: Component(tag='Propulsor Converters'))
 
-    design_thrust_parameters:   DesignParameters    = eqx.field(default_factory=DesignParameters)
+    design_parameters:  DesignParameters    = init_field(DesignParameters)
 
     def compute_thrust(self):
         raise NotImplementedError("Subclasses must implement this method")
@@ -62,21 +71,15 @@ def _JetConverters():
 
 class JetEngine(Propulsor):
 
-    tag:                            str     = eqx.field(static=True, default='Jet')
+    tag:                            str     = init_field('Jet', static=True)
     plug_diameter:                  float   = 0.0
 
-    reference_temperature:          float   = 288.15      # Kelvin
-    reference_total_temperature:    float   = 298.15      # Kelvin
+    fuel:                           Propellant      = init_field(JetA)
+    working_fluid:                  Gas             = init_field(Air)
 
-    reference_pressure:             float   = 101325.0    # Pascal
-    reference_total_pressure:       float   = 101325.0    # Pascal
+    converters:                     Component       = init_field(_JetConverters)
 
-    fuel:                   Propellant      = eqx.field(default_factory=JetA)
-    working_fluid:          Gas             = eqx.field(default_factory=Air)
-
-    converters:             Component       = eqx.field(default_factory=_JetConverters)
-
-    installation_geometry:  JetInstallationGeometry     = eqx.field(default_factory=JetInstallationGeometry)
+    installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
 
 def _TurbojetConverters():
     convs = Component(tag="Turbojet Converters")
@@ -101,9 +104,9 @@ def _TurbojetConverters():
 
 class TurbojetEngine(JetEngine):
 
-    tag: str = eqx.field(static=True, default='Turbojet')
+    tag: str = init_field('Turbojet', static=True)
 
-    converters: Component = eqx.field(default_factory=_TurbojetConverters)
+    converters: Component = init_field(_TurbojetConverters)
 
 def _TurbofanConverters():
     convs = _TurbojetConverters()
@@ -115,9 +118,26 @@ def _TurbofanConverters():
 
 class TurbofanEngine(TurbojetEngine):
 
-    tag: str = eqx.field(static=True, default='Turbofan')
+    tag: str = init_field('Turbofan', static=True)
 
     bypass_ratio: float = 1.0
-    exa: float = 1.0        # Fan Face-to-Exit Distance
+    exa: float = 1.0                # Fan Face-to-Exit Distance
 
-    converters: Component = eqx.field(default_factory=_TurbofanConverters)
+    converters: Component = init_field(_TurbofanConverters)
+
+    def __post_init__(self):
+        des = self.design_parameters
+        if des.total_thrust != 0.0 and des.SLS_thrust == 0.0:
+            
+            func_sea_level_static_thrust(
+                F_ref=des.total_thrust,
+                delta_SFC=des.delta_SFC,
+                v_fan_nozzle,
+                AR_fan_nozzle,
+                P_fan_nozzle,
+                v_core_nozzle,
+                AR_core_nozzle,
+                P_core_nozzle,
+                f, # Fuel-Air Ratio
+                alpha, # Bypass Ratio
+            ):

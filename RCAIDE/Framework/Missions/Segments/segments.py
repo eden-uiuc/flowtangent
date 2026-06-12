@@ -35,6 +35,7 @@ from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 from .Profiles import *
 
+from RCAIDE.utils import init_field
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import null_step
 from RCAIDE.Framework.Missions.Initialize import *
@@ -141,12 +142,12 @@ class InitializeSegment(Process):
 
     tag: str = 'Segment Initialization'
 
-    active_controls:   tuple[str|ControlVariable, ...]  = eqx.field(default_factory=tuple)
-    active_residuals:  tuple[ResidualNames, ...]        = eqx.field(default_factory=tuple)
+    active_controls:   tuple[str|ControlVariable, ...]  = init_field(tuple)
+    active_residuals:  tuple[ResidualNames, ...]        = init_field(tuple)
 
     controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
-    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_initialization_steps)
+    steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
 
     def __call__(self, state, system, settings, validate_controls=False):
 
@@ -214,9 +215,9 @@ def _default_analyses():
 
 class AnalyzeSegment(Process):
 
-    tag: str = eqx.field(static=True, default="Segment Analysis")
+    tag: str = init_field("Segment Analysis", static=True)
 
-    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_default_analyses)
+    steps: tuple[ProcessStep, ...] = init_field(_default_analyses)
 
 
 def find_circular_references(obj, path="root", visited=None): 
@@ -266,8 +267,8 @@ def find_circular_references(obj, path="root", visited=None):
 
 class IterateSegment(Process):
 
-    tag:            str     = eqx.field(static=True, default='Segment Convergence')
-    analyze:        Process = eqx.field(default_factory=AnalyzeSegment)
+    tag:            str     = init_field('Segment Convergence', static=True)
+    analyze:        Process = init_field(AnalyzeSegment)
 
     
     def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
@@ -459,8 +460,8 @@ def _default_finalize():
 
 class FinalizeSegment(Process):
 
-    tag: str = eqx.field(static=True, default='Segment Finalization')
-    steps: tuple[ProcessStep, ...] = eqx.field(default_factory=_default_finalize)
+    tag: str = init_field('Segment Finalization', static=True)
+    steps: tuple[ProcessStep, ...] = init_field(_default_finalize)
     
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -470,18 +471,18 @@ class FinalizeSegment(Process):
 
 class Segment(Process):
 
-    tag: str = eqx.field(static=True, default="Segment")
+    tag: str = init_field("Segment", static=True)
 
     # Pass-through configuration for InitializeSegment
-    active_controls:  tuple[str | ControlVariable, ...]     = eqx.field(default_factory=tuple)
-    active_residuals: tuple[ResidualNames, ...]             = eqx.field(default_factory=tuple)
+    active_controls:  tuple[str | ControlVariable, ...]     = init_field(tuple)
+    active_residuals: tuple[ResidualNames, ...]             = init_field(tuple)
     controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
 
-    course_profile:     CourseProfile   = eqx.field(default_factory=ConstantCourse)
-    position_profile:   PositionProfile = eqx.field(default_factory=ConstantAltitude)
-    speed_profile:      SpeedProfile    = eqx.field(default_factory=ConstantSpeed)
-    velocity_profile:   VelocityProfile = eqx.field(default_factory=ConstantAltitudeChangeRate)
-    duration_profile:   DurationProfile = eqx.field(default_factory=FixedDistance)
+    course_profile:     CourseProfile   = init_field(ConstantCourse)
+    position_profile:   PositionProfile = init_field(ConstantAltitude)
+    speed_profile:      SpeedProfile    = init_field(ConstantSpeed)
+    velocity_profile:   VelocityProfile = init_field(ConstantAltitudeChangeRate)
+    duration_profile:   DurationProfile = init_field(FixedDistance)
 
     # Global dynamics variables
     sideslip_angle:         float = 0.0
@@ -489,7 +490,7 @@ class Segment(Process):
     true_course:            float = 0.0
 
     # Start with an empty tuple. We will populate it securely in __post_init__
-    steps: tuple = eqx.field(default_factory=tuple)
+    steps: tuple = init_field(tuple)
 
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones
@@ -554,7 +555,7 @@ class Segment(Process):
 
 class FixedSegment(Segment):
 
-    tag: str = eqx.field(static=True, default="Fixed Segment")
+    tag: str = init_field("Fixed Segment", static=True)
 
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones

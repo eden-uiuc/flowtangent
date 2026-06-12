@@ -14,6 +14,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Framework.Missions.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -57,8 +58,8 @@ def chebyshev_matrices(n: int = 16,
 class NumericalTime(Conditions):
 
     # Attribute     Type                Default Value
-    control_points: jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    differentiate:  jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    control_points: jnp.ndarray         = empty_array(0)
+    differentiate:  jnp.ndarray         = empty_array(0)
     integrate:      jnp.ndarray | None  = None
 
     def __repr__(self):
@@ -68,22 +69,22 @@ class NumericalTime(Conditions):
 class Numerics(Conditions):
 
     # Attribute                 Type                Default Value
-    tag:                        str                 = eqx.field(static=True, default='Numerics')
+    tag:                        str                 = init_field('Numerics', static=True)
 
-    number_of_control_points:   int                 = eqx.field(static=True, default=16)
-    control_point_spacing:      str                 = eqx.field(static=True, default='cosine')
-    calculate_integration:      bool                = eqx.field(static=True, default=True)
-    discretization_method:      Callable | None     = eqx.field(static=True, default=None)
+    number_of_control_points:   int                 = init_field(16, static=True)
+    control_point_spacing:      str                 = init_field('cosine', static=True)
+    calculate_integration:      bool                = init_field(True, static=True)
+    discretization_method:      Callable | None     = init_field(None, static=True)
 
-    solver_jacobian:            str | None          = eqx.field(static=True, default=None)
-    solution_tolerance:         float               = eqx.field(static=True, default=1e-8)
-    max_evaluations:            int                 = eqx.field(static=True, default=int(500))
-    step_size:                  float | None        = eqx.field(static=True, default=None)
+    solver_jacobian:            str | None          = init_field(None, static=True)
+    solution_tolerance:         float               = init_field(1e-8, static=True)
+    max_evaluations:            int                 = init_field(500, static=True)
+    step_size:                  float | None        = init_field(None, static=True)
     
     converged:                  bool                = False
 
-    dimensionless:              NumericalTime   = eqx.field(default_factory=lambda: NumericalTime(tag='Dimensionless Time'))
-    time:                       NumericalTime   = eqx.field(default_factory=lambda: NumericalTime(tag='Time'))
+    dimensionless:              NumericalTime   = init_field(lambda: NumericalTime(tag='Dimensionless Time'))
+    time:                       NumericalTime   = init_field(lambda: NumericalTime(tag='Time'))
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
