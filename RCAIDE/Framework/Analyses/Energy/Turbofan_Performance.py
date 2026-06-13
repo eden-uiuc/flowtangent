@@ -28,11 +28,6 @@ from RCAIDE.Library.Methods.Energy.Transmission.Shaft_Offtake import *
 def _build_turbofan_steps() -> tuple[ProcessStep, ...]:
     """Builds the static pipeline of turbofan cycle analysis steps."""
     return (
-        ProcessStep(tag="Fan", function=fan_performance),
-        ProcessStep(tag="Combustor", function=jet_combustor_transmission),
-        ProcessStep(tag="Turbine", function=turbine_performance),
-        ProcessStep(tag="Core Nozzle", function=core_nozzle_performance),
-        ProcessStep(tag="Fan Nozzle", function=fan_nozzle_performance),
         ProcessStep(tag="Thrust", function=thrust_and_power),
     )
 

@@ -18,25 +18,24 @@ if TYPE_CHECKING:
 
 
 def func_turbine_performance(
-        g,
+        gamma,
         Cp,
         f,
-        a,
-        w_c,
-        w_s,
-        w_f,
-        n_m,
+        input_work,
+        n_mech,
+        n_flow,
         T_t,
         P_t,
-        n_p,
+        
 ):
 
-        d_h_t = -1 / (1 + f) * (w_c + w_s + (a * w_f)) / n_m            # Total enthalpy drop across the turbine
+        d_h_t = -1 / (1 + f) * (input_work) / n_mech # Total enthalpy drop across the turbine
+        # d_h_t = -1 / (1 + f) * (compressor_work + shaft_work + (BPR * fan_work)) / n_mech # Total enthalpy drop across the turbine
 
-        T_t_out = T_t + d_h_t / Cp                                      # Total temperature out
-        P_t_out = P_t * (T_t_out / T_t) ** (g / ((g - 1) * n_p))        # Total pressure out
+        T_t_out = T_t + d_h_t / Cp                                              # Total temperature out
+        P_t_out = P_t * (T_t_out / T_t) ** (gamma / ((gamma - 1) * n_flow))        # Total pressure out
 
-        h_t_out = Cp * T_t_out                                          # Total enthalpy out
+        h_t_out = Cp * T_t_out                                                  # Total enthalpy out
 
         return T_t_out, P_t_out, h_t_out
 

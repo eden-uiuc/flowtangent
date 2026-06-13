@@ -88,21 +88,21 @@ def func_expansion_nozzle_performance(
     P0,
     M0,
     Cp,
-    g,
+    gamma,
     R,
     PR,
     n_p
 ):
 
-    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, g, PR, 1., n_p)
+    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1., n_p)
 
     # Supersonic Expansion
     sup = M_isn > 1
     M = np.maximum(np.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
-    P   = P_t_out / (1. + (g - 1.) / 2. * M ** 2) ** (g / (g - 1.))
+    P   = P_t_out / (1. + (gamma - 1.) / 2. * M ** 2) ** (gamma / (gamma - 1.))
     P_out = P0.at(sup).set(P)
 
-    T_out   = T_t_out / (1. + (g - 1.) / 2. * M ** 2)
+    T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M ** 2)
 
     h_t_out = Cp * T_t_out
     h_out   = Cp * T_out
@@ -117,7 +117,7 @@ def func_expansion_nozzle_performance(
 
         return m1 * M / m2
 
-    AR      = (fm(M0, g) / fm(M, g) * (1 / (P_t_out / P_t0)) * (np.sqrt(T_t_out / T_t0)))
+    AR      = (fm(M0, gamma) / fm(M, gamma) * (1 / (P_t_out / P_t0)) * (np.sqrt(T_t_out / T_t0)))
 
     return AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 

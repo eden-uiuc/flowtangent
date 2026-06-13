@@ -56,9 +56,9 @@ def func_thrust_and_power(
     
     mdot_core = (F_ref * f_core)/(F_sp * a0 * throttle)
 
-    F       = F_sp * a0 * (1 + alpha) * mdot_core * throttle                      # Dimensional Thrust
+    F       = F_sp * a0 * (1 + alpha) * mdot_core * throttle                    # Dimensional Thrust
     p       = F * u0                                                            # Power
-    ff      = np.maximum(F * TSFC / g, 0.) * 1 / 3600                          # Fuel Flow Rate
+    ff      = np.maximum(F * TSFC / g, 0.) * 1 / 3600                           # Fuel Flow Rate
 
     return F, F_sp, I_sp, TSFC, mdot_core, p, ff
 

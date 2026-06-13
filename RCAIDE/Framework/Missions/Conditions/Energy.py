@@ -21,27 +21,37 @@ from RCAIDE.Framework.Missions.Conditions import Conditions
 
 
 class MechanicalOutputs(Conditions):
-    tag = "Mechanical Interface Conditions"
+    tag = "Mechanical Outputs"
 
     work: jnp.ndarray  = empty_array(0)
+    power: 
 
 class ElectricalOutputs(Conditions):
-    tag = "Electrical Interface Conditions"
+    tag = "Electrical Outputs"
+
+    power: 
 
 class FuelOutputs(Conditions):
-    tag = "Fuel Interface Conditions"
+    tag = "Fuel Outputs"
 
-    demand: jnp.ndarray = empty_array(0)
+    demand:                 jnp.ndarray = empty_array(0)
+    fuel_air_ratio:         jnp.ndarray = empty_array(0)
+    TSFC:                   jnp.ndarray = empty_array(0)
+    fuel_flow_rate:         jnp.ndarray = empty_array(0)
 
 class FlowOutputs(Conditions):
-    tag = "Flow Interface Conditions"
+    tag = "Flow Outputs"
 
     speed:                  jnp.ndarray  = empty_array(0)
     speed_of_sound:         jnp.ndarray  = empty_array(0)
+    area_ratio:             jnp.ndarray  = empty_array(0)
+    
     pressure:               jnp.ndarray  = empty_array(0)
     temperature:            jnp.ndarray  = empty_array(0)
     density:                jnp.ndarray  = empty_array(0)
     enthalpy:               jnp.ndarray  = empty_array(0)
+
+    mass_flow_rate:         jnp.ndarray = empty_array(0)
 
     dynamic_viscosity:      jnp.ndarray  = empty_array(0)
     dynamic_pressure:       jnp.ndarray  = empty_array(0)
@@ -60,7 +70,9 @@ class FlowOutputs(Conditions):
 class ForceOutputs(Conditions):
     tag = "Force Interface Conditions"
 
-    total_force_vector: jnp.ndarray = empty_array((0, 3))
+    thrust: jnp.ndarray = empty_array(0)
+    nondimensional_thrust: jnp.ndarray = empty_array(0)
+    specific_impulse: jnp.ndarray = empty_array(0)
 
 class OutputConditions(Conditions):
 
@@ -78,6 +90,7 @@ class EnergyNodeConditions(Conditions):
     tag:                str          = init_field('Energy Node Conditions', static=True)
 
     outputs:            OutputConditions  = init_field(lambda: OutputConditions)
+    throttle:           jnp.ndarray = empty_array(0)
 
     def __post_init__(self):
         object.__setattr__(self.outputs, "tag", f"{self.tag} Outputs")

@@ -51,9 +51,17 @@ class EnergyNode(Component):
         return (self.mechanical_inputs + self.electrical_inputs + self.fuel_inputs
                 + self.self.flow_inputs + self.self.force_inputs) #type: ignore
     
-    def sum_inputs(self, state, input_field: str):
-        all_inputs = jnp.concatenate([getattr(state.energy.nodes[i], input_field) for i in self.inputs], axis=-1)
+    def _get_all_inputs(self, state, input_type: str, input_field: str):
+        output_conditions = [getattr(state.energy.nodes[i], input_type) for i in self.inputs]
+        return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
+
+    def sum_inputs(self, state, input_type: str, input_field: str):
+        all_inputs = self._get_all_inputs(state, input_type, input_field)
         return jnp.sum(all_inputs, axis=-1)
+
+    def average_inputs(self, state, input_type: str, input_field: str):
+        all_inputs = self._get_all_inputs(state, input_type, input_field)
+        return jnp.mean(all_inputs, axis=-1)
 
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError("No transmission method implemented. " \
@@ -106,11 +114,7 @@ class FlowSplitter(EnergyNode):
         
         return state
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Mechanical Nodes
+# ----------------------------------------------------------------------------------------------------------------------
 
-class OfftakeShaft(FlowNode):
-
-    tag: str = init_field("Offtake Shaft", static=True)
-
-    power_draw:             float = 0.0
-    reference_temperature:  float = 298.15      # Kelvin
-    reference_pressure:     float = 101325.0    # Pascal

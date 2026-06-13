@@ -28,10 +28,10 @@ def func_combustor_performance(
         T_t_in,
         P_t_in,
         T_t_out,
+        h_t_f,
         Cp,
         PR,
         n_b,
-        h_t_f
 ):
 
     P_t_out = P_t_in * PR                                   # Output stagnation pressure
@@ -40,7 +40,7 @@ def func_combustor_performance(
     h_t_out = Cp * T_t_out                                  # Output stagnation enthalpy
     f       = (h_t_out - h_t_in) / (n_b * h_t_f - h_t_out)  # Fuel-to-air ratio
 
-    return P_t_out, T_t_out, h_t_out, f
+    return P_t_out, h_t_out, f
 
 
 def jet_combustor_transmission(
