@@ -24,12 +24,14 @@ class MechanicalOutputs(Conditions):
     tag = "Mechanical Outputs"
 
     work: jnp.ndarray  = empty_array(0)
-    power: 
+    power: jnp.ndarray  = empty_array(0)
 
 class ElectricalOutputs(Conditions):
     tag = "Electrical Outputs"
 
-    power: 
+    power: jnp.ndarray  = empty_array(0)
+    voltage: jnp.ndarray  = empty_array(0)
+    current: jnp.ndarray  = empty_array(0)
 
 class FuelOutputs(Conditions):
     tag = "Fuel Outputs"
@@ -37,7 +39,7 @@ class FuelOutputs(Conditions):
     demand:                 jnp.ndarray = empty_array(0)
     fuel_air_ratio:         jnp.ndarray = empty_array(0)
     TSFC:                   jnp.ndarray = empty_array(0)
-    fuel_flow_rate:         jnp.ndarray = empty_array(0)
+    flow_rate:         jnp.ndarray = empty_array(0)
 
 class FlowOutputs(Conditions):
     tag = "Flow Outputs"

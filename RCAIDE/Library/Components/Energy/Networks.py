@@ -54,7 +54,7 @@ class EnergyNetwork(EnergyNode):
     def lines(self) -> tuple:
         return tuple(c for c in self.subcomponents if isinstance(c, EnergyLine))
     
-    _nodes_dict: dict[str, "EnergyNode"] = init_field(dict)
+    nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
     
     def _rebalance_flow_splitters(self) -> "EnergyNetwork":
@@ -100,7 +100,7 @@ class EnergyNetwork(EnergyNode):
                     _recurse(comp.subcomponents)
         
         _recurse(self.subcomponents)
-        return eqx.tree_at(lambda n: n._nodes_dict, self, nodes_dict)
+        return eqx.tree_at(lambda n: n.nodes, self, nodes_dict)
     
     def sort_network_topology(self) -> "EnergyNetwork":
         """The single entry point to finalize the network for execution."""
@@ -109,7 +109,7 @@ class EnergyNetwork(EnergyNode):
         updated_network = balanced_network._get_all_nodes()
         dependency_graph = {
             tag: set(node.all_causal_inputs) 
-            for tag, node in updated_network._nodes_dict.items()
+            for tag, node in updated_network.nodes.items()
         }
 
         try:
@@ -128,7 +128,7 @@ class EnergyNetwork(EnergyNode):
         
         for tag in self._execution_order:
             
-            state, system, settings = self._nodes_dict[tag].transmit(state, system, settings) 
+            state, system, settings = self.nodes[tag].transmit(state, system, settings) 
 
         return state, system, settings
 
