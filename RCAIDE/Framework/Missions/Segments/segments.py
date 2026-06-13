@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import threading
+import warnings
 import timeit
 import time
 import sys
@@ -36,6 +37,9 @@ from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 from .Profiles import *
 
 from RCAIDE.utils import init_field, PathTuple
+
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Process import null_step
 from RCAIDE.Framework.Missions.Initialize import *
@@ -540,6 +544,13 @@ class Segment(Process):
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
         
         state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
+
+        if self.analyze.energy.function is null_step:
+            if isinstance(system.energy, EnergyNetwork):
+                self.analyze.energy.function = system.energy.analyze
+                if settings.DEBUG_MODE:
+                    warnings.warn(f"No energy analysis specified for segment {self.tag}. "
+                                  "Defaulting to system energy network analysis.")
 
         if settings.DEBUG_MODE:
             for step in self.analyze.steps:

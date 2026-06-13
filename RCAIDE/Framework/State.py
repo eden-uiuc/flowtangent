@@ -60,7 +60,9 @@ class State(Conditions):
 
     solver:             SolverConditions            = init_field(SolverConditions)
 
-    
+    def __post_init__(self):
+        frozen_initials = eqx.tree_at(lambda s: s.initials, self, None, is_leaf=lambda x: x is None)
+        object.__setattr__(self, "initials", frozen_initials)
 
     def check_controls(self, verbose=True) -> bool:
         """
@@ -130,7 +132,6 @@ class State(Conditions):
             stacked_residuals = jnp.empty((0,))
 
         return eqx.tree_at(lambda s: s.solver.residuals, self, stacked_residuals)
-
 
     def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
         

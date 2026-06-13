@@ -59,7 +59,7 @@ def fan_performance(
 
             fan     = propulsor.converters.fan
             PR      = fan.pressure_ratio
-            n_p     = fan.polytropic_efficiency
+            n_p     = fan.efficiencies.flow
 
             work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 
@@ -103,7 +103,7 @@ def compressor_performance(
             for c_idx, comp in enumerate(propulsor.converters.compressors):
 
                 PR = comp.pressure_ratio
-                n_p = comp.polytropic_efficiency
+                n_p = comp.efficiencies.flow
 
                 work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 

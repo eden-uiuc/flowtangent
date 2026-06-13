@@ -49,7 +49,7 @@ from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
                                                           initialize_VLM_data, discretize_surfaces,
                                                           apply_aerodynamic_forces)
 
-from RCAIDE.Framework.Methods.Aerodynamics import (expand_component_coefficients,
+from RCAIDE.Framework.Methods.Aerodynamics import (initialize_aerodynamics,
                                                    compute_parasite_drag,
                                                    compute_viscous_induced_drag)
 
@@ -227,7 +227,7 @@ class VORJAX_Settings(eqx.Module):
 
 def _default_VORJAX_init_steps():
     return(
-        ProcessStep(expand_component_coefficients, "Initialize Component Bookkeeping"),
+        ProcessStep(initialize_aerodynamics, "Initialize Component Bookkeeping"),
         ProcessStep(initialize_VLM_data, "Initialize Data Structures"),
         ProcessStep(discretize_surfaces, "Discretize Surfaces"),
     )

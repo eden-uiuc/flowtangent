@@ -36,7 +36,7 @@ from RCAIDE.Framework.Missions.Conditions.Aerodynamics import ComponentCoefficie
     "state.aerodynamics.coefficients.[ComponentCoefficients].fuselages",
     "state.aerodynamics.coefficients.[ComponentCoefficients].nacelles"
 )
-def expand_component_coefficients(
+def initialize_aerodynamics(
     state: "State",
     system: "Aircraft",
     settings: "Settings"

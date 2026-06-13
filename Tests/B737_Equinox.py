@@ -11,27 +11,28 @@ from jax import value_and_grad, jit
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
-from RCAIDE.Framework.Missions.Conditions import Numerics
+from RCAIDE.Framework import State, System, Settings, Process
+from RCAIDE.Framework.Missions.Conditions import Numerics, FreestreamConditions
 from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
-                                                         ConstantSpeed,  # Speed Profiles
-                                                         ConstantAltitudeChangeRate,  # Velocity Profiles
-                                                         FixedDistance, FixedTime,)  # Duration Profiles
+                                                         ConstantSpeed,                     # Speed Profiles
+                                                         ConstantAltitudeChangeRate,        # Velocity Profiles
+                                                         FixedDistance, FixedTime,)         # Duration Profiles
 from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VORJAX, VORJAX_Settings, Vortices, InitializeVORJAX
+from RCAIDE.Framework.Analyses.Aerodynamics import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data
+from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data, MassProperties
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Library.Components.Fuselages import *
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
 from RCAIDE.Library.Components.Nacelles import Nacelle, NacelleDiameters
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, DesignParameters
-from RCAIDE.Library.Components.Energy.Stores import FuelTank, FuelTankMass
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbofanEnergyLine
+from RCAIDE.Library.Components.Energy.Stores import FuelTank
+from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
 
 from RCAIDE.Library.Atmospheres import USStandard1976
 # ----------------------------------------------------------------------------------------------------------------------
@@ -156,9 +157,7 @@ def vehicle_setup():
         areas=ComponentAreas(reference=124.862, wetted=225.08),
         twists=WingDimensions(root=4.0 * Units.deg, tip=0.0 * Units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
-        control_surfaces=Component(
-            tag="Main Wing Control Surfaces",
-            subcomponents=(slat, flap, aileron))
+        subcomponents=(slat, flap, aileron)
     ).update_geometry()
     
     vehicle = vehicle.add_subcomponent(main_wing)
@@ -207,8 +206,9 @@ def vehicle_setup():
         chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
         areas                   =ComponentAreas(reference=41.49, exposed=59.354, wetted=71.81),
         twists                  =WingDimensions(root=3.0 * Units.deg, tip=3.0 * Units.deg),
-        # control_surfaces        =Component("Horizontal Stabilizer Controls", subcomponents=(elevator,)),
-        segments                =(h_root_segment, h_tip_segment)).update_geometry()
+        segments                =(h_root_segment, h_tip_segment),
+        subcomponents           =(elevator,)).update_geometry()
+    
 
     vehicle = vehicle.add_subcomponent(h_stab)
 
@@ -344,9 +344,6 @@ def vehicle_setup():
     # Turbofan Engines
     # ------------------------------------------------------------------------------------------------------------------
 
-    # Energy Line ------------------------------------------------------------------------------------------------------
-    vehicle = eqx.tree_at(lambda v: v.energy.lines, vehicle, vehicle.energy.lines.add_subcomponent(TurbofanEnergyLine()))
-
     # Engine -----------------------------------------------------------------------------------------------------------
     tf = TurbofanEngine(
         tag="Engine 1",
@@ -357,23 +354,18 @@ def vehicle_setup():
         design_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
     )
 
-    # Converters -------------------------------------------------------------------------------------------------------
-    
-    cons        = tf.converters
-
     # Direct Replacement
-    cons = eqx.tree_at(
+    tf = eqx.tree_at(
         lambda c: (
-                c.inlet_nozzle.polytropic_efficiency, c.inlet_nozzle.pressure_ratio,
-                c.fan.polytropic_efficiency, c.fan.pressure_ratio,
-                c.compressors.low_pressure_compressor.polytropic_efficiency, c.compressors.low_pressure_compressor.pressure_ratio,
-                c.compressors.high_pressure_compressor.polytropic_efficiency, c.compressors.high_pressure_compressor.pressure_ratio,
-                c.turbines.high_pressure_turbine.polytropic_efficiency, c.turbines.high_pressure_turbine.mechanical_efficiency,
-                c.turbines.low_pressure_turbine.polytropic_efficiency, c.turbines.low_pressure_turbine.mechanical_efficiency,
-                c.core_nozzle.polytropic_efficiency, c.core_nozzle.pressure_ratio, c.core_nozzle.diameters.reference,
-                c.fan_nozzle.polytropic_efficiency, c.fan_nozzle.pressure_ratio, c.fan_nozzle.diameters.reference,
-            ),
-            cons,
+                tf.inlet_nozzle.efficiencies.flow, tf.inlet_nozzle.pressure_ratio,
+                tf.fan.efficiencies.flow, tf.fan.pressure_ratio,
+                tf.lpc.efficiencies.flow, tf.lpc.pressure_ratio,
+                tf.hpc.efficiencies.flow, tf.hpc.pressure_ratio,
+                tf.hpt.efficiencies.flow, tf.hpt.efficiencies.mechanical,
+                tf.lpt.efficiencies.flow, tf.lpt.efficiencies.mechanical,
+                tf.core_nozzle.efficiencies.flow, tf.core_nozzle.pressure_ratio, tf.core_nozzle.diameters.reference,
+                tf.fan_nozzle.efficiencies.flow, tf.fan_nozzle.pressure_ratio, tf.fan_nozzle.diameters.reference,
+            ),tf,
             (
                 0.98, 0.98,
                 0.93, 1.7,
@@ -386,28 +378,21 @@ def vehicle_setup():
              )
         )
 
+    tf = tf.update_design_parameters()
+
     # Engine & Line Rebuild --------------------------------------------------------------------------------------------
-
-    tf = dc.replace(tf, converters=cons)
     tf2 = dc.replace(tf, tag="Engine 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
+    
+    fuel_mass = MassProperties(
+        total=79015.8-62732.0,
+        center_of_gravity=jnp.array([[13.61, 0., -0.93]])
+    )
+    fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]), mass_properties=fuel_mass)
 
-    line_cons = vehicle.energy.lines[0].converters
-    line_cons = line_cons.add_subcomponent(tf)
-    line_cons = line_cons.add_subcomponent(tf2)
+    tf_line = TurbojetEnergyLine(subcomponents=(tf, tf2, fuel))
 
-    vehicle = eqx.tree_at(lambda v: v.energy.lines[0].converters, vehicle, line_cons)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Fuel Tanks
-    # ------------------------------------------------------------------------------------------------------------------
-
-    fuel_mass = FuelTankMass(full_fuel_mass=79015.8-62732.0, center_of_gravity=jnp.array([[13.61, 0., -0.93]]))
-    fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]),mass_properties=fuel_mass)
-
-    line_stores = vehicle.energy.lines[0].stores
-    line_stores = line_stores.add_subcomponent(fuel)
-
-    vehicle = eqx.tree_at(lambda v: v.energy.lines[0].stores, vehicle, line_stores)
+    tf_network = EnergyNetwork(subcomponents=(tf_line,))
+    vehicle = vehicle.add_subcomponent(tf_network)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Configurations
@@ -530,32 +515,29 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         initial_settings=settings
     )
 
-    final_segments = []
+    updated_segments = []
     
     for segment in mission.steps:
-        aero_analysis = VORJAX()
-        seg_w_analysis = eqx.tree_at(lambda s: s.analyze.aerodynamics, segment, aero_analysis)
-        
         aero_init = InitializeVORJAX()
-        updated_init_steps = segment.initialize.steps + (aero_init,)
-        final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analysis, updated_init_steps)
+        aero_analysis = ComputeVORJAX()
         
-        final_segments.append(final_seg)
+        updated_segment = eqx.tree_at(
+            lambda s: (
+                s.initialize,
+                s.analyze.aerodynamics
+            ),
+            segment,
+            (
+                aero_init,
+                aero_analysis,
+            )
+        )
 
-    return eqx.tree_at(lambda m: m.steps, mission, tuple(final_segments)), updated_settings
+        updated_segments.append(updated_segment)
 
+    updated_mission = eqx.tree_at(lambda m: m.steps, mission, tuple(updated_segments))
 
-def state_setup():
-
-    numerics = Numerics(number_of_control_points=4)
-    
-    state = State(numerics=numerics)
-    state = eqx.tree_at(lambda s: s.freestream.atmosphere, state, USStandard1976(), is_leaf=lambda x: x is None)
-    frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-    state = eqx.tree_at(lambda s: s.initials, state, frozen_initials, is_leaf=lambda x: x is None)
-
-    return state
-
+    return updated_mission, updated_settings
 
 def mission_b737(state, system, settings):
 
@@ -574,9 +556,9 @@ if __name__ == '__main__':
 
     print("Setting up mission ...")
 
-    state = state_setup()
+    state = State(numerics=Numerics(number_of_control_points=4))
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=False)
+    settings = Settings(DEBUG_MODE=True)
 
     print("Setup complete, starting mission ...")
 

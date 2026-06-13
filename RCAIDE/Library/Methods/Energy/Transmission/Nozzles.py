@@ -205,7 +205,7 @@ def fan_nozzle_performance(
 
             nozzle = prop.converters.fan_nozzle
             PR  = nozzle.pressure_ratio
-            n_p = nozzle.polytropic_efficiency
+            n_p = nozzle.efficiencies.flow
 
             state, system, settings = _expansion_nozzle_performance(state, system, settings,
                                                                     prop.converters.fan,
@@ -227,7 +227,7 @@ def core_nozzle_performance(
 
             nozzle = prop.converters.core_nozzle
             PR = nozzle.pressure_ratio
-            n_p = nozzle.polytropic_efficiency
+            n_p = nozzle.efficiencies.flow
 
             state, system, settings = _expansion_nozzle_performance(state, system, settings,
                                                                     prop.converters.turbines[-1],

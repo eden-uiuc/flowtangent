@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 from warnings import warn
-from typing import TypeVar, List
+from typing import Any
 
 # package imports 
 import equinox as eqx
@@ -132,6 +132,8 @@ class Component(eqx.Module):
     mass_properties:        MassProperties        = init_field(MassProperties)
     material_properties:    MaterialProperties    = init_field(MaterialProperties)
 
+    _bookkeeping:           dict[str, Any] = init_field(dict, static=True)
+
     
     def __repr__(self):
         repr_str = self.tag + " - Subcomponents: [" + ', '.join([sc.tag for sc in self.subcomponents])+"]"
@@ -145,14 +147,20 @@ class Component(eqx.Module):
         else:
             raise TypeError(f"Indices must be int, slice, or str.")
     
-    def __getattr__(self, item:str):
+    def __getattr__(self, item: str):
         if item.startswith("__") and item.endswith("__"):
             raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
-        for sc in self.subcomponents:
-            if sc.get_field_name() == item:
-                return sc
 
-        raise AttributeError(f"'{self.tag}' has no attribute or subcomponent named '{item}'")
+        if hasattr(self, '_bookkeeping') and item in self._bookkeeping:
+            target_class = self._bookkeeping[item]
+            filtered_subs = tuple(
+                c for c in self.subcomponents if isinstance(c, target_class)
+            )
+            return Component(tag=item.capitalize(), subcomponents=filtered_subs)
+        for sc in self.subcomponents:
+            if hasattr(sc, 'get_field_name') and sc.get_field_name() == item:
+                return sc
+        raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
 
     def __bool__(self):
         return True

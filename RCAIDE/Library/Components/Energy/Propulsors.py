@@ -23,10 +23,11 @@ from RCAIDE.Framework.State import State
 from RCAIDE.Framework.System import System, Aircraft
 from RCAIDE.Framework.Missions.Initialize import initialize_energy
 
+from RCAIDE.Library import Component
 from RCAIDE.Library.Atmospheres import USStandard1976
 from RCAIDE.Library.Propellants import Propellant, JetA
 from RCAIDE.Library.Gases import Gas, Air
-from RCAIDE.Library.Components.Energy.Nodes import FlowNode, FlowSplitter
+from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode, FlowSplitter
 
 
 from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_compression_nozzle_performance
@@ -333,6 +334,8 @@ class ExpansionNozzle(FlowNode):
 
         return updated_state, system, settings
 
+
+
 def _TurbojetSetup():
     
     inlet = InletNozzle()
@@ -360,15 +363,12 @@ class TurbojetEngine(Propulsor):
 
     installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
 
-    @property
-    def compressors(self):
-        return tuple(c for c in self.subcomponents if isinstance(c, Compressor))
+    _bookkeeping = {
+        "compressors": Compressor,
+        "turbines": Turbine
+    }
     
-    @property
-    def turbines(self):
-        return tuple(c for c in self.subcomponents if isinstance(c, Turbine))
-    
-    def update_SLS_thrust(self) -> TurbojetEngine:
+    def update_design_parameters(self) -> TurbojetEngine:
         design_thrust = self.design_parameters.total_thrust
         
         if design_thrust == 0.0:
@@ -543,8 +543,8 @@ def _TurbofanSetup(BPR):
     inlet = InletNozzle()
     fan   = Fan()
 
-    core_flow = FlowSplitter(tag="Core Duct", flow_inputs=["Fan"], extraction_fraction=1./(1.+BPR))
-    bypass_flow = FlowSplitter(tag="Bypass Duct", flow_inputs=["Fan"], extraction_fraction=BPR/(1.+BPR))
+    core_flow = EnergySplitter(tag="Core Duct", flow_inputs=["Fan"], extraction_fraction=1./(1.+BPR))
+    bypass_flow = EnergySplitter(tag="Bypass Duct", flow_inputs=["Fan"], extraction_fraction=BPR/(1.+BPR))
     
     LPC = Compressor(tag="LPC", flow_inputs=["Core Duct"])
     HPC = Compressor(tag="HPC", flow_inputs=["LPC"])
@@ -639,5 +639,3 @@ class TurbofanEngine(TurbojetEngine):
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.tag].outputs, state, outputs)
 
         return updated_state, system, settings
-
-

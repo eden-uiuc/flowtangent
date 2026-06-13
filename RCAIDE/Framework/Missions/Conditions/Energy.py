@@ -36,10 +36,9 @@ class ElectricalOutputs(Conditions):
 class FuelOutputs(Conditions):
     tag = "Fuel Outputs"
 
-    demand:                 jnp.ndarray = empty_array(0)
     fuel_air_ratio:         jnp.ndarray = empty_array(0)
     TSFC:                   jnp.ndarray = empty_array(0)
-    flow_rate:         jnp.ndarray = empty_array(0)
+    flow_rate:              jnp.ndarray = empty_array(0)
 
 class FlowOutputs(Conditions):
     tag = "Flow Outputs"
@@ -101,7 +100,7 @@ class EnergyNodeConditions(Conditions):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Battery Stores
 # ----------------------------------------------------------------------------------------------------------------------
-class EnergyStoreConditions(Conditions):
+class EnergyStoreConditions(EnergyNodeConditions):
 
     # Attribute             Type        Default Value
     tag:                    str         = init_field('Energy Store', static=True)
@@ -142,7 +141,7 @@ class BatteryPackConditions(EnergyStoreConditions):
 #  Fuel Stores
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FuelConditions(EnergyStoreConditions):
+class FuelTankConditions(EnergyStoreConditions):
 
     # Attribute         Type        Default Value
     tag:                str         = init_field('Fuel', static=True)

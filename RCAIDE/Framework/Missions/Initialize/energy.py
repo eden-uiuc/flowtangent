@@ -67,7 +67,7 @@ def initialize_energy(state: "rcf.State", system: "rcf.Aircraft", settings: "rcf
     resolved_lines = []
 
     conditions_map = {
-        FuelTank: FuelConditions
+        FuelTank: FuelTankConditions
     }
     
     for l_idx, line in enumerate(system.energy.lines):

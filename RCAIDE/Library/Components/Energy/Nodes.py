@@ -8,7 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Optional
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
+
+from RCAIDE.Framework import ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -66,10 +68,41 @@ class EnergyNode(Component):
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError("No transmission method implemented. " \
         "Subclasses of EnergyNode must implement their individual transmission methods.")
+    
+    @property
+    def process_step(self):
+        return ProcessStep(self.transmit, f"Transmit {self.tag}")
 
 class EnergySplitter(EnergyNode):
 
-    output_fractions: tuple = init_field(tuple)
+    extraction_fraction: float = 1.0
+
+    _splitter_type: str = "flow"
+    split_values: tuple[str] = ("mass_flow_rate",)
+    
+    def __post_init__(self):
+        assert len(self.inputs) == 1 , f"Energy splitters can only have one input. Found: {self.inputs}"
+        for splitter in ["flow", "mechanical", "electrical", "fuel", "force"]:
+            if len(getattr(self, splitter+"_inputs")) > 0:
+                self._splitter_type = splitter
+    
+    def transmit(self, state: State, system: System, settings: Settings):
+
+        total_input = getattr(state.energy.nodes[self.inputs[0]].outputs, self._splitter_type)
+
+        extracted_input = eqx.tree_at(
+            lambda t:tuple(getattr(t, s) for s in self.split_values),
+            total_input,
+            tuple(getattr(total_input, s) * self.extraction_fraction for s in self.split_values)
+        )
+
+        updated_state = eqx.tree_at(
+            lambda s: getattr(s.energy.nodes[self.tag], self._splitter_type).outputs,
+            state,
+            extracted_input
+        )
+
+        return updated_state, system, settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Flow Nodes
@@ -85,6 +118,8 @@ class FlowNode(EnergyNode):
 
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
+
+
 
 class FlowSplitter(EnergyNode):
     
@@ -118,3 +153,4 @@ class FlowSplitter(EnergyNode):
 #  Mechanical Nodes
 # ----------------------------------------------------------------------------------------------------------------------
 
+class WorkSplitter(EnergyNode):

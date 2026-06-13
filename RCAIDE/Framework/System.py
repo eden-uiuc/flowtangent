@@ -80,44 +80,16 @@ class Aircraft(System):
     design_mach_number: float   = init_field(0., static=True)
     design_range:       float   = init_field(0., static=True)
     design_cruise_alt:  float   = init_field(0., static=True)
-
-    energy:         EnergyNetwork = init_field(lambda: EnergyNetwork(tag="Energy"))
     
-    wings:          Component = init_field(lambda: Component(tag='Wings'))
-    fuselages:      Component = init_field(lambda: Component(tag='Fuselages'))
-    nacelles:       Component = init_field(lambda: Component(tag='Nacelles'))
-    landing_gear:   Component = init_field(lambda: Component(tag='Landing Gear'))
+    _bookkeeping = {
+        "energy": EnergyNetwork,
+        "wings": Wing,
+        "fuselages": Fuselage,
+        "nacelles": Nacelle,
+        "landing_gear": LandingGear
+    }
 
-    reference_geometry:  AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
-    analysis_data:      dict = init_field(dict)
-
-    def add_subcomponent(
-            self,
-            subcomponent: Component,
-    ):
-
-        if isinstance(subcomponent, Wing):
-            new_wings = self.wings.add_subcomponent(subcomponent)
-            return eqx.tree_at(lambda a: a.wings, self, new_wings)
-        elif isinstance(subcomponent, Fuselage):
-            new_fuses = self.fuselages.add_subcomponent(subcomponent)
-            return eqx.tree_at(lambda a: a.fuselages, self, new_fuses)
-        elif isinstance(subcomponent, Nacelle):
-            new_nacs = self.nacelles.add_subcomponent(subcomponent)
-            return eqx.tree_at(lambda a: a.nacelles, self, new_nacs)
-        elif isinstance(subcomponent, LandingGear):
-            new_LGs = self.landing_gear.add_subcomponent(subcomponent)
-            return eqx.tree_at(lambda a: a.landing_gear, self, new_LGs)
-        else:
-            return super(Aircraft, self).add_subcomponent(subcomponent)
-
-    def get_all_components(self):
-        return self.subcomponents + (
-            self.energy,
-            self.wings,
-            self.fuselages,
-            self.nacelles,
-            self.landing_gear
-        )
+    reference_geometry:     AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
+    analysis_data:          dict = init_field(dict)
 
 

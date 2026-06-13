@@ -19,40 +19,38 @@ import equinox as eqx
 from RCAIDE.utils import init_field
 
 from .Nodes import EnergyNode, EnergySplitter
-from RCAIDE.Library import Component
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
-from RCAIDE.Library.Components.Energy.Nodes import FlowNode, EnergySplitter
 from RCAIDE.Library.Components.Energy.Stores import EnergyStore
+
+from RCAIDE.Framework import Process
 
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
+
 # ----------------------------------------------------------------------------------------------------------------------
-#  Network
+#  Energy Lines
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 class EnergyLine(EnergyNode):
 
-    @property
-    def propulsors(self) -> tuple:
-        return tuple(c for c in self.subcomponents if isinstance(c, Propulsor))
+    _bookkeeping = {
+        "propulsors": Propulsor,
+        "splitters": EnergySplitter,
+        "stores": EnergyStore,
+    }
 
-    @property
-    def splitters(self) -> tuple:
-        return tuple(c for c in self.subcomponents if isinstance(c, EnergySplitter))
-    
-    @property
-    def stores(self) -> tuple:
-        return tuple(c for c in self.subcomponents if isinstance(c, EnergyStore))
-
+# ----------------------------------------------------------------------------------------------------------------------
+#  Energy Networks
+# ----------------------------------------------------------------------------------------------------------------------
 
 class EnergyNetwork(EnergyNode):
 
     tag: str = init_field('Energy Network', static=True)
 
-    @property
-    def lines(self) -> tuple:
-        return tuple(c for c in self.subcomponents if isinstance(c, EnergyLine))
+    _bookkeeping = {
+        "lines": EnergyLine
+    }
     
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
@@ -122,13 +120,11 @@ class EnergyNetwork(EnergyNode):
             )
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
-
-    def transmit(self, state: "State", system: "System", settings: "Settings"):
-        """The XLA-compiled mission execution loop."""
-        
-        for tag in self._execution_order:
-            
-            state, system, settings = self.nodes[tag].transmit(state, system, settings) 
-
-        return state, system, settings
+    
+    @property
+    def analyze(self):
+        return Process(
+            tag=f"{self.tag} Analysis",
+            steps=tuple(self.nodes[tag].process_step for tag in self._execution_order)
+        )
 
