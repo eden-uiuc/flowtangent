@@ -1596,20 +1596,20 @@ if __name__ == "__main__":
 
     os.chdir(ru.get_RCAIDE_root())
 
-    mach_path   = ru.PathTuple(("freestream", "mach_number"), tag="M")
-    alpha_path  = ru.PathTuple(("aerodynamics", "angles", "alpha"), tag="a")
-    beta_path   = ru.PathTuple(("aerodynamics", "angles", "beta"), tag="b")
+    mach_path   = ru.DataPath(("freestream", "mach_number"), tag="M")
+    alpha_path  = ru.DataPath(("aerodynamics", "angles", "alpha"), tag="a")
+    beta_path   = ru.DataPath(("aerodynamics", "angles", "beta"), tag="b")
 
-    p_path      = ru.PathTuple(("stability", "static", "roll_rate"), tag="p")
-    q_path      = ru.PathTuple(("stability", "static", "pitch_rate"), tag="q")
-    r_path      = ru.PathTuple(("stability", "static", "yaw_rate"), tag="r")
+    p_path      = ru.DataPath(("stability", "static", "roll_rate"), tag="p")
+    q_path      = ru.DataPath(("stability", "static", "pitch_rate"), tag="q")
+    r_path      = ru.DataPath(("stability", "static", "yaw_rate"), tag="r")
     
-    lift_path   = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
-    drag_path   = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
+    lift_path   = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
+    drag_path   = ru.DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
     
-    i_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "total"))
-    nf_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
-    ff_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
+    i_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "total"))
+    nf_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
+    ff_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
 
     GRAD_MAP = GradientMap(
         state_inputs=(
@@ -1662,8 +1662,8 @@ if __name__ == "__main__":
             f_st, f_sys, f_setts = results
 
             CL = ru.get_target(f_st, lift_path)
-            CD = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "drag", "total")))
-            C_m = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch")))
+            CD = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "drag", "total")))
+            C_m = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "moments", "pitch")))
 
             data = f_sys.analysis_data
             # VORJAX_dCp = np.round(np.asarray(data["dCp"]), 5)

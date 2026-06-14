@@ -37,13 +37,13 @@ def func_thrust_and_power(
         v_core_nozzle,
         AR_core_nozzle,
         P_core_nozzle,
-        f, # Fuel-Air Ratio
-        alpha, # Bypass Ratio
+        fuel_air_ratio,
+        BPR,
         throttle
 ):
 
-    f_fan = alpha / (1 + alpha)
-    f_core = 1 / (1 + alpha)
+    f_fan = BPR / (1 + BPR)
+    f_core = 1 / (1 + BPR)
 
     # Fan and Core Components of Non-Dimensional Thrust
     F_fan   = f_fan  * (gamma * M0 ** 2 * (v_fan_nozzle / u0 - 1) + AR_fan_nozzle * (P_fan_nozzle / P0 - 1))
@@ -51,12 +51,12 @@ def func_thrust_and_power(
     F_total = F_fan + F_core                                                    # Total Non-Dimensional Thrust
     
     F_sp    = 1 / (gamma * M0) * F_total                                        # Specific Thrust
-    I_sp    = F_sp * a0 * (1 + alpha) / (f * gamma)                             # Specific Impulse
-    TSFC    = f * gamma / (F_sp * a0 * (1 + alpha)) * (1 - delta_SFC) * 3600    # Thrust-Specific Fuel Consumption (TSFC)
+    I_sp    = F_sp * a0 * (1 + BPR) / (fuel_air_ratio * gamma)                             # Specific Impulse
+    TSFC    = fuel_air_ratio * gamma / (F_sp * a0 * (1 + BPR)) * (1 - delta_SFC) * 3600    # Thrust-Specific Fuel Consumption (TSFC)
     
     mdot_core = (F_ref * f_core)/(F_sp * a0 * throttle)
 
-    F       = F_sp * a0 * (1 + alpha) * mdot_core * throttle                    # Dimensional Thrust
+    F       = F_sp * a0 * (1 + BPR) * mdot_core * throttle                      # Dimensional Thrust
     p       = F * u0                                                            # Power
     ff      = np.maximum(F * TSFC / g, 0.) * 1 / 3600                           # Fuel Flow Rate
 
@@ -85,14 +85,14 @@ def func_sea_level_static_thrust(
         g = 9.81,
         F_ref=F_ref,
         delta_SFC = delta_SFC,
-        f = f,
+        fuel_air_ratio = f,
         v_fan_nozzle = v_fan_nozzle,
         AR_fan_nozzle = AR_fan_nozzle,
         P_fan_nozzle = P_fan_nozzle,
         v_core_nozzle = v_core_nozzle,
         AR_core_nozzle = AR_core_nozzle,
         P_core_nozzle = P_core_nozzle,
-        alpha=alpha,
+        BPR=alpha,
         throttle=1.0
     )
 
@@ -134,8 +134,8 @@ def thrust_and_power(
                 v_core_nozzle=cn_out.velocity,
                 AR_core_nozzle=cn_out.area_ratio,
                 P_core_nozzle= cn_out.pressure,
-                f=tf_state.combustor.fuel_air_ratio,
-                alpha=tf.bypass_ratio,
+                fuel_air_ratio=tf_state.combustor.fuel_air_ratio,
+                BPR=tf.bypass_ratio,
                 throttle=tf_state.throttle,
             )
 

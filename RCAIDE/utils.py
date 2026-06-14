@@ -90,7 +90,7 @@ class Token(eqx.Module):
     settings: eqx.Module
 
 @dataclass(frozen=True)
-class PathTuple:
+class DataPath:
     
     path: tuple
     slice_obj: slice
@@ -98,7 +98,7 @@ class PathTuple:
 
     def __init__(self, path: tuple | Self = (slice(None),), tag="Variable Path"):
         
-        if isinstance(path, PathTuple):
+        if isinstance(path, DataPath):
             object.__setattr__(self, 'path', path.path)
             object.__setattr__(self, 'slice_obj', path.slice_obj)
             object.__setattr__(self, 'tag', path.tag)
@@ -116,7 +116,7 @@ class PathTuple:
     def __len__(self):
         return len(self.path)
 
-def get_parent_target(obj, path_tuple: PathTuple):
+def get_parent_target(obj, path_tuple: DataPath):
     """Gets the full PyTree leaf, ignoring the slice."""
     for key in path_tuple.path:
         if isinstance(obj, dict):
@@ -125,7 +125,7 @@ def get_parent_target(obj, path_tuple: PathTuple):
             obj = getattr(obj, key)
     return obj
 
-def get_target(obj, path_tuple: PathTuple):
+def get_target(obj, path_tuple: DataPath):
     """Gets the target and applies the slice if one exists."""
     parent = get_parent_target(obj, path_tuple)
     if hasattr(parent, "__getitem__") and path_tuple.slice_obj != slice(None):

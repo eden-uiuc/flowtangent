@@ -34,7 +34,7 @@ def build_analysis_from_network(network: EnergyNetwork):
                 tag=f"{network.tag} Analysis",
                 steps=tuple(
                     ProcessStep(
-                        tag=f"tag Transmission",
+                        tag=f"{tag}",
                         function=network.nodes[tag].transmit
                     ) for tag in network._execution_order
                 )

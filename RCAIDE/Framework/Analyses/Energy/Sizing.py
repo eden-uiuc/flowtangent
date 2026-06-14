@@ -25,6 +25,7 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 from RCAIDE.Framework import State, Aircraft, Settings
 from RCAIDE.Framework.Missions.Initialize import initialize_energy
+from RCAIDE.Framework.Missions.Update import update_freestream
 from .GraphNetwork import build_analysis_from_network
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propulsion Sizing Analyses
@@ -48,7 +49,7 @@ def update_design_parameters(turbojet: TurbojetEngine):
             s.freestream.gravity,
             s.freestream.mach_number,
             s.freestream.speed_of_sound,
-            s.freestream.speed,
+            s.frames.inertial.velocity_vector,
             s.freestream.temperature,
             s.freestream.pressure,
             s.freestream.density,
@@ -58,32 +59,37 @@ def update_design_parameters(turbojet: TurbojetEngine):
             s.freestream.R,
         ), State().expand_rows(1),
         (
-            jnp.atleast_1d(0.),
-            jnp.atleast_1d(9.81),
-            jnp.atleast_1d(M0),
-            jnp.atleast_1d(a0),
-            jnp.atleast_1d(a0*M0),
-            jnp.atleast_1d(T0),
-            jnp.atleast_1d(atmo.compute_pressure(0.0)),
-            jnp.atleast_1d(atmo.compute_density(0.0)),
-            jnp.atleast_1d(atmo.compute_dynamic_viscosity(0.0)),
-            jnp.atleast_1d(turbojet.working_fluid.compute_gamma(T0)),
-            jnp.atleast_1d(turbojet.working_fluid.compute_Cp(T0)),
-            jnp.atleast_1d(turbojet.working_fluid.R_specific),
+            jnp.atleast_2d(0.),
+            jnp.atleast_2d(9.81),
+            jnp.atleast_2d(M0),
+            jnp.atleast_2d(a0),
+            jnp.atleast_2d([[a0*M0, 0., 0.]]),
+            jnp.atleast_2d(T0),
+            jnp.atleast_2d(atmo.compute_pressure(0.0)),
+            jnp.atleast_2d(atmo.compute_density(0.0)),
+            jnp.atleast_2d(atmo.compute_dynamic_viscosity(0.0)),
+            jnp.atleast_2d(turbojet.working_fluid.compute_gamma(T0)),
+            jnp.atleast_2d(turbojet.working_fluid.compute_Cp(T0)),
+            jnp.atleast_2d(turbojet.working_fluid.R_specific),
         ))
         
-        sls_line = TurbojetEnergyLine(subcomponents=(turbojet,), fuel_inputs=("Engine 1",))
+        sls_line = TurbojetEnergyLine(subcomponents=(turbojet,), fuel_inputs=("self.engine_1",))
         sls_network = EnergyNetwork(subcomponents=(sls_line,))
         sls_system = Aircraft(subcomponents=(sls_network,))
 
-
-        sls_state, sls_system, settings = initialize_energy(sls_state, sls_system, Settings())
+        sls_state, sls_system, sls_settings = initialize_energy(sls_state, sls_system, Settings())
+        sls_state, sls_system, sls_settings = update_freestream(sls_state, sls_system, sls_settings)
+        sls_state = eqx.tree_at(
+             lambda s: s.energy.nodes["turbojet_energy_line.engine_1"].throttle,
+             sls_state,
+             jnp.atleast_2d(1.0)
+        )
+        
         sls_analysis = build_analysis_from_network(sls_system.energy_networks[0])
 
-        sls_state, sls_system, settings = sls_analysis(sls_state, sls_system, settings)
-        sls_engine = sls_system.energy_networks[0].lines[0].engines[0]
-
-        sls_thrust = sls_state.energy.nodes[sls_engine.tag].outputs.force.thrust.item(0)
+        sls_state, sls_system, sls_settings = sls_analysis(sls_state, sls_system, sls_settings)
+        sls_engine = sls_system.energy_networks[0].nodes["turbojet_energy_line.engine_1"]
+        sls_thrust = sls_state.energy.nodes["turbojet_energy_line.engine_1"].outputs.force.thrust.item(0)
 
         updated_params = eqx.tree_at(lambda d: d.SLS_thrust, sls_engine.design_parameters, sls_thrust)
         updated_turbojet = eqx.tree_at(lambda s: s.design_parameters, sls_engine, updated_params)

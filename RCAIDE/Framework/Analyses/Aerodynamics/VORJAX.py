@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # RCAIDE imports
-from RCAIDE.utils import PathTuple, init_field
+from RCAIDE.utils import DataPath, init_field
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Methods.Aerodynamics.Transonic import peaked_CL_spline, ensemble_CL_spline
@@ -262,26 +262,26 @@ class VORJAX(Process):
 #-----------------------------------------------------------
 
 VORJAX_Inputs = {
-    "mach":         (PathTuple(("freestream", "mach_number")), [0.0]),
-    "alpha":        (PathTuple(("aerodynamics", "angles", "alpha")), [0.0]),
-    "beta":         (PathTuple(("aerodynamics", "angles", "beta")), [0.0]),
-    "roll_rate":    (PathTuple(("stability", "static", "roll_rate")), [0.0]),
-    "pitch_rate":   (PathTuple(("stability", "static", "pitch_rate")), [0.0]),
-    "yaw_rate":     (PathTuple(("stability", "static", "yaw_rate")), [0.0]),
-    "density":      (PathTuple(("freestream", "density")), [1.225]),
-    "gamma":        (PathTuple(("freestream", "gamma")), [1.4]),
-    "temperature":  (PathTuple(("freestream", "temperature")), [288.15]),
+    "mach":         (DataPath(("freestream", "mach_number")), [0.0]),
+    "alpha":        (DataPath(("aerodynamics", "angles", "alpha")), [0.0]),
+    "beta":         (DataPath(("aerodynamics", "angles", "beta")), [0.0]),
+    "roll_rate":    (DataPath(("stability", "static", "roll_rate")), [0.0]),
+    "pitch_rate":   (DataPath(("stability", "static", "pitch_rate")), [0.0]),
+    "yaw_rate":     (DataPath(("stability", "static", "yaw_rate")), [0.0]),
+    "density":      (DataPath(("freestream", "density")), [1.225]),
+    "gamma":        (DataPath(("freestream", "gamma")), [1.4]),
+    "temperature":  (DataPath(("freestream", "temperature")), [288.15]),
 }
 
 VORJAX_Outputs = {
-    "CL":           PathTuple(("aerodynamics", "coefficients", "lift", "total")),
-    "CD":           PathTuple(("aerodynamics", "coefficients", "drag", "total")),
-    "CX":           PathTuple(("aerodynamics", "coefficients", "X",)),
-    "CY":           PathTuple(("aerodynamics", "coefficients", "Y",)),
-    "CZ":           PathTuple(("aerodynamics", "coefficients", "Z",)),
-    "C_l":          PathTuple(("aerodynamics", "coefficients", "moments", "roll")),
-    "C_m":          PathTuple(("aerodynamics", "coefficients", "moments", "pitch")),
-    "C_n":          PathTuple(("aerodynamics", "coefficients", "moments", "yaw")),
+    "CL":           DataPath(("aerodynamics", "coefficients", "lift", "total")),
+    "CD":           DataPath(("aerodynamics", "coefficients", "drag", "total")),
+    "CX":           DataPath(("aerodynamics", "coefficients", "X",)),
+    "CY":           DataPath(("aerodynamics", "coefficients", "Y",)),
+    "CZ":           DataPath(("aerodynamics", "coefficients", "Z",)),
+    "C_l":          DataPath(("aerodynamics", "coefficients", "moments", "roll")),
+    "C_m":          DataPath(("aerodynamics", "coefficients", "moments", "pitch")),
+    "C_n":          DataPath(("aerodynamics", "coefficients", "moments", "yaw")),
 }
 
 class BatchVORJAX(BatchAnalysis):

@@ -16,8 +16,8 @@ from dataclasses import replace
 import equinox as eqx
 
 # RCAIDE Imports
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
-from RCAIDE.Framework.Conditions.Energy import *
+from RCAIDE.Framework.Conditions.Energy import FuelTankConditions, EnergyNodeConditions
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork, EnergyLine
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -31,15 +31,23 @@ def _resolve_namespaces(node, parent_prefix=""):
     """
     # Define this node's absolute ID
     absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
+
+    def parse_input(input:str):
+        flat_input_parts = input.replace(' ','_').lower().split('.')
+        if flat_input_parts[0]=="self":
+            return absolute_id+"."+flat_input_parts[-1]
+        else:
+            return parent_prefix+"."+flat_input_parts[-1]
     
+        
     # Resolve the input/output connection strings
     # We rebuild the interfaces so they point to the absolute paths
     new_inputs = {
-        "mechanical":[f"{parent_prefix}.{port.replace(' ','_').lower()}" for port in node.mechanical_inputs],
-        "electrical":[f"{parent_prefix}.{port.replace(' ','_').lower()}" for port in node.electrical_inputs],
-        "flow":[f"{parent_prefix}.{port.replace(' ','_').lower()}" for port in node.flow_inputs],
-        "force":[f"{parent_prefix}.{port.replace(' ','_').lower()}" for port in node.force_inputs],
-        "fuel":[f"{parent_prefix}.{port.replace(' ','_').lower()}" for port in node.fuel_inputs],
+        "mechanical":tuple(parse_input(port) for port in node.mechanical_inputs),
+        "electrical":tuple(parse_input(port) for port in node.electrical_inputs),
+        "flow":tuple(parse_input(port) for port in node.flow_inputs),
+        "force":tuple(parse_input(port) for port in node.force_inputs),
+        "fuel":tuple(parse_input(port) for port in node.fuel_inputs),
     }
     
     # Update the node itself
@@ -72,10 +80,10 @@ def initialize_energy(state: State, system: System, settings: Settings):
         "FuelTank": FuelTankConditions
     }
     
-    for l_idx, line in enumerate(system.energy_networks[0].lines):
+    for line in system.energy_networks[0].lines:
         
         # Resolve the namespace for this entire line and all its nested children
-        resolved_line = _resolve_namespaces(line, parent_prefix=f"line_{l_idx}")
+        resolved_line = _resolve_namespaces(line, parent_prefix=f"")
         resolved_lines.append(resolved_line)
         
         # Helper function to extract all nodes into our flat dict

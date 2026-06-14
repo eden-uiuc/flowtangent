@@ -2,9 +2,6 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from RCAIDE.Framework import System, Settings
 
 # package imports
 import dataclasses as dc
@@ -13,7 +10,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE Imports
-from RCAIDE.Framework import Process, State
+from RCAIDE.Framework import Process, State, Settings
 from RCAIDE.Framework.Conditions import Numerics
 from RCAIDE.Framework.Systems import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
@@ -353,7 +350,12 @@ def vehicle_setup():
         bypass_ratio=5.4,
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
-        design_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
+        design_parameters=DesignParameters(
+            total_thrust=24000.,
+            altitude=10668.,
+            mach_number=0.78,
+            turbine_intake_temperature=1450.
+            ),
     )
 
     # Direct Replacement
@@ -454,7 +456,7 @@ def vehicle_setup():
     return vehicle
 
 
-def mission_setup(state: "State", system: "System", settings: "Settings"):
+def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     # Set Controls & Analysis Settings
 

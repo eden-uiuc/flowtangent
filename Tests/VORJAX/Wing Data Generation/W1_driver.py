@@ -13,7 +13,7 @@ from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
 
-from RCAIDE.utils import PathTuple
+from RCAIDE.utils import DataPath
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
@@ -239,12 +239,12 @@ if __name__ == "__main__":
         
         solver=BatchVORJAX()
 
-        mach_path   = PathTuple(("freestream", "mach_number"), tag="M")
-        alpha_path  = PathTuple(("aerodynamics", "angles", "alpha"), tag="a")
-        beta_path   = PathTuple(("aerodynamics", "angles", "beta"), tag="b")
+        mach_path   = DataPath(("freestream", "mach_number"), tag="M")
+        alpha_path  = DataPath(("aerodynamics", "angles", "alpha"), tag="a")
+        beta_path   = DataPath(("aerodynamics", "angles", "beta"), tag="b")
 
-        lift_path   = PathTuple(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
-        drag_path   = PathTuple(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
+        lift_path   = DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
+        drag_path   = DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
 
         GRAD_MAP = GradientMap(
             state_inputs=(

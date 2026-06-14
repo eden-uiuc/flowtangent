@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # package imports
-import jax.numpy as np
+import jax.numpy as jnp
 
 # RCAIDE imports
 if TYPE_CHECKING:
@@ -23,43 +23,38 @@ if TYPE_CHECKING:
 
 
 def func_isentropic_nozzle_performance(
-    T_t,
-    P_t,
-    P0,
-    g,
-    PR,
-    n_r,
-    n_p
+    T_t, P_t,
+    P0, gamma,
+    PR, n_r, n_p
 ):
 
     # Isentropic Outputs
 
-    P_t_out = np.maximum(P_t * PR * n_r, P0)              # Output stagnation pressure, minimum is freestream pressure
-    T_t_out = T_t * (PR * n_r) ** ((g - 1.) / (g * n_p))  # Output stagnation temperature
+    P_t_out = jnp.maximum(P_t * PR * n_r, P0)                       # Output stagnation pressure, minimum is freestream pressure
+    T_t_out = T_t * (PR * n_r) ** ((gamma - 1.) / (gamma * n_p))    # Output stagnation temperature
 
-    M_out   = np.sqrt((((P_t_out / P0) ** ((g - 1.) / g)) - 1.) * 2. / (g - 1.))  # Output Mach number
-    T_out   = T_t_out / (1. + (g - 1.) / 2. * M_out ** 2)                         # Output static temperature
+    M_out   = jnp.sqrt((((P_t_out / P0) ** ((gamma - 1.) / gamma)) - 1.) * 2. / (gamma - 1.))  # Output Mach number
+    T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2)                                  # Output temperature
 
     return P_t_out, T_t_out, T_out, M_out
 
 
 def func_compression_nozzle_performance(
-    T_t,
-    P_t,
-    P0,
-    M0,
-    Cp,
-    gamma,
-    PR,
-    n_r,
-    n_p
+    T_t, P_t,
+    P0, M0,
+    Cp, gamma,
+    PR, n_r, n_p
 ):
 
-    P_t_out, T_t_out, T_out, M_out = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, n_r, n_p)
+    (P_t_out, T_t_out,
+     T_out, M_out) = func_isentropic_nozzle_performance(
+       T_t, P_t,
+       P0, gamma,
+       PR, n_r, n_p)
 
     # Normal Shock Outputs
 
-    ns_M    = np.sqrt((1. + (gamma - 1.) / 2. * M0 ** 2.) / (gamma * M0 ** 2 - (gamma - 1.) / 2.))
+    ns_M    = jnp.sqrt((1. + (gamma - 1.) / 2. * M0 ** 2.) / (gamma * M0 ** 2 - (gamma - 1.) / 2.))
     ns_T    = T_t_out / (1. + (gamma - 1.) / 2 * ns_M ** 2)
     ns_P_t  = (PR *
                P_t *
@@ -69,44 +64,43 @@ def func_compression_nozzle_performance(
 
     # Combine Outputs
 
-    P_t_out[M0[:, 0] > 1.0] = ns_P_t[M0[:, 0] > 1.0]
-    T_out[M0[:, 0] > 1.0] = ns_T[M0[:, 0] > 1.0]
-    M_out[M0[:, 0] > 1.0] = ns_M[M0[:, 0] > 1.0]
+    P_t_out = jnp.where(M0 > 1.0, ns_P_t, P_t_out)
+    T_out   = jnp.where(M0 > 1.0, ns_T, T_out)
+    M_out   = jnp.where(M0 > 1.0, ns_M, M_out)
 
     h_out   = Cp * T_out                        # Output static enthalpy
     h_t_out = Cp * T_t_out                      # Output stagnation enthalpy
-    u_out   = np.sqrt(2. * (h_t_out - h_out))   # Output velocity
+    u_out   = jnp.sqrt(2. * (h_t_out - h_out))  # Output velocity
 
     return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
 
 
 def func_expansion_nozzle_performance(
-    T_t,
-    T_t0,
-    P_t,
-    P_t0,
-    P0,
-    M0,
-    Cp,
-    gamma,
-    R,
-    PR,
-    n_p
+    T_t, T_t0,
+    P_t, P_t0,
+    P0, M0,
+    Cp, gamma, R,
+    PR, n_p
 ):
 
-    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1., n_p)
+    (P_t_out, T_t_out,
+     T_out, M_isn) = func_isentropic_nozzle_performance(
+         T_t, P_t,
+         P0, gamma,
+         PR, 1., n_p
+    )
 
     # Supersonic Expansion
-    sup = M_isn > 1
-    M = np.maximum(np.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
-    P   = P_t_out / (1. + (gamma - 1.) / 2. * M ** 2) ** (gamma / (gamma - 1.))
-    P_out = P0.at(sup).set(P)
+    sup     = M_isn > 1
+    M_out   = jnp.maximum(jnp.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
+    P       = P_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2) ** (gamma / (gamma - 1.))
+    P_out   = jnp.where(sup, P, P0)
 
-    T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M ** 2)
+    T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2)
 
     h_t_out = Cp * T_t_out
     h_out   = Cp * T_out
-    u_out   = np.sqrt(2. * (h_t_out - h_out))
+    u_out   = jnp.sqrt(2. * (h_t_out - h_out))
     r_out   = P_out/(R * T_out)
 
     def fm(M, g):
@@ -117,9 +111,9 @@ def func_expansion_nozzle_performance(
 
         return m1 * M / m2
 
-    AR      = (fm(M0, gamma) / fm(M, gamma) * (1 / (P_t_out / P_t0)) * (np.sqrt(T_t_out / T_t0)))
+    AR      = (fm(M0, gamma) / fm(M_out, gamma) * (1 / (P_t_out / P_t0)) * (jnp.sqrt(T_t_out / T_t0)))
 
-    return AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
+    return AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
 
 def _expansion_nozzle_performance(
@@ -140,23 +134,23 @@ def _expansion_nozzle_performance(
     P0      = fs.pressure
     M0      = fs.mach_number
     Cp      = fs.Cp
-    g       = fs.gamma
+    gamma   = fs.gamma
     R       = fs.R
     P_t0    = fs.stagnation_pressure
     T_t0    = fs.stagnation_temperature
     # Call function
 
-    AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = func_expansion_nozzle_performance(T_t,
-                                                                                                            T_t0,
-                                                                                                            P_t,
-                                                                                                            P_t0,
-                                                                                                            P0,
-                                                                                                            M0,
-                                                                                                            Cp,
-                                                                                                            g,
-                                                                                                            R,
-                                                                                                            PR,
-                                                                                                            n_p)
+    (AR, M,
+     r_out, u_out,
+     P_out, P_t_out,
+     T_out, T_t_out,
+     h_out, h_t_out) = func_expansion_nozzle_performance(
+        T_t, T_t0,
+        P_t, P_t0,
+        P0, M0,
+        Cp, gamma, R,
+        PR, n_p
+    )
 
     # Set Input State
     inputs = input_converter_state
@@ -169,7 +163,7 @@ def _expansion_nozzle_performance(
     inputs.freestream_pressure                  = P0
     inputs.freestream_mach_number               = M0
     inputs.freestream_Cp                        = Cp
-    inputs.freestream_gamma                     = g
+    inputs.freestream_gamma                     = gamma
     inputs.freestream_R                         = R
 
     # Set Output State

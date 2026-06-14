@@ -87,11 +87,11 @@ class OutputConditions(Conditions):
 
 class EnergyNodeConditions(Conditions):
 
-    # Attribute         Type         Default Value
-    tag:                str          = init_field('Energy Node Conditions', static=True)
+    # Attribute         Type                Default Value
+    tag:                str                 = init_field('Energy Node Conditions', static=True)
 
-    outputs:            OutputConditions  = init_field(OutputConditions)
-    throttle:           jnp.ndarray = empty_array(0)
+    outputs:            OutputConditions    = init_field(OutputConditions)
+    throttle:           jnp.ndarray         = empty_array(0)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

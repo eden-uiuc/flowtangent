@@ -52,16 +52,16 @@ class EnergyNode(Component):
                 + self.flow_inputs + self.force_inputs) #type: ignore
     
     def _get_all_inputs(self, state, input_type: str, input_field: str):
-        output_conditions = [getattr(state.energy.nodes[i], input_type) for i in self.inputs]
+        output_conditions = [getattr(state.energy.nodes[i].outputs, input_type) for i in getattr(self, f"{input_type}_inputs")]
         return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
 
     def sum_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
-        return jnp.sum(all_inputs, axis=-1)
+        return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1))
 
     def average_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
-        return jnp.mean(all_inputs, axis=-1)
+        return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1))
 
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError("No transmission method implemented. " \
@@ -92,7 +92,7 @@ class EnergySplitter(EnergyNode):
         )
 
         updated_state = eqx.tree_at(
-            lambda s: getattr(s.energy.nodes[self.tag], self._splitter_type).outputs,
+            lambda s: getattr(s.energy.nodes[self.tag].outputs, self._splitter_type),
             state,
             extracted_input
         )

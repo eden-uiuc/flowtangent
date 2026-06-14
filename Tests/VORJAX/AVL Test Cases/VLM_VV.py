@@ -876,8 +876,8 @@ if __name__ == "__main__":
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
-    alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-    lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+    alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
+    lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
     grad_map = GradientMap(
         state_inputs=(alpha_path,),
@@ -1013,8 +1013,8 @@ if __name__ == "__main__":
         alpha = [3.06 * Units.deg] * 21
         Mach =  [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
 
-        alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-        lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+        alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
+        lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
         grad_map = GradientMap(
             state_inputs=(alpha_path,),

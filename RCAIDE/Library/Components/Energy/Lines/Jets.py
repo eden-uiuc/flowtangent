@@ -45,7 +45,7 @@ class TurbojetEnergyLine(EnergyLine):
 
     tag: str = init_field('Turbojet Energy Line', static=True)
 
-    fuel_inputs: tuple[str, ...] = ("Engine 1", "Engine 2")
+    fuel_inputs: tuple[str, ...] = ("self.engine_1", "self.engine_2")
     
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
     
@@ -57,10 +57,16 @@ class TurbojetEnergyLine(EnergyLine):
         "fuel_tanks": FuelTank,
     }, static=True)
 
-    def __post_init__(self):
-        if len(self.tank_draw_ratios) != len(self.fuel_tanks):
-            # If draw ratios not specified, balance fuel draw by tank mass
-            object.__setattr__(self, "tank_draw_ratios", tuple(t.mass_properties.total for t in self.fuel_tanks))
+    # def __post_init__(self):
+    #     if len(self.tank_draw_ratios) != len(self.fuel_tanks):
+    #         # If draw ratios not specified, balance fuel draw by tank mass
+    #         object.__setattr__(self, "tank_draw_ratios", tuple(t.mass_properties.total for t in self.fuel_tanks))
+    #     if not any(self.get_field_name() in i for i in self.inputs):
+    #         object.__setattr__(
+    #             self,
+    #             "fuel_inputs",
+    #             tuple(self.get_field_name() +"."+i.replace(" ","_").lower() for i in self.fuel_inputs)
+    #         )
 
     @inputs(
             "state.energy.nodes[Line_fuel_tanks].mass",

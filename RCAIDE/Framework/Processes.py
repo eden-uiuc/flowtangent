@@ -32,7 +32,7 @@ from numcodecs import Blosc
 from tqdm import trange
 
 # RCAIDE imports
-from RCAIDE.utils import Token, PathTuple, init_field
+from RCAIDE.utils import Token, DataPath, init_field
 import RCAIDE.utils as ru
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
@@ -90,13 +90,13 @@ class GradientMap:
     ):
 
         # Sanitize inputs/oututs to PathTuples  
-        self.state_inputs     = tuple(PathTuple(p) for p in state_inputs)
-        self.system_inputs    = tuple(PathTuple(p) for p in system_inputs)
-        self.settings_inputs  = tuple(PathTuple(p) for p in settings_inputs)
+        self.state_inputs     = tuple(DataPath(p) for p in state_inputs)
+        self.system_inputs    = tuple(DataPath(p) for p in system_inputs)
+        self.settings_inputs  = tuple(DataPath(p) for p in settings_inputs)
         
-        self.state_outputs    = tuple(PathTuple(p) for p in state_outputs)
-        self.system_outputs   = tuple(PathTuple(p) for p in system_outputs)
-        self.settings_outputs = tuple(PathTuple(p) for p in settings_outputs)
+        self.state_outputs    = tuple(DataPath(p) for p in state_outputs)
+        self.system_outputs   = tuple(DataPath(p) for p in system_outputs)
+        self.settings_outputs = tuple(DataPath(p) for p in settings_outputs)
 
         # Count inputs
         self._n_st = len(self.state_inputs)
@@ -879,7 +879,7 @@ class OptimizerInterface:
 
     def __init__(self, process: Process,
                  base_state: State, base_system: System, base_settings: Settings,
-                 grad_map: GradientMap, objective_path: PathTuple, 
+                 grad_map: GradientMap, objective_path: DataPath, 
                  **kwargs):
         
         self.process = process

@@ -161,11 +161,11 @@ class Compressor(FlowNode):
 
         outputs = state.energy.nodes[self.tag].outputs
         
-        outputs = eqx.tree_at(lambda o: o.mechanical.work             , work)
+        outputs = eqx.tree_at(lambda o: o.mechanical.work, outputs, work)
         
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure    , P_t_out)
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature , T_t_out)
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy    , h_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure, outputs, P_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.tag].outputs, state, outputs)
 
@@ -195,12 +195,13 @@ class TurbojetCombustor(FlowNode):
     def transmit(self, state: State, system: System, settings: Settings):
         
         jet_tag     = '.'.join(self.tag.split('.')[:-1])
-        jet         = system.energy[jet_tag]
+        jet         = system.energy_networks[0].nodes[jet_tag]
+        T_t_ref     = jnp.atleast_2d(jet.design_parameters.turbine_intake_temperature)
 
         P_t_out, h_t_out, f = func_combustor_performance(
             T_t_in = self.sum_inputs(state, "flow", "stagnation_temperature"),
             P_t_in=self.sum_inputs(state, "flow", "stagnation_pressure"),
-            T_t_out=jet.design_parameters.turbine_intake_temperature,
+            T_t_out=T_t_ref,
             h_t_f=jet.fuel.specific_energy,
             Cp=state.freestream.Cp,
             PR=self.pressure_ratio,
@@ -209,11 +210,15 @@ class TurbojetCombustor(FlowNode):
 
         outputs = state.energy.nodes[self.tag].outputs
         
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure   , outputs, P_t_out)
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, jet.design_parameters.turbine_intake_temperature)
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy   , outputs, h_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure, outputs, P_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_ref)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
         
-        outputs = eqx.tree_at(lambda o: o.fuel.fuel_air_ratio        , outputs, f)
+        outputs = eqx.tree_at(lambda o: o.fuel.fuel_air_ratio, outputs, f)
+
+        updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.tag].outputs, state, outputs)
+
+        return updated_state, system, settings
 
 class Turbine(FlowNode):
 
@@ -293,7 +298,7 @@ class ExpansionNozzle(FlowNode):
 
         fs = state.freestream
 
-        AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = func_expansion_nozzle_performance(
+        AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = func_expansion_nozzle_performance(
             T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
             T_t0=fs.stagnation_temperature,
             P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
@@ -307,10 +312,10 @@ class ExpansionNozzle(FlowNode):
             n_p=self.efficiencies.flow
         )
 
-        outputs = state.energy.nodes[self.tag].flow
+        outputs = state.energy.nodes[self.tag].outputs.flow
 
         outputs = eqx.tree_at(lambda o: o.area_ratio            , outputs , AR)
-        outputs = eqx.tree_at(lambda o: o.mach_number           , outputs , M)
+        outputs = eqx.tree_at(lambda o: o.mach_number           , outputs , M_out)
         outputs = eqx.tree_at(lambda o: o.density               , outputs , r_out)
         outputs = eqx.tree_at(lambda o: o.speed                 , outputs , u_out)
         outputs = eqx.tree_at(lambda o: o.pressure              , outputs , P_out)
@@ -337,7 +342,7 @@ def _TurbojetSetup():
     HPT = Turbine(tag="HPT", mechanical_inputs=("HPC",), flow_inputs=("Combustor",))
     LPT = Turbine(tag="LPT", mechanical_inputs=("LPC",), flow_inputs=("HPT",))
 
-    nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPC",))
+    nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPT",))
 
     return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
 
@@ -351,12 +356,28 @@ class TurbojetEngine(Propulsor):
     fuel:                           Propellant      = init_field(JetA)
     working_fluid:                  Gas             = init_field(Air)
 
+    flow_inputs: tuple = ('self.core_nozzle',)
+    fuel_inputs: tuple = ('self.combustor',)
+
     installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
 
     _bookkeeping: dict = init_field(lambda: {
         "compressors": Compressor,
         "turbines": Turbine
     }, static=True)
+
+    # def __post_init__(self):
+    #     if not any(self.get_field_name() in i for i in self.inputs):
+    #         object.__setattr__(
+    #             self,
+    #             "flow_inputs",
+    #             tuple(self.get_field_name() +"."+i.replace(" ","_").lower() for i in self.flow_inputs)
+    #         )
+    #         object.__setattr__(
+    #             self,
+    #             "fuel_inputs",
+    #             tuple(self.get_field_name() +"."+i.replace(" ","_").lower() for i in self.fuel_inputs)
+    #         )
 
     @inputs(
         "state.freestream.gamma",
@@ -404,8 +425,8 @@ class TurbojetEngine(Propulsor):
                 v_core_nozzle=cn_out.speed,
                 AR_core_nozzle=cn_out.area_ratio,
                 P_core_nozzle= cn_out.pressure,
-                f=comb_out.fuel_air_ratio,
-                alpha=0.,
+                fuel_air_ratio=comb_out.fuel_air_ratio,
+                BPR=0.,
                 throttle=state.energy.nodes[self.tag].throttle,
             )
         
@@ -489,7 +510,7 @@ def _TurbofanSetup(BPR):
     HPT = Turbine(tag="HPT", mechanical_inputs=("HPC",), flow_inputs=("Combustor",))
     LPT = Turbine(tag="LPT", mechanical_inputs=("LPC", "Fan"), flow_inputs=("HPT",))
 
-    core_nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPC",))
+    core_nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPT",))
     fan_nozz = ExpansionNozzle(tag="Fan Nozzle", flow_inputs=("Bypass Duct",))
 
     return (inlet, fan, core_flow, bypass_flow, LPC, HPC, comb, HPT, LPT, core_nozz, fan_nozz)
@@ -503,6 +524,7 @@ class TurbofanEngine(TurbojetEngine):
     
     def __post_init__(self):
         object.__setattr__(self, "subcomponents", _TurbofanSetup(self.bypass_ratio))
+        # super(TurbofanEngine, self).__post_init__()
     
     @inputs(
         "state.freestream.gamma",
@@ -553,8 +575,8 @@ class TurbofanEngine(TurbojetEngine):
                 v_core_nozzle=cn_out.speed,
                 AR_core_nozzle=cn_out.area_ratio,
                 P_core_nozzle= cn_out.pressure,
-                f=comb_out.fuel_air_ratio,
-                alpha=self.bypass_ratio,
+                fuel_air_ratio=comb_out.fuel_air_ratio,
+                BPR=self.bypass_ratio,
                 throttle=state.energy.nodes[self.tag].throttle,
             )
         
