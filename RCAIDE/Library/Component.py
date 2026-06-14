@@ -156,7 +156,7 @@ class Component(eqx.Module):
             filtered_subs = tuple(
                 c for c in self.subcomponents if isinstance(c, target_class)
             )
-            return Component(tag=item.capitalize(), subcomponents=filtered_subs)
+            return Component(tag=item.replace('_',' ').title(), subcomponents=filtered_subs)
         for sc in self.subcomponents:
             if hasattr(sc, 'get_field_name') and sc.get_field_name() == item:
                 return sc

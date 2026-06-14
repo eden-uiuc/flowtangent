@@ -1,4 +1,4 @@
-from .initialization import initialize_VLM_data
+from .initialization import initialize_VORJAX_data
 from .panelization import discretize_surfaces
 from .boundary_conditions import compute_boundary_conditions
 from .induced_velocity import compute_induced_velocity

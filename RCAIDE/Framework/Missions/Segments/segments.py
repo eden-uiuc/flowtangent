@@ -15,9 +15,8 @@ import timeit
 import time
 import sys
 
-from typing import Callable, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from dataclasses import replace
-from enum import Enum
 
 # package imports
 
@@ -36,11 +35,9 @@ from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 from .Profiles import *
 
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, scan_for_invalid_JAX_types
 
 from RCAIDE.Framework import Process, ProcessStep
-
-from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
 
 from RCAIDE.Framework.Processes import null_step
 from RCAIDE.Framework.Missions.Initialize import *
@@ -141,6 +138,7 @@ def _initialization_steps():
         ProcessStep(tag="Energy",               function=initialize_energy),
         ProcessStep(tag="Inertial Position",    function=initialize_inertial_position),
         ProcessStep(tag="Planetary Position",   function=initialize_planetary_position),
+        ProcessStep(tag="Analyses",             function=null_step),
     )
 
 class InitializeSegment(Process):
@@ -155,6 +153,10 @@ class InitializeSegment(Process):
     steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
 
     def __call__(self, state, system, settings, validate_controls=False):
+        
+        if settings.DEBUG_MODE:
+            scan_for_invalid_JAX_types(state,  f"Pre-{self.tag} State")
+            scan_for_invalid_JAX_types(system, f"Pre-{self.tag} System")
 
         current_state = state
 
@@ -305,7 +307,7 @@ class IterateSegment(Process):
         
         return root.run(x0, state, system, settings)
 
-    def __call__(self, state, system, settings):
+    def __call__(self, state: State, system: System, settings: Settings):
 
         root_finder = settings.mission.root_finder
         
@@ -545,13 +547,6 @@ class Segment(Process):
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
         
         state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
-
-        if self.analyze.energy.function is null_step:
-            if hasattr(system, "energy") and system.energy:
-                    self.analyze.energy.function = build_analysis_from_network(system.energy)
-                    if settings.DEBUG_MODE:
-                        warnings.warn(f"No energy analysis specified for segment {self.tag}. "
-                                    "Defaulting to system energy network analysis.")
 
         if settings.DEBUG_MODE:
             for step in self.analyze.steps:

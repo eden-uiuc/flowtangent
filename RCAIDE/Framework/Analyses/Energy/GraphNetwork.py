@@ -29,13 +29,18 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 # 2. STATEFUL FRAMEWORK ROUTER
 # ---------------------------------------------------------
 def build_analysis_from_network(network: EnergyNetwork):
-    
+
+    def make_node_function(node_ID: str):
+        def _pure_transmit(state, system, settings):
+            return network.nodes[node_ID].transmit(state, system, settings)
+        return _pure_transmit
+
     return Process(
                 tag=f"{network.tag} Analysis",
                 steps=tuple(
                     ProcessStep(
-                        tag=f"{tag}",
-                        function=network.nodes[tag].transmit
-                    ) for tag in network._execution_order
+                        tag=f"{ID}",
+                        function=make_node_function(ID)
+                    ) for ID in network._execution_order
                 )
             )

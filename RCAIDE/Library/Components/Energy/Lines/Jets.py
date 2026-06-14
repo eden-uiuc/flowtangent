@@ -45,7 +45,7 @@ class TurbojetEnergyLine(EnergyLine):
 
     tag: str = init_field('Turbojet Energy Line', static=True)
 
-    fuel_inputs: tuple[str, ...] = ("self.engine_1", "self.engine_2")
+    fuel_inputs: tuple[str, ...] = init_field(("self.engine_1", "self.engine_2"), static=True)
     
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
     
@@ -82,7 +82,7 @@ class TurbojetEnergyLine(EnergyLine):
         total_fuel_burn = self.sum_inputs(state, "fuel", "flow_rate")
         
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
-        current_fuel_mass = jnp.sum(jnp.asarray([state.energy.nodes[t.tag].mass for t in self.fuel_tanks]))
+        current_fuel_mass = jnp.sum(jnp.asarray([state.energy.nodes[t.network_ID].mass for t in self.fuel_tanks]))
         fuel_fraction = current_fuel_mass / total_fuel_mass
 
         selector_ratios = {t: t.selector_ratio for t in self.fuel_tanks}
@@ -92,7 +92,7 @@ class TurbojetEnergyLine(EnergyLine):
         balanced_draws = active_draws/jnp.sum(active_draws)
         
         updated_state = eqx.tree_at(
-            lambda s: tuple(s.energy.nodes[t.tag].outputs.fuel.flow_rate for t in self.fuel_tanks),
+            lambda s: tuple(s.energy.nodes[t.network_ID].outputs.fuel.flow_rate for t in self.fuel_tanks),
             state,
             tuple(-balanced_draws[i] * total_fuel_burn for i in range(len(balanced_draws)))
         )

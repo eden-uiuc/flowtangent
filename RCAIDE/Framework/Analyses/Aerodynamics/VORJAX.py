@@ -36,7 +36,7 @@ from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
                                                           compute_coefficients, compute_induced_velocity,
                                                           compute_panel_pressures, compute_boundary_conditions,
                                                           compute_vortex_strength,
-                                                          initialize_VLM_data, discretize_surfaces,
+                                                          initialize_VORJAX_data, discretize_surfaces,
                                                           apply_aerodynamic_forces)
 
 from RCAIDE.Framework.Missions.Initialize import initialize_aerodynamics
@@ -54,7 +54,7 @@ class SupersonicSettings(eqx.Module):
     
     peak_CL_multiplier:             float = 1.15
     peak_mach_number:               Optional[float] = None
-    _transonic_CL_blender:          Callable = init_field(ensemble_CL_spline, static=True)
+    _transonic_CL_blender:          Callable = init_field(ensemble_CL_spline, as_value=True, static=True)
     
     begin_drag_rise_mach_number:    float = 0.95
     end_drag_rise_mach_number:      float = 1.2
@@ -67,7 +67,7 @@ class SupersonicSettings(eqx.Module):
 
     def __post_init__(self):
         if self.peak_mach_number is not None:
-            object.__setattr__(self, "_transonic_CL_blender", peaked_CL_spline)
+            object.__setattr__(self, "_transonic_CL_blender", init_field(peaked_CL_spline, as_value=True, static=True))
     
     def transonic_CL_blender(self, M, val_sub, val_sup):
         return self._transonic_CL_blender(
@@ -217,7 +217,7 @@ class VORJAX_Settings(eqx.Module):
 def _default_VORJAX_init_steps():
     return(
         ProcessStep(initialize_aerodynamics, "Initialize Component Bookkeeping"),
-        ProcessStep(initialize_VLM_data, "Initialize Data Structures"),
+        ProcessStep(initialize_VORJAX_data, "Initialize Data Structures"),
         ProcessStep(discretize_surfaces, "Discretize Surfaces"),
     )
 

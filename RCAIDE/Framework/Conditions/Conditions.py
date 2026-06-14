@@ -101,4 +101,5 @@ class Conditions(eqx.Module):
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
     
     def __repr__(self):
-        return self.tag
+        repr_str = self.tag + " - Subconditions: [" + ', '.join([sc.tag for sc in self.subconditions])+"]"
+        return repr_str

@@ -17,6 +17,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+import numpy as np
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
@@ -32,12 +33,14 @@ if TYPE_CHECKING:
 # Syntax Helpers
 #----------------------------------------------------------
 
-def init_field(initializer: Any, **kwargs):
+def init_field(initializer: Any, as_value: bool = False, **kwargs):
     """
     Smart wrapper for eqx.field that automatically routes the initializer 
     to `default` (for immutables) or `default_factory` (for classes/callables).
     """
     # Handle factories and classes (e.g., list, dict, MediumRange)
+    if as_value:
+        return eqx.field(default=initializer, **kwargs)
     if callable(initializer):
         return eqx.field(default_factory=initializer, **kwargs)
     
@@ -170,6 +173,47 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
         new_leaves[idx] = leaf
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
+
+# ---------------------------------------------------------
+# Debugging Tools
+# ---------------------------------------------------------
+
+def scan_for_invalid_JAX_types(pytree, name="PyTree"):
+    print(f"--- Scanning {name} for invalid dynamic leaves ---")
+    found_invalid = False
+
+    def check_leaf(path, leaf):
+        nonlocal found_invalid
+        
+        # These are the only types JAX should ever see in the dynamic leaves
+        valid_jax_types = (jax.Array, np.ndarray, float, int, complex, bool)
+        
+        if not isinstance(leaf, valid_jax_types):
+            found_invalid = True
+            
+            # Format the exact path (handles Equinox attributes, dict keys, and tuple indices)
+            path_str = ""
+            for p in path:
+                if hasattr(p, 'name'):
+                    path_str += f".{p.name}"
+                elif hasattr(p, 'key'):
+                    path_str += f"[{repr(p.key)}]"
+                elif hasattr(p, 'idx'):
+                    path_str += f"[{p.idx}]"
+                else:
+                    path_str += f"<{p}>"
+                    
+            print(f"Invalid JAX Type Found: {name}{path_str}")
+            print(f"   Type:  {type(leaf)}")
+            print(f"   Value: {leaf}\n")
+            
+        return leaf
+
+    # Walk the tree and check every single dynamic leaf
+    jax.tree_util.tree_map_with_path(check_leaf, pytree)
+    
+    if not found_invalid:
+        print(f"{name} is a valid PyTree.\n")
 
 # ---------------------------------------------------------
 # General Mathematical Utilities

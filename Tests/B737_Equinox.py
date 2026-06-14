@@ -2,7 +2,6 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-
 # package imports
 import dataclasses as dc
 
@@ -10,6 +9,8 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE Imports
+import RCAIDE.utils as ru
+
 from RCAIDE.Framework import Process, State, Settings
 from RCAIDE.Framework.Conditions import Numerics
 from RCAIDE.Framework.Systems import Aircraft, VehicleEnvelope, AircraftMassProperties
@@ -21,6 +22,7 @@ from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, Altit
 from RCAIDE.Framework.Conditions.Controls import DirectControlVariable
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from RCAIDE.Framework.Analyses.Energy.Sizing import update_design_parameters
+from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
@@ -393,9 +395,9 @@ def vehicle_setup():
     )
     fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]), mass_properties=fuel_mass)
 
-    tf_line = TurbojetEnergyLine(subcomponents=(tf, tf2, fuel))
+    tf_line = TurbojetEnergyLine(tag="Turbofan Energy Line", subcomponents=(tf, tf2, fuel))
 
-    tf_network = EnergyNetwork(subcomponents=(tf_line,))
+    tf_network = EnergyNetwork(tag="Turbofan Network", subcomponents=(tf_line,))
     vehicle = vehicle.add_subcomponent(tf_network)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -524,16 +526,19 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
     for segment in mission.steps:
         aero_init = InitializeVORJAX()
         aero_analysis = ComputeVORJAX()
+        energy_analysis = build_analysis_from_network(system.energy_networks.turbofan_network)
         
         updated_segment = eqx.tree_at(
             lambda s: (
-                s.initialize,
-                s.analyze.aerodynamics
+                s.initialize.analyses,
+                s.analyze.aerodynamics,
+                s.analyze.energy,
             ),
             segment,
             (
                 aero_init,
                 aero_analysis,
+                energy_analysis,
             )
         )
 
@@ -550,19 +555,20 @@ def mission_b737(state, system, settings):
     final_state, final_system, final_settings = mission.run(state, system, updated_settings)
 
     VLM_data = final_system.analysis_data
-    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['pressure_coefficients'][0])
+    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['dCp'][0])
     fig.show()
 
     return final_state, final_system, final_settings
 
 
+
 if __name__ == '__main__':
 
-    print("Setting up mission ...")
+    print("\nSetting up mission ...")
 
     state = State(numerics=Numerics(number_of_control_points=4))
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=True)
+    settings = Settings(DEBUG_MODE=False)
 
     print("Setup complete, starting mission ...")
 

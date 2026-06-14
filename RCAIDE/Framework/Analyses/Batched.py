@@ -144,7 +144,7 @@ class BatchAnalysis:
             grad_keys = [f"d{p[0].tag}_d{p[1].tag}" for p in grad_pairs]
             grad_idxs = list(product(range(len(out)), range(len(inp))))
 
-        # Initialize VORJAX once
+        # Initialize Analysis once
         init_results = self.initialization_process.run(base_state.expand_rows(batch_size), system, settings)
         state = init_results[0]
         system = init_results[1]

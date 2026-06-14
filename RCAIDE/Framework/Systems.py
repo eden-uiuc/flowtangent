@@ -87,7 +87,7 @@ class Aircraft(System):
         "fuselages": Fuselage,
         "nacelles": Nacelle,
         "landing_gear": LandingGear
-    })
+    }, static=True)
 
     reference_geometry:     AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
     analysis_data:          dict = init_field(dict)

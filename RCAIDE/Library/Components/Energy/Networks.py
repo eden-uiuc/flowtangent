@@ -58,12 +58,12 @@ class EnergyNetwork(EnergyNode):
         temp_dict = {}
         def _temp_recurse(subs):
             for c in subs:
-                if isinstance(c, EnergyNode): temp_dict[c.tag] = c
+                if isinstance(c, EnergyNode): temp_dict[c.network_ID] = c
                 if hasattr(c, "subcomponents") and c.subcomponents: _temp_recurse(c.subcomponents)
         _temp_recurse(self.subcomponents)
 
         source_to_splitters = {}
-        for tag, node in temp_dict.items():
+        for ID, node in temp_dict.items():
             if hasattr(node, 'extraction_fraction') and node.inputs:
                 upstream_source = node.inputs[0]
                 source_to_splitters.setdefault(upstream_source, []).append(node)
@@ -73,14 +73,14 @@ class EnergyNetwork(EnergyNode):
             total = sum(s.extraction_fraction for s in splitters)
             if abs(total - 1.0) > 1e-6 and total > 0:
                 for s in splitters:
-                    corrected_fractions[s.tag] = s.extraction_fraction / total
+                    corrected_fractions[s.network_ID] = s.extraction_fraction / total
 
         if not corrected_fractions:
             return self
 
         def _apply(node):
-            if isinstance(node, EnergyNode) and node.tag in corrected_fractions:
-                return eqx.tree_at(lambda n: n.extraction_fraction, node, corrected_fractions[node.tag])
+            if isinstance(node, EnergyNode) and node.network_ID in corrected_fractions:
+                return eqx.tree_at(lambda n: n.extraction_fraction, node, corrected_fractions[node.network_ID])
             return node
 
         return jax.tree_util.tree_map(_apply, self, is_leaf=lambda x: isinstance(x, EnergyNode))
@@ -90,7 +90,7 @@ class EnergyNetwork(EnergyNode):
         def _recurse(subcomponents):
             for comp in subcomponents:
                 if isinstance(comp, EnergyNode):
-                    nodes_dict[comp.tag] = comp
+                    nodes_dict[comp.network_ID] = comp
                 if hasattr(comp, "subcomponents") and comp.subcomponents:
                     _recurse(comp.subcomponents)
         
@@ -98,7 +98,8 @@ class EnergyNetwork(EnergyNode):
         return eqx.tree_at(lambda n: n.nodes, self, nodes_dict)
     
     def sort_network_topology(self) -> "EnergyNetwork":
-        """The single entry point to finalize the network for execution."""
+        """The single entry point to finalize the network for execution.
+        Use after running initialize_energy so parts are properly ID'd."""
         
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()

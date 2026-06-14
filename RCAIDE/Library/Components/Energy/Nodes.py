@@ -38,6 +38,8 @@ class EnergyEfficiencies(eqx.Module):
 
 class EnergyNode(Component):
     
+    network_ID: str = init_field("energy_node", static=True)
+    
     efficiencies:   EnergyEfficiencies  = init_field(EnergyEfficiencies)
 
     mechanical_inputs: tuple[str, ...] = init_field(tuple, static=True)
@@ -51,14 +53,17 @@ class EnergyNode(Component):
         return (self.mechanical_inputs + self.electrical_inputs + self.fuel_inputs
                 + self.flow_inputs + self.force_inputs) #type: ignore
     
+    @eqx.filter_jit
     def _get_all_inputs(self, state, input_type: str, input_field: str):
         output_conditions = [getattr(state.energy.nodes[i].outputs, input_type) for i in getattr(self, f"{input_type}_inputs")]
         return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
 
+    @eqx.filter_jit
     def sum_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1))
 
+    @eqx.filter_jit
     def average_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1))
@@ -72,8 +77,8 @@ class EnergySplitter(EnergyNode):
 
     extraction_fraction: float = 1.0
 
-    _splitter_type: str = "flow"
-    split_values: tuple[str] = ("mass_flow_rate",)
+    _splitter_type: str = init_field("flow", static=True)
+    split_values: tuple[str] = init_field(("mass_flow_rate",), static=True)
     
     def __post_init__(self):
         assert len(self.inputs) == 1 , f"Energy splitters can only have one input. Found: {self.inputs}"
@@ -92,7 +97,7 @@ class EnergySplitter(EnergyNode):
         )
 
         updated_state = eqx.tree_at(
-            lambda s: getattr(s.energy.nodes[self.tag].outputs, self._splitter_type),
+            lambda s: getattr(s.energy.nodes[self.network_ID].outputs, self._splitter_type),
             state,
             extracted_input
         )
@@ -113,36 +118,6 @@ class FlowNode(EnergyNode):
 
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
-
-
-
-# class FlowSplitter(EnergyNode):
-    
-#     # The fraction of the upstream mass flow this node will extract
-#     extraction_fraction: float = init_field(1.0)
-
-#     def transmit(self, state, system, settings):
-        
-#         # Pull the TOTAL flow state from the upstream node
-#         upstream_tag = self.flow_inputs[0]
-#         total_inlet_flow = state.energy.nodes[upstream_tag].outputs.flow
-        
-#         # Copy the thermodynamic state (pressure, temperature, etc.)
-#         # Scale only the mass flow by the extraction fraction
-#         extracted_flow = eqx.tree_at(
-#             lambda f: f.mass_flow, 
-#             total_inlet_flow, 
-#             total_inlet_flow.mass_flow * self.extraction_fraction
-#         )
-        
-#         # Dump the scaled flow into this node's outputs
-#         state = eqx.tree_at(
-#             lambda s: s.energy.nodes[self.tag].outputs.flow, 
-#             state, 
-#             extracted_flow
-#         )
-        
-#         return state
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Energy Store
