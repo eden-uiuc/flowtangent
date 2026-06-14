@@ -20,7 +20,7 @@ import RCAIDE.Framework as rcf
 import equinox as eqx
 
 def initialize_inertial_position(state: "rcf.State",
-                                 system: "rcf.System",
+                                 system: "rcf.Systems",
                                  settings: "rcf.Settings",
                                  ):
 

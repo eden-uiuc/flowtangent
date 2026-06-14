@@ -39,7 +39,7 @@ from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
 
 from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, System
 from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Missions.Conditions import Numerics
+from RCAIDE.Framework.Conditions import Numerics
 
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator

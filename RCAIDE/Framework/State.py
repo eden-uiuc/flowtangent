@@ -7,25 +7,19 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING
 from functools import reduce
 
 # package imports
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-# RCAIDE imports
-if TYPE_CHECKING:
-    from RCAIDE.Framework import System
-    from RCAIDE.Library import Component
-
-import RCAIDE.Library.Components
-
-from RCAIDE.utils import empty_array, init_field, get_all_targets
-from RCAIDE.Framework.Missions.Conditions import (
-    Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
-    AerodynamicsConditions, StabilityConditions, ControlsConditions, DynamicsConditions)
+from RCAIDE.utils import empty_array, init_field
+from RCAIDE.Framework.Conditions import (
+    Conditions, Numerics,
+    AerodynamicsConditions, ControlsConditions, DynamicsConditions,
+    EnergyNetworkConditions, FrameConditions, FreestreamConditions,
+    MassConditions, StabilityConditions
+)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  State
@@ -132,67 +126,5 @@ class State(Conditions):
             stacked_residuals = jnp.empty((0,))
 
         return eqx.tree_at(lambda s: s.solver.residuals, self, stacked_residuals)
-
-    def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
-        
-        new_controls = self.controls
-        surface_controls = []
-        direct_controls = []
-        unbound_controls = []
-
-        
-        if verbose:
-            print(f"Building controls from {system.tag}...")
-        
-        for component in system.subcomponents:
-            self.build_controls_from_system(component)
-
-            if component.is_control_component:
-                if isinstance(component, RCAIDE.Library.Components.Wing):
-                    new_controls = self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
-                            tag=component.tag + "_deflection",
-                            surfaces=(system,),
-                        )
-                    )
-                    surface_controls.append(component.tag + "_deflection")
-
-                else:
-                    unbound = False
-                    if hasattr(component, "control_path"): path = component.control_path
-                    else: path = (); unbound = True
-
-                    if hasattr(component, "control_path_indices"): indices = component.control_path_indices
-                    else: indices = (slice(None), 0); unbound = True
-
-                    if unbound: unbound_controls.append(component.tag)
-
-                    new_controls = self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.Conditions.Controls.DirectControlVariable(
-                            tag=component.tag,
-                            path=path,
-                            path_indices=indices,
-                        )
-                    )
-                    if not unbound: direct_controls.append(component.tag)
-
-                if verbose:
-                    if surface_controls:
-                        print(f"Added the following aerodynamic surface controls:" +
-                              "\n\t- ".join(surface_controls))
-                    if direct_controls:
-                        print(f"Added the following direct controls:" +
-                              "\n\t- ".join(direct_controls))
-                    if unbound_controls:
-                        print(f"The following control components were found, but without path information."
-                              f"They may not function as intended:"
-                              "\n\t- ".join(unbound_controls))
-        
-        if verbose:
-            print(f"Completed building controls from {system.tag}.\n"
-                  f"Controls may be activated for mission segments by setting "
-                  f"segment.active_controls = ('control_variable', ...)")
-        
-        return eqx.tree_at(lambda s: s.controls, self, new_controls)
 
 

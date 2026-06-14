@@ -25,8 +25,8 @@ from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingD
 from RCAIDE.Library.Components.Airfoils import Airfoil
 
 from RCAIDE.Framework import Process, State, Settings, GradientMap
-from RCAIDE.Framework.System import Aircraft
-from RCAIDE.Framework.Missions.Conditions import Numerics
+from RCAIDE.Framework.Systems import Aircraft
+from RCAIDE.Framework.Conditions import Numerics
 
 from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 

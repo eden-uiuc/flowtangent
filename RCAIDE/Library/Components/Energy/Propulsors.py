@@ -7,9 +7,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 
-import warnings
 
 # package imports
 import jax.numpy as jnp
@@ -18,17 +19,9 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Framework.Settings import Settings
-from RCAIDE.Framework.State import State
-from RCAIDE.Framework.System import System, Aircraft
-from RCAIDE.Framework.Missions.Initialize import initialize_energy
-
-from RCAIDE.Library import Component
-from RCAIDE.Library.Atmospheres import USStandard1976
 from RCAIDE.Library.Propellants import Propellant, JetA
 from RCAIDE.Library.Gases import Gas, Air
-from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode, FlowSplitter
-
+from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode
 
 from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_compression_nozzle_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Fan_Compressors import func_fan_compressor_performance
@@ -52,10 +45,10 @@ class DesignParameters(eqx.Module):
     mach_number:                    float = 0.01
     
     temperature:                    float = 288.15      # Kelvin
-    total_temperature:              float = 288.15      # Kelvin
+    stagnation_temperature:         float = 288.15      # Kelvin
     
     pressure:                       float = 101325.0    # Pascal
-    total_pressure:                 float = 101325.0    # Pascal
+    stagnation_pressure:            float = 101325.0    # Pascal
     
     isa_deviation:                  float = 0.0
 
@@ -139,8 +132,6 @@ class InletNozzle(FlowNode):
 class Compressor(FlowNode):
 
     tag: str = init_field("Compressor", static=True)
-
-    flow_inputs: list[str] = init_field(list, static=True)
     
     @inputs(
         "state.freestream.Cp",
@@ -182,9 +173,9 @@ class Compressor(FlowNode):
 
 class TurbojetCombustor(FlowNode):
 
-    tag = init_field("Combustor", static=True)
+    tag: str = init_field("Combustor", static=True)
 
-    flow_inputs = init_field(['HPC'], static=True)
+    flow_inputs: tuple[str, ...] = init_field(('HPC',), static=True)
 
     @inputs(
         "state.freestream.Cp"
@@ -226,11 +217,10 @@ class TurbojetCombustor(FlowNode):
 
 class Turbine(FlowNode):
 
-    tag = init_field("Turbine", static=True)
+    tag: str = init_field("Turbine", static=True)
     
-    mechanical_inputs = init_field(["Offtake Shaft"], static=True)
-    flow_inputs: list[str] = init_field(list, static=True)
-    fuel_inputs: list[str] = init_field(["Combustor"], static=True)
+    mechanical_inputs: tuple[str, ...] = init_field(("Offtake Shaft",), static=True)
+    fuel_inputs: tuple[str, ...] = init_field(("Combustor",), static=True)
 
     @inputs(
         "state.freestream.gamma",
@@ -273,7 +263,7 @@ class Turbine(FlowNode):
 
 class ExpansionNozzle(FlowNode):
 
-    tag = init_field("Nozzle", static=True)
+    tag: str = init_field("Nozzle", static=True)
 
     @inputs(
         "state.freestream.stagnation_temperature",
@@ -339,22 +329,22 @@ class ExpansionNozzle(FlowNode):
 def _TurbojetSetup():
     
     inlet = InletNozzle()
-    LPC = Compressor(tag="LPC", flow_inputs=["Inlet Nozzle"])
-    HPC = Compressor(tag="HPC", flow_inputs=["LPC"])
+    LPC = Compressor(tag="LPC", flow_inputs=("Inlet Nozzle",))
+    HPC = Compressor(tag="HPC", flow_inputs=("LPC",))
 
     comb = TurbojetCombustor()
 
-    HPT = Turbine(tag="HPT", mechanical_inputs=["HPC"], flow_inputs=["Combustor"])
-    LPT = Turbine(tag="LPT", mechanical_inputs=["LPC"], flow_inputs=["HPT"])
+    HPT = Turbine(tag="HPT", mechanical_inputs=("HPC",), flow_inputs=("Combustor",))
+    LPT = Turbine(tag="LPT", mechanical_inputs=("LPC",), flow_inputs=("HPT",))
 
-    nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=["LPC"])
+    nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPC",))
 
     return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
 
 class TurbojetEngine(Propulsor):
 
     tag: str        = init_field('Turbojet', static=True)
-    subcomponents   = tuple = init_field(_TurbojetSetup())
+    subcomponents: tuple = init_field(_TurbojetSetup())
 
     plug_diameter:                  float   = 0.0
 
@@ -363,65 +353,10 @@ class TurbojetEngine(Propulsor):
 
     installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
 
-    _bookkeeping = {
+    _bookkeeping: dict = init_field(lambda: {
         "compressors": Compressor,
         "turbines": Turbine
-    }
-    
-    def update_design_parameters(self) -> TurbojetEngine:
-        design_thrust = self.design_parameters.total_thrust
-        
-        if design_thrust == 0.0:
-            warnings.warn("Attempted to calculate sea-level static thrust without reference design thrust. "
-            f"Please set {self.tag}.design_parameters.total_thrust.")
-            return self
-        
-        atmo = USStandard1976()
-        T0 = atmo.compute_temperature(0.0)
-        a0 = atmo.compute_speed_of_sound(0.0)
-        M0 = 0.01
-
-        sls_state = eqx.tree_at(lambda s:(
-            s.freestream.altitude,
-            s.freestream.gravity,
-            s.freestream.mach_number,
-            s.freestream.speed_of_sound,
-            s.freestream.speed,
-            s.freestream.temperature,
-            s.freestream.pressure,
-            s.freestream.density,
-            s.freestream.dynamic_viscosity,
-            s.freestream.isentropic_expansion_factor,
-            s.freestream.Cp,
-            s.freestream.R,
-        ), State().expand_rows(1),
-        (
-            jnp.atleast_2d(0.),
-            jnp.atleast_2d(9.81),
-            jnp.atleast_2d(M0),
-            jnp.atleast_2d(a0),
-            jnp.atleast_2d(a0*M0),
-            jnp.atleast_2d(T0),
-            jnp.atleast_2d(atmo.compute_pressure(0.0)),
-            jnp.atleast_2d(atmo.compute_density(0.0)),
-            jnp.atleast_2d(atmo.compute_dynamic_viscosity(0.0)),
-            jnp.atleast_2d(self.working_fluid.compute_gamma(T0)),
-            jnp.atleast_2d(self.working_fluid.compute_Cp(T0)),
-            jnp.atleast_2d(self.working_fluid.R_specific),
-        ))
-
-        sls_system = Aircraft()
-        sls_system = eqx.tree_at(lambda s: s.energy, sls_system, sls_system.energy.add_subcomponent(self))
-
-        sls_state, sls_system, settings = initialize_energy(sls_state, sls_system, Settings())
-        sls_state, sls_system, settings = self.transmit(sls_state, sls_system, settings)
-
-        sls_thrust = sls_state.energy.nodes[self.tag].outputs.force.thrust.item(0)
-
-        updated_params = eqx.tree_at(lambda d: d.SLS_thrust, self.design_parameters, sls_thrust)
-        updated_self = eqx.tree_at(lambda s: s.design_parameters, self, updated_params)
-
-        return updated_self
+    }, static=True)
 
     @inputs(
         "state.freestream.gamma",
@@ -497,8 +432,8 @@ class TurbojetEngine(Propulsor):
 
 class Fan(FlowNode):
 
-    tag = "Fan"
-    flow_inputs = init_field(["Inlet Nozzle"], static=True)
+    tag: str = "Fan"
+    flow_inputs: tuple[str, ...] = init_field(("Inlet Nozzle",), static=True)
 
     @inputs(
         "state.freestream.Cp",
@@ -543,19 +478,19 @@ def _TurbofanSetup(BPR):
     inlet = InletNozzle()
     fan   = Fan()
 
-    core_flow = EnergySplitter(tag="Core Duct", flow_inputs=["Fan"], extraction_fraction=1./(1.+BPR))
-    bypass_flow = EnergySplitter(tag="Bypass Duct", flow_inputs=["Fan"], extraction_fraction=BPR/(1.+BPR))
+    core_flow = EnergySplitter(tag="Core Duct", flow_inputs=("Fan",), extraction_fraction=1./(1.+BPR))
+    bypass_flow = EnergySplitter(tag="Bypass Duct", flow_inputs=("Fan",), extraction_fraction=BPR/(1.+BPR))
     
-    LPC = Compressor(tag="LPC", flow_inputs=["Core Duct"])
-    HPC = Compressor(tag="HPC", flow_inputs=["LPC"])
+    LPC = Compressor(tag="LPC", flow_inputs=("Core Duct",))
+    HPC = Compressor(tag="HPC", flow_inputs=("LPC",))
 
     comb = TurbojetCombustor()
 
-    HPT = Turbine(tag="HPT", mechanical_inputs=["HPC"], flow_inputs=["Combustor"])
-    LPT = Turbine(tag="LPT", mechanical_inputs=["LPC", "Fan"], flow_inputs=["HPT"])
+    HPT = Turbine(tag="HPT", mechanical_inputs=("HPC",), flow_inputs=("Combustor",))
+    LPT = Turbine(tag="LPT", mechanical_inputs=("LPC", "Fan"), flow_inputs=("HPT",))
 
-    core_nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=["LPC"])
-    fan_nozz = ExpansionNozzle(tag="Fan Nozzle", flow_inputs=["Bypass Duct"])
+    core_nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPC",))
+    fan_nozz = ExpansionNozzle(tag="Fan Nozzle", flow_inputs=("Bypass Duct",))
 
     return (inlet, fan, core_flow, bypass_flow, LPC, HPC, comb, HPT, LPT, core_nozz, fan_nozz)
     
@@ -611,7 +546,7 @@ class TurbofanEngine(TurbojetEngine):
                 P0=fs.pressure,
                 g=fs.gravity,
                 F_ref =self.design_parameters.total_thrust,
-                delta_SFC=self.delta_SFC,
+                delta_SFC=self.design_parameters.delta_SFC,
                 v_fan_nozzle=fn_out.speed,
                 AR_fan_nozzle=fn_out.area_ratio,
                 P_fan_nozzle=fn_out.pressure,

@@ -6,9 +6,12 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-
 from __future__ import annotations
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
+
+from dataclasses import replace
 from graphlib import TopologicalSorter, CycleError
 
 # package imports
@@ -18,14 +21,8 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from .Nodes import EnergyNode, EnergySplitter
+from RCAIDE.Library.Components.Energy.Nodes import EnergyNode, EnergySplitter, EnergyStore
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
-from RCAIDE.Library.Components.Energy.Stores import EnergyStore
-
-from RCAIDE.Framework import Process
-
-if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Lines
@@ -34,11 +31,11 @@ if TYPE_CHECKING:
 
 class EnergyLine(EnergyNode):
 
-    _bookkeeping = {
+    _bookkeeping: dict = init_field(lambda: {
         "propulsors": Propulsor,
         "splitters": EnergySplitter,
         "stores": EnergyStore,
-    }
+    }, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks
@@ -48,9 +45,9 @@ class EnergyNetwork(EnergyNode):
 
     tag: str = init_field('Energy Network', static=True)
 
-    _bookkeeping = {
+    _bookkeeping: dict = init_field(lambda: {
         "lines": EnergyLine
-    }
+    }, static=True)
     
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
@@ -106,25 +103,18 @@ class EnergyNetwork(EnergyNode):
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()
         dependency_graph = {
-            tag: set(node.all_causal_inputs) 
+            tag: set(node.inputs) 
             for tag, node in updated_network.nodes.items()
         }
 
         try:
             sorter = TopologicalSorter(dependency_graph)
+            updated_order = tuple(sorter.static_order())
             
-            return eqx.tree_at(
-                lambda n: n._execution_order, 
+            return replace(
                 updated_network, 
-                tuple(sorter.static_order())
+                _execution_order=updated_order
             )
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
-    
-    @property
-    def analyze(self):
-        return Process(
-            tag=f"{self.tag} Analysis",
-            steps=tuple(self.nodes[tag].process_step for tag in self._execution_order)
-        )
 

@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import Optional
+from typing import Optional, Literal
 
 import jax
 import equinox as eqx
@@ -54,11 +54,11 @@ class AnalysisSettings(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-RootFinders = ScipyRootFinding | Broyden | GaussNewton
+RootFinders = Literal["ScipyRootFinding", "Broyden", "GaussNewton"]
 
 class MissionSettings(eqx.Module):
 
-    root_finder:    RootFinders         = init_field(GaussNewton, static=True)
+    root_finder: RootFinders = init_field("GaussNewton", static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Full Settings

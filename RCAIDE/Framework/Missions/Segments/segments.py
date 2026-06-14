@@ -36,15 +36,16 @@ from jaxopt import ScipyRootFinding, Broyden, GaussNewton
 
 from .Profiles import *
 
-from RCAIDE.utils import init_field, PathTuple
-
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+from RCAIDE.utils import init_field
 
 from RCAIDE.Framework import Process, ProcessStep
-from RCAIDE.Framework.Process import null_step
+
+from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
+
+from RCAIDE.Framework.Processes import null_step
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
-from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
+from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
 
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, Settings, System
@@ -311,7 +312,7 @@ class IterateSegment(Process):
         with Spinner(enabled=not settings.DEBUG_MODE):
             
             match root_finder:
-                case cls if cls is GaussNewton:
+                case cls if cls == "GaussNewton":
                     
                     x0 = state.solver.unknowns
 
@@ -352,7 +353,7 @@ class IterateSegment(Process):
 
                     return self.analyze(current_state, system, settings)
 
-                case cls if cls is ScipyRootFinding:
+                case cls if cls == "ScipyRootFinding":
 
                     x0 = state.unknowns
 
@@ -385,7 +386,7 @@ class IterateSegment(Process):
 
                     return self.analyze(current_state, system, settings)
 
-                case cls if cls is Broyden:
+                case cls if cls == "Broyden":
                     x0 = state.unknowns
 
                     # 2. Start the clock
@@ -546,11 +547,11 @@ class Segment(Process):
         state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
 
         if self.analyze.energy.function is null_step:
-            if isinstance(system.energy, EnergyNetwork):
-                self.analyze.energy.function = system.energy.analyze
-                if settings.DEBUG_MODE:
-                    warnings.warn(f"No energy analysis specified for segment {self.tag}. "
-                                  "Defaulting to system energy network analysis.")
+            if hasattr(system, "energy") and system.energy:
+                    self.analyze.energy.function = build_analysis_from_network(system.energy)
+                    if settings.DEBUG_MODE:
+                        warnings.warn(f"No energy analysis specified for segment {self.tag}. "
+                                    "Defaulting to system energy network analysis.")
 
         if settings.DEBUG_MODE:
             for step in self.analyze.steps:

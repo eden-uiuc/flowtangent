@@ -25,7 +25,7 @@ from RCAIDE.Library import Component
 #  Airfoil Data Locator
 # ----------------------------------------------------------------------------------------------------------------------
 
-Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
+AirfoilData = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil

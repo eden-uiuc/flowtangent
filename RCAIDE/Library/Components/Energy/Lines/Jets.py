@@ -18,7 +18,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Library.Components.Energy.Stores import FuelTank
+from RCAIDE.Library.Components.Energy.Nodes import FuelTank
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine, TurbofanEngine
 
@@ -43,19 +43,19 @@ def _TurbojetLineSetup():
 
 class TurbojetEnergyLine(EnergyLine):
 
-    tag:       str = init_field('Turbojet Energy Line', static=True)
+    tag: str = init_field('Turbojet Energy Line', static=True)
 
-    fuel_inputs = ["Engine 1", "Engine 2"]
+    fuel_inputs: tuple[str, ...] = ("Engine 1", "Engine 2")
     
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
     
-    subcomponents = init_field(_TurbojetLineSetup())
+    subcomponents: tuple = init_field(_TurbojetLineSetup())
     
-    _bookkeeping = {
+    _bookkeeping: dict = init_field(lambda: {
         "engines": TurbojetEngine,
         "stores": FuelTank,
         "fuel_tanks": FuelTank,
-    }
+    }, static=True)
 
     def __post_init__(self):
         if len(self.tank_draw_ratios) != len(self.fuel_tanks):

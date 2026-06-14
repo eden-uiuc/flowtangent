@@ -1,40 +1,42 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import System, Settings
 
-import time
+# package imports
 import dataclasses as dc
-
-import jax
-from jax import value_and_grad, jit
 
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Framework import State, System, Settings, Process
-from RCAIDE.Framework.Missions.Conditions import Numerics, FreestreamConditions
-from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
+# RCAIDE Imports
+from RCAIDE.Framework import Process, State
+from RCAIDE.Framework.Conditions import Numerics
+from RCAIDE.Framework.Systems import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from RCAIDE.Framework.Conditions.Controls import DirectControlVariable
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from RCAIDE.Framework.Analyses.Energy.Sizing import update_design_parameters
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data, MassProperties
+from RCAIDE.Library.Components import ComponentAreas, Airfoil, AirfoilData, MassProperties
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Library.Components.Fuselages import *
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
 from RCAIDE.Library.Components.Nacelles import Nacelle, NacelleDiameters
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, DesignParameters
-from RCAIDE.Library.Components.Energy.Stores import FuelTank
+from RCAIDE.Library.Components.Energy.Nodes import FuelTank
 from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
 
-from RCAIDE.Library.Atmospheres import USStandard1976
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
 # ----------------------------------------------------------------------------------------------------------------------
@@ -85,7 +87,7 @@ def vehicle_setup():
         thickness_to_chord      =0.1,
         dihedral_outboard       =2.5 * Units.deg,
         sweeps                  =WingSweeps(quarter_chord=28.225 * Units.deg),
-        airfoil                 =Airfoil.from_file(Airfoil_Data/'B737a.txt'))
+        airfoil                 =Airfoil.from_file(AirfoilData/'B737a.txt'))
 
     yehudi_segment = WingSegment(
         tag='Main Wing Yehudi Segment',
@@ -95,7 +97,7 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * Units.deg,
         sweeps=WingSweeps(quarter_chord=25. * Units.deg),
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737b.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737b.txt'))
 
     mid_segment = WingSegment(
         tag='Main Wing Mid Segment',
@@ -105,14 +107,14 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * Units.deg,
         sweeps=WingSweeps(quarter_chord=56.75 * Units.deg),
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737c.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737c.txt'))
 
     tip_segment = WingSegment(
         tag='Main Wing Tip Segment',
         percent_span_location=1.,
         root_chord_percent=0.10077,
         thickness_to_chord=0.1,
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737d.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737d.txt'))
 
     # Control Surfaces -------------------------------------------------------------------------------------------------
 
@@ -356,7 +358,7 @@ def vehicle_setup():
 
     # Direct Replacement
     tf = eqx.tree_at(
-        lambda c: (
+        lambda tf: (
                 tf.inlet_nozzle.efficiencies.flow, tf.inlet_nozzle.pressure_ratio,
                 tf.fan.efficiencies.flow, tf.fan.pressure_ratio,
                 tf.lpc.efficiencies.flow, tf.lpc.pressure_ratio,
@@ -378,7 +380,7 @@ def vehicle_setup():
              )
         )
 
-    tf = tf.update_design_parameters()
+    tf = update_design_parameters(tf)
 
     # Engine & Line Rebuild --------------------------------------------------------------------------------------------
     tf2 = dc.replace(tf, tag="Engine 2", origin=jnp.array([[13.72, 4.86, -1.9]]))

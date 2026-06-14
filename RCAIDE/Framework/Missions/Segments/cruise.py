@@ -20,7 +20,7 @@ from .Profiles import *
 from RCAIDE.utils import init_field
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DirectControlVariable, ResidualNames
+from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, ResidualNames
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Cruise

@@ -13,7 +13,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.Framework.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Interfaces
@@ -90,11 +90,8 @@ class EnergyNodeConditions(Conditions):
     # Attribute         Type         Default Value
     tag:                str          = init_field('Energy Node Conditions', static=True)
 
-    outputs:            OutputConditions  = init_field(lambda: OutputConditions)
+    outputs:            OutputConditions  = init_field(OutputConditions)
     throttle:           jnp.ndarray = empty_array(0)
-
-    def __post_init__(self):
-        object.__setattr__(self.outputs, "tag", f"{self.tag} Outputs")
 
 
 # ----------------------------------------------------------------------------------------------------------------------

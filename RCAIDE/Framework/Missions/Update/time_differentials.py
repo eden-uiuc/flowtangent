@@ -19,7 +19,7 @@ import RCAIDE.Framework as rcf
 
 
 def update_time_differentials(state: "rcf.State",
-                              system: "rcf.System",
+                              system: "rcf.Systems",
                               settings: "rcf.Settings",
                               ):
 

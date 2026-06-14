@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional, Iterable, Tuple, Dict
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
 
 from pathlib import Path
@@ -89,7 +89,7 @@ class BatchAnalysis:
             logger.addHandler(ch)
 
         # Set up base state
-        from RCAIDE.Framework.Missions.Conditions import Numerics
+        from RCAIDE.Framework.Conditions import Numerics
         state       = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
         initials    = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
         base_state  = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)

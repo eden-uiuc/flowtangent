@@ -39,7 +39,7 @@ def func_shaft_offtake(
 
 def shaft_offtake(
         state: "rcf.State",
-        system: "rcf.System",
+        system: "rcf.Systems",
         settings: "rcf.Settings",
 ) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 

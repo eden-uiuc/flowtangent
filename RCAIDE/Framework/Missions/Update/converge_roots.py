@@ -15,7 +15,7 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 def converge_roots(State: "rcf.State",
-                   System: "rcf.System",
+                   System: "rcf.Systems",
                    Settings: "rcf.Settings",
                    ):
 

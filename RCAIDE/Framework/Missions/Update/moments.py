@@ -21,7 +21,7 @@ import RCAIDE.Framework as rcf
 
 def update_moments(
         state: "rcf.State",
-        system: "rcf.System",
+        system: "rcf.Systems",
         settings: "rcf.Settings",
         ):
 

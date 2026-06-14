@@ -124,7 +124,7 @@ def func_expansion_nozzle_performance(
 
 def _expansion_nozzle_performance(
     state: "rcf.State",
-    system: "rcf.System",
+    system: "rcf.Systems",
     settings: "rcf.Settings",
     input_converter_state,
     output_converter_state,

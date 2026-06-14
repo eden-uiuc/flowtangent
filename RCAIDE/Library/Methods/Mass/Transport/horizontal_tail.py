@@ -82,7 +82,7 @@ def func_horizontal_tail(wingspan : float,
 # -----------------------------------------------------------------------
 
 def horizontal_tail(state: "rcf.State",
-                    system: "rcf.System",
+                    system: "rcf.Systems",
                     settings: "rcf.Settings"):
 
 

@@ -20,7 +20,7 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import Aircraft
+    from RCAIDE.Framework.Systems import Aircraft
     from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 

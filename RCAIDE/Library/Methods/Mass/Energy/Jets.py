@@ -5,14 +5,20 @@
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, Aircraft, Settings
+
+
+import warnings
+
+# package imports
+import jax
+import equinox as eqx
 
 # RCAIDE Imports
-
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine
-import RCAIDE.Framework as rcf
-
-from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import func_sea_level_static_thrust
-
 # -------------------------------------------------------------------------------
 #  Functional/Library Version
 # -------------------------------------------------------------------------------
@@ -33,54 +39,24 @@ def func_tf_mass_from_SLS(
 # -------------------------------------------------------------------------------
 
 def tf_mass_from_SLS(
-    state: "rcf.State",
-    system: "rcf.Aircraft",
-    settings: "rcf.Settings",
+        state: State,
+        system: Aircraft,
+        settings: Settings,
     ):
     """
-    Framework version of Jet_Mass_from_SLS. Assumes a turbofan engine.
+    Framework version of tf_mass_from_SLS. Assumes a turbofan engine.
     
     See Also
     --------
-    func_Jet_Mass_from_SLS: 
+    func_tf_Mass_from_SLS: 
         Functional implementation which this method calls.
     """
 
 
+    def update_tf_mass(node):
+        if isinstance(node, TurbofanEngine) and node.mass_properties.total == 0.0 and node.design_parameters.SLS_thrust != 0.0:
+            return eqx.tree_at(lambda t: t.mass_properties.total, node, func_tf_mass_from_SLS(node.design_parameters.SLS_thrust))
+    
+    updated_system = jax.tree_util.tree_map(update_tf_mass, system, is_leaf=lambda x: isinstance(x, TurbofanEngine))
 
-    for line in system.energy.lines:
-        for jet in line.converters:
-
-            jet: TurbofanEngine
-
-            if jet.design_parameters.SLS_thrust == 0.:
-                try:
-                    F = func_sea_level_static_thrust(
-                        F_ref=jet.design_parameters.total_thrust
-                        T_ref=jet.reference_temperature,
-                        T_t_ref=jet.reference_total_temperature,
-                        P_ref=jet.reference_pressure,
-                        P_t_ref=jet.reference_total_pressure,
-                        delta_SFC=,
-                        f,
-                        v_fan_nozzle,
-                        AR_fan_nozzle,
-                        P_fan_nozzle,
-                        v_core_nozzle,
-                        AR_core_nozzle,
-                        P_core_nozzle,
-                        alpha,
-                        throttle
-                    ):
-
-                jet.design_parameters.SLS_thrust = F
-
-
-            sls_thrust = jet.design_parameters.SLS_thrust
-
-            jet_mass = func_tf_mass_from_SLS(sls_thrust)
-            jet.mass_properties.total = jet_mass
-
-    # TODO: Unpack results
-
-    return state, system, settings
+    return state, updated_system, settings

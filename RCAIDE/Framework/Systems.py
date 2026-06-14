@@ -81,13 +81,13 @@ class Aircraft(System):
     design_range:       float   = init_field(0., static=True)
     design_cruise_alt:  float   = init_field(0., static=True)
     
-    _bookkeeping = {
-        "energy": EnergyNetwork,
+    _bookkeeping: dict = init_field(lambda: {
+        "energy_networks": EnergyNetwork,
         "wings": Wing,
         "fuselages": Fuselage,
         "nacelles": Nacelle,
         "landing_gear": LandingGear
-    }
+    })
 
     reference_geometry:     AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
     analysis_data:          dict = init_field(dict)

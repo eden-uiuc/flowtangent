@@ -8,5 +8,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
  
-from .TestAero import TestAero
-from .VORJAX import InitializeVORJAX, ComputeVORJAX, VORJAX, BatchVORJAX, VORJAX_Settings, Vortices, SupersonicSettings
+from . import TestAero
+from . import VORJAX 

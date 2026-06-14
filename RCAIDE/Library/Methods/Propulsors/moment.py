@@ -34,7 +34,7 @@ def func_propulsor_moment(
 
 
 def propulsor_moment(state: "rcf.State",
-                     system: "rcf.System",
+                     system: "rcf.Systems",
                      settings: "rcf.Settings",
                      ):
 

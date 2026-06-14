@@ -96,9 +96,9 @@ class Wing(Component):
     tag:                str             = init_field('Wing', static=True)
     airfoil:            Airfoil | None  = None
     
-    _bookkeeping = {
+    _bookkeeping: dict = init_field(lambda: {
         "control_surfaces": WingControlSurface
-    }
+    }, static=True)
 
     # Specialty Attributes
 

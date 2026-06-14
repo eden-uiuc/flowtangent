@@ -16,13 +16,11 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
 
 from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
-
-from RCAIDE.Framework import ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -42,16 +40,16 @@ class EnergyNode(Component):
     
     efficiencies:   EnergyEfficiencies  = init_field(EnergyEfficiencies)
 
-    mechanical_inputs: list[str] = init_field(list, static=True)
-    electrical_inputs: list[str] = init_field(list, static=True)
-    fuel_inputs:       list[str] = init_field(list, static=True)
-    flow_inputs:       list[str] = init_field(list, static=True)
-    force_inputs:      list[str] = init_field(list, static=True)
+    mechanical_inputs: tuple[str, ...] = init_field(tuple, static=True)
+    electrical_inputs: tuple[str, ...] = init_field(tuple, static=True)
+    fuel_inputs:       tuple[str, ...] = init_field(tuple, static=True)
+    flow_inputs:       tuple[str, ...] = init_field(tuple, static=True)
+    force_inputs:      tuple[str, ...] = init_field(tuple, static=True)
     
     @property
     def inputs(self):
         return (self.mechanical_inputs + self.electrical_inputs + self.fuel_inputs
-                + self.self.flow_inputs + self.self.force_inputs) #type: ignore
+                + self.flow_inputs + self.force_inputs) #type: ignore
     
     def _get_all_inputs(self, state, input_type: str, input_field: str):
         output_conditions = [getattr(state.energy.nodes[i], input_type) for i in self.inputs]
@@ -68,10 +66,7 @@ class EnergyNode(Component):
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError("No transmission method implemented. " \
         "Subclasses of EnergyNode must implement their individual transmission methods.")
-    
-    @property
-    def process_step(self):
-        return ProcessStep(self.transmit, f"Transmit {self.tag}")
+
 
 class EnergySplitter(EnergyNode):
 
@@ -121,36 +116,87 @@ class FlowNode(EnergyNode):
 
 
 
-class FlowSplitter(EnergyNode):
+# class FlowSplitter(EnergyNode):
     
-    # The fraction of the upstream mass flow this node will extract
-    extraction_fraction: float = init_field(1.0)
+#     # The fraction of the upstream mass flow this node will extract
+#     extraction_fraction: float = init_field(1.0)
 
-    def transmit(self, state, system, settings):
+#     def transmit(self, state, system, settings):
         
-        # Pull the TOTAL flow state from the upstream node
-        upstream_tag = self.flow_inputs[0]
-        total_inlet_flow = state.energy.nodes[upstream_tag].outputs.flow
+#         # Pull the TOTAL flow state from the upstream node
+#         upstream_tag = self.flow_inputs[0]
+#         total_inlet_flow = state.energy.nodes[upstream_tag].outputs.flow
         
-        # Copy the thermodynamic state (pressure, temperature, etc.)
-        # Scale only the mass flow by the extraction fraction
-        extracted_flow = eqx.tree_at(
-            lambda f: f.mass_flow, 
-            total_inlet_flow, 
-            total_inlet_flow.mass_flow * self.extraction_fraction
-        )
+#         # Copy the thermodynamic state (pressure, temperature, etc.)
+#         # Scale only the mass flow by the extraction fraction
+#         extracted_flow = eqx.tree_at(
+#             lambda f: f.mass_flow, 
+#             total_inlet_flow, 
+#             total_inlet_flow.mass_flow * self.extraction_fraction
+#         )
         
-        # Dump the scaled flow into this node's outputs
-        state = eqx.tree_at(
-            lambda s: s.energy.nodes[self.tag].outputs.flow, 
-            state, 
-            extracted_flow
-        )
+#         # Dump the scaled flow into this node's outputs
+#         state = eqx.tree_at(
+#             lambda s: s.energy.nodes[self.tag].outputs.flow, 
+#             state, 
+#             extracted_flow
+#         )
         
-        return state
+#         return state
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Mechanical Nodes
+# Energy Store
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WorkSplitter(EnergyNode):
+class EnergyStore(EnergyNode):
+
+    tag: str = init_field('Energy Store', static=True)
+
+    max_energy: float = 0.0
+
+    specific_energy: float = 0.0
+    specific_volume: float = 0.0   
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Fuel Tank
+# ----------------------------------------------------------------------------------------------------------------------
+
+class FuelTank(EnergyStore):
+
+    tag: str = init_field('Fuel Tank', static=True)
+
+    selector_ratio:         float = 1.0
+    secondary_fuel_flow:    float = 0.0
+
+    def transmit(
+            self,
+            state: State,
+            system: System,
+            settings: Settings,
+    ):  
+        return state, system, settings
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Battery
+# ----------------------------------------------------------------------------------------------------------------------
+
+class BatteryRagoneParameters(eqx.Module):
+
+    const_1: float = 0.0
+    const_2: float = 0.0
+    lower_bound: float = 0.0
+    i: float = 0.0
+
+
+class Battery(EnergyStore):
+
+    tag: str = init_field('Battery', static=True)
+
+    max_energy:     float = 0.0
+    max_power:      float = 0.0
+    max_voltage:    float = 0.0
+
+    resistance:     float = 0.0
+
+    ragone: BatteryRagoneParameters = init_field(BatteryRagoneParameters)
