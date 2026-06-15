@@ -80,7 +80,7 @@ def update_design_parameters(turbojet: TurbojetEngine):
         sls_state, sls_system, sls_settings = initialize_energy(sls_state, sls_system, Settings())
         sls_state, sls_system, sls_settings = update_freestream(sls_state, sls_system, sls_settings)
         sls_state = eqx.tree_at(
-             lambda s: s.energy.nodes["network_0.turbojet_energy_line.engine_1"].throttle,
+             lambda s: s.energy.nodes["energy_network.turbojet_energy_line.engine_1"].throttle,
              sls_state,
              jnp.atleast_2d(1.0)
         )
@@ -88,10 +88,10 @@ def update_design_parameters(turbojet: TurbojetEngine):
         sls_analysis = build_analysis_from_network(sls_system.energy_networks[0])
 
         sls_state, sls_system, sls_settings = sls_analysis(sls_state, sls_system, sls_settings)
-        sls_engine = sls_system.energy_networks[0].nodes["network_0.turbojet_energy_line.engine_1"]
-        sls_thrust = sls_state.energy.nodes["network_0.turbojet_energy_line.engine_1"].outputs.force.thrust.item(0)
+        sls_engine = sls_system.energy_networks[0].nodes["energy_network.turbojet_energy_line.engine_1"]
+        sls_thrust = sls_state.energy.nodes["energy_network.turbojet_energy_line.engine_1"].outputs.force.thrust.item(0)
 
         updated_params = eqx.tree_at(lambda d: d.SLS_thrust, sls_engine.design_parameters, sls_thrust)
-        updated_turbojet = eqx.tree_at(lambda s: s.design_parameters, sls_engine, updated_params)
+        updated_turbojet = eqx.tree_at(lambda s: s.design_parameters, turbojet, updated_params)
 
         return updated_turbojet

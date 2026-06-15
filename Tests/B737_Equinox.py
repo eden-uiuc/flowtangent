@@ -395,7 +395,7 @@ def vehicle_setup():
     )
     fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]), mass_properties=fuel_mass)
 
-    tf_line = TurbojetEnergyLine(tag="Turbofan Energy Line", subcomponents=(tf, tf2, fuel))
+    tf_line = TurbojetEnergyLine(tag="Turbofan Line", subcomponents=(tf, tf2, fuel))
 
     tf_network = EnergyNetwork(tag="Turbofan Network", subcomponents=(tf_line,))
     vehicle = vehicle.add_subcomponent(tf_network)

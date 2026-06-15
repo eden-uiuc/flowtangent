@@ -41,6 +41,52 @@ class EnergyLine(EnergyNode):
 #  Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
 
+def _resolve_namespaces(node, parent_prefix=""):
+    """
+    Recursively generates absolute paths for nodes and resolves local connections.
+    """
+    # Define this node's absolute ID
+    absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
+
+    def parse_input(input:str):
+        flat_input_parts = input.replace(' ','_').lower().split('.')
+        if flat_input_parts[0]=="self" or node.get_field_name() in flat_input_parts:
+            return absolute_id+"."+flat_input_parts[-1]
+        else:
+            return parent_prefix+"."+flat_input_parts[-1]
+    
+        
+    # Resolve the input/output connection strings
+    # We rebuild the interfaces so they point to the absolute paths
+    new_inputs = {
+        "mechanical":tuple(parse_input(port) for port in node.mechanical_inputs),
+        "electrical":tuple(parse_input(port) for port in node.electrical_inputs),
+        "flow":tuple(parse_input(port) for port in node.flow_inputs),
+        "force":tuple(parse_input(port) for port in node.force_inputs),
+        "fuel":tuple(parse_input(port) for port in node.fuel_inputs),
+    }
+    
+    # Update the node itself
+    node = replace(
+        node,
+        network_ID=absolute_id,
+        mechanical_inputs=new_inputs['mechanical'],
+        electrical_inputs=new_inputs['electrical'],
+        flow_inputs=new_inputs['flow'],
+        force_inputs=new_inputs['force'],
+        fuel_inputs=new_inputs['fuel'],
+    )
+    
+    # Recurse through any subcomponents
+    if hasattr(node, 'subcomponents') and node.subcomponents:
+        resolved_children = tuple(
+            _resolve_namespaces(child, parent_prefix=absolute_id) 
+            for child in node.subcomponents
+        )
+        node = eqx.tree_at(lambda n: n.subcomponents, node, resolved_children)
+        
+    return node
+
 class EnergyNetwork(EnergyNode):
 
     tag: str = init_field('Energy Network', static=True)
@@ -85,6 +131,25 @@ class EnergyNetwork(EnergyNode):
 
         return jax.tree_util.tree_map(_apply, self, is_leaf=lambda x: isinstance(x, EnergyNode))
     
+    def assign_network_IDs(self):
+
+        updated_network = replace(self, network_ID=self.get_field_name())
+        resolved_lines = []
+
+        for line in updated_network.lines:
+            
+            # Resolve the namespace for this entire line and all its nested children
+            resolved_line = _resolve_namespaces(line, parent_prefix=f"{updated_network.get_field_name()}")
+            resolved_lines.append(resolved_line)
+
+        updated_network = eqx.tree_at(
+            lambda e: e.subcomponents,
+            updated_network,
+            tuple(resolved_lines)
+        ).sort_network_topology()
+        
+        return updated_network
+
     def _get_all_nodes(self) -> "EnergyNetwork":
         nodes_dict = {}
         def _recurse(subcomponents):
@@ -104,8 +169,8 @@ class EnergyNetwork(EnergyNode):
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()
         dependency_graph = {
-            tag: set(node.inputs) 
-            for tag, node in updated_network.nodes.items()
+            ID: set(node.inputs) 
+            for ID, node in updated_network.nodes.items()
         }
 
         try:
