@@ -354,6 +354,7 @@ def vehicle_setup():
         lengths=ComponentDimensions(total=2.71),
         design_parameters=DesignParameters(
             total_thrust=24000.,
+            SLS_thrust=24000.,
             altitude=10668.,
             mach_number=0.78,
             turbine_intake_temperature=1450.
@@ -383,8 +384,6 @@ def vehicle_setup():
                 0.95, 0.99, 1.659
              )
         )
-
-    tf = update_design_parameters(tf)
 
     # Engine & Line Rebuild --------------------------------------------------------------------------------------------
     tf2 = dc.replace(tf, tag="Engine 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
@@ -545,6 +544,9 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
         updated_segments.append(updated_segment)
 
     updated_mission = eqx.tree_at(lambda m: m.steps, mission, tuple(updated_segments))
+
+    VORJAX_Graph = aero_analysis.to_mermaid(save_path="./Tests/VORJAX_graph.md")
+    Energy_Graph = energy_analysis.to_mermaid(save_path="./Tests/energy_graph.md")
 
     return updated_mission, updated_settings
 

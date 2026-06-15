@@ -13,13 +13,10 @@ from typing import TYPE_CHECKING, Optional, Callable, Self, Generator, Tuple
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
-import logging
-from pathlib import Path
-from collections import defaultdict
-from itertools import product
+import re
+import os
 
 # package imports
-import zarr
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -27,12 +24,8 @@ import networkx as nx
 
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-from jax.flatten_util import ravel_pytree
-from numcodecs import Blosc
-from tqdm import trange
-
 # RCAIDE imports
-from RCAIDE.utils import Token, DataPath, init_field
+from RCAIDE.utils import Token, DataPath, MERMAID_STYLES, init_field
 import RCAIDE.utils as ru
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
@@ -145,6 +138,7 @@ class GradientMap:
         self.unravel_function = unravel_function
         return flat_input_array
     
+    
     def update_inputs(
             self,
             input_array,
@@ -238,6 +232,10 @@ class Process(ProcessStep):
 
     _val_and_jac_fn:    Optional[Callable]      = init_field(None, static=True)
     _cached_grad_map:   Optional[GradientMap]   = init_field(None, static=True)
+
+    _filter_map: dict = init_field(lambda: {
+            "energy": r"state\.energy\.nodes\.\[*\].outputs",
+        },static=True)
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -530,7 +528,7 @@ class Process(ProcessStep):
                     else:
                         G.add_edge(producer_node, step_node, variables=[in_var])
                 else:
-                    global_node = "Global Inputs"
+                    global_node = "User Inputs"
                     if not G.has_node(global_node):
                         G.add_node(global_node)
 
@@ -544,7 +542,99 @@ class Process(ProcessStep):
                 latest_producers[out_var] = step_node
 
         return G
+    
+    def to_mermaid(
+        self, 
+        recursive: bool = False, 
+        show_edges: bool = True, 
+        layout: str = "LR", 
+        exclude: list[str] = None,
+        save_path: str = None,
+        style: str = "modern"
+    ) -> str:
+        """
+        Generates a Mermaid.js flowchart string from the Process DAG.
+        
+        Args:
+            recursive: Whether to flatten nested Processes.
+            show_edges: Whether to label the edges with the variables passed between steps.
+            layout: "LR" (Left-to-Right) or "TD" (Top-Down).
+            exclude: List of predefined domains to hide from the edges (e.g., ['energy']).
+        """
+        # 1. Setup the exclusion filters using the shared class attribute
+        if exclude is None:
+            exclude = ['energy']
 
+        compiled_patterns = [
+            re.compile(self._filter_map[k]) 
+            for k in exclude if k in self._filter_map
+        ]
+
+        def is_filtered(var_name: str) -> bool:
+            return any(pat.search(var_name) for pat in compiled_patterns)
+
+        # 2. Grab the graph
+        G = self.graph(recursive=recursive)
+        mermaid_lines = []
+
+        if style in MERMAID_STYLES and MERMAID_STYLES[style]:
+            mermaid_lines.append(MERMAID_STYLES[style])
+            
+        mermaid_lines.append(f"graph {layout}")
+
+        # 3. Build safe Node IDs and visual shapes
+        node_id_map = {}
+        for i, node_name in enumerate(G.nodes()):
+            safe_id = f"N{i}"
+            node_id_map[node_name] = safe_id
+            
+            if node_name == "User Inputs":
+                mermaid_lines.append(f"    {safe_id}([{node_name}])") 
+            else:
+                step_obj = G.nodes[node_name].get('step_obj')
+                display_label = step_obj.tag if step_obj else str(node_name)
+                mermaid_lines.append(f"    {safe_id}[{display_label}]")
+
+        # 4. Build edges and apply filters to the variable lists
+        for u, v, data in G.edges(data=True):
+            raw_vars = data.get('variables', [])
+            
+            # Apply the filter to strip out unwanted phantom paths
+            vars_list = [var for var in raw_vars if not is_filtered(var)]
+            
+            if show_edges and vars_list:
+                if len(vars_list) > 4:
+                    label = f"{len(vars_list)} variables"
+                else:
+                    clean_vars = [var.split('.')[-1] for var in vars_list]
+                    label = "<br>".join(clean_vars)
+                
+                # Sanitize any stray double quotes to single quotes
+                label = label.replace('"', "'")
+                    
+                # Wrap the final label in double quotes for Mermaid's parser
+                mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
+            else:
+                mermaid_lines.append(f"    {node_id_map[u]} --> {node_id_map[v]}")
+                
+        mermaid_str = "\n".join(mermaid_lines)
+
+        if save_path:
+            # Ensure the target directory exists
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            
+            with open(save_path, "w", encoding="utf-8") as f:
+                # If it's a markdown file, wrap it in the mermaid code block
+                if save_path.lower().endswith(".md"):
+                    f.write("```mermaid\n")
+                    f.write(mermaid_str)
+                    f.write("\n```\n")
+                else:
+                    # For .mmd or .txt, just write the raw string
+                    f.write(mermaid_str)
+        
+        return mermaid_str
+    
     def print_io_tree(self, exclude: list[str] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
@@ -554,16 +644,11 @@ class Process(ProcessStep):
         Args:
             exclude: List of predefined domains to hide from the I/O tree (e.g., ['energy']).
         """
-        import re
 
         if exclude is None:
             exclude = ['energy']
 
-        filter_map = {
-            "energy": r"state\.energy\.nodes\.\[*\].outputs",
-        }
-
-        exclude_patterns = [filter_map[k] for k in exclude if k in filter_map]
+        exclude_patterns = [self._filter_map[k] for k in exclude if k in self._filter_map]
 
         def filter_paths(paths: set[str]) -> set[str]:
             if not exclude_patterns or not paths:

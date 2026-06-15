@@ -63,7 +63,7 @@ def update_design_parameters(turbojet: TurbojetEngine):
             jnp.atleast_2d(9.81),
             jnp.atleast_2d(M0),
             jnp.atleast_2d(a0),
-            jnp.atleast_2d([[a0*M0, 0., 0.]]),
+            jnp.atleast_2d(jnp.array([[a0*M0, 0., 0.]])),
             jnp.atleast_2d(T0),
             jnp.atleast_2d(atmo.compute_pressure(0.0)),
             jnp.atleast_2d(atmo.compute_density(0.0)),

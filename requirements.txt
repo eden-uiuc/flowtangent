@@ -1,0 +1,14 @@
+equinox
+jax
+jaxopt
+matplotlib
+networkx
+numcodecs
+nvidia-ml-py
+numpy
+pandas
+plotly
+scikit-learn
+scipy
+tqdm
+zarr
