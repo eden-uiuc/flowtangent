@@ -294,7 +294,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     "state.freestream.speed",
     "state.freestream.mach_number",
     "state.freestream.density",
-    "state.freestream.gamma"
+    "state.freestream.gamma",
     "system.areas.reference",
     "system.reference_geometry.mean_aerodynamic_chord",
     "system.reference_geometry.projected_span",

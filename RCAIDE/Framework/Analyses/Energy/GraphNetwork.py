@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import inputs, outputs
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Missions.Initialize import initialize_energy
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
@@ -28,12 +29,24 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 def build_analysis_from_network(network: EnergyNetwork):
 
-    def make_node_function(node_ID: str):
-        def _pure_transmit(state, system, settings):
-            return network.nodes[node_ID].transmit(state, system, settings)
-        return _pure_transmit
-    
     analysis_network = network.assign_network_IDs()
+
+    # def make_node_function(node_ID: str):
+    #     def _pure_transmit(state, system, settings):
+    #         return analysis_network.nodes[node_ID].transmit(state, system, settings)
+    #     return _pure_transmit
+    
+    def make_node_function(node_ID: str):
+        node_func = analysis_network.nodes[node_ID].__class__.transmit
+        node_inputs = getattr(node_func, '_inputs', set())
+        node_outputs = getattr(node_func, '_outputs', set())
+        
+        @inputs(*node_inputs)
+        @outputs(*node_outputs)
+        def _pure_transmit(state, system, settings):
+            return analysis_network.nodes[node_ID].transmit(state, system, settings)
+        
+        return _pure_transmit
 
     network_analysis =  Process(
         tag=f"{network.tag} Analysis",

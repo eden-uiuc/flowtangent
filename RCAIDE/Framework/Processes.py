@@ -545,13 +545,35 @@ class Process(ProcessStep):
 
         return G
 
-    def print_io_tree(self):
+    def print_io_tree(self, exclude: list[str] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
         in a hierarchical, human-readable ASCII tree structure.
         Handles iterators ([Item]), dictionaries (['key']), and pseudo-types (: Type).
+
+        Args:
+            exclude: List of predefined domains to hide from the I/O tree (e.g., ['energy']).
         """
         import re
+
+        if exclude is None:
+            exclude = ['energy']
+
+        filter_map = {
+            "energy": r"state\.energy\.nodes\.\[*\].outputs",
+        }
+
+        exclude_patterns = [filter_map[k] for k in exclude if k in filter_map]
+
+        def filter_paths(paths: set[str]) -> set[str]:
+            if not exclude_patterns or not paths:
+                return paths
+                
+            compiled_patterns = [re.compile(p) for p in exclude_patterns]
+            return {p for p in paths if not any(pat.search(p) for pat in compiled_patterns)}
+        
+        display_inputs = filter_paths(self.inputs)
+        display_outputs = filter_paths(self.outputs)
 
         def build_tree_and_metadata(paths: set[str]) -> tuple[dict, dict]:
             """
@@ -614,17 +636,17 @@ class Process(ProcessStep):
                 display_tree(tree[key], type_hints, depth + 1, node_parts)
 
         print("=== Process Inputs ===")
-        if not self.inputs:
+        if not display_inputs:
             print("  (None)")
         else:
-            in_tree, in_hints = build_tree_and_metadata(self.inputs)
+            in_tree, in_hints = build_tree_and_metadata(display_inputs)
             display_tree(in_tree, in_hints)
 
         print("\n=== Process Outputs ===")
-        if not self.outputs:
+        if not display_outputs:
             print("  (None)")
         else:
-            out_tree, out_hints = build_tree_and_metadata(self.outputs)
+            out_tree, out_hints = build_tree_and_metadata(display_outputs)
             display_tree(out_tree, out_hints)
 
     def find_variable_usage(self, search_term: str):

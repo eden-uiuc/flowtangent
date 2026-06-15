@@ -83,8 +83,8 @@ class InletNozzle(FlowNode):
         "state.freestream.pressure",
         "state.freestream.mach_number",
         "state.freestream.Cp",
-        "state.freestream.gamma"
-        "system.energy.[InletNozzle].pressure_ratio",
+        "state.freestream.gamma",
+        "system.energy.nodes[InletNozzle].pressure_ratio",
         "system.energy.nodes[InletNozzle].pressure_recovery",
         "system.energy.nodes[InletNozzle].efficiencies.flow"
     )
@@ -135,8 +135,8 @@ class Compressor(FlowNode):
     @inputs(
         "state.freestream.Cp",
         "state.freestream.gamma",
-        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_temperature,"
-        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_pressure,"
+        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_temperature",
+        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_pressure",
         "system.energy.nodes[Compressor].pressure_ratio",
         "system.energy.nodes[Compressor].efficiencies.flow"
     )
@@ -177,7 +177,7 @@ class TurbojetCombustor(FlowNode):
     flow_inputs: tuple[str, ...] = init_field(('HPC',), static=True)
 
     @inputs(
-        "state.freestream.Cp"
+        "state.freestream.Cp",
         "state.energy.nodes[Combustor_flow_inputs].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Combustor_flow_inputs].outputs.flow.stagnation_pressure",
         "system.energy.nodes[Turbojet].design_paramters.turbine_intake_temperature",
@@ -518,7 +518,7 @@ class TurbofanEngine(TurbojetEngine):
         "state.freestream.mach_number",
         "state.freestream.pressure",
         "state.freestream.gravity",
-        "state.energy.nodes[Turbofan].throttle"
+        "state.energy.nodes[Turbofan].throttle",
         "state.energy.nodes[Turbofan_core_nozzle].outputs.flow.speed",
         "state.energy.nodes[Turbofan_core_nozzle].outputs.flow.area_ratio",
         "state.energy.nodes[Turbofan_core_nozzle].outputs.flow.pressure",
