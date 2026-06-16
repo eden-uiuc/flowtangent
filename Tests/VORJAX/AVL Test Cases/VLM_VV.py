@@ -25,10 +25,10 @@ from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingD
 from RCAIDE.Library.Components.Airfoils import Airfoil
 
 from RCAIDE.Framework import Process, State, Settings, GradientMap
-from RCAIDE.Framework.System import Aircraft
-from RCAIDE.Framework.Missions.Conditions import Numerics
+from RCAIDE.Framework.Systems import Aircraft
+from RCAIDE.Framework.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VLMSettings, InitializeVLM, VLMVortices, SupersonicSettings
+from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 from RCAIDE.Framework.Plotting import plot_vlm_panels
@@ -402,7 +402,7 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
         end_blend_mach=1.2
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, le_suction_correction=True)
+    aero_settings = VORJAX_Settings(vortices=vortices, supersonic=mach_settings, le_suction_correction=True)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -876,8 +876,8 @@ if __name__ == "__main__":
 
     # AVL_basic_test(geometry_file, oper_mode="st")
 
-    alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-    lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+    alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
+    lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
     grad_map = GradientMap(
         state_inputs=(alpha_path,),
@@ -1013,8 +1013,8 @@ if __name__ == "__main__":
         alpha = [3.06 * Units.deg] * 21
         Mach =  [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
 
-        alpha_path = ru.PathTuple(("aerodynamics", "angles", "alpha"))
-        lift_path = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"))
+        alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
+        lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
         grad_map = GradientMap(
             state_inputs=(alpha_path,),

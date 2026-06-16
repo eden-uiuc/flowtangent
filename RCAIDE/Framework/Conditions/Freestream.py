@@ -12,7 +12,8 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.utils import empty_array, init_field
+from RCAIDE.Framework.Conditions import Conditions
 from RCAIDE.Library.Atmospheres import Atmosphere, USStandard1976
 from RCAIDE.Library.Planets import Planet, Earth
 
@@ -76,29 +77,29 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    tag:                    str          = eqx.field(static=True, default='Freestream')
-    atmosphere:             Atmosphere   = eqx.field(default_factory=USStandard1976)
-    planet:                 Planet       = eqx.field(default_factory=Earth)
+    tag:                    str          = init_field('Freestream', static=True)
+    atmosphere:             Atmosphere   = init_field(USStandard1976)
+    planet:                 Planet       = init_field(Earth)
 
-    speed:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    altitude:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    gravity:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    speed:                  jnp.ndarray  = empty_array(0)
+    altitude:               jnp.ndarray  = empty_array(0)
+    gravity:                jnp.ndarray  = empty_array(0)
     
-    speed_of_sound:         jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    pressure:               jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    temperature:            jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    density:                jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    speed_of_sound:         jnp.ndarray  = empty_array(0)
+    pressure:               jnp.ndarray  = empty_array(0)
+    temperature:            jnp.ndarray  = empty_array(0)
+    density:                jnp.ndarray  = empty_array(0)
 
-    dynamic_viscosity:      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    dynamic_pressure:       jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    dynamic_viscosity:      jnp.ndarray  = empty_array(0)
+    dynamic_pressure:       jnp.ndarray  = empty_array(0)
 
-    stagnation_pressure:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    stagnation_temperature: jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    stagnation_pressure:    jnp.ndarray  = empty_array(0)
+    stagnation_temperature: jnp.ndarray  = empty_array(0)
 
-    mach_number:            jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    reynolds_number:        jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    mach_number:            jnp.ndarray  = empty_array(0)
+    reynolds_number:        jnp.ndarray  = empty_array(0)
 
-    delta_ISA:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    gamma:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    Cp:                     jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    R:                      jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_ISA:              jnp.ndarray  = empty_array(0)
+    gamma:                  jnp.ndarray  = empty_array(0)
+    Cp:                     jnp.ndarray  = empty_array(0)
+    R:                      jnp.ndarray  = empty_array(0)

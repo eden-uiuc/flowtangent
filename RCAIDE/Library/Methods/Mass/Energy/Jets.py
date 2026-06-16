@@ -5,20 +5,26 @@
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, Aircraft, Settings
+
+
+import warnings
+
+# package imports
+import jax
+import equinox as eqx
 
 # RCAIDE Imports
-
-import RCAIDE.Library as rcl
-import RCAIDE.Framework as rcf
-
-from RCAIDE.Library.Methods.Energy.Converters.Turbofans import func_thrust_and_power
-
+from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine
 # -------------------------------------------------------------------------------
 #  Functional/Library Version
 # -------------------------------------------------------------------------------
 
 
-def func_Jet_Mass_from_SLS(
+def func_tf_mass_from_SLS(
     sls_thrust: float
 ):
 
@@ -32,41 +38,25 @@ def func_Jet_Mass_from_SLS(
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
 
-def Jet_Mass_from_SLS(
-    state: "rcf.State",
-    system: "rcf.Aircraft",
-    settings: "rcf.Settings",
+def tf_mass_from_SLS(
+        state: State,
+        system: Aircraft,
+        settings: Settings,
     ):
     """
-    Framework version of Jet_Mass_from_SLS. Assumes a turbofan engine.
+    Framework version of tf_mass_from_SLS. Assumes a turbofan engine.
     
     See Also
     --------
-    func_Jet_Mass_from_SLS: 
+    func_tf_Mass_from_SLS: 
         Functional implementation which this method calls.
     """
 
-    for line in system.energy.lines:
-        for jet in line.converters:
 
-            jet: rcl.Components.Energy.Converters.TurbofanEngine
+    def update_tf_mass(node):
+        if isinstance(node, TurbofanEngine) and node.mass_properties.total == 0.0 and node.design_parameters.SLS_thrust != 0.0:
+            return eqx.tree_at(lambda t: t.mass_properties.total, node, func_tf_mass_from_SLS(node.design_parameters.SLS_thrust))
+    
+    updated_system = jax.tree_util.tree_map(update_tf_mass, system, is_leaf=lambda x: isinstance(x, TurbofanEngine))
 
-            if jet.design_thrust_parameters.SLS_thrust == 0.:
-
-                T_ref = jet.reference_temperature
-
-                F = func_thrust_and_power(
-                    gamma=jet.working_fluid.compute_gamma(T_ref)
-                )
-
-                jet.design_thrust_parameters.SLS_thrust = F
-
-
-            sls_thrust = jet.design_thrust_parameters.SLS_thrust
-
-            jet_mass = func_Jet_Mass_from_SLS(sls_thrust)
-            jet.mass_properties.total = jet_mass
-
-    # TODO: Unpack results
-
-    return state, system, settings
+    return state, updated_system, settings

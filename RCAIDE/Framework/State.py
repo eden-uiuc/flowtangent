@@ -7,23 +7,19 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING
 from functools import reduce
 
 # package imports
-import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-if TYPE_CHECKING:
-    from RCAIDE.Framework import System
-    from RCAIDE.Library import Component
-
-import RCAIDE.Library.Components
-# RCAIDE imports
-from RCAIDE.Framework.Missions.Conditions import (
-    Conditions, Numerics, FrameConditions, FreestreamConditions, MassConditions, EnergyNetworkConditions,
-    AerodynamicsConditions, StabilityConditions, ControlsConditions, DynamicsConditions)
+from RCAIDE.utils import empty_array, init_field
+from RCAIDE.Framework.Conditions import (
+    Conditions, Numerics,
+    AerodynamicsConditions, ControlsConditions, DynamicsConditions,
+    EnergyNetworkConditions, FrameConditions, FreestreamConditions,
+    MassConditions, StabilityConditions
+)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  State
@@ -31,34 +27,36 @@ from RCAIDE.Framework.Missions.Conditions import (
 
 class SolverConditions(Conditions):
 
-    tag: str = eqx.field(static=True, default='Solver Conditions')
+    tag: str = init_field('Solver Conditions', static=True)
 
-    unknowns:           jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
-    residuals:          jnp.ndarray                 = eqx.field(default_factory=lambda: jnp.empty(0))
+    unknowns:           jnp.ndarray                 = empty_array(0)
+    residuals:          jnp.ndarray                 = empty_array(0)
     
 
 class State(Conditions):
 
     # Attribute         Type                        Default Value
-    tag:                str                         = eqx.field(static=True, default='State')
+    tag:                str                         = init_field('State', static=True)
     
     initials:           eqx.Module | None           = None
-    numerics:           Numerics                    = eqx.field(default_factory=Numerics)
+    numerics:           Numerics                    = init_field(Numerics)
 
-    frames:             FrameConditions             = eqx.field(default_factory=FrameConditions)
-    freestream:         FreestreamConditions        = eqx.field(default_factory=FreestreamConditions)
+    frames:             FrameConditions             = init_field(FrameConditions)
+    freestream:         FreestreamConditions        = init_field(FreestreamConditions)
 
-    mass:               MassConditions              = eqx.field(default_factory=MassConditions)
-    energy:             EnergyNetworkConditions     = eqx.field(default_factory=EnergyNetworkConditions)
-    aerodynamics:       AerodynamicsConditions      = eqx.field(default_factory=AerodynamicsConditions)
-    stability:          StabilityConditions         = eqx.field(default_factory=StabilityConditions)
+    mass:               MassConditions              = init_field(MassConditions)
+    energy:             EnergyNetworkConditions     = init_field(EnergyNetworkConditions)
+    aerodynamics:       AerodynamicsConditions      = init_field(AerodynamicsConditions)
+    stability:          StabilityConditions         = init_field(StabilityConditions)
 
-    controls:           ControlsConditions          = eqx.field(default_factory=ControlsConditions)
-    dynamics:           DynamicsConditions          = eqx.field(default_factory=DynamicsConditions)
+    controls:           ControlsConditions          = init_field(ControlsConditions)
+    dynamics:           DynamicsConditions          = init_field(DynamicsConditions)
 
-    solver:             SolverConditions            = eqx.field(default_factory=SolverConditions)
+    solver:             SolverConditions            = init_field(SolverConditions)
 
-    
+    def __post_init__(self):
+        frozen_initials = eqx.tree_at(lambda s: s.initials, self, None, is_leaf=lambda x: x is None)
+        object.__setattr__(self, "initials", frozen_initials)
 
     def check_controls(self, verbose=True) -> bool:
         """
@@ -90,13 +88,13 @@ class State(Conditions):
         routing_table = self.controls.active_routing_table
 
         # 2. Extract all targets in one shot
-        def get_all_targets(s):
+        def get_unknown_targets(s):
             targets = []
             for path, _ in routing_table:
                 targets.append(reduce(getattr, path, s))
             return tuple(targets)
 
-        current_targets = get_all_targets(self)
+        current_targets = get_unknown_targets(self)
         new_arrays = []
         control_idx = 0
 
@@ -111,7 +109,7 @@ class State(Conditions):
             control_idx += n_points
 
         # 4. Swap all arrays in a single JAX graph node
-        return eqx.tree_at(get_all_targets, self, tuple(new_arrays))
+        return eqx.tree_at(get_unknown_targets, self, tuple(new_arrays))
 
     def pack_residuals(self):
         """
@@ -128,68 +126,5 @@ class State(Conditions):
             stacked_residuals = jnp.empty((0,))
 
         return eqx.tree_at(lambda s: s.solver.residuals, self, stacked_residuals)
-
-
-    def build_controls_from_system(self, system: "System|Component", verbose=True) -> None:
-        
-        new_controls = self.controls
-        surface_controls = []
-        direct_controls = []
-        unbound_controls = []
-
-        
-        if verbose:
-            print(f"Building controls from {system.tag}...")
-        
-        for component in system.subcomponents:
-            self.build_controls_from_system(component)
-
-            if component.is_control_component:
-                if isinstance(component, RCAIDE.Library.Components.Wing):
-                    new_controls = self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.Conditions.Controls.SurfaceControlVariable(
-                            tag=component.tag + "_deflection",
-                            surfaces=(system,),
-                        )
-                    )
-                    surface_controls.append(component.tag + "_deflection")
-
-                else:
-                    unbound = False
-                    if hasattr(component, "control_path"): path = component.control_path
-                    else: path = (); unbound = True
-
-                    if hasattr(component, "control_path_indices"): indices = component.control_path_indices
-                    else: indices = (slice(None), 0); unbound = True
-
-                    if unbound: unbound_controls.append(component.tag)
-
-                    new_controls = self.controls.add_control_variable(
-                        RCAIDE.Framework.Missions.Conditions.Controls.DirectControlVariable(
-                            tag=component.tag,
-                            path=path,
-                            path_indices=indices,
-                        )
-                    )
-                    if not unbound: direct_controls.append(component.tag)
-
-                if verbose:
-                    if surface_controls:
-                        print(f"Added the following aerodynamic surface controls:" +
-                              "\n\t- ".join(surface_controls))
-                    if direct_controls:
-                        print(f"Added the following direct controls:" +
-                              "\n\t- ".join(direct_controls))
-                    if unbound_controls:
-                        print(f"The following control components were found, but without path information."
-                              f"They may not function as intended:"
-                              "\n\t- ".join(unbound_controls))
-        
-        if verbose:
-            print(f"Completed building controls from {system.tag}.\n"
-                  f"Controls may be activated for mission segments by setting "
-                  f"segment.active_controls = ('control_variable', ...)")
-        
-        return eqx.tree_at(lambda s: s.controls, self, new_controls)
 
 

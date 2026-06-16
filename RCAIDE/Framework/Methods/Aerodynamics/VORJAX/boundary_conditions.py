@@ -15,9 +15,9 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
     from RCAIDE.Framework.Methods.Aerodynamics.VORJAX.panelization import VortexDistribution
 
 from RCAIDE.utils import inputs, outputs
@@ -46,7 +46,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     RHS = (V_freestream + V_rotation + V_wake) @ n
     """
     
-    vlm_settings: "VLMSettings" = settings.analysis.aerodynamics  # type: ignore
+    vlm_settings: "VORJAX_Settings" = settings.analysis.aerodynamics  # type: ignore
     VD: VortexDistribution = system.analysis_data["vortex_distribution"]  # type: ignore
     
     # Extract State Conditions

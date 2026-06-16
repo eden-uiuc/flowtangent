@@ -73,6 +73,7 @@ nosetests.xml
 # Images
 *.pdf
 *.png
+*.md
 
 # Docs
 *.html
@@ -84,6 +85,3 @@ nosetests.xml
 /docs/_modules/
 /docs/_sources/
 /docs/_static/
-
-
-

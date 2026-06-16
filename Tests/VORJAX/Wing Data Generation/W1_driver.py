@@ -13,7 +13,7 @@ from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
 
-from RCAIDE.utils import PathTuple
+from RCAIDE.utils import DataPath
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
@@ -21,7 +21,7 @@ from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, Wi
 from RCAIDE.Framework import Aircraft, Settings, GradientMap
 from RCAIDE.Framework.Settings import AnalysisSettings
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings, Vortices, BatchVORJAX
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data
@@ -239,12 +239,12 @@ if __name__ == "__main__":
         
         solver=BatchVORJAX()
 
-        mach_path   = PathTuple(("freestream", "mach_number"), tag="M")
-        alpha_path  = PathTuple(("aerodynamics", "angles", "alpha"), tag="a")
-        beta_path   = PathTuple(("aerodynamics", "angles", "beta"), tag="b")
+        mach_path   = DataPath(("freestream", "mach_number"), tag="M")
+        alpha_path  = DataPath(("aerodynamics", "angles", "alpha"), tag="a")
+        beta_path   = DataPath(("aerodynamics", "angles", "beta"), tag="b")
 
-        lift_path   = PathTuple(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
-        drag_path   = PathTuple(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
+        lift_path   = DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
+        drag_path   = DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
 
         GRAD_MAP = GradientMap(
             state_inputs=(
@@ -257,7 +257,7 @@ if __name__ == "__main__":
                 drag_path
             ))
 
-        aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+        aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
         analysis_settings = AnalysisSettings(
             aerodynamics=aero_settings,
             gradient_map=GRAD_MAP

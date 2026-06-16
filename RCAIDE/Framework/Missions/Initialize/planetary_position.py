@@ -18,7 +18,7 @@ import RCAIDE.Framework as rcf
 
 
 def initialize_planetary_position(state: "rcf.State",
-                                  system: "rcf.System",
+                                  system: "rcf.Systems",
                                   settings: "rcf.Settings",
                                   ):
 

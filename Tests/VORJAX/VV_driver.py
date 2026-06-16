@@ -39,9 +39,9 @@ from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
 
 from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, System
 from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Missions.Conditions import Numerics
+from RCAIDE.Framework.Conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VLMSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
@@ -484,7 +484,7 @@ def VORJAX_test_run(
         suction=suction,
     )
     
-    aero_settings = VLMSettings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
+    aero_settings = VORJAX_Settings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -1596,20 +1596,20 @@ if __name__ == "__main__":
 
     os.chdir(ru.get_RCAIDE_root())
 
-    mach_path   = ru.PathTuple(("freestream", "mach_number"), tag="M")
-    alpha_path  = ru.PathTuple(("aerodynamics", "angles", "alpha"), tag="a")
-    beta_path   = ru.PathTuple(("aerodynamics", "angles", "beta"), tag="b")
+    mach_path   = ru.DataPath(("freestream", "mach_number"), tag="M")
+    alpha_path  = ru.DataPath(("aerodynamics", "angles", "alpha"), tag="a")
+    beta_path   = ru.DataPath(("aerodynamics", "angles", "beta"), tag="b")
 
-    p_path      = ru.PathTuple(("stability", "static", "roll_rate"), tag="p")
-    q_path      = ru.PathTuple(("stability", "static", "pitch_rate"), tag="q")
-    r_path      = ru.PathTuple(("stability", "static", "yaw_rate"), tag="r")
+    p_path      = ru.DataPath(("stability", "static", "roll_rate"), tag="p")
+    q_path      = ru.DataPath(("stability", "static", "pitch_rate"), tag="q")
+    r_path      = ru.DataPath(("stability", "static", "yaw_rate"), tag="r")
     
-    lift_path   = ru.PathTuple(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
-    drag_path   = ru.PathTuple(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
+    lift_path   = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
+    drag_path   = ru.DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
     
-    i_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "total"))
-    nf_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
-    ff_drag_path = ru.PathTuple(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
+    i_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "total"))
+    nf_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
+    ff_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
 
     GRAD_MAP = GradientMap(
         state_inputs=(
@@ -1662,8 +1662,8 @@ if __name__ == "__main__":
             f_st, f_sys, f_setts = results
 
             CL = ru.get_target(f_st, lift_path)
-            CD = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "drag", "total")))
-            C_m = ru.get_target(f_st, ru.PathTuple(("aerodynamics", "coefficients", "moments", "pitch")))
+            CD = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "drag", "total")))
+            C_m = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "moments", "pitch")))
 
             data = f_sys.analysis_data
             # VORJAX_dCp = np.round(np.asarray(data["dCp"]), 5)
@@ -2030,7 +2030,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP
@@ -2063,7 +2063,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VLMSettings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
+            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP

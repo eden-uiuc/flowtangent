@@ -10,13 +10,14 @@
 
 from __future__ import annotations
 from warnings import warn
-from typing import TypeVar, List
+from typing import Any
 
 # package imports 
 import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library.Attributes.Materials import Solid, Aluminum
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -37,7 +38,7 @@ class ComponentFineness(eqx.Module):
 class ComponentDimensions(eqx.Module):
 
     # Attribute         Type    Default Value
-    ordinal_direction:  bool    = eqx.field(static=True, default=False)
+    ordinal_direction:  bool    = init_field(False, static=True)
 
     reference:          float   = 0.0
     total:              float   = 0.0
@@ -82,9 +83,9 @@ class ComponentAreas(eqx.Module):
 class MaterialProperties(eqx.Module):
 
     # Attribute                 Type        Default Value
-    tensile_stress_carrier:     Solid   = eqx.field(default_factory=Aluminum)
-    torsional_stress_carrier:   Solid   = eqx.field(default_factory=Aluminum)
-    shear_stress_carrier:       Solid   = eqx.field(default_factory=Aluminum)
+    tensile_stress_carrier:     Solid   = init_field(Aluminum)
+    torsional_stress_carrier:   Solid   = init_field(Aluminum)
+    shear_stress_carrier:       Solid   = init_field(Aluminum)
 
     def __repr__(self):
         return ""
@@ -99,9 +100,9 @@ class MassProperties(eqx.Module):
     volume:                             float       = 1.0
     density:                            float       = 0.0
 
-    center_of_gravity:                  jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros(3))
-    moments_of_inertia:                 jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros((3, 3)))
-    subcomponent_moments_of_inertia:    jnp.ndarray  = eqx.field(default_factory=lambda: jnp.zeros((3, 3)))
+    center_of_gravity:                  jnp.ndarray  = empty_array(3)
+    moments_of_inertia:                 jnp.ndarray  = empty_array((3, 3))
+    subcomponent_moments_of_inertia:    jnp.ndarray  = empty_array((3, 3))
 
 
     def __repr__(self):
@@ -111,25 +112,27 @@ class MassProperties(eqx.Module):
 class Component(eqx.Module):
 
 
-    tag:                    str                   = eqx.field(static=True, default='Component')
-    is_control_component:   bool                  = eqx.field(static=True, default=False)
+    tag:                    str                   = init_field('Component', static=True)
+    is_control_component:   bool                  = init_field(False, static=True)
 
-    segments:               tuple[Component, ...] = eqx.field(default_factory=tuple)
-    subcomponents:          tuple[Component, ...] = eqx.field(default_factory=tuple)
-    origin:                 jnp.ndarray           = eqx.field(default_factory=lambda: jnp.zeros(3))
+    segments:               tuple[Component, ...] = init_field(tuple)
+    subcomponents:          tuple[Component, ...] = init_field(tuple)
+    origin:                 jnp.ndarray           = empty_array(3)
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
-    areas:                  ComponentAreas        = eqx.field(default_factory=ComponentAreas)
+    areas:                  ComponentAreas        = init_field(ComponentAreas)
 
     # -------------------------------------------------DIMENSIONS-------------------------------------------------------
-    lengths:                ComponentDimensions   = eqx.field(default_factory=ComponentDimensions)
-    widths:                 ComponentDimensions   = eqx.field(default_factory=ComponentDimensions)
-    heights:                ComponentDimensions   = eqx.field(default_factory=ComponentDimensions)
-    diameters:              ComponentDimensions   = eqx.field(default_factory=ComponentDimensions)
+    lengths:                ComponentDimensions   = init_field(ComponentDimensions)
+    widths:                 ComponentDimensions   = init_field(ComponentDimensions)
+    heights:                ComponentDimensions   = init_field(ComponentDimensions)
+    diameters:              ComponentDimensions   = init_field(ComponentDimensions)
 
     # -----------------------------------------------MASS & MATERIALS---------------------------------------------------
-    mass_properties:        MassProperties        = eqx.field(default_factory=MassProperties)
-    material_properties:    MaterialProperties    = eqx.field(default_factory=MaterialProperties)
+    mass_properties:        MassProperties        = init_field(MassProperties)
+    material_properties:    MaterialProperties    = init_field(MaterialProperties)
+
+    _bookkeeping:           dict[str, Any] = init_field(dict, static=True)
 
     
     def __repr__(self):
@@ -144,14 +147,20 @@ class Component(eqx.Module):
         else:
             raise TypeError(f"Indices must be int, slice, or str.")
     
-    def __getattr__(self, item:str):
+    def __getattr__(self, item: str):
         if item.startswith("__") and item.endswith("__"):
             raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
-        for sc in self.subcomponents:
-            if sc.get_field_name() == item:
-                return sc
 
-        raise AttributeError(f"'{self.tag}' has no attribute or subcomponent named '{item}'")
+        if hasattr(self, '_bookkeeping') and item in self._bookkeeping:
+            target_class = self._bookkeeping[item]
+            filtered_subs = tuple(
+                c for c in self.subcomponents if isinstance(c, target_class)
+            )
+            return Component(tag=item.replace('_',' ').title(), subcomponents=filtered_subs)
+        for sc in self.subcomponents:
+            if hasattr(sc, 'get_field_name') and sc.get_field_name() == item:
+                return sc
+        raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
 
     def __bool__(self):
         return True
@@ -225,6 +234,6 @@ class Component(eqx.Module):
 
 class ControlComponent(Component):
 
-    is_control_component:   bool = eqx.field(static=True, default=True)
-    control_path:           tuple[str, ...] |None   = eqx.field(static=True, default_factory=tuple)
-    control_path_indices:   tuple | None            = eqx.field(static=True, default_factory=lambda: (slice(None), 0))
+    is_control_component:   bool = init_field(True, static=True)
+    control_path:           tuple[str, ...] |None   = init_field(tuple, static=True)
+    control_path_indices:   tuple | None            = init_field(lambda: (slice(None), 0), static=True)

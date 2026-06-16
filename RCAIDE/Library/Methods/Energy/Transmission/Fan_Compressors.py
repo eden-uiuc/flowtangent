@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def func_fan_compressor_performance(
-        g,
+        gamma,
         Cp,
         T_t,
         P_t,
@@ -27,7 +27,7 @@ def func_fan_compressor_performance(
         n_p
 ):
 
-    T_t_out = T_t * (PR ** ((g - 1.) / (g * n_p)))
+    T_t_out = T_t * (PR ** ((gamma - 1.) / (gamma * n_p)))
 
     h_t     = T_t * Cp
     h_t_out = T_t_out * Cp
@@ -59,7 +59,7 @@ def fan_performance(
 
             fan     = propulsor.converters.fan
             PR      = fan.pressure_ratio
-            n_p     = fan.polytropic_efficiency
+            n_p     = fan.efficiencies.flow
 
             work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 
@@ -103,7 +103,7 @@ def compressor_performance(
             for c_idx, comp in enumerate(propulsor.converters.compressors):
 
                 PR = comp.pressure_ratio
-                n_p = comp.polytropic_efficiency
+                n_p = comp.efficiencies.flow
 
                 work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(g, Cp, T_t, P_t, PR, n_p)
 

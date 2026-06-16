@@ -6,8 +6,8 @@ from .Aerodynamics import (AerodynamicAngles, ComponentCoefficients, LiftCoeffic
 from .Controls import (ResidualNames, DynamicResidual, DynamicsConditions, ControlVariable, SurfaceControlVariable, EnergyControlVariable,
                        ControlsConditions)
 
-from .Energy import (EnergyNetworkConditions, EnergyStoreConditions, EnergyConverterConditions, BatteryCellConditions,
-                     BatteryPackConditions, FuelConditions)
+from .Energy import (EnergyNetworkConditions, EnergyStoreConditions, EnergyNodeConditions, BatteryCellConditions,
+                     BatteryPackConditions, FuelTankConditions)
 
 from .Frames import Frame, InertialFrame, BodyFrame, WindFrame, PlanetFrame, FrameConditions
 

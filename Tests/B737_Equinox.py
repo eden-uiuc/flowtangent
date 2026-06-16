@@ -1,39 +1,41 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
-
-import time
+from __future__ import annotations
+# package imports
 import dataclasses as dc
-
-import jax
-from jax import value_and_grad, jit
 
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Framework import State, System, Settings, Process, ProcessStep
-from RCAIDE.Framework.Missions.Conditions import Numerics
-from RCAIDE.Framework.System import Aircraft, VehicleEnvelope, AircraftMassProperties
+# RCAIDE Imports
+import RCAIDE.utils as ru
+
+from RCAIDE.Framework import Process, State, Settings
+from RCAIDE.Framework.Conditions import Numerics
+from RCAIDE.Framework.Systems import Aircraft, VehicleEnvelope, AircraftMassProperties
 from RCAIDE.Framework.Missions.Segments import Segment
 from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
-                                                         ConstantSpeed,  # Speed Profiles
-                                                         ConstantAltitudeChangeRate,  # Velocity Profiles
-                                                         FixedDistance, FixedTime,)  # Duration Profiles
-from RCAIDE.Framework.Missions.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics import TestAero, VLM, VLMSettings, VLMVortices, InitializeVLM
+                                                         ConstantSpeed,                     # Speed Profiles
+                                                         ConstantAltitudeChangeRate,        # Velocity Profiles
+                                                         FixedDistance, FixedTime,)         # Duration Profiles
+from RCAIDE.Framework.Conditions.Controls import DirectControlVariable
+from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from RCAIDE.Framework.Analyses.Energy.Sizing import update_design_parameters
+from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Library import Units
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, Airfoil_Data
+from RCAIDE.Library.Components import ComponentAreas, Airfoil, AirfoilData, MassProperties
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from RCAIDE.Library.Components.Fuselages import *
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
 from RCAIDE.Library.Components.Nacelles import Nacelle, NacelleDiameters
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, DesignParameters
-from RCAIDE.Library.Components.Energy.Stores import FuelTank, FuelTankMass
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbofanEnergyLine
+from RCAIDE.Library.Components.Energy.Nodes import FuelTank
+from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
 
-from RCAIDE.Library.Atmospheres import USStandard1976
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
 # ----------------------------------------------------------------------------------------------------------------------
@@ -84,7 +86,7 @@ def vehicle_setup():
         thickness_to_chord      =0.1,
         dihedral_outboard       =2.5 * Units.deg,
         sweeps                  =WingSweeps(quarter_chord=28.225 * Units.deg),
-        airfoil                 =Airfoil.from_file(Airfoil_Data/'B737a.txt'))
+        airfoil                 =Airfoil.from_file(AirfoilData/'B737a.txt'))
 
     yehudi_segment = WingSegment(
         tag='Main Wing Yehudi Segment',
@@ -94,7 +96,7 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * Units.deg,
         sweeps=WingSweeps(quarter_chord=25. * Units.deg),
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737b.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737b.txt'))
 
     mid_segment = WingSegment(
         tag='Main Wing Mid Segment',
@@ -104,14 +106,14 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * Units.deg,
         sweeps=WingSweeps(quarter_chord=56.75 * Units.deg),
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737c.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737c.txt'))
 
     tip_segment = WingSegment(
         tag='Main Wing Tip Segment',
         percent_span_location=1.,
         root_chord_percent=0.10077,
         thickness_to_chord=0.1,
-        airfoil=Airfoil.from_file(Airfoil_Data/'B737d.txt'))
+        airfoil=Airfoil.from_file(AirfoilData/'B737d.txt'))
 
     # Control Surfaces -------------------------------------------------------------------------------------------------
 
@@ -156,9 +158,7 @@ def vehicle_setup():
         areas=ComponentAreas(reference=124.862, wetted=225.08),
         twists=WingDimensions(root=4.0 * Units.deg, tip=0.0 * Units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
-        control_surfaces=Component(
-            tag="Main Wing Control Surfaces",
-            subcomponents=(slat, flap, aileron))
+        subcomponents=(slat, flap, aileron)
     ).update_geometry()
     
     vehicle = vehicle.add_subcomponent(main_wing)
@@ -207,8 +207,9 @@ def vehicle_setup():
         chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
         areas                   =ComponentAreas(reference=41.49, exposed=59.354, wetted=71.81),
         twists                  =WingDimensions(root=3.0 * Units.deg, tip=3.0 * Units.deg),
-        # control_surfaces        =Component("Horizontal Stabilizer Controls", subcomponents=(elevator,)),
-        segments                =(h_root_segment, h_tip_segment)).update_geometry()
+        segments                =(h_root_segment, h_tip_segment),
+        subcomponents           =(elevator,)).update_geometry()
+    
 
     vehicle = vehicle.add_subcomponent(h_stab)
 
@@ -344,9 +345,6 @@ def vehicle_setup():
     # Turbofan Engines
     # ------------------------------------------------------------------------------------------------------------------
 
-    # Energy Line ------------------------------------------------------------------------------------------------------
-    vehicle = eqx.tree_at(lambda v: v.energy.lines, vehicle, vehicle.energy.lines.add_subcomponent(TurbofanEnergyLine()))
-
     # Engine -----------------------------------------------------------------------------------------------------------
     tf = TurbofanEngine(
         tag="Engine 1",
@@ -354,26 +352,27 @@ def vehicle_setup():
         bypass_ratio=5.4,
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
-        design_thrust_parameters=DesignParameters(total_thrust=24000., altitude=10668., mach_number=0.78),
+        design_parameters=DesignParameters(
+            total_thrust=24000.,
+            SLS_thrust=24000.,
+            altitude=10668.,
+            mach_number=0.78,
+            turbine_intake_temperature=1450.
+            ),
     )
 
-    # Converters -------------------------------------------------------------------------------------------------------
-    
-    cons        = tf.converters
-
     # Direct Replacement
-    cons = eqx.tree_at(
-        lambda c: (
-                c.inlet_nozzle.polytropic_efficiency, c.inlet_nozzle.pressure_ratio,
-                c.fan.polytropic_efficiency, c.fan.pressure_ratio,
-                c.compressors.low_pressure_compressor.polytropic_efficiency, c.compressors.low_pressure_compressor.pressure_ratio,
-                c.compressors.high_pressure_compressor.polytropic_efficiency, c.compressors.high_pressure_compressor.pressure_ratio,
-                c.turbines.high_pressure_turbine.polytropic_efficiency, c.turbines.high_pressure_turbine.mechanical_efficiency,
-                c.turbines.low_pressure_turbine.polytropic_efficiency, c.turbines.low_pressure_turbine.mechanical_efficiency,
-                c.core_nozzle.polytropic_efficiency, c.core_nozzle.pressure_ratio, c.core_nozzle.diameters.reference,
-                c.fan_nozzle.polytropic_efficiency, c.fan_nozzle.pressure_ratio, c.fan_nozzle.diameters.reference,
-            ),
-            cons,
+    tf = eqx.tree_at(
+        lambda tf: (
+                tf.inlet_nozzle.efficiencies.flow, tf.inlet_nozzle.pressure_ratio,
+                tf.fan.efficiencies.flow, tf.fan.pressure_ratio,
+                tf.lpc.efficiencies.flow, tf.lpc.pressure_ratio,
+                tf.hpc.efficiencies.flow, tf.hpc.pressure_ratio,
+                tf.hpt.efficiencies.flow, tf.hpt.efficiencies.mechanical,
+                tf.lpt.efficiencies.flow, tf.lpt.efficiencies.mechanical,
+                tf.core_nozzle.efficiencies.flow, tf.core_nozzle.pressure_ratio, tf.core_nozzle.diameters.reference,
+                tf.fan_nozzle.efficiencies.flow, tf.fan_nozzle.pressure_ratio, tf.fan_nozzle.diameters.reference,
+            ),tf,
             (
                 0.98, 0.98,
                 0.93, 1.7,
@@ -387,27 +386,18 @@ def vehicle_setup():
         )
 
     # Engine & Line Rebuild --------------------------------------------------------------------------------------------
-
-    tf = dc.replace(tf, converters=cons)
     tf2 = dc.replace(tf, tag="Engine 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
+    
+    fuel_mass = MassProperties(
+        total=79015.8-62732.0,
+        center_of_gravity=jnp.array([[13.61, 0., -0.93]])
+    )
+    fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]), mass_properties=fuel_mass)
 
-    line_cons = vehicle.energy.lines[0].converters
-    line_cons = line_cons.add_subcomponent(tf)
-    line_cons = line_cons.add_subcomponent(tf2)
+    tf_line = TurbojetEnergyLine(tag="Turbofan Line", subcomponents=(tf, tf2, fuel))
 
-    vehicle = eqx.tree_at(lambda v: v.energy.lines[0].converters, vehicle, line_cons)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Fuel Tanks
-    # ------------------------------------------------------------------------------------------------------------------
-
-    fuel_mass = FuelTankMass(full_fuel_mass=79015.8-62732.0, center_of_gravity=jnp.array([[13.61, 0., -0.93]]))
-    fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]),mass_properties=fuel_mass)
-
-    line_stores = vehicle.energy.lines[0].stores
-    line_stores = line_stores.add_subcomponent(fuel)
-
-    vehicle = eqx.tree_at(lambda v: v.energy.lines[0].stores, vehicle, line_stores)
+    tf_network = EnergyNetwork(tag="Turbofan Network", subcomponents=(tf_line,))
+    vehicle = vehicle.add_subcomponent(tf_network)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Configurations
@@ -467,19 +457,20 @@ def vehicle_setup():
     return vehicle
 
 
-def mission_setup(state: "State", system: "System", settings: "Settings"):
+def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     # Set Controls & Analysis Settings
 
     controls = (
         "body_angle",
-        DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True)
+        # DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True),
+        DirectControlVariable(tag='Throttle', path=("energy", "throttle"), active=True)
     )
 
     residuals = ("force_x", "force_z")
 
-    vortex_settings = VLMVortices(spanwise_vortices=20, chordwise_vortices=12)
-    aero_settings = VLMSettings(vortices=vortex_settings)
+    vortex_settings = Vortices(n_spanwise=20, n_chordwise=12)
+    aero_settings = VORJAX_Settings(vortices=vortex_settings)
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, aero_settings)
 
@@ -493,7 +484,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedTime(time = 10000.0 / 6.0 * Units.s),
         active_controls=controls,
         active_residuals=residuals,
-        controls_initial_guess=(0.03, 50000.0 * Units.N),
+        controls_initial_guess=(0.03, 0.5),
     )
     
     cruise_segment = Segment(
@@ -503,7 +494,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
         active_residuals=residuals,
-        controls_initial_guess=(0.03, 50000.0 * Units.N),
+        controls_initial_guess=(0.03, 0.5),
     )
 
     descent_segment = Segment(
@@ -514,6 +505,7 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         duration_profile=FixedTime(time = 10000.0 / 5.0 * Units.s),
         active_controls=controls,
         active_residuals=residuals,
+        controls_initial_guess=(0.03, 0.5),
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
@@ -530,53 +522,59 @@ def mission_setup(state: "State", system: "System", settings: "Settings"):
         initial_settings=settings
     )
 
-    final_segments = []
+    updated_segments = []
     
     for segment in mission.steps:
-        aero_analysis = VLM()
-        seg_w_analysis = eqx.tree_at(lambda s: s.analyze.aerodynamics, segment, aero_analysis)
+        aero_init = InitializeVORJAX()
+        aero_analysis = ComputeVORJAX()
+        energy_analysis = build_analysis_from_network(system.energy_networks.turbofan_network)
         
-        aero_init = InitializeVLM()
-        updated_init_steps = segment.initialize.steps + (aero_init,)
-        final_seg = eqx.tree_at(lambda s: s.initialize.steps, seg_w_analysis, updated_init_steps)
-        
-        final_segments.append(final_seg)
+        updated_segment = eqx.tree_at(
+            lambda s: (
+                s.initialize.analyses,
+                s.analyze.aerodynamics,
+                s.analyze.energy,
+            ),
+            segment,
+            (
+                aero_init,
+                aero_analysis,
+                energy_analysis,
+            )
+        )
 
-    return eqx.tree_at(lambda m: m.steps, mission, tuple(final_segments)), updated_settings
+        updated_segments.append(updated_segment)
 
+    updated_mission = eqx.tree_at(lambda m: m.steps, mission, tuple(updated_segments))
 
-def state_setup():
+    VORJAX_Graph = aero_analysis.to_mermaid(save_path="./Tests/VORJAX_graph.md")
+    Energy_Graph = energy_analysis.to_mermaid(save_path="./Tests/energy_graph.md")
 
-    numerics = Numerics(number_of_control_points=4)
-    
-    state = State(numerics=numerics)
-    state = eqx.tree_at(lambda s: s.freestream.atmosphere, state, USStandard1976(), is_leaf=lambda x: x is None)
-    frozen_initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-    state = eqx.tree_at(lambda s: s.initials, state, frozen_initials, is_leaf=lambda x: x is None)
+    updated_state = state
 
-    return state
-
+    return updated_mission, updated_state, updated_settings
 
 def mission_b737(state, system, settings):
 
-    mission, updated_settings = mission_setup(state, system, settings)
+    mission, updated_state, updated_settings = mission_setup(state, system, settings)
 
-    final_state, final_system, final_settings = mission.run(state, system, updated_settings)
+    final_state, final_system, final_settings = mission.run(updated_state, system, updated_settings)
 
     VLM_data = final_system.analysis_data
-    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['pressure_coefficients'][0])
+    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['dCp'][0])
     fig.show()
 
     return final_state, final_system, final_settings
 
 
+
 if __name__ == '__main__':
 
-    print("Setting up mission ...")
+    print("\nSetting up mission ...")
 
-    state = state_setup()
+    state = State(numerics=Numerics(number_of_control_points=4))
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=False)
+    settings = Settings(DEBUG_MODE=True)
 
     print("Setup complete, starting mission ...")
 

@@ -17,9 +17,10 @@ if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
 from .Profiles import *
+from RCAIDE.utils import init_field
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Conditions.Controls import ControlVariable, DirectControlVariable, ResidualNames
+from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, ResidualNames
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Cruise
@@ -106,8 +107,8 @@ class TestCSACruise(Cruise):
     altitude:   float = 1.0
     air_speed:  float = 1.0
 
-    active_controls:  tuple[str | ControlVariable, ...]   = eqx.field(default_factory=_test_cruise_controls)
-    active_residuals: tuple[ResidualNames, ...]           = eqx.field(static=True, default=('force_x', 'force_z'))
+    active_controls:  tuple[str | ControlVariable, ...]   = init_field(_test_cruise_controls)
+    active_residuals: tuple[ResidualNames, ...]           = init_field(('force_x', 'force_z'), static=True)
     controls_initial_guess : tuple[jnp.ndarray|float,...] = (1.0, 0.05)
 
     def __post_init__(self):

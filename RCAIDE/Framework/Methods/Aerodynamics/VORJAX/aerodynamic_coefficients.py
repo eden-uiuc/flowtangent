@@ -15,9 +15,9 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 
 from RCAIDE.utils import inputs, outputs
 from RCAIDE.Library.Methods.Aerodynamics.Shocks import theta_beta_mach, oblique_shock
@@ -294,7 +294,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     "state.freestream.speed",
     "state.freestream.mach_number",
     "state.freestream.density",
-    "state.freestream.gamma"
+    "state.freestream.gamma",
     "system.areas.reference",
     "system.reference_geometry.mean_aerodynamic_chord",
     "system.reference_geometry.projected_span",
@@ -327,7 +327,7 @@ def compute_coefficients(state: "State", system: "System", settings: "Settings")
     )
 
     # Apply Correction Factors
-    vlm_settings: VLMSettings = settings.analysis.aerodynamics  # type: ignore
+    vlm_settings: VORJAX_Settings = settings.analysis.aerodynamics  # type: ignore
 
     CDi = jnp.where(vlm_settings.near_field_drag, CDi_near, CDi_far)
     CL = jnp.where(vlm_settings.model_fuselage, CL * vlm_settings.corrections.fuselage_lift, CL)

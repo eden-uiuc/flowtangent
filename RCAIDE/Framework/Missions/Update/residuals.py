@@ -21,7 +21,7 @@ import RCAIDE.Framework as rcf
 
 def flight_dynamics_residuals(
     state: "rcf.State",
-    system: "rcf.System",
+    system: "rcf.Systems",
     settings: "rcf.Settings",
 ):
     """

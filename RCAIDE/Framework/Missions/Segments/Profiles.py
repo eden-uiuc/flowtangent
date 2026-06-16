@@ -15,9 +15,10 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import System
+    from RCAIDE.Framework.Systems import System
     from RCAIDE.Framework.Settings import Settings
 
+from RCAIDE.utils import init_field
 from RCAIDE.Framework import ProcessStep
 from RCAIDE.Library import Units
 
@@ -29,7 +30,7 @@ from RCAIDE.Library import Units
 
 class ConstantCourse(ProcessStep):
 
-    tag: str = eqx.field(static=True, default="Set Constant Course")
+    tag: str = init_field("Set Constant Course", static=True)
 
     true_course: float = 0.0 * Units.deg
 
@@ -44,7 +45,7 @@ CourseProfile = ConstantCourse
 # Position Profiles
 
 class ConstantAltitude(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Constant Altitude")
+    tag: str = init_field("Set Constant Altitude", static=True)
     altitude: float = 1.0 * Units.km
     
     def __call__(self, state, system, settings):
@@ -59,7 +60,7 @@ class ConstantAltitude(ProcessStep):
         return updated_state, system, settings
 
 class AltitudeChange(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Altitude Change")
+    tag: str = init_field("Set Altitude Change", static=True)
     initial_altitude: float = 1.0 * Units.km
     final_altitude: float = 10.0 * Units.km
     
@@ -81,7 +82,7 @@ PositionProfile = ConstantAltitude | AltitudeChange
 # TODO: Add sideslip calculation and/or deprecate in favor of full 6-DOF
 
 class ConstantSpeed(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Constant Speed")
+    tag: str = init_field("Set Constant Speed", static=True)
     speed: float = 1.0 * Units.m/Units.s
 
     def __call__(self, state, system, settings):
@@ -98,7 +99,7 @@ class ConstantSpeed(ProcessStep):
         return updated_state, system, settings
 
 class ConstantMach(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Constant Mach Number")
+    tag: str = init_field("Set Constant Mach Number", static=True)
 
     mach_number: float = 0.5
 
@@ -123,7 +124,7 @@ SpeedProfile = ConstantSpeed | ConstantMach
 # Velocity Profiles
 
 class ConstantAltitudeChangeRate(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Constant Alt. Change Rate")
+    tag: str = init_field("Set Constant Alt. Change Rate", static=True)
     
     change_rate: float = 0.0 * Units.m/Units.s
 
@@ -144,7 +145,7 @@ VelocityProfile = ConstantAltitudeChangeRate
 # Duration Profiles
 
 class FixedDistance(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Fixed Distance Duration")
+    tag: str = init_field("Set Fixed Distance Duration", static=True)
     distance: float = 1.0 * Units.km
 
     def __call__(self, state, system, settings):
@@ -161,7 +162,7 @@ class FixedDistance(ProcessStep):
         return updated_state, system, settings
 
 class FixedTime(ProcessStep):
-    tag: str = eqx.field(static=True, default="Set Fixed Time Duration")
+    tag: str = init_field("Set Fixed Time Duration", static=True)
     time: float = 1.0 * Units.s
 
     def __call__(self, state, system, settings):

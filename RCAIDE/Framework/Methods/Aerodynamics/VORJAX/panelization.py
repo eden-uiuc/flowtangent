@@ -20,9 +20,9 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import Aircraft
+    from RCAIDE.Framework.Systems import Aircraft
     from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VLMSettings
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 
 # package imports 
 from RCAIDE.utils import inputs, outputs
@@ -620,7 +620,7 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
     # Pre-Processing ---------------------------------------------------------------------------------------------------
 
     # Unpacking 
-    vlm_settings: VLMSettings = settings.analysis.aerodynamics  # type: ignore
+    vlm_settings: VORJAX_Settings = settings.analysis.aerodynamics  # type: ignore
     updated_system = system
     VD_list = []
         

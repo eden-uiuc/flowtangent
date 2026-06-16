@@ -13,7 +13,8 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.utils import empty_array, init_field
+from RCAIDE.Framework.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Stability
@@ -57,20 +58,20 @@ class StaticCoefficients(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = eqx.field(static=True, default='Static Stability Coefficients')
+    tag:            str         = init_field('Static Stability Coefficients', static=True)
 
-    lift:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    drag:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    lift:           jnp.ndarray = empty_array(0)
+    drag:           jnp.ndarray = empty_array(0)
 
-    X:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    Y:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    Z:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    X:              jnp.ndarray = empty_array(0)
+    Y:              jnp.ndarray = empty_array(0)
+    Z:              jnp.ndarray = empty_array(0)
 
-    L:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    M:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    N:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    L:              jnp.ndarray = empty_array(0)
+    M:              jnp.ndarray = empty_array(0)
+    N:              jnp.ndarray = empty_array(0)
 
-    e:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    e:              jnp.ndarray = empty_array(0)
 
 
 
@@ -103,14 +104,14 @@ class StaticForces(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = eqx.field(static=True, default='Static Stability Forces')
+    tag:           str         = init_field('Static Stability Forces', static=True)
 
-    lift:           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    drag:           jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    lift:           jnp.ndarray  = empty_array(0)
+    drag:           jnp.ndarray  = empty_array(0)
 
-    X:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    Y:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    Z:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    X:              jnp.ndarray  = empty_array(0)
+    Y:              jnp.ndarray  = empty_array(0)
+    Z:              jnp.ndarray  = empty_array(0)
 
 
 
@@ -139,11 +140,11 @@ class StaticMoments(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = eqx.field(static=True, default='Static Stability Moments')
+    tag:            str         = init_field('Static Stability Moments', static=True)
 
-    L:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    M:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
-    N:              jnp.ndarray  = eqx.field(default_factory=lambda: jnp.empty(0))
+    L:              jnp.ndarray  = empty_array(0)
+    M:              jnp.ndarray  = empty_array(0)
+    N:              jnp.ndarray  = empty_array(0)
 
 
 
@@ -197,30 +198,30 @@ class CoefficientDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = eqx.field(static=True, default='Coefficient Static Stability Derivatives')
+    tag:            str         = init_field('Coefficient Static Stability Derivatives', static=True)
 
     # Throttle Derivative
-    throttle:       jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    throttle:       jnp.ndarray = empty_array(0)
 
     # Stability Axis Derivatives
-    beta:           jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    alpha:          jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    beta:           jnp.ndarray = empty_array(0)
+    alpha:          jnp.ndarray = empty_array(0)
 
-    delta_a:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    delta_e:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    delta_r:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    delta_f:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    delta_s:        jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    delta_a:        jnp.ndarray = empty_array(0)
+    delta_e:        jnp.ndarray = empty_array(0)
+    delta_r:        jnp.ndarray = empty_array(0)
+    delta_f:        jnp.ndarray = empty_array(0)
+    delta_s:        jnp.ndarray = empty_array(0)
 
     # Body Axis Derivatives
 
-    u:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    v:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    w:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    u:              jnp.ndarray = empty_array(0)
+    v:              jnp.ndarray = empty_array(0)
+    w:              jnp.ndarray = empty_array(0)
 
-    p:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    q:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
-    r:              jnp.ndarray = eqx.field(default_factory=lambda: jnp.empty(0))
+    p:              jnp.ndarray = empty_array(0)
+    q:              jnp.ndarray = empty_array(0)
+    r:              jnp.ndarray = empty_array(0)
 
 
 
@@ -259,56 +260,56 @@ class StaticDerivatives(Conditions):
     """
 
     # Attribute     Type            Default Value
-    tag:            str             = eqx.field(static=True, default='Static Stability Coefficients Derivatives')
+    tag:            str             = init_field('Static Stability Coefficients Derivatives', static=True)
 
-    Clift:  CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    Clift:  CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
-    Cdrag:  CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    Cdrag:  CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='Drag Coefficient Static Stability Derivatives'))
 
-    CX:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CX:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='X Coefficient Static Stability Derivatives'))
-    CY:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CY:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='Y Coefficient Static Stability Derivatives'))
-    CZ:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CZ:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='Z Coefficient Static Stability Derivatives'))
 
-    CL:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CL:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='L Coefficient Static Stability Derivatives'))
-    CM:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CM:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='M Coefficient Static Stability Derivatives'))
-    CN:     CoefficientDerivatives  = eqx.field(default_factory=lambda:
+    CN:     CoefficientDerivatives  = init_field(lambda:
                                             CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
 
 
 
 class StaticStability(Conditions):
 
-    tag:                str                 = eqx.field(static=True, default='Static Stability')
+    tag:                str                 = init_field('Static Stability', static=True)
     
-    forces:             StaticForces        = eqx.field(default_factory=StaticForces)
-    moments:            StaticMoments       = eqx.field(default_factory=StaticMoments)
+    forces:             StaticForces        = init_field(StaticForces)
+    moments:            StaticMoments       = init_field(StaticMoments)
     
-    coefficients:       StaticCoefficients  = eqx.field(default_factory=StaticCoefficients)
-    derivatives:        StaticDerivatives   = eqx.field(default_factory=StaticDerivatives)
+    coefficients:       StaticCoefficients  = init_field(StaticCoefficients)
+    derivatives:        StaticDerivatives   = init_field(StaticDerivatives)
     
-    static_margin:      jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    neutral_point:      jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    spiral_criteria:    jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    static_margin:      jnp.ndarray         = empty_array(0)
+    neutral_point:      jnp.ndarray         = empty_array(0)
+    spiral_criteria:    jnp.ndarray         = empty_array(0)
     
-    pitch_rate:         jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    roll_rate:          jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    yaw_rate:           jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    pitch_rate:         jnp.ndarray         = empty_array(0)
+    roll_rate:          jnp.ndarray         = empty_array(0)
+    yaw_rate:           jnp.ndarray         = empty_array(0)
 
 
 
 class DynamicStability(Conditions):
 
     #Attribute      Type        Default Value
-    tag:            str         = eqx.field(static=True, default='Dynamic Stability')
+    tag:            str         = init_field('Dynamic Stability', static=True)
 
-    LongModes:      Conditions  = eqx.field(default_factory=lambda: Conditions(tag='Longitudinal Modes'))
-    LatModes:       Conditions  = eqx.field(default_factory=lambda: Conditions(tag='Lateral Modes'))
+    LongModes:      Conditions  = init_field(lambda: Conditions(tag='Longitudinal Modes'))
+    LatModes:       Conditions  = init_field(lambda: Conditions(tag='Lateral Modes'))
 
 
 
@@ -316,7 +317,7 @@ class DynamicStability(Conditions):
 class StabilityConditions(Conditions):
 
     # Attribute     Type                Default Value
-    tag:            str                 = eqx.field(static=True, default='Stability')
+    tag:            str                 = init_field('Stability', static=True)
 
-    static:         StaticStability     = eqx.field(default_factory=StaticStability)
-    dynamic:        DynamicStability    = eqx.field(default_factory=DynamicStability)
+    static:         StaticStability     = init_field(StaticStability)
+    dynamic:        DynamicStability    = init_field(DynamicStability)

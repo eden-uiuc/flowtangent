@@ -14,7 +14,8 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Framework.Missions.Conditions import Conditions
+from RCAIDE.utils import empty_array, init_field
+from RCAIDE.Framework.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Numerics
@@ -27,18 +28,31 @@ def chebyshev_matrices(n: int = 16,
 
     assert n > 0, "Attempted to calculate Chebyshev matrices with non-positive number of control points."
 
+    # Find Chebyshev-Gauss-Lobatto Control Point Nodes
     x = 0.5 * (1 - jnp.cos(jnp.pi * jnp.arange(n) / (n - 1)))
 
-    c = jnp.array([2.] + [1.] * (n - 2) + [2.])
-    c *= (-1.) ** jnp.arange(n)
-    c_inv = 1./c
-
+    # Assume a Lagrange polynomial of degree N-1.
+    # Exact derivative can be found as: F' = D * F
+    # D_ij = c_i/c_j * (-1)^(i+j)/(x_i - x_j) for i !=j
+    # c_i = 2 if i=0 or N-1; c_i = 1 otherwise
+    # See Trefethen, L.N. "Spectral Methods in MATLAB"
+    
+    # c_neg = c_i*(-1)^i
+    c_neg = jnp.array([2.] + [1.] * (n - 2) + [2.])
+    c_neg *= (-1.) ** jnp.arange(n)
+    c_neg_inv = 1./c_neg
+    
+    # Calculate x_i - x_j as matrix operation
     A = jnp.tile(x, (n, 1)).T
     dA = A - A.T + jnp.eye(n)
 
-    cs = jnp.multiply(jnp.atleast_2d(c), jnp.atleast_2d(c_inv).T)
-    D = jnp.divide(cs.T, dA)
-
+    # c = c_neg * c_neg_inv = c_i/c_j*(-1)^(i-j) = c_i/c_j * (-1)^(i+j)
+    c = jnp.multiply(jnp.atleast_2d(c_neg), jnp.atleast_2d(c_neg_inv).T)
+    
+    # D = c_i/c_j * (-1)^(i+j) / (x_i - x_j) -> c/dA
+    # Diagnoal term must exactly cancel the rest of the row
+    # Recompute diagonal to avoid floating point errors
+    D = jnp.divide(c.T, dA)
     D -= jnp.diag(jnp.sum(D.T, axis=0))
 
     if calculate_integration:
@@ -57,8 +71,8 @@ def chebyshev_matrices(n: int = 16,
 class NumericalTime(Conditions):
 
     # Attribute     Type                Default Value
-    control_points: jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
-    differentiate:  jnp.ndarray         = eqx.field(default_factory=lambda: jnp.empty(0))
+    control_points: jnp.ndarray         = empty_array(0)
+    differentiate:  jnp.ndarray         = empty_array(0)
     integrate:      jnp.ndarray | None  = None
 
     def __repr__(self):
@@ -68,22 +82,22 @@ class NumericalTime(Conditions):
 class Numerics(Conditions):
 
     # Attribute                 Type                Default Value
-    tag:                        str                 = eqx.field(static=True, default='Numerics')
+    tag:                        str                 = init_field('Numerics', static=True)
 
-    number_of_control_points:   int                 = eqx.field(static=True, default=16)
-    control_point_spacing:      str                 = eqx.field(static=True, default='cosine')
-    calculate_integration:      bool                = eqx.field(static=True, default=True)
-    discretization_method:      Callable | None     = eqx.field(static=True, default=None)
+    number_of_control_points:   int                 = init_field(16, static=True)
+    control_point_spacing:      str                 = init_field('cosine', static=True)
+    calculate_integration:      bool                = init_field(True, static=True)
+    discretization_method:      Callable | None     = init_field(None, static=True)
 
-    solver_jacobian:            str | None          = eqx.field(static=True, default=None)
-    solution_tolerance:         float               = eqx.field(static=True, default=1e-8)
-    max_evaluations:            int                 = eqx.field(static=True, default=int(500))
-    step_size:                  float | None        = eqx.field(static=True, default=None)
+    solver_jacobian:            str | None          = init_field(None, static=True)
+    solution_tolerance:         float               = init_field(1e-8, static=True)
+    max_evaluations:            int                 = init_field(500,  static=True)
+    step_size:                  float | None        = init_field(None, static=True)
     
     converged:                  bool                = False
 
-    dimensionless:              NumericalTime   = eqx.field(default_factory=lambda: NumericalTime(tag='Dimensionless Time'))
-    time:                       NumericalTime   = eqx.field(default_factory=lambda: NumericalTime(tag='Time'))
+    dimensionless:              NumericalTime   = init_field(lambda: NumericalTime(tag='Dimensionless Time'))
+    time:                       NumericalTime   = init_field(lambda: NumericalTime(tag='Time'))
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT

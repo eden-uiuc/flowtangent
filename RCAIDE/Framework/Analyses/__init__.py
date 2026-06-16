@@ -10,6 +10,6 @@
 
 from .Batched import ShardedDatasetGenerator, BatchAnalysis
 
-from . import Aerodynamics
 from . import Energy
+from . import Aerodynamics
 from . import Mass

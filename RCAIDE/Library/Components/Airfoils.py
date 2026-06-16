@@ -17,13 +17,15 @@ import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
+from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library import Component
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil Data Locator
 # ----------------------------------------------------------------------------------------------------------------------
 
-Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
+AirfoilData = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -31,24 +33,23 @@ Airfoil_Data = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
 
 class Airfoil(Component):
 
-    tag:                str = eqx.field(static=True, default="Airfoil")
+    tag:                str = init_field("Airfoil", static=True)
 
     thickness_to_chord: float = 0.0
     max_thickness:      float = 0.0
     wedge_angle:        float = 0.0
 
-    coordinates:        jnp.ndarray = eqx.field(default_factory=jnp.empty((0, 2)))
-
-    camber:             jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
-
-    x_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
-    y_coordinates:      jnp.ndarray = eqx.field(default_factory=jnp.empty((0)))
+    coordinates:        jnp.ndarray = empty_array((0, 2))
+    camber:             jnp.ndarray = empty_array(0)
     
-    x_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
-    x_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    x_coordinates:      jnp.ndarray = empty_array(0)
+    y_coordinates:      jnp.ndarray = empty_array(0)
     
-    y_upper_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
-    y_lower_surface:    jnp.ndarray = eqx.field(default_factory=jnp.empty(0))
+    x_upper_surface:    jnp.ndarray = empty_array(0)
+    x_lower_surface:    jnp.ndarray = empty_array(0)
+    
+    y_upper_surface:    jnp.ndarray = empty_array(0)
+    y_lower_surface:    jnp.ndarray = empty_array(0)
 
     @classmethod
     def NACA_4_Series(cls, series_number: str | int, n_pts: int = 201, edge_factor: float = 1.5):

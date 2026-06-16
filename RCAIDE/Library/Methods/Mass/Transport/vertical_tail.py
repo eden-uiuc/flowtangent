@@ -82,7 +82,7 @@ def func_vertical_tail(wingspan : float,
 # -----------------------------------------------------------------------
 
 def vertical_tail(state: "rcf.State",
-                  system: "rcf.System",
+                  system: "rcf.Systems",
                   settings: "rcf.Settings",):
 
     v_tail = system.wings.vertical_tail

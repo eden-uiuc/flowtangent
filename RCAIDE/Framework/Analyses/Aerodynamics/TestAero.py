@@ -9,6 +9,7 @@
 
 import equinox as eqx
 
+from RCAIDE.utils import init_field
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Methods.Aerodynamics.Test_Aero import direct_aero
 
@@ -25,5 +26,5 @@ def _build_test_aero_steps():
 
 
 class TestAero(Process):
-    tag: str = eqx.field(static=True, default="Aerodynamics")
-    steps: tuple = eqx.field(default_factory=_build_test_aero_steps)
+    tag: str = init_field("Aerodynamics", static=True)
+    steps: tuple = init_field(_build_test_aero_steps)

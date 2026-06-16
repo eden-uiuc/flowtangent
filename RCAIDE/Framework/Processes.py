@@ -13,13 +13,10 @@ from typing import TYPE_CHECKING, Optional, Callable, Self, Generator, Tuple
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
-import logging
-from pathlib import Path
-from collections import defaultdict
-from itertools import product
+import re
+import os
 
 # package imports
-import zarr
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -27,12 +24,8 @@ import networkx as nx
 
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-from jax.flatten_util import ravel_pytree
-from numcodecs import Blosc
-from tqdm import trange
-
 # RCAIDE imports
-from RCAIDE.utils import Token, PathTuple
+from RCAIDE.utils import Token, DataPath, MERMAID_STYLES, init_field
 import RCAIDE.utils as ru
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
@@ -43,8 +36,8 @@ def null_step(*args):
 
 class ProcessStep(eqx.Module):
 
-    function:       Callable | str     = eqx.field(static=True, default=null_step)
-    tag:            str                = eqx.field(static=True, default="Process Step")
+    function:       Callable | str     = init_field(null_step, static=True)
+    tag:            str                = init_field("Process Step", static=True)
 
     state_delta:          State | None     = None
     system_delta:         System | None    = None
@@ -90,13 +83,13 @@ class GradientMap:
     ):
 
         # Sanitize inputs/oututs to PathTuples  
-        self.state_inputs     = tuple(PathTuple(p) for p in state_inputs)
-        self.system_inputs    = tuple(PathTuple(p) for p in system_inputs)
-        self.settings_inputs  = tuple(PathTuple(p) for p in settings_inputs)
+        self.state_inputs     = tuple(DataPath(p) for p in state_inputs)
+        self.system_inputs    = tuple(DataPath(p) for p in system_inputs)
+        self.settings_inputs  = tuple(DataPath(p) for p in settings_inputs)
         
-        self.state_outputs    = tuple(PathTuple(p) for p in state_outputs)
-        self.system_outputs   = tuple(PathTuple(p) for p in system_outputs)
-        self.settings_outputs = tuple(PathTuple(p) for p in settings_outputs)
+        self.state_outputs    = tuple(DataPath(p) for p in state_outputs)
+        self.system_outputs   = tuple(DataPath(p) for p in system_outputs)
+        self.settings_outputs = tuple(DataPath(p) for p in settings_outputs)
 
         # Count inputs
         self._n_st = len(self.state_inputs)
@@ -144,6 +137,7 @@ class GradientMap:
 
         self.unravel_function = unravel_function
         return flat_input_array
+    
     
     def update_inputs(
             self,
@@ -226,18 +220,22 @@ class GradientMap:
 
 class Process(ProcessStep):
 
-    tag:                str                     = eqx.field(static=True, default="Process")
+    tag:                str                     = init_field("Process", static=True)
 
-    steps:              tuple[ProcessStep, ...] = eqx.field(default_factory=tuple)
+    steps:              tuple[ProcessStep, ...] = init_field(tuple)
 
-    initial_step:       int                     = eqx.field(static=True, default=0)
+    initial_step:       int                     = init_field(0, static=True)
 
     initial_state:      Optional[State]     = None
     initial_system:     Optional[System]    = None
     initial_settings:   Optional[Settings]  = None
 
-    _val_and_jac_fn:    Optional[Callable]      = eqx.field(static=True, default=None)
-    _cached_grad_map:   Optional[GradientMap]   = eqx.field(static=True, default=None)
+    _val_and_jac_fn:    Optional[Callable]      = init_field(None, static=True)
+    _cached_grad_map:   Optional[GradientMap]   = init_field(None, static=True)
+
+    _filter_map: dict = init_field(lambda: {
+            "energy": r"state\.energy\.nodes\.\[*\].outputs",
+        },static=True)
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -530,7 +528,7 @@ class Process(ProcessStep):
                     else:
                         G.add_edge(producer_node, step_node, variables=[in_var])
                 else:
-                    global_node = "Global Inputs"
+                    global_node = "User Inputs"
                     if not G.has_node(global_node):
                         G.add_node(global_node)
 
@@ -544,14 +542,123 @@ class Process(ProcessStep):
                 latest_producers[out_var] = step_node
 
         return G
+    
+    def to_mermaid(
+        self, 
+        recursive: bool = False, 
+        show_edges: bool = True, 
+        layout: str = "LR", 
+        exclude: list[str] = None,
+        save_path: str = None,
+        style: str = "modern"
+    ) -> str:
+        """
+        Generates a Mermaid.js flowchart string from the Process DAG.
+        
+        Args:
+            recursive: Whether to flatten nested Processes.
+            show_edges: Whether to label the edges with the variables passed between steps.
+            layout: "LR" (Left-to-Right) or "TD" (Top-Down).
+            exclude: List of predefined domains to hide from the edges (e.g., ['energy']).
+        """
+        # 1. Setup the exclusion filters using the shared class attribute
+        if exclude is None:
+            exclude = ['energy']
 
-    def print_io_tree(self):
+        compiled_patterns = [
+            re.compile(self._filter_map[k]) 
+            for k in exclude if k in self._filter_map
+        ]
+
+        def is_filtered(var_name: str) -> bool:
+            return any(pat.search(var_name) for pat in compiled_patterns)
+
+        # 2. Grab the graph
+        G = self.graph(recursive=recursive)
+        mermaid_lines = []
+
+        if style in MERMAID_STYLES and MERMAID_STYLES[style]:
+            mermaid_lines.append(MERMAID_STYLES[style])
+            
+        mermaid_lines.append(f"graph {layout}")
+
+        # 3. Build safe Node IDs and visual shapes
+        node_id_map = {}
+        for i, node_name in enumerate(G.nodes()):
+            safe_id = f"N{i}"
+            node_id_map[node_name] = safe_id
+            
+            if node_name == "User Inputs":
+                mermaid_lines.append(f"    {safe_id}([{node_name}])") 
+            else:
+                step_obj = G.nodes[node_name].get('step_obj')
+                display_label = step_obj.tag if step_obj else str(node_name)
+                mermaid_lines.append(f"    {safe_id}[{display_label}]")
+
+        # 4. Build edges and apply filters to the variable lists
+        for u, v, data in G.edges(data=True):
+            raw_vars = data.get('variables', [])
+            
+            # Apply the filter to strip out unwanted phantom paths
+            vars_list = [var for var in raw_vars if not is_filtered(var)]
+            
+            if show_edges and vars_list:
+                if len(vars_list) > 4:
+                    label = f"{len(vars_list)} variables"
+                else:
+                    clean_vars = [var.split('.')[-1] for var in vars_list]
+                    label = "<br>".join(clean_vars)
+                
+                # Sanitize any stray double quotes to single quotes
+                label = label.replace('"', "'")
+                    
+                # Wrap the final label in double quotes for Mermaid's parser
+                mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
+            else:
+                mermaid_lines.append(f"    {node_id_map[u]} --> {node_id_map[v]}")
+                
+        mermaid_str = "\n".join(mermaid_lines)
+
+        if save_path:
+            # Ensure the target directory exists
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            
+            with open(save_path, "w", encoding="utf-8") as f:
+                # If it's a markdown file, wrap it in the mermaid code block
+                if save_path.lower().endswith(".md"):
+                    f.write("```mermaid\n")
+                    f.write(mermaid_str)
+                    f.write("\n```\n")
+                else:
+                    # For .mmd or .txt, just write the raw string
+                    f.write(mermaid_str)
+        
+        return mermaid_str
+    
+    def print_io_tree(self, exclude: list[str] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
         in a hierarchical, human-readable ASCII tree structure.
         Handles iterators ([Item]), dictionaries (['key']), and pseudo-types (: Type).
+
+        Args:
+            exclude: List of predefined domains to hide from the I/O tree (e.g., ['energy']).
         """
-        import re
+
+        if exclude is None:
+            exclude = ['energy']
+
+        exclude_patterns = [self._filter_map[k] for k in exclude if k in self._filter_map]
+
+        def filter_paths(paths: set[str]) -> set[str]:
+            if not exclude_patterns or not paths:
+                return paths
+                
+            compiled_patterns = [re.compile(p) for p in exclude_patterns]
+            return {p for p in paths if not any(pat.search(p) for pat in compiled_patterns)}
+        
+        display_inputs = filter_paths(self.inputs)
+        display_outputs = filter_paths(self.outputs)
 
         def build_tree_and_metadata(paths: set[str]) -> tuple[dict, dict]:
             """
@@ -614,17 +721,17 @@ class Process(ProcessStep):
                 display_tree(tree[key], type_hints, depth + 1, node_parts)
 
         print("=== Process Inputs ===")
-        if not self.inputs:
+        if not display_inputs:
             print("  (None)")
         else:
-            in_tree, in_hints = build_tree_and_metadata(self.inputs)
+            in_tree, in_hints = build_tree_and_metadata(display_inputs)
             display_tree(in_tree, in_hints)
 
         print("\n=== Process Outputs ===")
-        if not self.outputs:
+        if not display_outputs:
             print("  (None)")
         else:
-            out_tree, out_hints = build_tree_and_metadata(self.outputs)
+            out_tree, out_hints = build_tree_and_metadata(display_outputs)
             display_tree(out_tree, out_hints)
 
     def find_variable_usage(self, search_term: str):
@@ -705,171 +812,6 @@ class Process(ProcessStep):
 
         return process_str
 
-#-----------------------------------------------------------------------------------------------------------------------
-# Batch Process
-#-----------------------------------------------------------------------------------------------------------------------
-
-class BatchAnalysis:
-    def __init__(
-            self,
-            tag: str="BatchAnalysis",
-            initialize: Process=Process(),
-            compute: Process=Process(),
-            inputs: dict={},
-            outputs: dict={},
-            db_path: Optional[str | Path] = None
-        ):
-        
-        self.tag = tag
-        
-        # Path mapping and default settings.
-        self.input_mappings = inputs
-        self.output_mappings = outputs
-
-        self.initialization_process = initialize
-        self.compute_process = compute
-        self._compiled_step = eqx.filter_jit(self.compute_process.run)
-
-        self.db_path = db_path
-
-    def run(
-        self,
-        system: System,
-        settings: Settings,
-        mode="zip",
-        batch_size: Optional[int]=None,
-        logger_handle: Optional[str]=None,
-        **kwargs
-    ):
-
-        if logger_handle is not None:  # Inherit logger from dataset generator
-            logger = logging.getLogger(logger_handle)
-        else:  # Self logging
-            logger = logging.getLogger(self.tag+"_Logger")
-            
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
-            
-            formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-            ch.setFormatter(formatter)
-            logger.addHandler(ch)
-
-        # Set up base state
-        from RCAIDE.Framework.Missions.Conditions import Numerics
-        state       = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
-        initials    = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-        base_state  = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
-
-        active_keys = []
-        target_map  = []
-        raw_arrays  = []
-
-        # Validate inputs, convert to JAX arrays
-        for k, v in kwargs.items():
-            if k.lower() not in self.input_mappings:
-                logger.warning(f"Unrecognized variable {k} ignored. "
-                              f"Allowed variables: {list(self.input_mappings.keys())}")
-            else:
-                active_keys.append(k.lower())
-                target_map.append(self.input_mappings[k.lower()][0])
-                raw_arrays.append(jnp.atleast_1d(v))
-
-        if len(active_keys) == 0:
-            raise ValueError("No valid inputs provided.")
-        for k, v in self.input_mappings.items():
-            if k not in active_keys:
-                active_keys.append(k)
-                target_map.append(v[0])
-                raw_arrays.append(jnp.atleast_1d(v[1]))
-
-        # Get all flight states
-        if mode == "zip":
-            processed_arrays = jnp.broadcast_arrays(*raw_arrays)
-        elif mode == "mesh":
-            grids = jnp.meshgrid(*raw_arrays, indexing="ij")
-            processed_arrays = [g.ravel().reshape(-1, 1) for g in grids]
-        else:
-            raise ValueError(f"Invalid mode {mode}. Supported modes: 'zip', 'mesh'.")
-        
-        total_states = len(processed_arrays[0])
-        all_outputs = {k: [] for k in self.output_mappings.keys()}
-        all_grads = defaultdict(list)
-        jac_arr = None
-        
-        # Prepare for grads if provided
-        if settings.analysis.gradient_map is not None:
-            g_map = settings.analysis.gradient_map
-            inp = g_map.state_inputs
-            out = g_map.state_outputs
-            
-            grad_pairs = product(out, inp)
-            grad_keys = [f"d{p[0].tag}_d{p[1].tag}" for p in grad_pairs]
-            grad_idxs = list(product(range(len(out)), range(len(inp))))
-
-        # Initialize VORJAX once
-        init_results = self.initialization_process.run(base_state.expand_rows(batch_size), system, settings)
-        state = init_results[0]
-        system = init_results[1]
-        settings = init_results[2]
-
-        # Batch over computation
-        for i in trange(0, total_states, batch_size, desc=f"Running {self.tag} Analysis"):
-            batch_arrays = tuple(arr[i:i+batch_size].reshape(-1, 1) for arr in processed_arrays)
-            actual_size  = len(batch_arrays[0])
-
-            if actual_size < batch_size:
-                pad_length = ((0, batch_size - actual_size), (0, 0))
-                batch_arrays = tuple(jnp.pad(arr, pad_length, mode="edge") for arr in batch_arrays)
-            
-            batch_state = eqx.tree_at(lambda s: ru.get_all_targets(s, target_map), state, batch_arrays)
-            
-            try:    
-                res = self._compiled_step(batch_state, system, settings)
-
-                raw_coeff_arrs = jax.device_get(ru.get_all_targets(res[0], self.output_mappings.values()))
-                clean_coeff_arrs = [arr[:actual_size] for arr in raw_coeff_arrs]
-                
-                for j, key in enumerate(self.output_mappings.keys()):
-                    all_outputs[key].append(clean_coeff_arrs[j])
-                
-                if settings.analysis.gradient_map is not None:
-                    jac_arr = jax.device_get(res[3])
-                    for i, key in enumerate(grad_keys):
-                        out_idx, in_idx = grad_idxs[i]
-                        v_np = jac_arr[:actual_size, out_idx, in_idx]
-                        all_grads[key].append(v_np)
-            
-            except Exception as e:
-                logger.error(f"Failed at states {i} to {i + batch_size}. Injecting NaNs...", exc_info=True)
-                nan_array = np.full((actual_size, 1), np.nan, dtype=np.float64)
-                
-                for key in self.output_mappings.keys():
-                    all_outputs[key].append(nan_array)
-                    
-                if settings.analysis.gradient_map is not None:
-                    for key in grad_keys:
-                        all_grads[key].append(nan_array)
-            
-        merged_results = all_outputs | all_grads
-        
-        if self.db_path is not None:
-            db_root = zarr.open_group(self.db_path, mode='a', zarr_format=2)
-            for key, list_of_arrays in merged_results.items():
-                # Concatenate the thousands of 256-length arrays into one 3,000,000-length array
-                full_array = np.concatenate(list_of_arrays, axis=0)
-                
-                if key not in db_root:
-                    db_root.create_array(
-                        name=key,
-                        shape=(0,) + full_array.shape[1:],
-                        chunks=(100_000,) + full_array.shape[1:],
-                        dtype=full_array.dtype,
-                        compressor=Blosc(cname='zstd', clevel=5, shuffle=Blosc.BITSHUFFLE)
-                    )
-                db_root[key].append(full_array, axis=0)
-
-        return merged_results
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  Legacy Optimizer Interface
 # ----------------------------------------------------------------------------------------------------------------------
@@ -879,7 +821,7 @@ class OptimizerInterface:
 
     def __init__(self, process: Process,
                  base_state: State, base_system: System, base_settings: Settings,
-                 grad_map: GradientMap, objective_path: PathTuple, 
+                 grad_map: GradientMap, objective_path: DataPath, 
                  **kwargs):
         
         self.process = process

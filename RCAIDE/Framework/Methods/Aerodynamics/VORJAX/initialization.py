@@ -16,7 +16,7 @@ import equinox as eqx
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.System import Aircraft
+    from RCAIDE.Framework.Systems import Aircraft
     from RCAIDE.Framework.Settings import Settings
     
     from RCAIDE.Library.Components.Wings import Wing
@@ -36,14 +36,14 @@ from RCAIDE.utils import inputs, outputs
     "system.reference_geometry",
     "system.analysis_data"
 )
-def initialize_VLM_data(state: "State", system: "Aircraft", settings: "Settings"):
+def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Parses the vehicle geometry to find the primary reference parameters 
     and packs them into JAX arrays for the VLM solver.
     """
     
-    if "VLMSettings" not in settings.analysis.aerodynamics.__class__.__name__:
-        raise ValueError("settings.analysis.aerodynamics are not VLM Settings."\
+    if "VORJAX" not in settings.analysis.aerodynamics.__class__.__name__:
+        raise ValueError("settings.analysis.aerodynamics are not VORJAX Settings."\
         "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings")
 
     # Standard Python Control Flow (Safe outside of @jax.jit)

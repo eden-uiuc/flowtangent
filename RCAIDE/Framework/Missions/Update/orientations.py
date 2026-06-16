@@ -44,7 +44,7 @@ vmap_euler_to_dcm = vmap(euler_zyx_to_dcm)
 
 
 def update_orientations(state: "rcf.State",
-                        system: "rcf.System",
+                        system: "rcf.Systems",
                         settings: "rcf.Settings",
                         ):
 

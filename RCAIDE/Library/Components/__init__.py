@@ -22,7 +22,7 @@ from . import Energy
 
 # Top-Level Components for Direct Import
 
-from .Airfoils import Airfoil
+from .Airfoils import Airfoil, AirfoilData
 from .Fuselages import Fuselage
 from .Landing_Gear import LandingGear
 from .Wings import Wing

@@ -7,12 +7,14 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+from dataclasses import fields
 
 # package imports
 import jax
 import equinox as eqx
 import jax.numpy as jnp
+
+from RCAIDE.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions
@@ -21,11 +23,19 @@ import jax.numpy as jnp
 
 class Conditions(eqx.Module):
 
-    tag: str = eqx.field(static=True, default='Conditions')
+    tag: str = init_field('Conditions', static=True)
 
-    subconditions: tuple = eqx.field(default_factory=tuple)
+    subconditions: tuple = init_field(tuple)
 
-
+    def __post_init__(self):
+        subcons = tuple(
+            getattr(self, f.name) 
+            for f in fields(self) 
+            if f.name != "subconditions" and isinstance(getattr(self, f.name), Conditions)
+        )
+        
+        object.__setattr__(self, "subconditions", subcons)
+    
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
             return self.subconditions[item]
@@ -91,4 +101,5 @@ class Conditions(eqx.Module):
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
     
     def __repr__(self):
-        return self.tag
+        repr_str = self.tag + " - Subconditions: [" + ', '.join([sc.tag for sc in self.subconditions])+"]"
+        return repr_str

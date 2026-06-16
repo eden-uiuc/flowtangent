@@ -8,11 +8,12 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Process import Process, ProcessStep, GradientMap, OptimizerInterface
+from .Processes import Process, ProcessStep, GradientMap, OptimizerInterface
+from . import Conditions
 
 from .State import State
 from .Settings import Settings
-from .System import System, Aircraft
+from .Systems import System, Aircraft
 
 from . import Methods
 from . import Missions

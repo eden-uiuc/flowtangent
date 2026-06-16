@@ -47,7 +47,7 @@ def func_passenger_payload(n_passengers,
 # -----------------------------------------------------------------------
 
 def passenger_payload(state: "rcf.State",
-                      system: "rcf.System",
+                      system: "rcf.Systems",
                       settings: "rcf.Settings"):
 
     n_passengers    = system.number_of_passengers

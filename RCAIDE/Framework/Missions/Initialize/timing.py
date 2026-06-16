@@ -19,7 +19,7 @@ import RCAIDE.Framework as rcf
 
 
 def initialize_time(state: "rcf.State",
-                    system: "rcf.System",
+                    system: "rcf.Systems",
                     settings: "rcf.Settings"
                     ):
 
