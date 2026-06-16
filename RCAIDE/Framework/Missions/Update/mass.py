@@ -13,9 +13,6 @@ import jax.numpy as jnp
 # RCAIDE Imports
 import RCAIDE.Framework as rcf
 
-
-
-
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
@@ -30,13 +27,13 @@ def update_mass_and_weight(
     Updates the current mass of the system
     """
 
-    m0    = state.mass.total[0,0]
+    m0    = state.mass.total[0, 0]
     mdot  = state.mass.rate_of_change
     I     = state.numerics.time.integrate
     g     = state.freestream.gravity
 
     # calculate
-    m = m0 + jnp.dot(I, mdot )
+    m = m0 + jnp.dot(I, mdot)
     W = m*g
 
     # pack
@@ -47,7 +44,7 @@ def update_mass_and_weight(
         ),
         state,
         (
-            state.mass.total.at[1:,0].set(m[1:,0]),
+            m,
             state.frames.inertial.gravity_force_vector.at[:,2].set(W[:,0])
         )
     )

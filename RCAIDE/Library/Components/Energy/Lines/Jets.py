@@ -81,20 +81,40 @@ class TurbojetEnergyLine(EnergyLine):
     def transmit(self, state: State, system: System, settings: Settings):
         total_fuel_burn = self.sum_inputs(state, "fuel", "flow_rate")
         
+        #  Compute fuel fraction
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
         current_fuel_mass = jnp.sum(jnp.asarray([state.energy.nodes[t.network_ID].mass for t in self.fuel_tanks]))
         fuel_fraction = current_fuel_mass / total_fuel_mass
 
-        selector_ratios = {t: t.selector_ratio for t in self.fuel_tanks}
-        active_tanks = tuple(t for t, r in selector_ratios.items() if r >= fuel_fraction)
+        # Extract configuration as pure JAX arrays
+        selector_ratios = jnp.asarray([t.selector_ratio for t in self.fuel_tanks])
+        baseline_draws = jnp.asarray([self.tank_draw_ratios[i] for i in range(len(self.fuel_tanks))])
+
+        # Create the active mask (1.0 if active, 0.0 if inactive)
+        active_mask = jnp.where(selector_ratios[None, :] >= fuel_fraction, 1.0, 0.0)
         
-        active_draws = jnp.asarray([self.tank_draw_ratios[self.fuel_tanks.subcomponents.index(t)] for t in active_tanks])
-        balanced_draws = active_draws/jnp.sum(active_draws)
+        # Mask the baseline draws
+        masked_draws = baseline_draws * active_mask
         
+        # Normalize the draws (with a safeguard against division-by-zero if all tanks are inactive)
+        sum_draws = jnp.sum(masked_draws)
+        safe_sum = jnp.where(sum_draws == 0.0, 1.0, sum_draws) 
+        balanced_draws = masked_draws / safe_sum
+
+        # Distribute the burn across ALL tanks (inactive ones get multiplied by 0.0)
+        tank_burns = tuple(-balanced_draws[i] * total_fuel_burn for i in range(len(self.fuel_tanks)))
+
+        # Apply updates sequentially
         updated_state = eqx.tree_at(
             lambda s: tuple(s.energy.nodes[t.network_ID].outputs.fuel.flow_rate for t in self.fuel_tanks),
             state,
-            tuple(-balanced_draws[i] * total_fuel_burn for i in range(len(balanced_draws)))
+            tank_burns
+        )
+
+        updated_state = eqx.tree_at(
+            lambda s: s.mass.rate_of_change,
+            updated_state,
+            updated_state.mass.rate_of_change - total_fuel_burn
         )
 
         return updated_state, system, settings

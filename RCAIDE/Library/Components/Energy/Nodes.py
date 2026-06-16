@@ -61,12 +61,12 @@ class EnergyNode(Component):
     @eqx.filter_jit
     def sum_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
-        return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1))
+        return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1)).T
 
     @eqx.filter_jit
     def average_inputs(self, state, input_type: str, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
-        return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1))
+        return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1)).T
 
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError("No transmission method implemented. " \

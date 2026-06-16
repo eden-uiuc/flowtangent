@@ -33,7 +33,10 @@ def update_time_differentials(state: "rcf.State",
     D_scaled = D / T
     I_scaled = I * T
 
-    state = eqx.tree_at(lambda s: (s.numerics.time.control_points, s.numerics.time.differentiate, s.numerics.time.integrate), state,
-                        (t_scaled, D_scaled, I_scaled), is_leaf=lambda x: x is None)
+    state = eqx.tree_at(
+        lambda s: (s.numerics.time.control_points, s.numerics.time.differentiate, s.numerics.time.integrate),
+        state,
+        (t_scaled, D_scaled, I_scaled), is_leaf=lambda x: x is None
+    )
 
     return state, system, settings

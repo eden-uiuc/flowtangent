@@ -28,18 +28,31 @@ def chebyshev_matrices(n: int = 16,
 
     assert n > 0, "Attempted to calculate Chebyshev matrices with non-positive number of control points."
 
+    # Find Chebyshev-Gauss-Lobatto Control Point Nodes
     x = 0.5 * (1 - jnp.cos(jnp.pi * jnp.arange(n) / (n - 1)))
 
-    c = jnp.array([2.] + [1.] * (n - 2) + [2.])
-    c *= (-1.) ** jnp.arange(n)
-    c_inv = 1./c
-
+    # Assume a Lagrange polynomial of degree N-1.
+    # Exact derivative can be found as: F' = D * F
+    # D_ij = c_i/c_j * (-1)^(i+j)/(x_i - x_j) for i !=j
+    # c_i = 2 if i=0 or N-1; c_i = 1 otherwise
+    # See Trefethen, L.N. "Spectral Methods in MATLAB"
+    
+    # c_neg = c_i*(-1)^i
+    c_neg = jnp.array([2.] + [1.] * (n - 2) + [2.])
+    c_neg *= (-1.) ** jnp.arange(n)
+    c_neg_inv = 1./c_neg
+    
+    # Calculate x_i - x_j as matrix operation
     A = jnp.tile(x, (n, 1)).T
     dA = A - A.T + jnp.eye(n)
 
-    cs = jnp.multiply(jnp.atleast_2d(c), jnp.atleast_2d(c_inv).T)
-    D = jnp.divide(cs.T, dA)
-
+    # c = c_neg * c_neg_inv = c_i/c_j*(-1)^(i-j) = c_i/c_j * (-1)^(i+j)
+    c = jnp.multiply(jnp.atleast_2d(c_neg), jnp.atleast_2d(c_neg_inv).T)
+    
+    # D = c_i/c_j * (-1)^(i+j) / (x_i - x_j) -> c/dA
+    # Diagnoal term must exactly cancel the rest of the row
+    # Recompute diagonal to avoid floating point errors
+    D = jnp.divide(c.T, dA)
     D -= jnp.diag(jnp.sum(D.T, axis=0))
 
     if calculate_integration:
@@ -78,7 +91,7 @@ class Numerics(Conditions):
 
     solver_jacobian:            str | None          = init_field(None, static=True)
     solution_tolerance:         float               = init_field(1e-8, static=True)
-    max_evaluations:            int                 = init_field(500, static=True)
+    max_evaluations:            int                 = init_field(500,  static=True)
     step_size:                  float | None        = init_field(None, static=True)
     
     converged:                  bool                = False

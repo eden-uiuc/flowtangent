@@ -463,7 +463,8 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     controls = (
         "body_angle",
-        DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True)
+        # DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True),
+        DirectControlVariable(tag='Throttle', path=("energy", "throttle"), active=True)
     )
 
     residuals = ("force_x", "force_z")
@@ -483,7 +484,7 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
         duration_profile=FixedTime(time = 10000.0 / 6.0 * Units.s),
         active_controls=controls,
         active_residuals=residuals,
-        controls_initial_guess=(0.03, 50000.0 * Units.N),
+        controls_initial_guess=(0.03, 0.5),
     )
     
     cruise_segment = Segment(
@@ -493,7 +494,7 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
         duration_profile=FixedDistance(distance=5500. * Units.km),
         active_controls=controls,
         active_residuals=residuals,
-        controls_initial_guess=(0.03, 50000.0 * Units.N),
+        controls_initial_guess=(0.03, 0.5),
     )
 
     descent_segment = Segment(
@@ -504,6 +505,7 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
         duration_profile=FixedTime(time = 10000.0 / 5.0 * Units.s),
         active_controls=controls,
         active_residuals=residuals,
+        controls_initial_guess=(0.03, 0.5),
     )
 
     # test_cruise_segment = TestCSACruise(altitude=10000.0, speed)
@@ -548,13 +550,15 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
     VORJAX_Graph = aero_analysis.to_mermaid(save_path="./Tests/VORJAX_graph.md")
     Energy_Graph = energy_analysis.to_mermaid(save_path="./Tests/energy_graph.md")
 
-    return updated_mission, updated_settings
+    updated_state = state
+
+    return updated_mission, updated_state, updated_settings
 
 def mission_b737(state, system, settings):
 
-    mission, updated_settings = mission_setup(state, system, settings)
+    mission, updated_state, updated_settings = mission_setup(state, system, settings)
 
-    final_state, final_system, final_settings = mission.run(state, system, updated_settings)
+    final_state, final_system, final_settings = mission.run(updated_state, system, updated_settings)
 
     VLM_data = final_system.analysis_data
     fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['dCp'][0])
@@ -570,7 +574,7 @@ if __name__ == '__main__':
 
     state = State(numerics=Numerics(number_of_control_points=4))
     system = vehicle_setup()
-    settings = Settings(DEBUG_MODE=False)
+    settings = Settings(DEBUG_MODE=True)
 
     print("Setup complete, starting mission ...")
 

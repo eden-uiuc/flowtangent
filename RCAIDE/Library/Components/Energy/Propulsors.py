@@ -562,7 +562,7 @@ class TurbofanEngine(TurbojetEngine):
                 P_core_nozzle= cn_out.pressure,
                 fuel_air_ratio=comb_out.fuel_air_ratio,
                 BPR=self.bypass_ratio,
-                throttle=state.energy.nodes[self.network_ID].throttle,
+                throttle=state.energy.throttle,
             )
         
         outputs = state.energy.nodes[self.network_ID].outputs
