@@ -165,7 +165,7 @@ class Wing(Component):
         if provided < 2:
             raise ValueError(
                 f"Wing geometry under-defined. You must provide at least two of "
-                f"(root, tip, taper). Currently provided: root={root}, tip={tip}, taper={taper}"
+                f"(root chord, tip chord, taper). Currently provided: root={root}, tip={tip}, taper={taper}"
             )
 
         elif provided == 2:

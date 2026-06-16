@@ -1634,7 +1634,6 @@ if __name__ == "__main__":
     TEST_DELTA_AR   = False
     TEST_ONERA      = False
     TEST_BATCH      = True
-    TEST_SHARD      = False
     
     COSINE_SPC_SW   = True
     PLOT_WINGS      = False
@@ -2054,38 +2053,5 @@ if __name__ == "__main__":
         df = pd.DataFrame(data_dict)
 
         print(df.head(50))
-    
-    if TEST_SHARD:
-        print("\n--- Sharded Dataset Test ---")
-        if NEW_DATA:
-            
-            solver = BatchVORJAX()
-
-            system = VORJAX_straight_wing(10.0, 1.0)
-
-            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
-            analysis_settings = AnalysisSettings(
-                aerodynamics=aero_settings,
-                gradient_map=GRAD_MAP
-            )
-            settings = Settings(analysis=analysis_settings, DEBUG_MODE=DEBUG)
-
-            generator = ShardedDatasetGenerator(
-                batch_analysis=solver,
-                cache_dir="./Tests/VORJAX/shard_test",
-                storage_dir="/media/jordan/Ashley_Backup/shard_test",
-                shard_size=3_000_000,
-                tag="Rectangle AR 10"
-            )
-
-            generator.run(
-                system=system,
-                settings=settings,
-                state_mode="mesh",
-                Mach=np.linspace(0.0, 2.0, 101),
-                alpha=np.linspace(-5.0, 15.0, 101),
-                beta=np.linspace(-10.0, 10.0, 101),
-                batch_size=256
-            )
 
     print("\nAll tests complete.")
