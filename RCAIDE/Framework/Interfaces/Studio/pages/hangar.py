@@ -3,6 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 import httpx
 import json
+import time
 
 from utils.state import master_state, theme_config
 
@@ -18,6 +19,21 @@ def hangar(client: Client):
     # Moved inside the page function so each browser tab gets its own isolated session state
     hangar_state = master_state['hangar']
 
+    def get_selected_node():
+        """Returns the type ('wing', 'segment', 'fuse', 'nac') and the dictionary object."""
+        sel_id = hangar_state['selected_id']
+        veh = hangar_state['vehicle']
+        
+        for w in veh['wings']:
+            if w['id'] == sel_id: return 'wing', w
+            for s in w['segments']:
+                if s['id'] == sel_id: return 'segment', s
+        for f in veh['fuselages']:
+            if f['id'] == sel_id: return 'fuse', f
+        for n in veh['nacelles']:
+            if n['id'] == sel_id: return 'nac', n
+            
+        return None, None
 
     # --- 3. 3D GEOMETRY GENERATION ---
     def generate_wing_mesh():
@@ -92,64 +108,125 @@ def hangar(client: Client):
             attribute_sliders.refresh() 
 
     def add_segment():
-        new_idx = len(hangar_state['segments']) + 1
-        new_id = f'seg_{new_idx}'
-        hangar_state['segments'].append({
-            'id': new_id, 'name': f'Segment {new_idx}',
+        sel_type, sel_obj = get_selected_node()
+        
+        # Find the parent wing regardless of if a wing or segment is selected
+        target_wing = sel_obj if sel_type == 'wing' else next(w for w in hangar_state['vehicle']['wings'] if sel_obj in w['segments'])
+        
+        new_id = f"seg_{int(time.time()*1000)}"
+        target_wing['segments'].append({
+            'id': new_id, 'name': f'Segment {len(target_wing["segments"]) + 1}',
             'span': 5.0, 'taper': 0.8, 'sweep': 10.0, 'dihedral': 0.0, 'twist': 0.0
         })
         hangar_state['selected_id'] = new_id
         vehicle_tree.refresh()
         attribute_sliders.refresh()
         update_plot()
-
+        
     def remove_segment():
-        if len(hangar_state['segments']) > 1:
-            hangar_state['segments'] = [s for s in hangar_state['segments'] if s['id'] != hangar_state['selected_id']]
-            hangar_state['selected_id'] = 'root'
-            vehicle_tree.refresh()
-            attribute_sliders.refresh()
-            update_plot()
+        sel_type, sel_obj = get_selected_node()
+        if sel_type == 'segment':
+            target_wing = next(w for w in hangar_state['vehicle']['wings'] if sel_obj in w['segments'])
+            if len(target_wing['segments']) > 1:
+                target_wing['segments'] = [s for s in target_wing['segments'] if s['id'] != sel_obj['id']]
+                hangar_state['selected_id'] = target_wing['id']
+                vehicle_tree.refresh()
+                attribute_sliders.refresh()
+                update_plot()
+                
+    def add_component():
+        cat = hangar_state['selected_id']
+        new_id = f"comp_{int(time.time()*1000)}"
+        
+        if cat == 'cat_wings':
+            hangar_state['vehicle']['wings'].append({'id': new_id, 'name': 'New Wing', 'symmetric': True, 'x_offset': 0, 'y_offset': 0, 'z_offset': 0, 'root_chord': 2.0, 'root_twist': 0.0, 'segments': [{'id': f"{new_id}_s1", 'name': 'Seg 1', 'span': 5.0, 'taper': 1.0, 'sweep': 0, 'dihedral': 0, 'twist': 0}]})
+        elif cat == 'cat_fuses':
+            hangar_state['vehicle']['fuselages'].append({'id': new_id, 'name': 'New Fuselage', 'length': 10.0, 'diameter': 2.0, 'x_offset': 0, 'y_offset': 0, 'z_offset': 0})
+        elif cat == 'cat_nacs':
+             hangar_state['vehicle']['nacelles'].append({'id': new_id, 'name': 'New Engine', 'length': 3.0, 'diameter': 1.0, 'x_offset': 0, 'y_offset': 3.0, 'z_offset': -1.0, 'symmetric': True})
+             
+        hangar_state['selected_id'] = new_id
+        vehicle_tree.refresh()
+        attribute_sliders.refresh()
+        update_plot()
 
     # --- 5. DYNAMIC UI COMPONENTS ---
     @ui.refreshable
     def vehicle_tree():
-        children = [{'id': s['id'], 'label': s['name'], 'icon': 'straighten'} for s in hangar_state['segments']]
-        tree_data = [{'id': 'root', 'label': 'Main Wing', 'children': children, 'icon': 'flight'}]
+        veh = hangar_state['vehicle']
         
+        # Build nested tree data
+        tree_data = [
+            {'id': 'cat_wings', 'label': 'Wings & Tails', 'icon': 'flight', 'children': []},
+            {'id': 'cat_fuses', 'label': 'Fuselages', 'icon': 'straighten', 'children': []},
+            {'id': 'cat_nacs', 'label': 'Engines', 'icon': 'cyclone', 'children': []}
+        ]
+        
+        for w in veh['wings']:
+            w_node = {'id': w['id'], 'label': w['name'], 'children': [{'id': s['id'], 'label': s['name']} for s in w['segments']]}
+            tree_data[0]['children'].append(w_node)
+            
+        for f in veh['fuselages']:
+            tree_data[1]['children'].append({'id': f['id'], 'label': f['name']})
+            
+        for n in veh['nacelles']:
+            tree_data[2]['children'].append({'id': n['id'], 'label': n['name']})
+            
         ui.tree(tree_data, on_select=select_node, tick_strategy='none').expand()
         
-        with ui.row().classes('w-full mt-2'):
-            ui.button('+ Add Segment', on_click=add_segment, color='blue').classes('flex-grow')
-            if hangar_state['selected_id'] != 'root' and len(hangar_state['segments']) > 1:
-                ui.button('- Remove Segment', on_click=remove_segment, color='blue').classes('flex-grow')
+        # Contextual Action Buttons
+        sel_type, sel_obj = get_selected_node()
+        ui.separator().classes('my-4')
+        
+        with ui.row().classes('w-full gap-2'):
+            if sel_type == 'wing' or sel_type == 'segment':
+                ui.button('+ Add Segment', on_click=add_segment, color='green').classes('flex-grow text-xs')
+                if sel_type == 'segment':
+                    ui.button('- Remove Segment', on_click=remove_segment, color='red').classes('flex-grow text-xs')
+            elif hangar_state['selected_id'].startswith('cat_'):
+                # Give options to add new base components if a category folder is clicked
+                ui.button('+ Add Component Here', on_click=add_component, color='blue').classes('flex-grow text-xs')
 
     def synced_slider(label_text, state_dict, state_key, min_val, max_val, step_val):
         ui.label(label_text).classes('text-sm text-gray-500 mt-2')
         with ui.row().classes('w-full items-center justify-between no-wrap'):
+            # The slider takes up ~66% of the space
             ui.slider(min=min_val, max=max_val, step=step_val, value=state_dict[state_key], on_change=update_plot) \
                 .bind_value(state_dict, state_key).classes('w-2/3')
+            
+            # The number input takes the remaining space. 'dense' makes it compact.
             ui.number(value=state_dict[state_key], step=step_val, format='%.2f', on_change=update_plot) \
                 .bind_value(state_dict, state_key).classes('w-1/4').props('dense')
 
     @ui.refreshable
     def attribute_sliders():
-        sel_id = hangar_state['selected_id']
+        sel_type, sel_obj = get_selected_node()
+        if not sel_type:
+            ui.label('Select a component to edit.').classes('text-gray-500 italic')
+            return
+            
+        ui.input('Name', value=sel_obj['name'], on_change=lambda _: vehicle_tree.refresh()).bind_value(sel_obj, 'name').classes('w-full mb-4 text-lg font-bold')
         
-        if sel_id == 'root':
-            ui.label('Wing Properties').classes('text-lg font-bold mb-2')
-            synced_slider('Root Chord (m)', hangar_state, 'root_chord', 0.5, 10.0, 0.1)
-            synced_slider('Root Twist (°)', hangar_state, 'root_twist', -10.0, 10.0, 0.5)
-        else:
-            seg = next((s for s in hangar_state['segments'] if s['id'] == sel_id), None)
-            if seg:
-                ui.input('Segment Name', value=seg['name'], on_change=lambda _: vehicle_tree.refresh()) \
-                    .bind_value(seg, 'name').classes('w-full mb-4 text-lg font-bold')
-                synced_slider('Span (m)', seg, 'span', 1.0, 20.0, 0.1)
-                synced_slider('Taper Ratio', seg, 'taper', 0.1, 1.5, 0.05)
-                synced_slider('LE Sweep (°)', seg, 'sweep', -20.0, 60.0, 1.0)
-                synced_slider('Dihedral (°)', seg, 'dihedral', -10.0, 20.0, 1.0)
-                synced_slider('Tip Twist (°)', seg, 'twist', -10.0, 10.0, 0.5)
+        ui.label('Position (m)').classes('text-sm font-bold text-gray-700 mt-2')
+        if sel_type in ['wing', 'fuse', 'nac']:
+            synced_slider('X Offset (Nose-to-Tail)', sel_obj, 'x_offset', -10.0, 50.0, 0.5)
+            synced_slider('Y Offset (Center-to-Tip)', sel_obj, 'y_offset', 0.0, 20.0, 0.5)
+            synced_slider('Z Offset (Vertical)', sel_obj, 'z_offset', -10.0, 20.0, 0.5)
+            
+        ui.label('Geometry').classes('text-sm font-bold text-gray-700 mt-4')
+        if sel_type == 'wing':
+            ui.checkbox('Symmetric (Mirror across Y)').bind_value(sel_obj, 'symmetric').on('change', update_plot)
+            synced_slider('Root Chord (m)', sel_obj, 'root_chord', 0.5, 15.0, 0.1)
+            synced_slider('Root Twist (°)', sel_obj, 'root_twist', -10.0, 10.0, 0.5)
+        elif sel_type == 'segment':
+            synced_slider('Span (m)', sel_obj, 'span', 0.5, 30.0, 0.1)
+            synced_slider('Taper Ratio', sel_obj, 'taper', 0.05, 1.5, 0.05)
+            synced_slider('LE Sweep (°)', sel_obj, 'sweep', -30.0, 70.0, 1.0)
+            synced_slider('Dihedral (°)', sel_obj, 'dihedral', -30.0, 90.0, 1.0)
+            synced_slider('Tip Twist (°)', sel_obj, 'twist', -10.0, 10.0, 0.5)
+        elif sel_type in ['fuse', 'nac']:
+            synced_slider('Length (m)', sel_obj, 'length', 1.0, 80.0, 0.5)
+            synced_slider('Diameter (m)', sel_obj, 'diameter', 0.5, 10.0, 0.1)
 
     def generate_rcaide_payload():
         return {
