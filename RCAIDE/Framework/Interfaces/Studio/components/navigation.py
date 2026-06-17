@@ -1,9 +1,20 @@
 import json
 from nicegui import ui
-from utils.state import master_state
+from utils.state import master_state, theme_config
 
 def navigation_header():
     """Shared header with master state Save/Load capabilities."""
+    
+    dark = ui.dark_mode()
+
+    if 'is_dark' not in master_state:
+        master_state['is_dark'] = True
+
+    def on_theme_toggle(e):
+        # Update the master state boolean
+        master_state['is_dark'] = e.value
+        for callback in master_state.get('on_theme_changed', []):
+            callback()
     
     # --- GLOBAL SAVE & LOAD LOGIC ---
     def save_project():
@@ -40,12 +51,11 @@ def navigation_header():
             ui.button('Cancel', on_click=upload_dialog.close, color='gray')
 
     # --- HEADER UI ---
-    with ui.header().classes('bg-slate-900 flex flex-row items-center justify-between px-6 py-2 shadow-md z-50 relative'):
+    with ui.header().classes('bg-slate-900 flex flex-row items-center justify-between px-6 py-2 shadow-md z-50'):
         
         # 1. LEFT: Logo and Title 
         with ui.row().classes('items-center gap-3 z-10'):
-            # ui.icon('rocket_launch', color='blue-400', size='sm')
-            ui.label('RCAIDE-EDEn Studio').classes('text-white text-xl font-bold tracking-widest uppercase')
+            ui.label('RCAIDE-EDEn STUDIO').classes('text-white text-xl font-bold tracking-widest')
         
         # 2. CENTER: Navigation Icons (Absolutely Centered)
         with ui.row().classes('absolute left-1/2 -translate-x-1/2 flex items-center justify-center gap-4 z-20'):
@@ -70,3 +80,11 @@ def navigation_header():
 
                     ui.menu_item('Load Project', on_click=upload_dialog.open) \
                         .classes('hover:bg-slate-700 whitespace-nowrap')
+                    
+                    ui.separator()
+
+                    with ui.row().classes('items-center w-full px-4 py-2'):
+                        ui.switch('Dark Mode', value=master_state['is_dark'], on_change=on_theme_toggle) \
+                            .bind_value_to(dark, 'value') \
+                            .classes('w-full')
+

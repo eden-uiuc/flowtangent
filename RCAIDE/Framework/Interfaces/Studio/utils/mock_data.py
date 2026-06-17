@@ -45,6 +45,7 @@ for i in range(201):
 plot_variables = ['Alt (ft)', 'Mach', 'Alpha (deg)', 'CL', 'CD', 'L/D', 'Throttle (%)', 'Fuel Burn (lb/hr)']
 
 def create_plot(var_name):
+    
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=flight_profile['Time/Progress'], y=flight_profile[var_name], mode='lines', line=dict(color='#3b82f6', width=2)))
     fig.update_layout(

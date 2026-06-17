@@ -1,17 +1,17 @@
-from nicegui import ui
+from nicegui import ui, Client
 import numpy as np
 import plotly.graph_objects as go
 import httpx
 import json
 
-from utils.state import master_state
+from utils.state import master_state, theme_config
 
 # Import the shared navigation bar we defined in components/navigation.py
 from components.navigation import navigation_header
 
 @ui.page('/')
-def hangar():
-    # Inject the master app navigation at the top of the page
+def hangar(client: Client):
+    client.content.classes('p-0 gap-0')
     navigation_header()
 
     # --- 1. STATE DATA ---
@@ -75,7 +75,10 @@ def hangar():
         fig.update_layout(
             uirevision='preserve_ui_state', 
             scene=dict(aspectmode='data', xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, camera=dict(eye=dict(x=-2.5, y=-2.5, z=2.5))),
-            margin=dict(l=0, r=0, b=0, t=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            margin=dict(l=0, r=0, b=0, t=0),
+            template=theme_config[master_state['is_dark']]['plotly_template'],
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
         )
         return fig
 
@@ -187,9 +190,21 @@ def hangar():
                         elif data['type'] == 'result':
                             coeffs = data['coefficients']
                             results_table.rows = [
-                                {'coeff': 'Lift (CL)', 'base': f"{extract_scalar(coeffs.get('CL', 0.0)):.4f}", 'd_alpha': f"{extract_scalar(coeffs.get('dCL_da', 0.0)):.4f}", 'd_beta': f"{extract_scalar(coeffs.get('dCL_db', 0.0)):.4f}", 'd_mach': f"{extract_scalar(coeffs.get('dCL_dM', 0.0)):.4f}"},
-                                {'coeff': 'Drag (CD)', 'base': f"{extract_scalar(coeffs.get('CD', 0.0)):.4f}", 'd_alpha': f"{extract_scalar(coeffs.get('dCD_da', 0.0)):.4f}", 'd_beta': f"{extract_scalar(coeffs.get('dCD_db', 0.0)):.4f}", 'd_mach': f"{extract_scalar(coeffs.get('dCD_dM', 0.0)):.4f}"},
-                                {'coeff': 'Pitch (Cm)', 'base': f"{extract_scalar(coeffs.get('C_m', 0.0)):.4f}", 'd_alpha': f"{extract_scalar(coeffs.get('dC_m_da', 0.0)):.4f}", 'd_beta': f"{extract_scalar(coeffs.get('dC_m_db', 0.0)):.4f}", 'd_mach': f"{extract_scalar(coeffs.get('dC_m_dM', 0.0)):.4f}"}
+                                {'coeff': 'Lift (CL)',
+                                 'base': f"{extract_scalar(coeffs.get('CL', 0.0)):.4f}",
+                                 'd_alpha': f"{extract_scalar(coeffs.get('dCL_da', 0.0)):.4f}",
+                                 'd_beta': f"{extract_scalar(coeffs.get('dCL_db', 0.0)):.4f}",
+                                 'd_mach': f"{extract_scalar(coeffs.get('dCL_dM', 0.0)):.4f}"},
+                                {'coeff': 'Drag (CD)',
+                                 'base': f"{extract_scalar(coeffs.get('CD', 0.0)):.4f}",
+                                 'd_alpha': f"{extract_scalar(coeffs.get('dCD_da', 0.0)):.4f}",
+                                 'd_beta': f"{extract_scalar(coeffs.get('dCD_db', 0.0)):.4f}",
+                                 'd_mach': f"{extract_scalar(coeffs.get('dCD_dM', 0.0)):.4f}"},
+                                {'coeff': 'Pitch (Cm)',
+                                 'base': f"{extract_scalar(coeffs.get('C_m', 0.0)):.4f}",
+                                 'd_alpha': f"{extract_scalar(coeffs.get('dC_m_da', 0.0)):.4f}",
+                                 'd_beta': f"{extract_scalar(coeffs.get('dC_m_db', 0.0)):.4f}",
+                                 'd_mach': f"{extract_scalar(coeffs.get('dC_m_dM', 0.0)):.4f}"}
                             ]
                             results_table.classes(remove='hidden')
                             ui.notify('Solve Complete!', type='positive', position='bottom-right')
@@ -204,7 +219,8 @@ def hangar():
                 loading_indicator.classes(add='hidden')
 
     # --- 6. MAIN LAYOUT ---
-    
+    master_state['on_theme_changed'].append(update_plot)
+
     # Dialogs (Must be instantiated inside the page function)
     with ui.dialog() as payload_dialog, ui.card().classes('w-full max-w-2xl'):
         ui.label('RCAIDE JSON Payload').classes('text-xl font-bold')
@@ -214,13 +230,13 @@ def hangar():
             ui.button('Send to Solver', color='blue') 
 
     # Drawers
-    with ui.left_drawer().classes('bg-slate-50 p-4 border-r w-80'):
+    with ui.left_drawer().classes('p-4 border-r w-80'):
         ui.label('Vehicle Tree').classes('text-lg font-bold mb-2')
         vehicle_tree()  
         ui.separator().classes('my-4')
         attribute_sliders() 
 
-    with ui.right_drawer().props('width=450').classes('bg-slate-50 p-4 border-l'):
+    with ui.right_drawer().props('width=450').classes('p-4 border-l'):
         ui.label('Flight Regime').classes('text-lg font-bold mb-2')
         
         ui.number('Mach Number', value=hangar_state['mach'], step=0.05).bind_value(hangar_state, 'mach').classes('w-full')
@@ -248,7 +264,7 @@ def hangar():
         results_table = ui.table(columns=result_columns, rows=[], row_key='coeff').classes('w-full hidden').props('dense flat bordered')
 
     # Main 3D Canvas
-    with ui.element('div').classes('w-full h-[calc(100vh-100px)] p-0 m-0 bg-white flex justify-center items-center'):
+    with ui.element('div').classes('absolute-full flex justify-center items-center'):
         plot = ui.plotly(generate_wing_mesh()).classes('w-full h-full')
 
     ui.timer(0.1, update_plot, once=True)

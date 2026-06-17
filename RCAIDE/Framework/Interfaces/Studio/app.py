@@ -333,7 +333,7 @@ with ui.header().classes('bg-slate-800 flex items-center justify-between w-full'
         ui.button('Load Project', on_click=upload_dialog.open, icon='file_upload').props('flat color=white')
         ui.button('Save Project', on_click=save_project, icon='save').props('flat color=white')
 
-with ui.left_drawer().classes('bg-slate-50 p-4 border-r w-80'):
+with ui.left_drawer().classes('p-4 border-r w-80'):
     ui.label('Vehicle Tree').classes('text-lg font-bold mb-2')
     vehicle_tree()  # Call the refreshable component
     
@@ -341,7 +341,7 @@ with ui.left_drawer().classes('bg-slate-50 p-4 border-r w-80'):
     attribute_sliders()  # Call the refreshable component
 
 # Right Panel: Flight Regime & Execution
-with ui.right_drawer().props('width=450').classes('bg-slate-50 p-4 border-l'):
+with ui.right_drawer().props('width=450').classes('p-4 border-l'):
     ui.label('Flight Regime').classes('text-lg font-bold mb-2')
     
     ui.number('Mach Number', value=app_state['mach'], step=0.05).bind_value(app_state, 'mach').classes('w-full')

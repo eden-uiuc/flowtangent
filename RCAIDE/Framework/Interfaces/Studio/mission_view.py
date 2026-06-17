@@ -110,7 +110,7 @@ def index():
         update_state(time_slider.value)
 
     # --- RIGHT DRAWER (Results Data) ---
-    right_drawer = ui.right_drawer(fixed=False).props('width=450').classes('bg-slate-50 border-l shadow-2xl w-[400px] p-4 z-50').props('bordered')
+    right_drawer = ui.right_drawer(fixed=False).props('width=450').classes('border-l shadow-2xl w-[400px] p-4 z-50').props('bordered')
     
     with right_drawer:
         with ui.row().classes('w-full justify-between items-center mb-4'):
@@ -134,7 +134,7 @@ def index():
     with ui.row().classes('w-full h-screen wrap-none m-0 p-0'):
         
         # LEFT PANEL
-        with ui.column().classes('w-[350px] p-6 bg-slate-50 border-r h-full shadow-lg z-20'):
+        with ui.column().classes('w-[350px] p-6 border-r h-full shadow-lg z-20'):
             ui.label('B737 Mission Simulator').classes('text-2xl font-bold mb-6 text-slate-800')
             ui.label('Main Wing Geometry').classes('text-sm font-bold text-slate-500 uppercase')
             ui.number('Span (m)', value=35.9).classes('w-full')
