@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
@@ -21,7 +21,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library.Components.Energy.Nodes import EnergyNode, EnergySplitter, EnergyStore
+from RCAIDE.Library.Components.Energy.Nodes import EnergyNode, EnergySplitter, EnergyStore, EnergyDomain, EnergyInput
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -58,23 +58,26 @@ def _resolve_namespaces(node, parent_prefix=""):
         
     # Resolve the input/output connection strings
     # We rebuild the interfaces so they point to the absolute paths
-    new_inputs = {
-        "mechanical":tuple(parse_input(port) for port in node.mechanical_inputs),
-        "electrical":tuple(parse_input(port) for port in node.electrical_inputs),
-        "flow":tuple(parse_input(port) for port in node.flow_inputs),
-        "force":tuple(parse_input(port) for port in node.force_inputs),
-        "fuel":tuple(parse_input(port) for port in node.fuel_inputs),
-    }
+    # new_inputs = {
+    #     "mechanical":tuple(parse_input(port) for port in node.mechanical_inputs),
+    #     "electrical":tuple(parse_input(port) for port in node.electrical_inputs),
+    #     "flow":tuple(parse_input(port) for port in node.flow_inputs),
+    #     "force":tuple(parse_input(port) for port in node.force_inputs),
+    #     "fuel":tuple(parse_input(port) for port in node.fuel_inputs),
+    # }
+
+    new_inputs = tuple(EnergyInput(i.domain, parse_input(i.network_ID)) for i in node.inputs)
     
     # Update the node itself
     node = replace(
         node,
         network_ID=absolute_id,
-        mechanical_inputs=new_inputs['mechanical'],
-        electrical_inputs=new_inputs['electrical'],
-        flow_inputs=new_inputs['flow'],
-        force_inputs=new_inputs['force'],
-        fuel_inputs=new_inputs['fuel'],
+        inputs=new_inputs
+        # mechanical_inputs=new_inputs['mechanical'],
+        # electrical_inputs=new_inputs['electrical'],
+        # flow_inputs=new_inputs['flow'],
+        # force_inputs=new_inputs['force'],
+        # fuel_inputs=new_inputs['fuel'],
     )
     
     # Recurse through any subcomponents
@@ -90,6 +93,8 @@ def _resolve_namespaces(node, parent_prefix=""):
 class EnergyNetwork(EnergyNode):
 
     tag: str = init_field('Energy Network', static=True)
+
+    domains: tuple[EnergyDomain, ...] = init_field(tuple, static=True)
 
     _bookkeeping: dict = init_field(lambda: {
         "lines": EnergyLine

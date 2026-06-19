@@ -8,8 +8,8 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING, Literal, Optional
-import jax
+from typing import TYPE_CHECKING, Literal
+
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Settings import Settings
 
 from RCAIDE.utils import init_field
-from RCAIDE.Library import Component
+from RCAIDE.Library import Component, Units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -36,35 +36,49 @@ class EnergyEfficiencies(eqx.Module):
     flow:       float = 1.0
     force:      float = 1.0
 
+EnergyDomain = Literal[
+    "flow",
+    "mechanical",
+    "electrical",
+    "fuel",
+    "force"
+]
+
+class EnergyInput(eqx.Module):
+
+    domain: EnergyDomain
+    network_ID: str
+
 class EnergyNode(Component):
     
     network_ID: str = init_field("energy_node", static=True)
     
     efficiencies:   EnergyEfficiencies  = init_field(EnergyEfficiencies)
 
-    mechanical_inputs: tuple[str, ...] = init_field(tuple, static=True)
-    electrical_inputs: tuple[str, ...] = init_field(tuple, static=True)
-    fuel_inputs:       tuple[str, ...] = init_field(tuple, static=True)
-    flow_inputs:       tuple[str, ...] = init_field(tuple, static=True)
-    force_inputs:      tuple[str, ...] = init_field(tuple, static=True)
+    inputs: tuple[EnergyInput, ...] = init_field(tuple, static=True)
+
+    def _get_inputs_by_domain(self, domain: EnergyDomain):
+        return tuple(i for i in self.inputs if i.domain == domain)
     
-    @property
-    def inputs(self):
-        return (self.mechanical_inputs + self.electrical_inputs + self.fuel_inputs
-                + self.flow_inputs + self.force_inputs) #type: ignore
-    
+    def __getattr__(self, name):
+        if name.endswith("_inputs"):
+            domain = name.replace("_inputs", "")
+            return tuple(i.network_ID for i in self._get_inputs_by_domain(domain))
+        else:
+            return super().__getattribute__(name)
+
     @eqx.filter_jit
-    def _get_all_inputs(self, state, input_type: str, input_field: str):
-        output_conditions = [getattr(state.energy.nodes[i].outputs, input_type) for i in getattr(self, f"{input_type}_inputs")]
+    def _get_all_inputs(self, state, input_type: EnergyDomain, input_field: str):
+        output_conditions = [getattr(state.energy.nodes[i].outputs, input_type) for i in self._get_inputs_by_domain(input_type)]
         return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
 
     @eqx.filter_jit
-    def sum_inputs(self, state, input_type: str, input_field: str):
+    def sum_inputs(self, state, input_type: EnergyDomain, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1)).T
 
     @eqx.filter_jit
-    def average_inputs(self, state, input_type: str, input_field: str):
+    def average_inputs(self, state, input_type: EnergyDomain, input_field: str):
         all_inputs = self._get_all_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1)).T
 
@@ -118,6 +132,22 @@ class FlowNode(EnergyNode):
 
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Mechanical Nodes
+# ----------------------------------------------------------------------------------------------------------------------
+
+class OfftakeShaft(EnergyNode):
+
+    tag: str = init_field('Offtake Shaft', static=True)
+
+    power_draw: float = 1.0 * Units.W
+
+    reference_temperature: float = 288.15 * Units.K
+    reference_pressure: float = 101325. * Units.Pa
+
+    def transmit(self, state: State, system: System, settings: Settings):
+        return state, system, settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Energy Store

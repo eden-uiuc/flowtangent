@@ -18,7 +18,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Library.Components.Energy.Nodes import FuelTank
+from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine, TurbofanEngine
 
@@ -31,14 +31,16 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
-
 def _TurbojetLineSetup():
     E1 = TurbofanEngine(tag="Engine 1")
+    S1 = OfftakeShaft(tag="Shaft 1")
+
     E2 = TurbofanEngine(tag="Engine 2")
+    S2 = OfftakeShaft(tag="Shaft 2")
 
     tank = FuelTank()
 
-    return (E1, E2, tank)
+    return (E1, E2, S1, S2,tank)
 
 
 class TurbojetEnergyLine(EnergyLine):
@@ -55,18 +57,8 @@ class TurbojetEnergyLine(EnergyLine):
         "engines": TurbojetEngine,
         "stores": FuelTank,
         "fuel_tanks": FuelTank,
+        "offtakes": OfftakeShaft
     }, static=True)
-
-    # def __post_init__(self):
-    #     if len(self.tank_draw_ratios) != len(self.fuel_tanks):
-    #         # If draw ratios not specified, balance fuel draw by tank mass
-    #         object.__setattr__(self, "tank_draw_ratios", tuple(t.mass_properties.total for t in self.fuel_tanks))
-    #     if not any(self.get_field_name() in i for i in self.inputs):
-    #         object.__setattr__(
-    #             self,
-    #             "fuel_inputs",
-    #             tuple(self.get_field_name() +"."+i.replace(" ","_").lower() for i in self.fuel_inputs)
-    #         )
 
     @inputs(
             "state.energy.nodes[Line_fuel_tanks].mass",
@@ -79,6 +71,8 @@ class TurbojetEnergyLine(EnergyLine):
         "state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate"
     )
     def transmit(self, state: State, system: System, settings: Settings):
+        
+        # Manage Fuel --------------------------------------------------------------------------------------------------
         total_fuel_burn = self.sum_inputs(state, "fuel", "flow_rate")
         
         #  Compute fuel fraction
@@ -116,6 +110,24 @@ class TurbojetEnergyLine(EnergyLine):
             updated_state,
             updated_state.mass.rate_of_change - total_fuel_burn
         )
+
+        # Manage Electrical Power --------------------------------------------------------------------------------------
+
+        for idx, offtake in enumerate(self.offtakes):
+            
+            engine_ID = self.engines[idx].network_ID  #type: ignore
+
+            updated_state = eqx.tree_at(
+                lambda s: (
+                    s.energy.nodes[offtake.network_ID].outputs.electical.power,
+                    s.energy.nodes[offtake.network_ID].outputs.mechanical.work,
+                    ),
+                updated_state,
+                (
+                    offtake.power_draw,
+                    offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate
+                )
+            )    
 
         return updated_state, system, settings
 

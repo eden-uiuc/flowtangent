@@ -17,11 +17,12 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # RCAIDE imports
-from RCAIDE.utils import init_field, inputs, outputs
+from RCAIDE.utils import init_field
+import RCAIDE.utils as ru
 
 from RCAIDE.Library.Propellants import Propellant, JetA
 from RCAIDE.Library.Gases import Gas, Air
-from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode
+from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode, EnergyInput
 
 from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_compression_nozzle_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Fan_Compressors import func_fan_compressor_performance
@@ -77,7 +78,7 @@ class InletNozzle(FlowNode):
     
     tag: str = init_field("Inlet Nozzle", static=True)
     
-    @inputs(
+    @ru.inputs(
         "state.freestream.stagnation_temperature",
         "state.freestream.stagnation_pressure",
         "state.freestream.pressure",
@@ -88,7 +89,7 @@ class InletNozzle(FlowNode):
         "system.energy.nodes[InletNozzle].pressure_recovery",
         "system.energy.nodes[InletNozzle].efficiencies.flow"
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[InletNozzle].outputs.flow.mach_number",
         "state.energy.nodes[InletNozzle].outputs.flow.speed",
         "state.energy.nodes[InletNozzle].outputs.flow.stagnation_pressure",
@@ -132,7 +133,7 @@ class Compressor(FlowNode):
 
     tag: str = init_field("Compressor", static=True)
     
-    @inputs(
+    @ru.inputs(
         "state.freestream.Cp",
         "state.freestream.gamma",
         "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_temperature",
@@ -140,7 +141,7 @@ class Compressor(FlowNode):
         "system.energy.nodes[Compressor].pressure_ratio",
         "system.energy.nodes[Compressor].efficiencies.flow"
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Compressor].flow.stagnation_temperature"
         "state.energy.nodes[Compressor].flow.stagnation_pressure",
         "state.energy.nodes[Compressor].flow.stagnation_enthalpy",
@@ -174,9 +175,9 @@ class TurbojetCombustor(FlowNode):
 
     tag: str = init_field("Combustor", static=True)
 
-    flow_inputs: tuple[str, ...] = init_field(('HPC',), static=True)
+    inputs = init_field((EnergyInput("flow", 'HPC'),), static=True)
 
-    @inputs(
+    @ru.inputs(
         "state.freestream.Cp",
         "state.energy.nodes[Combustor_flow_inputs].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Combustor_flow_inputs].outputs.flow.stagnation_pressure",
@@ -185,7 +186,7 @@ class TurbojetCombustor(FlowNode):
         "system.energy.nodes[Combustor].pressure_ratio",
         "system.energy.nodes[Combustor].efficiencies.flow",
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Combustor].outputs.flow.stagnation_pressure",
         "state.energy.nodes[Combustor].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Combustor].outputs.flow.stagnation_enthalpy",
@@ -223,10 +224,12 @@ class Turbine(FlowNode):
 
     tag: str = init_field("Turbine", static=True)
     
-    mechanical_inputs: tuple[str, ...] = init_field(("Offtake Shaft",), static=True)
-    fuel_inputs: tuple[str, ...] = init_field(("Combustor",), static=True)
+    inputs = init_field((
+        EnergyInput("mechanical", "Offtake Shaft"),
+        EnergyInput("fuel", "Combustor"),
+    ), static=True)
 
-    @inputs(
+    @ru.inputs(
         "state.freestream.gamma",
         "state.freestream.Cp",
         "state.energy.nodes[Turbine_flow_inputs].outputs.flow.stagnation_temperature",
@@ -236,7 +239,7 @@ class Turbine(FlowNode):
         "system.energy.nodes[Turbine].efficiencies.mechanical",
         "system.energy.nodes[Turbine].efficiencies.flow",
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Turbine].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Turbine].outputs.flow.stagnation_pressure",
         "state.energy.nodes[Turbine].outputs.flow.stagnation_enthalpy",
@@ -269,7 +272,7 @@ class ExpansionNozzle(FlowNode):
 
     tag: str = init_field("Nozzle", static=True)
 
-    @inputs(
+    @ru.inputs(
         "state.freestream.stagnation_temperature",
         "state.freestream.stagnation_pressure",
         "state.freestream.pressure",
@@ -280,7 +283,7 @@ class ExpansionNozzle(FlowNode):
         "system.energy.nodes[ExpansionNozzle].pressure_ratio",
         "system.energy.nodes[ExpansionNozzle].efficiencies.flow",
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[ExpansionNozzle].outputs.flow",
         "state.energy.nodes[ExpansionNozzle].outputs.flow.area_ratio",
         "state.energy.nodes[ExpansionNozzle].outputs.flow.mach_number",
@@ -332,15 +335,15 @@ class ExpansionNozzle(FlowNode):
 def _TurbojetSetup():
     
     inlet = InletNozzle()
-    LPC = Compressor(tag="LPC", flow_inputs=("Inlet Nozzle",))
-    HPC = Compressor(tag="HPC", flow_inputs=("LPC",))
+    LPC = Compressor(tag="LPC", inputs=(EnergyInput("flow", "Inlet Nozzle"),))
+    HPC = Compressor(tag="HPC", inputs=(EnergyInput("flow", "LPC"),))
 
     comb = TurbojetCombustor()
 
-    HPT = Turbine(tag="HPT", mechanical_inputs=("HPC",), flow_inputs=("Combustor",))
-    LPT = Turbine(tag="LPT", mechanical_inputs=("LPC",), flow_inputs=("HPT",))
+    HPT = Turbine(tag="HPT", inputs=(EnergyInput("mechanical", "HPC",), EnergyInput("flow", "Combustor")))
+    LPT = Turbine(tag="LPT", inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT")))
 
-    nozz = ExpansionNozzle(tag="Core Nozzle", flow_inputs=("LPT",))
+    nozz = ExpansionNozzle(tag="Core Nozzle", inputs=(EnergyInput("flow", "LPT"),))
 
     return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
 
@@ -354,8 +357,10 @@ class TurbojetEngine(Propulsor):
     fuel:           Propellant      = init_field(JetA)
     working_fluid:  Gas             = init_field(Air)
 
-    flow_inputs: tuple = init_field(('self.core_nozzle',), static=True)
-    fuel_inputs: tuple = init_field(('self.combustor',), static=True)
+    inputs = init_field((
+        EnergyInput("flow", "self.core_nozzle"),
+        EnergyInput("fuel", "self.combustor")
+    ), static=True)
 
     installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
 
@@ -364,7 +369,7 @@ class TurbojetEngine(Propulsor):
         "turbines": Turbine
     }, static=True)
 
-    @inputs(
+    @ru.inputs(
         "state.freestream.gamma",
         "state.freestream.speed",
         "state.freestream.speed_of_sound",
@@ -379,7 +384,7 @@ class TurbojetEngine(Propulsor):
         "system.energy.nodes[Turbojet].design_parameters.total_thrust"
         "system.energy.nodes[Turbojet].design_parameters.delta_SFC",
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Turbojet].outputs.force.thrust",
         "state.energy.nodes[Turbojet].outputs.force.nondimensional_thrust",
         "state.energy.nodes[Turbojet].outputs.force.specific_impulse",
@@ -439,9 +444,9 @@ class TurbojetEngine(Propulsor):
 class Fan(FlowNode):
 
     tag: str = init_field("Fan", static=True)
-    flow_inputs: tuple[str, ...] = init_field(("Inlet Nozzle",), static=True)
+    inputs = init_field((EnergyInput("flow", "Inlet Nozzle"),), static=True)
 
-    @inputs(
+    @ru.inputs(
         "state.freestream.Cp",
         "state.freestream.gamma",
         "state.energy.nodes[Fan_flow_inputs].outputs.flow.stagnation_temperature",
@@ -449,7 +454,7 @@ class Fan(FlowNode):
         "system.energy.nodes[Fan].pressure_ratio",
         "system.energy.nodes[Fan].efficiencies.flow",
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Fan].outputs.flow.stagnation_pressure",
         "state.energy.nodes[Fan].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Fan].outputs.flow.stagnation_enthalpy",
@@ -511,7 +516,7 @@ class TurbofanEngine(TurbojetEngine):
         object.__setattr__(self, "subcomponents", _TurbofanSetup(self.bypass_ratio))
         # super(TurbofanEngine, self).__post_init__()
     
-    @inputs(
+    @ru.inputs(
         "state.freestream.gamma",
         "state.freestream.speed",
         "state.freestream.speed_of_sound",
@@ -528,7 +533,7 @@ class TurbofanEngine(TurbojetEngine):
         "state.energy.nodes[Turbofan_combustor].outputs.fuel.fuel_air_ratio",
         "system.energy.nodes[Turbofan].bypass_ratio"
     )
-    @outputs(
+    @ru.outputs(
         "state.energy.nodes[Turbofan].outputs.force.thrust",
         "state.energy.nodes[Turbofan].outputs.force.nondimensional_thrust",
         "state.energy.nodes[Turbofan].outputs.force.specific_impulse",

@@ -10,65 +10,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
-from dataclasses import replace
-
 # package imports
 import equinox as eqx
 
 # RCAIDE Imports
 from RCAIDE.Framework.Conditions.Energy import FuelTankConditions, EnergyNodeConditions
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork, EnergyLine
+from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
 # ----------------------------------------------------------------------------------------------------------------------
-
-def _resolve_namespaces(node, parent_prefix=""):
-    """
-    Recursively generates absolute paths for nodes and resolves local connections.
-    """
-    # Define this node's absolute ID
-    absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
-
-    def parse_input(input:str):
-        flat_input_parts = input.replace(' ','_').lower().split('.')
-        if flat_input_parts[0]=="self":
-            return absolute_id+"."+flat_input_parts[-1]
-        else:
-            return parent_prefix+"."+flat_input_parts[-1]
-    
-        
-    # Resolve the input/output connection strings
-    # We rebuild the interfaces so they point to the absolute paths
-    new_inputs = {
-        "mechanical":tuple(parse_input(port) for port in node.mechanical_inputs),
-        "electrical":tuple(parse_input(port) for port in node.electrical_inputs),
-        "flow":tuple(parse_input(port) for port in node.flow_inputs),
-        "force":tuple(parse_input(port) for port in node.force_inputs),
-        "fuel":tuple(parse_input(port) for port in node.fuel_inputs),
-    }
-    
-    # Update the node itself
-    node = replace(
-        node,
-        network_ID=absolute_id,
-        mechanical_inputs=new_inputs['mechanical'],
-        electrical_inputs=new_inputs['electrical'],
-        flow_inputs=new_inputs['flow'],
-        force_inputs=new_inputs['force'],
-        fuel_inputs=new_inputs['fuel'],
-    )
-    
-    # Recurse through any subcomponents
-    if hasattr(node, 'subcomponents') and node.subcomponents:
-        resolved_children = tuple(
-            _resolve_namespaces(child, parent_prefix=absolute_id) 
-            for child in node.subcomponents
-        )
-        node = eqx.tree_at(lambda n: n.subcomponents, node, resolved_children)
-        
-    return node
 
 def initialize_energy(state: State, system: System, settings: Settings):
     

@@ -7,10 +7,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
+from __future__ import annotations
 from typing import TYPE_CHECKING
-import jax
-import jax.numpy as jnp
-import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
@@ -20,7 +18,6 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import inputs, outputs
 from RCAIDE.Framework import Process, ProcessStep
-from RCAIDE.Framework.Missions.Initialize import initialize_energy
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -30,11 +27,6 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 def build_analysis_from_network(network: EnergyNetwork):
 
     analysis_network = network.assign_network_IDs()
-
-    # def make_node_function(node_ID: str):
-    #     def _pure_transmit(state, system, settings):
-    #         return analysis_network.nodes[node_ID].transmit(state, system, settings)
-    #     return _pure_transmit
     
     def make_node_function(node_ID: str):
         node_func = analysis_network.nodes[node_ID].__class__.transmit
