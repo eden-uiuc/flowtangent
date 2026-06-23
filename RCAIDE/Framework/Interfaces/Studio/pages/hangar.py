@@ -16,21 +16,7 @@ def hangar_ui():
         # Moved inside the page function so each browser tab gets its own isolated session state
         hangar_state = app_state['hangar']
 
-        def get_selected_node():
-            """Returns the type ('wing', 'segment', 'fuse', 'nac') and the dictionary object."""
-            sel_id = hangar_state['selected_id']
-            veh = hangar_state['vehicle']
-            
-            for w in veh['wings']:
-                if w['id'] == sel_id: return 'wing', w
-                for s in w['segments']:
-                    if s['id'] == sel_id: return 'segment', s
-            for f in veh['fuselages']:
-                if f['id'] == sel_id: return 'fuse', f
-            for n in veh['nacelles']:
-                if n['id'] == sel_id: return 'nac', n
-                
-            return None, None
+        
 
         def generate_vehicle_mesh():
             print("--- STARTING MESH GENERATION ---")
@@ -247,7 +233,22 @@ def hangar_ui():
                 print(f"ERROR IN UPDATE_PLOT: {e}")
                 import traceback
                 traceback.print_exc()
-
+        
+        def get_selected_node():
+            """Returns the type ('wing', 'segment', 'fuse', 'nac') and the dictionary object."""
+            sel_id = hangar_state['selected_id']
+            veh = hangar_state['vehicle']
+            
+            for w in veh['wings']:
+                if w['id'] == sel_id: return 'wing', w
+                for s in w['segments']:
+                    if s['id'] == sel_id: return 'segment', s
+            for f in veh['fuselages']:
+                if f['id'] == sel_id: return 'fuse', f
+            for n in veh['nacelles']:
+                if n['id'] == sel_id: return 'nac', n
+                
+            return None, None
         def select_node(e):
             if e.value:  
                 hangar_state['selected_id'] = e.value
@@ -260,10 +261,18 @@ def hangar_ui():
             target_wing = sel_obj if sel_type == 'wing' else next(w for w in hangar_state['vehicle']['wings'] if sel_obj in w['segments'])
             
             new_id = f"seg_{int(time.time()*1000)}"
-            target_wing['segments'].append({
+            new_segment = {
                 'id': new_id, 'name': f'Segment {len(target_wing["segments"]) + 1}',
                 'span': 5.0, 'taper': 0.8, 'sweep': 10.0, 'dihedral': 0.0, 'twist': 0.0
-            })
+            }
+
+            # Insert after the selected segment, or append to the tip if the wing is selected
+            if sel_type == 'segment':
+                insert_idx = target_wing['segments'].index(sel_obj) + 1
+                target_wing['segments'].insert(insert_idx, new_segment)
+            else:
+                target_wing['segments'].append(new_segment)
+
             hangar_state['selected_id'] = new_id
             vehicle_tree.refresh()
             attribute_sliders.refresh()
@@ -292,6 +301,25 @@ def hangar_ui():
                 hangar_state['vehicle']['nacelles'].append({'id': new_id, 'name': 'New Engine', 'length': 3.0, 'diameter': 1.0, 'x_offset': 0, 'y_offset': 3.0, 'z_offset': -1.0, 'symmetric': True})
                 
             hangar_state['selected_id'] = new_id
+            vehicle_tree.refresh()
+            attribute_sliders.refresh()
+            update_plot()
+        
+        def remove_component():
+            sel_type, sel_obj = get_selected_node()
+            veh = hangar_state['vehicle']
+            
+            # Filter out the selected component and bump the selection back to the parent folder
+            if sel_type == 'wing':
+                veh['wings'] = [w for w in veh['wings'] if w['id'] != sel_obj['id']]
+                hangar_state['selected_id'] = 'cat_wings'
+            elif sel_type == 'fuse':
+                veh['fuselages'] = [f for f in veh['fuselages'] if f['id'] != sel_obj['id']]
+                hangar_state['selected_id'] = 'cat_fuses'
+            elif sel_type == 'nac':
+                veh['nacelles'] = [n for n in veh['nacelles'] if n['id'] != sel_obj['id']]
+                hangar_state['selected_id'] = 'cat_nacs'
+                
             vehicle_tree.refresh()
             attribute_sliders.refresh()
             update_plot()
@@ -381,15 +409,23 @@ def hangar_ui():
                     synced_slider('Diameter (m)', sel_obj, 'diameter', 0.5, 10.0, 0.1)
 
             # --- DYNAMIC BUTTON LOGIC ---
-            ui.separator().classes('my-4') # <--- Separator goes OUTSIDE the row!
+            ui.separator().classes('my-4 opacity-50')
             
-            with ui.row().classes('w-full gap-2'):
+            with ui.row().classes('w-full gap-2 flex-wrap'):
+                
+                # 1. Segment Tools
                 if sel_type in ['wing', 'segment']:
                     ui.button('+ Add Segment', on_click=add_segment, color='primary').classes('flex-grow text-xs')
-                    if sel_type == 'segment':
-                        ui.button('- Remove Segment', on_click=remove_segment, color='Blue').classes('flex-grow text-xs')
+                if sel_type == 'segment':
+                    ui.button('- Remove Segment', on_click=remove_segment, color='blue').classes('flex-grow text-xs')
+                    
+                # 2. Root Component Tools
+                if sel_type in ['wing', 'fuse', 'nac']:
+                    ui.button('- Remove Component', on_click=remove_component, color='blue').classes('flex-grow text-xs')
+                    
+                # 3. Category Tools
                 elif hangar_state.get('selected_id', '').startswith('cat_'):
-                    ui.button('+ Add Component Here', on_click=add_component, color='blue').classes('flex-grow text-xs')
+                    ui.button('+ Add Component Here', on_click=add_component, color='primary').classes('flex-grow text-xs')
 
         def generate_rcaide_payload():
             return {
