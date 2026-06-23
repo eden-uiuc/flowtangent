@@ -13,7 +13,7 @@ from components.navigation import navigation_header
 @ui.page('/')
 def hangar(client: Client):
     client.content.classes('p-0 gap-0')
-    navigation_header()
+    navigation_header(active_page='/')
 
     # --- 1. STATE DATA ---
     # Moved inside the page function so each browser tab gets its own isolated session state
@@ -34,70 +34,6 @@ def hangar(client: Client):
             if n['id'] == sel_id: return 'nac', n
             
         return None, None
-
-    # --- 3. 3D GEOMETRY GENERATION ---
-    # def generate_wing_mesh():
-    #     x_pts, y_pts, z_pts = [], [], []
-    #     y_curr, x_le, z_le = 0.0, 0.0, 0.0
-    #     c_curr = hangar_state['root_chord']
-    #     tw_curr = np.radians(hangar_state['root_twist'])
-        
-    #     x_pts.extend([x_le, x_le + c_curr * np.cos(tw_curr)])
-    #     y_pts.extend([y_curr, y_curr])
-    #     z_pts.extend([z_le, z_le - c_curr * np.sin(tw_curr)])
-        
-    #     for seg in hangar_state['segments']:
-    #         b = seg['span']
-    #         sw_rad = np.radians(seg['sweep'])
-    #         dih_rad = np.radians(seg['dihedral'])
-            
-    #         x_le += b * np.tan(sw_rad)
-    #         y_curr += b
-    #         z_le += b * np.tan(dih_rad)
-    #         c_curr *= seg['taper']
-    #         tw_curr = np.radians(seg['twist'])
-            
-    #         x_pts.extend([x_le, x_le + c_curr * np.cos(tw_curr)])
-    #         y_pts.extend([y_curr, y_curr])
-    #         z_pts.extend([z_le, z_le - c_curr * np.sin(tw_curr)])
-            
-    #     N = len(x_pts) 
-        
-    #     for idx in range(N):
-    #         x_pts.append(x_pts[idx])
-    #         y_pts.append(-y_pts[idx]) 
-    #         z_pts.append(z_pts[idx])
-            
-    #     i_faces, j_faces, k_faces = [], [], []
-    #     num_sections = len(hangar_state['segments'])
-        
-    #     for n in range(num_sections):
-    #         base = 2 * n
-    #         i_faces.extend([base, base + 2])
-    #         j_faces.extend([base + 1, base + 1])
-    #         k_faces.extend([base + 2, base + 3])
-            
-    #     for n in range(num_sections):
-    #         base = N + 2 * n
-    #         i_faces.extend([base, base + 2])
-    #         j_faces.extend([base + 2, base + 3])
-    #         k_faces.extend([base + 1, base + 1])
-            
-    #     fig = go.Figure(data=[
-    #         go.Mesh3d(x=x_pts, y=y_pts, z=z_pts, i=i_faces, j=j_faces, k=k_faces, color='#3b82f6', opacity=0.8, flatshading=True)
-    #     ])
-        
-    #     no_axis = dict(visible=False)
-    #     fig.update_layout(
-    #         uirevision='preserve_ui_state', 
-    #         scene=dict(aspectmode='data', xaxis=no_axis, yaxis=no_axis, zaxis=no_axis, camera=dict(eye=dict(x=-2.5, y=-2.5, z=2.5))),
-    #         margin=dict(l=0, r=0, b=0, t=0),
-    #         template=theme_config[master_state['is_dark']]['plotly_template'],
-    #         paper_bgcolor='rgba(0,0,0,0)',
-    #         plot_bgcolor='rgba(0,0,0,0)',
-    #     )
-    #     return fig
-
 
     def generate_vehicle_mesh():
         print("--- STARTING MESH GENERATION ---")

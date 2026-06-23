@@ -131,7 +131,7 @@ def create_plot(var_name):
 def simulator_page(client: Client):
     client.content.classes('p-0 gap-0 absolute-full')
 
-    navigation_header()
+    navigation_header(active_page='/simulator')
     
     ui.add_head_html('''
         <style>

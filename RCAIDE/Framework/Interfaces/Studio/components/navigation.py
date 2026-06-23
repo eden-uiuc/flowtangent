@@ -2,7 +2,7 @@ import json
 from nicegui import ui
 from utils.state import master_state, theme_config
 
-def navigation_header():
+def navigation_header(active_page: str='/'):
     """Shared header with master state Save/Load capabilities."""
     
     dark = ui.dark_mode()
@@ -56,16 +56,26 @@ def navigation_header():
         # 1. LEFT: Logo and Title 
         with ui.row().classes('items-center gap-3 z-10'):
             ui.label('RCAIDE-EDEn STUDIO').classes('text-white text-xl font-bold tracking-widest')
-        
+
         # 2. CENTER: Navigation Icons (Absolutely Centered)
         with ui.row().classes('absolute left-1/2 -translate-x-1/2 flex items-center justify-center gap-4 z-20'):
-            with ui.button(icon='send', on_click=lambda: ui.navigate.to('/')) \
-                    .props('flat round color=white size=md').classes('hover:bg-slate-800'):
-                ui.tooltip('Hangar').classes('text-sm bg-slate-700')
+            
+            # Dictionary mapping routes to their respective icons and tooltip labels
+            nav_items = {
+                '/': {'icon': 'send', 'label': 'Hangar'},
+                '/simulator': {'icon': 'flight_takeoff', 'label': 'Simulator'},
+            }
+            
+            for route, info in nav_items.items():
+                is_active = (active_page == route)
                 
-            with ui.button(icon='flight_takeoff', on_click=lambda: ui.navigate.to('/simulator')) \
-                    .props('flat round color=white size=md').classes('hover:bg-slate-800'):
-                ui.tooltip('Simulator').classes('text-sm bg-slate-700')
+                # Added '!' to force Tailwind to override Quasar's default primary text color
+                state_classes = 'bg-white !text-slate-900' if is_active else 'bg-transparent !text-white hover:bg-slate-800'
+                
+                with ui.button(icon=info['icon'], on_click=lambda r=route: ui.navigate.to(r)) \
+                        .props('flat round size=md') \
+                        .classes(f'transition-colors duration-200 {state_classes}'):
+                    ui.tooltip(info['label']).classes('text-sm bg-slate-700')
         
         # 3. RIGHT: Hamburger Menu
         with ui.row().classes('items-center z-10'):
@@ -87,4 +97,3 @@ def navigation_header():
                         ui.switch('Dark Mode', value=master_state['is_dark'], on_change=on_theme_toggle) \
                             .bind_value_to(dark, 'value') \
                             .classes('w-full')
-
