@@ -5,7 +5,8 @@ import httpx
 import json
 import time
 
-from utils.state import app_state, theme_config
+from utils.state import app_state, theme_config, save_snapshot
+from components.context_menus import setup_context_menu
 
 
 def hangar_ui():
@@ -255,6 +256,7 @@ def hangar_ui():
                 attribute_sliders.refresh() 
 
         def add_segment():
+            save_snapshot()
             sel_type, sel_obj = get_selected_node()
             
             # Find the parent wing regardless of if a wing or segment is selected
@@ -279,6 +281,7 @@ def hangar_ui():
             update_plot()
             
         def remove_segment():
+            save_snapshot()
             sel_type, sel_obj = get_selected_node()
             if sel_type == 'segment':
                 target_wing = next(w for w in hangar_state['vehicle']['wings'] if sel_obj in w['segments'])
@@ -290,6 +293,7 @@ def hangar_ui():
                     update_plot()
                     
         def add_component():
+            save_snapshot()
             cat = hangar_state['selected_id']
             new_id = f"comp_{int(time.time()*1000)}"
             
@@ -306,6 +310,7 @@ def hangar_ui():
             update_plot()
         
         def remove_component():
+            save_snapshot()
             sel_type, sel_obj = get_selected_node()
             veh = hangar_state['vehicle']
             
@@ -517,6 +522,8 @@ def hangar_ui():
         # Added limits=(min, max) to physically prevent the Quasar collapse bug
         with ui.splitter(value=350, limits=(200, 800)).classes('w-full h-full').props('unit="px"') as outer_split:
             
+            setup_context_menu()
+
             with outer_split.before:
                 # LEFT PANEL CONTENT
                 with ui.column().classes(f'w-full h-full p-4 border-r overflow-y-auto {sidebar_bg} {sidebar_border}'):

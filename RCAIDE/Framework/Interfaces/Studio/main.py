@@ -4,7 +4,7 @@ from nicegui import ui
 from pages.hangar import hangar_ui
 from pages.simulator import simulator_ui
 from components.navigation import navigation_header
-from utils.state import app_state
+from utils.state import app_state, perform_undo, perform_redo
 
 @ui.refreshable
 def router_content():
@@ -69,6 +69,10 @@ def main_app():
         
         with content_wrapper:
             router_content()
+    
+    # Global Keyboard Shortcuts (Surgically Corrected Syntax)
+    ui.keyboard(on_key=lambda e: perform_undo() if e.key.name == 'z' and e.modifiers.ctrl and e.action.keydown else None)
+    ui.keyboard(on_key=lambda e: perform_redo() if e.key.name == 'y' and e.modifiers.ctrl and e.action.keydown else None)
 
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(title="RCAIDE Studio", port=8080)

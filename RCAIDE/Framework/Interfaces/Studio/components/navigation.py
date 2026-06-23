@@ -1,6 +1,6 @@
 import json
 from nicegui import ui
-# from utils.state import app_state
+from utils.state import perform_undo, perform_redo
 
 def navigation_header(app_state: dict, on_nav: callable):
     """Shared header with master state Save/Load capabilities."""
@@ -92,10 +92,19 @@ def navigation_header(app_state: dict, on_nav: callable):
         
         # 3. RIGHT: Hamburger Menu
         with ui.row().classes('items-center z-10'):
+            with ui.button(icon='undo', on_click=perform_undo) \
+                .props('flat round color=white') \
+                .classes('hover:bg-slate-800'):
+                ui.tooltip('Undo (Ctrl+Z)')
+
+            with ui.button(icon='redo', on_click=perform_redo) \
+                .props('flat round color=white') \
+                .classes('hover:bg-slate-800'):
+                ui.tooltip('Redo (Ctrl+Y)')
+            
             with ui.button(icon='menu').props('flat round color=white').classes('hover:bg-slate-800'):
                 with ui.menu().style('min-width: 192px; width: 192px;') \
                               .classes('bg-slate-800 text-white border border-slate-700'):
-                    
                     ui.menu_item('Save Project', on_click=save_project).classes('hover:bg-slate-700 whitespace-nowrap')
                     ui.menu_item('Load Project', on_click=upload_dialog.open).classes('hover:bg-slate-700 whitespace-nowrap')
                     ui.separator()

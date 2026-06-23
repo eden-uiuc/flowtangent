@@ -1,10 +1,13 @@
 # utils/state.py
-
+from nicegui import ui
+import copy
 import plotly
 
 app_state = {
     'is_dark': True,
     'on_theme_changed': [],
+    'history_stack': [],
+    'redo_stack': [],
     'route': '/hangar',
     'hangar': {
         'mach': 0.78, 'alpha': 2.5, 'beta': 0.0,
@@ -59,6 +62,48 @@ app_state = {
         'cl': 0.0, 'cd': 0.0, 'l_d': 0.0, 'throttle': 0.0, 'fuel_burn': 0.0
     }
 }
+
+def save_snapshot():
+    
+    if len(app_state['history_stack']) >= 20:
+        app_state['history_stack'].pop(0)
+    
+    clean_state = {k: v for k, v in app_state.items() if k not in ['on_theme_changed', 'history_stack', 'redo_stack']}
+    app_state['history_stack'].append(copy.deepcopy(clean_state))
+    
+    app_state['redo_stack'].clear()
+
+def perform_undo():
+    if not app_state['history_stack']:
+        ui.notify('Nothing to undo.')
+        return
+    
+    # Save current state to redo stack before going back
+    clean_state = {k: v for k, v in app_state.items() if k not in ['on_theme_changed', 'history_stack', 'redo_stack']}
+    app_state['redo_stack'].append(copy.deepcopy(clean_state))
+    
+    previous_state = app_state['history_stack'].pop()
+    for key in previous_state:
+        app_state[key] = previous_state[key]
+        
+    from main import router_content
+    router_content.refresh()
+
+def perform_redo():
+    if not app_state['redo_stack']:
+        ui.notify('Nothing to redo.')
+        return
+        
+    # Save current state to undo stack before going forward
+    clean_state = {k: v for k, v in app_state.items() if k not in ['on_theme_changed', 'history_stack', 'redo_stack']}
+    app_state['history_stack'].append(copy.deepcopy(clean_state))
+    
+    next_state = app_state['redo_stack'].pop()
+    for key in next_state:
+        app_state[key] = next_state[key]
+        
+    from main import router_content
+    router_content.refresh()
 
 theme_config = {
     True: {  # Dark Mode
