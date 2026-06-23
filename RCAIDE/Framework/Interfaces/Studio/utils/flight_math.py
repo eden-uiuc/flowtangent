@@ -17,6 +17,15 @@ def calculate_haversine_nm(lat1, lng1, lat2, lng2):
     
     return R_nm * c
 
+def normalize_lng(target_lng, reference_lng):
+    """Unwraps longitudes across the antimeridian so Leaflet draws them contiguously."""
+    diff = target_lng - reference_lng
+    if diff > 180:
+        return target_lng - 360
+    elif diff < -180:
+        return target_lng + 360
+    return target_lng
+
 def get_great_circle_point(lat1, lon1, lat2, lon2, fraction):
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     d = 2 * math.asin(math.sqrt(math.sin((lat2-lat1)/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin((lon2-lon1)/2)**2))
@@ -83,23 +92,32 @@ def generate_procedural_flight_profile(origin_iata, destination_iata):
 
     total_time_min = time_climb_min + time_cruise_min + time_descent_min
     
-    # 4. Generate the Discrete Data Arrays (201 Profile Points)
-    STEPS = 200
+    # 4. Generate the Discrete Data Arrays 
+    STEPS = 201 # Exactly 201 elements so int(progress * 200) maps perfectly from index 0 to 200
     flight_profile = {
         'Time/Progress': [i / float(STEPS - 1) for i in range(STEPS)],
-        'Alt (ft)': [0.], 'Mach': [0.], 'Alpha (deg)': [0.], 
-        'CL': [0.], 'CD': [0.], 'L/D': [0.], 'Throttle (%)': [0.], 'Fuel Burn (lb/hr)': [0.]
+        'Alt (ft)': [], 'Mach': [], 'Alpha (deg)': [], 
+        'CL': [], 'CD': [], 'L/D': [], 'Throttle (%)': [], 'Fuel Burn (lb/hr)': []
     }
     
-    # Split intervals linearly by real-world calculated time fractions
     pct_climb = time_climb_min / total_time_min
     pct_cruise = (time_climb_min + time_cruise_min) / total_time_min
 
     for step in range(STEPS):
         prog = step / float(STEPS - 1)
         
+        # PRE-FLIGHT (Parked on the tarmac)
+        if prog == 0.0:
+            alt = orig['elevation']
+            mach = 0.0
+            alpha = 0.0
+            cl = 0.0
+            cd = 0.0
+            throttle = 0.0
+            fuel = 0.0
+            
         # CLIMB PHASE
-        if prog < pct_climb:
+        elif prog < pct_climb:
             phase_fraction = prog / pct_climb if pct_climb > 0 else 0
             alt = orig['elevation'] + (cruise_alt_target - orig['elevation']) * phase_fraction
             mach = 0.25 + (target_mach - 0.25) * phase_fraction
@@ -111,7 +129,6 @@ def generate_procedural_flight_profile(origin_iata, destination_iata):
             
         # CRUISE PHASE
         elif prog < pct_cruise:
-            # Steady-state with flight vibrations noise
             alt = cruise_alt_target + (step % 6 - 3) * 5
             mach = target_mach + (step % 4 - 2) * 0.001
             alpha = 2.8 + (step % 4 - 2) * 0.05
@@ -122,13 +139,13 @@ def generate_procedural_flight_profile(origin_iata, destination_iata):
         
         # LANDED PHASE
         elif prog == 1.0:
-            alt = 0.0
+            alt = dest['elevation']
             mach = 0.0
             alpha = 0.0
             cl = 0.0
             cd = 0.0
-            throttle=0.0
-            fuel=0.0
+            throttle = 0.0
+            fuel = 0.0
 
         # DESCENT PHASE
         else:
@@ -141,7 +158,6 @@ def generate_procedural_flight_profile(origin_iata, destination_iata):
             throttle = 18.0 - (6.0 * phase_fraction)
             fuel = 1400 - (400 * phase_fraction)
 
-        # Append variables to the simulation engine dictionary
         flight_profile['Alt (ft)'].append(alt)
         flight_profile['Mach'].append(mach)
         flight_profile['Alpha (deg)'].append(alpha)
@@ -153,12 +169,16 @@ def generate_procedural_flight_profile(origin_iata, destination_iata):
 
     plot_variables = ['Alt (ft)', 'Mach', 'Alpha (deg)', 'CL', 'CD', 'L/D', 'Throttle (%)', 'Fuel Burn (lb/hr)']
     
-    # Return the data payload plus metadata the UI needs to update the Map positions
+    raw_points = [get_great_circle_point(orig['lat'], orig['lon'], dest['lat'], dest['lon'], i/100.0) for i in range(101)]
+    normalized_route = [(lat, normalize_lng(lng, orig['lon'])) for lat, lng in raw_points]
+
     meta = {
-        'orig_lat': orig['lat'], 'orig_lng': orig['lon'],
-        'dest_lat': dest['lat'], 'dest_lng': dest['lon'],
+        'orig_lat': orig['lat'], 
+        'orig_lng': orig['lon'],
+        'dest_lat': dest['lat'], 
+        'dest_lng': dest['lon'],
         'distance_nm': distance_nm,
-        'route_points': [get_great_circle_point(orig['lat'], orig['lon'], dest['lat'], dest['lon'], i/100.0) for i in range(101)]
+        'route_points': normalized_route
     }
 
     return flight_profile, plot_variables, meta

@@ -2,9 +2,10 @@
 
 import plotly
 
-master_state = {
+app_state = {
     'is_dark': True,
     'on_theme_changed': [],
+    'route': '/hangar',
     'hangar': {
         'mach': 0.78, 'alpha': 2.5, 'beta': 0.0,
         'selected_id': 'wing_0', 
