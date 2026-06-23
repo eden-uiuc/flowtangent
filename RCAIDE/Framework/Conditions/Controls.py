@@ -25,12 +25,12 @@ from RCAIDE.Library import Component
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def get_active(Conditions):
+def get_active(cond: Conditions):
     """
     Returns the active controls/residuals
     """
 
-    return [c for c in vars(Conditions).values() if hasattr(c, 'active') and c.active]
+    return [c for c in cond.subconditions if hasattr(c, 'active') and c.active]
 
 
 def count_active(Conditions):
@@ -50,7 +50,8 @@ class DynamicResidual(Conditions):
 
     value:  jnp.ndarray  = empty_array(0)
 
-ResidualNames = Literal[
+# TODO: Refactor Dynamics into Dynamics.force.x, etc...
+NamedResidual = Literal[
     "force_x", "force_y", "force_z",
     "moment_x", "moment_y", "moment_z",
 ]

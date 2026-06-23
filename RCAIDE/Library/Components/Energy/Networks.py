@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual
 
 from dataclasses import replace
 from graphlib import TopologicalSorter, CycleError
@@ -102,7 +103,10 @@ class EnergyNetwork(EnergyNode):
     
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
-    
+
+    controls: tuple[ControlVariable, ...] = init_field(tuple, static=True)
+    residuals: tuple[DynamicResidual, ...] = init_field(tuple, static=True)
+
     def _rebalance_flow_splitters(self) -> "EnergyNetwork":
         """Rebalances fractions directly within the subcomponents tree."""
         # Grab a temporary flat dict just to look at the hierarchy
@@ -188,4 +192,6 @@ class EnergyNetwork(EnergyNode):
             )
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
+    
+    
 

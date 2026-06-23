@@ -12,7 +12,7 @@ import jax
 import equinox as eqx
 
 # package imports
-from jaxopt import ScipyRootFinding, Broyden, GaussNewton
+
 
 # RCAIDE imports
 from RCAIDE.utils import init_field
@@ -42,10 +42,15 @@ class MassAnalysisSettings(eqx.Module):
 
     reduction_factors: ReductionFactors = init_field(ReductionFactors)
 
+class EnergyAnalysisSettings(eqx.Module):
+
+    use_network_controls: bool = init_field(False, static=True)
+
 class AnalysisSettings(eqx.Module):
 
     aerodynamics: Optional[eqx.Module] = None
-    mass: Optional[MassAnalysisSettings] = init_field(MassAnalysisSettings)
+    energy: EnergyAnalysisSettings = init_field(EnergyAnalysisSettings)
+    mass: MassAnalysisSettings = init_field(MassAnalysisSettings)
 
     gradient_map: Optional[GradientMap] = init_field(None, static=True)
 

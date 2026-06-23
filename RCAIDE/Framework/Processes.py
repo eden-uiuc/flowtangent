@@ -489,7 +489,7 @@ class Process(ProcessStep):
         Recursively yields (node_name, step_obj) for all steps.
         The prefix tracks the hierarchical origin (e.g., '0_InitializeVLM.2_ProcessGeometry').
         """
-        for i, step in enumerate(self.steps):
+        for step in self.steps:
             node_name = step.tag
 
             # Check if this step is itself a nested Process containing other steps

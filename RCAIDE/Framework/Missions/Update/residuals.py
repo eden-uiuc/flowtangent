@@ -5,6 +5,10 @@
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.Framework import State, System, Settings
 
 # package imports
 import equinox as eqx
@@ -20,9 +24,9 @@ import RCAIDE.Framework as rcf
 
 
 def flight_dynamics_residuals(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: State,
+    system: System,
+    settings: Settings,
 ):
     """
     Calculates the residuals from the flight dynamics equations.

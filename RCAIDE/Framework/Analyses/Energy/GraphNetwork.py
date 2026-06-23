@@ -9,20 +9,38 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
-# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
+    from RCAIDE.Framework import State, System, Settings
 
-from RCAIDE.utils import inputs, outputs
+import networkx as nx
+
+from RCAIDE.utils import inputs, outputs, init_field
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Energy Network Analysis
 # ----------------------------------------------------------------------------------------------------------------------
+
+class GraphEnergyAnalysis(Process):
+
+    analysis_network: EnergyNetwork = init_field(EnergyNetwork)
+
+    def graph(self, **kwargs) -> nx.DiGraph:
+       
+        G   = nx.DiGraph()
+        net = self.analysis_network
+
+        for e_idx, network_ID in enumerate(net._execution_order):
+            node = net.nodes[network_ID]
+            G.add_node(e_idx, name=node.tag, network_ID=node.network_ID)
+            for input in node.inputs:
+                input_idx = net._execution_order.index(input.network_ID)
+                domain = input.domain
+                G.add_edge(input_idx, e_idx, domain=domain)
+
+        return G
+
 
 def build_analysis_from_network(network: EnergyNetwork):
 
@@ -40,7 +58,7 @@ def build_analysis_from_network(network: EnergyNetwork):
         
         return _pure_transmit
 
-    network_analysis =  Process(
+    network_analysis =  GraphEnergyAnalysis(
         tag=f"{network.tag} Analysis",
         steps=tuple(
             ProcessStep(

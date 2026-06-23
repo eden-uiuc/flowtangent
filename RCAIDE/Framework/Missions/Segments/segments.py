@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import threading
-import warnings
 import timeit
 import time
 import sys
@@ -42,7 +41,7 @@ from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Processes import null_step
 from RCAIDE.Framework.Missions.Initialize import *
 from RCAIDE.Framework.Missions.Update     import *
-from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual, ResidualNames
+from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual, NamedResidual
 
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, Settings, System
@@ -111,18 +110,22 @@ def _activate_control(control: str | ControlVariable, state):
 
 
 
-def _activate_residual(residual_name: ResidualNames, state):
+def _activate_residual(res: str | DynamicResidual, state):
     
-    current_residual = getattr(state.dynamics, residual_name)
-    active_residual = replace(current_residual, active=True)
-    
-    # Safely inject it using getattr path tracing
-    new_dynamics = eqx.tree_at(
-        lambda d: getattr(d, residual_name), 
-        state.dynamics, 
-        active_residual
-    )
-    
+    if isinstance(res, str) and res in  NamedResidual:
+        current_residual = getattr(state.dynamics, res)
+        active_residual = replace(current_residual, active=True)
+        
+        # Safely inject it using getattr path tracing
+        new_dynamics = eqx.tree_at(
+            lambda d: getattr(d, res), 
+            state.dynamics, 
+            active_residual
+        )
+    elif isinstance(res, DynamicResidual):
+        active_res = replace(res, active=True)
+        new_dynamics = state.dynamics.add_subcondition(active_res)
+        
     return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics).expand_rows(state.numerics.number_of_control_points)
 
 
@@ -146,13 +149,13 @@ class InitializeSegment(Process):
     tag: str = 'Segment Initialization'
 
     active_controls:   tuple[str|ControlVariable, ...]  = init_field(tuple)
-    active_residuals:  tuple[ResidualNames, ...]        = init_field(tuple)
+    active_residuals:  tuple[NamedResidual, ...]        = init_field(tuple)
 
     controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
 
     steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
 
-    def __call__(self, state, system, settings, validate_controls=False):
+    def __call__(self, state: State, system: System, settings: Settings, validate_controls=False):
         
         if settings.DEBUG_MODE:
             scan_for_invalid_JAX_types(state,  f"Pre-{self.tag} State")
@@ -165,12 +168,19 @@ class InitializeSegment(Process):
 
         # Set up static routing for active controls
         active_controls = current_state.controls.get_active_controls()
+        if settings.analysis.energy.use_network_controls:
+            for network in system.energy_network:
+                active_controls += network.controls # type: ignore
         routing_table = tuple((ctrl.path, ctrl.path_indices) for ctrl in active_controls)
         new_controls = replace(current_state.controls, active_routing_table=routing_table)
         current_state = eqx.tree_at(lambda s: s.controls, current_state, new_controls)
 
-        for res_name in self.active_residuals:
-            current_state = _activate_residual(res_name, current_state)
+        active_residuals = self.active_residuals
+        if settings.analysis.energy.use_network_controls:
+            for network in system.energy_network:
+                active_residuals += network.residuals # type: ignore
+        for res in self.active_residuals:
+            current_state = _activate_residual(res, current_state)
         
         n_cp = int(current_state.numerics.number_of_control_points)
         
@@ -482,7 +492,7 @@ class Segment(Process):
 
     # Pass-through configuration for InitializeSegment
     active_controls:  tuple[str | ControlVariable, ...]     = init_field(tuple)
-    active_residuals: tuple[ResidualNames, ...]             = init_field(tuple)
+    active_residuals: tuple[NamedResidual, ...]             = init_field(tuple)
     controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
 
     course_profile:     CourseProfile   = init_field(ConstantCourse)

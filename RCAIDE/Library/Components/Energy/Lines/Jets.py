@@ -22,12 +22,6 @@ from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine, TurbofanEngine
 
-
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from RCAIDE.Framework import State, Aircraft, Settings
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
@@ -113,8 +107,9 @@ class TurbojetEnergyLine(EnergyLine):
 
         # Manage Electrical Power --------------------------------------------------------------------------------------
 
-        for idx, offtake in enumerate(self.offtakes):
+        for idx, offtake in enumerate(self.offtakes): # type: ignore
             
+            offtake: OfftakeShaft
             engine_ID = self.engines[idx].network_ID  #type: ignore
 
             updated_state = eqx.tree_at(
