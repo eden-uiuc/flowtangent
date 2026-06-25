@@ -11,13 +11,8 @@ from components.context_menus import setup_context_menu
 
 def hangar_ui():
     with ui.column().classes('w-full h-full p-0 gap-0'):
-        # navigation_header(active_page='/')
-
         # --- 1. STATE DATA ---
-        # Moved inside the page function so each browser tab gets its own isolated session state
         hangar_state = app_state['hangar']
-
-        
 
         def generate_vehicle_mesh():
             print("--- STARTING MESH GENERATION ---")
@@ -389,15 +384,25 @@ def hangar_ui():
                 
                 ui.label('Origin (X, Z)').classes('text-sm font-bold text-gray-700 mt-2')
                 if sel_type in ['wing', 'fuse', 'nac']:
-                    sel_obj['y_offset'] = 0.0
                     if 'symmetric' in sel_obj:
                         sel_obj['symmetric'] = True
-        
-                    with ui.row().classes('w-full items-center gap-2 mb-2'):
-                        ui.number('X', value=sel_obj['x_offset'], step=0.5, format='%.1f', 
-                                on_change=update_plot).bind_value(sel_obj, 'x_offset').props('dense').classes('flex-1')
-                        ui.number('Z', value=sel_obj['z_offset'], step=0.5, format='%.1f', 
-                                on_change=update_plot).bind_value(sel_obj, 'z_offset').props('dense').classes('flex-1')
+                    if sel_type in ['wing', 'fuse']:
+                        sel_obj['y_offset'] = 0.0
+
+                    if sel_type is 'nac':
+                        with ui.row().classes('w-full items-center gap-2 mb-2'):
+                            ui.number('X', value=sel_obj['x_offset'], step=0.5, format='%.1f', 
+                                    on_change=update_plot).bind_value(sel_obj, 'x_offset').props('dense').classes('flex-1')
+                            ui.number('Y', value=sel_obj['y_offset'], step=0.5, format='%.1f', 
+                                    on_change=update_plot).bind_value(sel_obj, 'y_offset').props('dense').classes('flex-1')
+                            ui.number('Z', value=sel_obj['z_offset'], step=0.5, format='%.1f', 
+                                    on_change=update_plot).bind_value(sel_obj, 'z_offset').props('dense').classes('flex-1')
+                    else:
+                        with ui.row().classes('w-full items-center gap-2 mb-2'):
+                            ui.number('X', value=sel_obj['x_offset'], step=0.5, format='%.1f', 
+                                    on_change=update_plot).bind_value(sel_obj, 'x_offset').props('dense').classes('flex-1')
+                            ui.number('Z', value=sel_obj['z_offset'], step=0.5, format='%.1f', 
+                                    on_change=update_plot).bind_value(sel_obj, 'z_offset').props('dense').classes('flex-1')
                     
                 ui.label('Geometry').classes('text-sm font-bold text-gray-700 mt-2')
                 if sel_type == 'wing':
