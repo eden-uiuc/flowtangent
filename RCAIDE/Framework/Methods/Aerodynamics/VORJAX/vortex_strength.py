@@ -9,16 +9,17 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
 from RCAIDE.utils import inputs, outputs
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compute VLM Vortex Strength
 # ----------------------------------------------------------------------------------------------------------------------

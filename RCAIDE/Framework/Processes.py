@@ -9,24 +9,27 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Callable, Self, Generator, Tuple
-if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+from typing import TYPE_CHECKING, Callable, Generator, Optional, Self, Tuple
 
-import re
+if TYPE_CHECKING:
+    from RCAIDE.Framework import Settings, State, System
+
 import os
+import re
+
+import equinox as eqx
 
 # package imports
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 import networkx as nx
-
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-# RCAIDE imports
-from RCAIDE.utils import Token, DataPath, MERMAID_STYLES, init_field
 import RCAIDE.utils as ru
+
+# RCAIDE imports
+from RCAIDE.utils import MERMAID_STYLES, DataPath, Token, init_field
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------

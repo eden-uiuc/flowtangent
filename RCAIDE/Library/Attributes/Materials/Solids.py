@@ -7,6 +7,7 @@
 
 # package imports
 import equinox as eqx
+
 from RCAIDE.utils import init_field
 
 #-------------------------------------------------------------------------------

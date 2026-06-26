@@ -10,13 +10,14 @@
 
 from pathlib import Path
 
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 from RCAIDE.Library import Units
 from RCAIDE.Library.Components import ComponentAreas
 from RCAIDE.Library.Components.Airfoils import Airfoil
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
+
 from RCAIDE.Framework.Systems import Aircraft
 
 # ----------------------------------------------------------------------------------------------------------------------

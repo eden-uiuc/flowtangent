@@ -6,19 +6,23 @@
 #  Imports
 # -------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, Aircraft, Settings
+    from RCAIDE.Framework import Aircraft, Settings, State
 
 
 import warnings
 
+import equinox as eqx
+
 # package imports
 import jax
-import equinox as eqx
 
 # RCAIDE Imports
 from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine
+
 # -------------------------------------------------------------------------------
 #  Functional/Library Version
 # -------------------------------------------------------------------------------

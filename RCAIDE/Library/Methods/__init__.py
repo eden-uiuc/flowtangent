@@ -8,9 +8,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Energy
-from . import Aerodynamics
-from . import Propulsors
+from . import Aerodynamics, Energy, Propulsors
 # from . import Costs
 # from . import Geometry
 # from . import Performance

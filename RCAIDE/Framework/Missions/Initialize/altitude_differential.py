@@ -11,7 +11,6 @@
 import jax.numpy as jnp
 
 # RCAIDE Imports
-
 import RCAIDE.Framework as rcf
 
 # -------------------------------------------------------------------------------

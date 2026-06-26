@@ -1,6 +1,7 @@
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 import plotly.graph_objects as go
+
 
 def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
     """

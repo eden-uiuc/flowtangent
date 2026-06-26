@@ -8,8 +8,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Nodes
-from . import Propulsors
-from . import Lines
-from . import Networks
+from . import Lines, Networks, Nodes, Propulsors
 

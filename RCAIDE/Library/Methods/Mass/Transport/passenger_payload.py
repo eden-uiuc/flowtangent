@@ -7,9 +7,9 @@
 #  Imports
 # ----------------------------------------------------------------------
 
+import RCAIDE.Library as rcl
 from RCAIDE.Library import Units
 
-import RCAIDE.Library as rcl
 import RCAIDE.Framework as rcf
 
 # -----------------------------------------------------------------------

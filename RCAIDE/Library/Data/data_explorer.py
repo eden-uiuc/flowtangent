@@ -1,26 +1,24 @@
-import os
-import zarr
 import glob
+import os
 
+import dask.array as da
+import equinox as eqx
+import jax.numpy as jnp
+import numexpr as ne
 import numpy as np
 import pandas as pd
-import numexpr as ne
-import equinox as eqx
-import streamlit as st
-
-import jax.numpy as jnp
-import dask.array as da
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
+import zarr
 
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from RCAIDE.Framework import Aircraft, State, Settings
-from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Plotting import plot_vlm_panels
-
+from RCAIDE.Framework import Aircraft, Settings, State
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
+from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.Framework.Settings import AnalysisSettings
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Filter Functions

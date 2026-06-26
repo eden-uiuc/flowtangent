@@ -8,18 +8,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Processes import Process, ProcessStep, GradientMap, OptimizerInterface
-from . import Conditions
-
-from .State import State
+from . import Analyses, Conditions, Core, Interfaces, Methods, Missions, Plotting
+from .Processes import GradientMap, OptimizerInterface, Process, ProcessStep
 from .Settings import Settings
-from .Systems import System, Aircraft
-
-from . import Methods
-from . import Missions
-from . import Core
-from . import Analyses
-from . import Interfaces
-from . import Plotting
+from .State import State
+from .Systems import Aircraft, System
 # from . import External_Interfaces
 # from . import Optimization

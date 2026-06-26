@@ -8,17 +8,18 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, Aircraft, Settings
+    from RCAIDE.Framework import Aircraft, Settings, State
 
 # package imports
 import jax.numpy as np
 
 # RCAIDE imports
-
-from RCAIDE.Library.Gases import O2, CO2, Steam, IdealGas
-from RCAIDE.Library.Methods.Energy.Transmission import fM, Rayleigh
+from RCAIDE.Library.Gases import CO2, O2, IdealGas, Steam
+from RCAIDE.Library.Methods.Energy.Transmission import Rayleigh, fM
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Combustor Performance

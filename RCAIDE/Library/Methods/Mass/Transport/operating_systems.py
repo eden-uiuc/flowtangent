@@ -11,10 +11,11 @@
 # package imports
 import jax
 import jax.numpy as jnp
+
+import RCAIDE.Library as rcl
 from RCAIDE.Library import Units
 
 import RCAIDE.Framework as rcf
-import RCAIDE.Library as rcl
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

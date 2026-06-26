@@ -6,17 +6,17 @@
 #  Imports
 # -------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 
 # RCAIDE Imports
-
 import RCAIDE.Framework as rcf
-
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

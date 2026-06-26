@@ -11,6 +11,7 @@
 import equinox as eqx
 
 from RCAIDE.utils import init_field
+
 from RCAIDE.Library import Units
 
 # ----------------------------------------------------------------------------------------------------------------------

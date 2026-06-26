@@ -8,19 +8,22 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING, Literal
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
 from RCAIDE.utils import init_field
-from RCAIDE.Framework import ProcessStep
+
 from RCAIDE.Library import Units
+
+from RCAIDE.Framework import ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Segment Profiles

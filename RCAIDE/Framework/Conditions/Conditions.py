@@ -9,9 +9,10 @@
 
 from dataclasses import fields
 
+import equinox as eqx
+
 # package imports
 import jax
-import equinox as eqx
 import jax.numpy as jnp
 
 from RCAIDE.utils import init_field

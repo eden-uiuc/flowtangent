@@ -8,10 +8,11 @@
 #  Imports
 # ----------------------------------------------------------------------
 
-import RCAIDE.Framework as rcf
+import jax.numpy as np
+
 from RCAIDE.Library import Units
 
-import jax.numpy as np
+import RCAIDE.Framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

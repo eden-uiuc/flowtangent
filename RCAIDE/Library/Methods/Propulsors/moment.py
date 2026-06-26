@@ -9,10 +9,11 @@
 
 # package imports
 
-import jax.numpy as np
-
 # RCAIDE imports
 from typing import TYPE_CHECKING
+
+import jax.numpy as np
+
 if TYPE_CHECKING:
     import RCAIDE.Framework as rcf
 

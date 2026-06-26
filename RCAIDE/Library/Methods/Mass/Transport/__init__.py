@@ -8,10 +8,10 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .passenger_payload import passenger_payload, func_passenger_payload
-from .operating_systems import operating_systems, func_operating_systems
-from .segmented_main_wing import segmented_main_wing, func_segmented_main_wing
-from .horizontal_tail import horizontal_tail, func_horizontal_tail
-from .fuselage import fuselage, func_fuselage
-from .vertical_tail import vertical_tail, func_vertical_tail
-from .landing_gear import landing_gear, func_landing_gear
+from .fuselage import func_fuselage, fuselage
+from .horizontal_tail import func_horizontal_tail, horizontal_tail
+from .landing_gear import func_landing_gear, landing_gear
+from .operating_systems import func_operating_systems, operating_systems
+from .passenger_payload import func_passenger_payload, passenger_payload
+from .segmented_main_wing import func_segmented_main_wing, segmented_main_wing
+from .vertical_tail import func_vertical_tail, vertical_tail

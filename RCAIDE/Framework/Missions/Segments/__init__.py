@@ -1,2 +1,2 @@
 
-from .segments import Segment, FixedSegment
+from .segments import FixedSegment, Segment

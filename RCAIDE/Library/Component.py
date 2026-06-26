@@ -9,8 +9,9 @@
 
 
 from __future__ import annotations
-from warnings import warn
+
 from typing import Any
+from warnings import warn
 
 # package imports
 import equinox as eqx
@@ -18,7 +19,8 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Library.Attributes.Materials import Solid, Aluminum
+
+from RCAIDE.Library.Attributes.Materials import Aluminum, Solid
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component

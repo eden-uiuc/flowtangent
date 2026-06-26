@@ -8,11 +8,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Flow import fM, Rayleigh, sonic_split
-
-from . import Combustors
-from . import Fan_Compressors
-from . import Nozzles
-from . import Turbines
-from . import Shaft_Offtake
-from . import Turbofans
+from . import Combustors, Fan_Compressors, Nozzles, Shaft_Offtake, Turbines, Turbofans
+from .Flow import Rayleigh, fM, sonic_split

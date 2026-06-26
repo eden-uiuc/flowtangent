@@ -8,25 +8,28 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine
 
 import warnings
 
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 from RCAIDE.Library.Atmospheres import USStandard1976
 from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
-
-from RCAIDE.Framework import State, Aircraft, Settings
+from RCAIDE.Framework import Aircraft, Settings, State
 from RCAIDE.Framework.Missions.Initialize import initialize_energy
 from RCAIDE.Framework.Missions.Update import update_freestream
+
 from .GraphNetwork import build_analysis_from_network
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propulsion Sizing Analyses
 # ----------------------------------------------------------------------------------------------------------------------

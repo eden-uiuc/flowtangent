@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Freestream

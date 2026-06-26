@@ -8,19 +8,22 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 
 from RCAIDE.utils import inputs, outputs
-from RCAIDE.Library.Methods.Aerodynamics.Shocks import theta_beta_mach, oblique_shock
+
+from RCAIDE.Library.Methods.Aerodynamics.Shocks import oblique_shock, theta_beta_mach
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation
 # ----------------------------------------------------------------------------------------------------------------------

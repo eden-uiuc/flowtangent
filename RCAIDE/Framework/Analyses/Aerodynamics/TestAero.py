@@ -10,6 +10,7 @@
 import equinox as eqx
 
 from RCAIDE.utils import init_field
+
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Methods.Aerodynamics.Test_Aero import direct_aero
 

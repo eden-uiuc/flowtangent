@@ -8,19 +8,20 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import Aircraft
-    from RCAIDE.Framework.Settings import Settings
+
+from RCAIDE.utils import cubic_spline_blender, inputs, outputs
 
 from .Flat_Plate import flat_plate_friction
-
-from RCAIDE.utils import inputs, outputs, cubic_spline_blender
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Parasite Drag Methods

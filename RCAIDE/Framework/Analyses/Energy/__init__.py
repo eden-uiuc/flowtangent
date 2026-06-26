@@ -10,5 +10,5 @@
 
 from RCAIDE.Library.Methods.Energy import *
 
-from .GraphNetwork import build_analysis_from_network
 from . import Sizing
+from .GraphNetwork import build_analysis_from_network

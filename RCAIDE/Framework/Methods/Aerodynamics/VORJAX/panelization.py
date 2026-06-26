@@ -8,25 +8,28 @@
 #  Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-import warnings
 import dataclasses
+import warnings
 from typing import TYPE_CHECKING, Optional
+
+import equinox as eqx
 
 # package imports
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import Aircraft
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
 
 # package imports
 from RCAIDE.utils import inputs, outputs
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingDimensions
+
+from RCAIDE.Library.Components.Wings import Wing, WingDimensions, WingSegment, WingSweeps
+
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 
 # ----------------------------------------------------------------------------------------------------------------------

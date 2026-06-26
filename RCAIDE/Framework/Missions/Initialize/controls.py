@@ -8,20 +8,25 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Library import Component
+
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 from RCAIDE.Library.Components import Wing
-from RCAIDE.Framework.Conditions.Controls import SurfaceControlVariable, DirectControlVariable
+
+from RCAIDE.Framework.Conditions.Controls import DirectControlVariable, SurfaceControlVariable
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize
 # ----------------------------------------------------------------------------------------------------------------------

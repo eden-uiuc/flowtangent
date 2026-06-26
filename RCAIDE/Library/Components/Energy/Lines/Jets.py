@@ -7,20 +7,23 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 # package import
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
-from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine, TurbofanEngine
+from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
+from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, TurbojetEngine
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets

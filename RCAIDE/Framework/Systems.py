@@ -8,12 +8,14 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional
+
+import equinox as eqx
 
 # package imports
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
@@ -21,10 +23,10 @@ from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library import Component, MassProperties
 from RCAIDE.Library.Attributes import AircraftClass, MediumRange
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
-from RCAIDE.Library.Components.Wings import Wing
 from RCAIDE.Library.Components.Fuselages import Fuselage
-from RCAIDE.Library.Components.Nacelles import Nacelle
 from RCAIDE.Library.Components.Landing_Gear import LandingGear
+from RCAIDE.Library.Components.Nacelles import Nacelle
+from RCAIDE.Library.Components.Wings import Wing
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components

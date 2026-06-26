@@ -8,4 +8,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Solids import Solid, Aluminum
+from .Solids import Aluminum, Solid

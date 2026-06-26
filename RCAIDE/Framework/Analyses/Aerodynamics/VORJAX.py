@@ -8,39 +8,42 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING, Callable, Optional, Iterable, Any
+
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 import warnings
-
 from pathlib import Path
+
+import equinox as eqx
+import jax.numpy as jnp
 
 # package imports
 import sklearn
-
-import jax.numpy as jnp
-import equinox as eqx
 
 # RCAIDE imports
 from RCAIDE.utils import DataPath, init_field
 
 from RCAIDE.Library import Units
-from RCAIDE.Library.Methods.Aerodynamics.Transonic import peaked_CL_spline, ensemble_CL_spline
+from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline, peaked_CL_spline
 
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Analyses import BatchAnalysis
-
-from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (check_freestream,
-                                                          compute_coefficients, compute_induced_velocity,
-                                                          compute_panel_pressures, compute_boundary_conditions,
-                                                          compute_vortex_strength,
-                                                          initialize_VORJAX_data, discretize_surfaces,
-                                                          apply_aerodynamic_forces)
-
+from RCAIDE.Framework.Methods.Aerodynamics import compute_parasite_drag, compute_viscous_induced_drag
+from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (
+    apply_aerodynamic_forces,
+    check_freestream,
+    compute_boundary_conditions,
+    compute_coefficients,
+    compute_induced_velocity,
+    compute_panel_pressures,
+    compute_vortex_strength,
+    discretize_surfaces,
+    initialize_VORJAX_data,
+)
 from RCAIDE.Framework.Missions.Initialize import initialize_aerodynamics
-from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, compute_viscous_induced_drag)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings

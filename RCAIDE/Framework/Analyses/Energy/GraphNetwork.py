@@ -8,15 +8,19 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 import networkx as nx
 
-from RCAIDE.utils import inputs, outputs, init_field
-from RCAIDE.Framework import Process, ProcessStep
+from RCAIDE.utils import init_field, inputs, outputs
+
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+
+from RCAIDE.Framework import Process, ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Energy Network Analysis

@@ -26,9 +26,10 @@ ignore = [
     # Scientific code often uses single letters like 'I', 'O', or 'l'
     "E741", 
     # Math heavily relies on capital letters for matrices and thermodynamic states (PR, Wc, T_t).
-    # These rules force all variables to be lowercase, which ruins math readability.
+    # These rules force all variables and functions to be lowercase, which ruins math readability.
+    "N802",
     "N803", 
-    "N806", 
+    "N806",
 ]
 
 [tool.ruff.format]

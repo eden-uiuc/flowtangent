@@ -14,9 +14,9 @@ import jax.numpy as np
 # RCAIDE Imports
 
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
 
 # -------------------------------------------------------------------------------

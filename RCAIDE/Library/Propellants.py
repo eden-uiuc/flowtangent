@@ -10,9 +10,10 @@
 # package imports
 import equinox as eqx
 
+from RCAIDE.utils import init_field
+
 # RCAIDE imports
 import RCAIDE.Library as rcl
-from RCAIDE.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants

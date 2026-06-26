@@ -14,13 +14,15 @@ import equinox as eqx
 import jax.numpy as jnp
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
+
+from RCAIDE.utils import init_field
+
+from RCAIDE.Framework import ProcessStep
+from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, NamedResidual
+from RCAIDE.Framework.Missions.Segments import Segment
 
 from .Profiles import *
-from RCAIDE.utils import init_field
-from RCAIDE.Framework import ProcessStep
-from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, NamedResidual
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Cruise

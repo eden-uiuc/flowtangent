@@ -9,17 +9,16 @@
 
 from __future__ import annotations
 
-import threading
-import timeit
-import time
 import sys
-
-from typing import TYPE_CHECKING
+import threading
+import time
+import timeit
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 # package imports
-
 import jax
+
 jax.config.update("jax_enable_x64", True)
 
 first_structure = None
@@ -27,24 +26,21 @@ first_treedef = None
 
 import equinox as eqx
 import jax.numpy as jnp
-
-from jaxopt import ScipyRootFinding, Broyden, GaussNewton
-
-# RCAIDE imports
-
-from .Profiles import *
+from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 
 from RCAIDE.utils import init_field, scan_for_invalid_JAX_types
 
 from RCAIDE.Framework import Process, ProcessStep
-
-from RCAIDE.Framework.Processes import null_step
-from RCAIDE.Framework.Missions.Initialize import *
-from RCAIDE.Framework.Missions.Update     import *
 from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual, NamedResidual
+from RCAIDE.Framework.Missions.Initialize import *
+from RCAIDE.Framework.Missions.Update import *
+from RCAIDE.Framework.Processes import null_step
+
+# RCAIDE imports
+from .Profiles import *
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, Settings, System
+    from RCAIDE.Framework import Settings, State, System
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Mission Spinner

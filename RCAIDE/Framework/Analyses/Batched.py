@@ -8,35 +8,36 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Iterable, Tuple, Dict
+
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
+
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
-from pathlib import Path
-from collections import defaultdict
-from itertools import product
-
+import gc
+import logging
 import os
 import re
-import gc
-import jax
-import zarr
-import time
 import shutil
 import tempfile
-import logging
+import time
+from collections import defaultdict
+from itertools import product
+from pathlib import Path
 
+import equinox as eqx
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import equinox as eqx
-import jax.numpy as jnp
-
-from tqdm import tqdm, trange
+import zarr
 from numcodecs import Blosc
+from tqdm import tqdm, trange
 
 import RCAIDE.utils as ru
+
 from RCAIDE.Framework import Process, State
 
 

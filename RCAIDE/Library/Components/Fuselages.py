@@ -8,12 +8,13 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Library import Component, ComponentDimensions, ComponentFineness, ComponentAreas
+
+from RCAIDE.Library import Component, ComponentAreas, ComponentDimensions, ComponentFineness
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Fuselage

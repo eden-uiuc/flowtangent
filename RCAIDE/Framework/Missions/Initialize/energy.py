@@ -6,17 +6,19 @@
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 
-# RCAIDE Imports
-from RCAIDE.Framework.Conditions.Energy import FuelTankConditions, EnergyNodeConditions
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
+# RCAIDE Imports
+from RCAIDE.Framework.Conditions.Energy import EnergyNodeConditions, FuelTankConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy

@@ -1,5 +1,5 @@
-import plotly.graph_objects as go
 import numpy as np
+import plotly.graph_objects as go
 
 
 def plot_airfoil(airfoil, show_markers=False, show_camber=False):

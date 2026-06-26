@@ -7,22 +7,25 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Literal
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
     from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual
 
 from dataclasses import replace
-from graphlib import TopologicalSorter, CycleError
+from graphlib import CycleError, TopologicalSorter
+
+import equinox as eqx
 
 # package imports
 import jax
-import equinox as eqx
 
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library.Components.Energy.Nodes import EnergyNode, EnergySplitter, EnergyStore, EnergyDomain, EnergyInput
+from RCAIDE.Library.Components.Energy.Nodes import EnergyDomain, EnergyInput, EnergyNode, EnergySplitter, EnergyStore
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 
 # ----------------------------------------------------------------------------------------------------------------------

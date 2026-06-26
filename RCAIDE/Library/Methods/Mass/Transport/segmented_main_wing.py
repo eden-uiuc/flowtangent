@@ -8,9 +8,9 @@
 #  Imports
 # ----------------------------------------------------------------------
 
-from RCAIDE.Library import Units
-
 import jax.numpy as np
+
+from RCAIDE.Library import Units
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

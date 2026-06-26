@@ -1,7 +1,8 @@
 from RCAIDE.utils import init_field
-from RCAIDE.Framework import Process, ProcessStep
+
 from RCAIDE.Library.Methods.Mass import Transport as Mass
 
+from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Methods.Mass.Energy import tf_mass_from_SLS
 
 

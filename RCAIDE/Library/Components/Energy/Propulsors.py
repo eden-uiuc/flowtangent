@@ -7,29 +7,33 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Callable
+
+from typing import TYPE_CHECKING, Callable, Optional
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 
 # package imports
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
+
+import RCAIDE.utils as ru
 
 # RCAIDE imports
 from RCAIDE.utils import init_field
-import RCAIDE.utils as ru
 
-from RCAIDE.Library.Propellants import Propellant, JetA
-from RCAIDE.Library.Gases import IdealGas, Air, BurnedJetA
-from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode, EnergyInput
-
-from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_compression_nozzle_performance
-from RCAIDE.Library.Methods.Energy.Transmission.Fan_Compressors import func_fan_compressor_performance
+from RCAIDE.Library.Components.Energy.Nodes import EnergyInput, EnergySplitter, FlowNode
+from RCAIDE.Library.Gases import Air, BurnedJetA, IdealGas
 from RCAIDE.Library.Methods.Energy.Transmission.Combustors import func_combustor_performance
+from RCAIDE.Library.Methods.Energy.Transmission.Fan_Compressors import func_fan_compressor_performance
+from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import (
+    func_compression_nozzle_performance,
+    func_expansion_nozzle_performance,
+)
 from RCAIDE.Library.Methods.Energy.Transmission.Turbines import func_turbine_performance
-from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_expansion_nozzle_performance, func_compression_nozzle_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import func_thrust_and_power
+from RCAIDE.Library.Propellants import JetA, Propellant
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors

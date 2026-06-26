@@ -7,12 +7,13 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
+# RCAIDE imports
+from typing import TYPE_CHECKING
+
 # package imports
 import jax.numpy as np
 
-# RCAIDE imports
-
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
         import RCAIDE.Framework as rcf
 

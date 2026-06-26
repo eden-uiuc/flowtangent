@@ -8,5 +8,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import TestAero
-from . import VORJAX
+from . import VORJAX, TestAero

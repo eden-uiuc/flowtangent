@@ -7,11 +7,12 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Library import Component, ComponentDimensions, ComponentAreas
+
+from RCAIDE.Library import Component, ComponentAreas, ComponentDimensions
 from RCAIDE.Library.Components.Airfoils import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------

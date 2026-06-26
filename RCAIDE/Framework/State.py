@@ -9,16 +9,24 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from functools import reduce
 
-# package imports
-import jax.numpy as jnp
 import equinox as eqx
 
+# package imports
+import jax.numpy as jnp
+
 from RCAIDE.utils import empty_array, init_field
+
 from RCAIDE.Framework.Conditions import (
-    Conditions, Numerics,
-    AerodynamicsConditions, ControlsConditions, DynamicsConditions,
-    EnergyNetworkConditions, FrameConditions, FreestreamConditions,
-    MassConditions, StabilityConditions
+    AerodynamicsConditions,
+    Conditions,
+    ControlsConditions,
+    DynamicsConditions,
+    EnergyNetworkConditions,
+    FrameConditions,
+    FreestreamConditions,
+    MassConditions,
+    Numerics,
+    StabilityConditions,
 )
 
 # ----------------------------------------------------------------------------------------------------------------------

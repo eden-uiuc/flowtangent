@@ -6,16 +6,15 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import Optional, Literal
+from typing import Literal, Optional
 
-import jax
 import equinox as eqx
+import jax
 
 # package imports
-
-
 # RCAIDE imports
 from RCAIDE.utils import init_field
+
 from RCAIDE.Framework import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------

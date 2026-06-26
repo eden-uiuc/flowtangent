@@ -8,8 +8,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from decimal import Decimal
-from pathlib import Path
 from os import path
+from pathlib import Path
 
 # package imports
 import equinox as eqx
@@ -18,8 +18,8 @@ from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Library import Component
 
+from RCAIDE.Library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil Data Locator

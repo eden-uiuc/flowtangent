@@ -15,6 +15,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
+
 from RCAIDE.Framework.Conditions import Conditions
 
 # ----------------------------------------------------------------------------------------------------------------------

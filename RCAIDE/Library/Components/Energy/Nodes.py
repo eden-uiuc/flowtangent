@@ -8,20 +8,22 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Literal
 
-import jax.numpy as jnp
 import equinox as eqx
+import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from RCAIDE.Framework.Settings import Settings
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
-    from RCAIDE.Framework.Settings import Settings
 
 from RCAIDE.utils import init_field
+
 from RCAIDE.Library import Component, Units
-from RCAIDE.Library.Gases import IdealGas, Air
+from RCAIDE.Library.Gases import Air, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes

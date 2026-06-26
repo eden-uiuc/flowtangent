@@ -15,6 +15,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.utils import init_field
+
 import RCAIDE.Library as rcl
 
 # ----------------------------------------------------------------------------------------------------------------------
