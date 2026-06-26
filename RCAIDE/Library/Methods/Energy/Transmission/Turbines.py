@@ -18,26 +18,43 @@ if TYPE_CHECKING:
 
 
 def func_turbine_performance(
-        gamma,
-        Cp,
-        f,
-        input_work,
-        n_mech,
-        n_flow,
+        gas,           # The BurnedGas mixture
+        FAR,             # Fuel-to-air ratio from the combustor
+        input_work,    # Work required by the compressor (per kg of core air)
+        n_mech,        # Mechanical efficiency of the shaft
+        n_flow,        # Polytropic flow efficiency
         T_t,
         P_t,
-        
 ):
+    # Calculate the target specific enthalpy drop across the turbine
+    # Mass flow through the turbine is (1 + f) times the compressor flow
+    d_h_t = -1.0 / (1.0 + FAR) * (input_work / n_mech) 
 
-        d_h_t = -1 / (1 + f) * (input_work) / n_mech # Total enthalpy drop across the turbine
-        # d_h_t = -1 / (1 + f) * (compressor_work + shaft_work + (BPR * fan_work)) / n_mech # Total enthalpy drop across the turbine
+    # Set the target exit enthalpy
+    h_t_in = gas.compute_enthalpy(T_t)
+    h_t_out = h_t_in + d_h_t
 
-        T_t_out = T_t + d_h_t / Cp                                              # Total temperature out
-        P_t_out = P_t * (T_t_out / T_t) ** (gamma / ((gamma - 1) * n_flow))     # Total pressure out
+    # Newton-Raphson Root Solver for T_t_out
+    # Initial guess using the inlet Cp
+    Cp_in = gas.compute_Cp(T_t)
+    T_t_out = T_t + (d_h_t / Cp_in)
 
-        h_t_out = Cp * T_t_out                                                  # Total enthalpy out
+    for _ in range(4):
+        # Evaluate current guess
+        h_guess = gas.compute_enthalpy(T_t_out)
+        Cp_guess = gas.compute_Cp(T_t_out) 
+        
+        # Newton step: T_new = T_old - (h_guess - h_target) / (dh/dT)
+        T_t_out = T_t_out - ((h_guess - h_t_out) / Cp_guess)
 
-        return T_t_out, P_t_out, h_t_out
+    # Total pressure out using polytropic efficiency, averaging gamma across the expansion
+    gamma_in = gas.compute_gamma(T_t)
+    gamma_out = gas.compute_gamma(T_t_out)
+    gamma_avg = 0.5 * (gamma_in + gamma_out)
+
+    P_t_out = P_t * (T_t_out / T_t) ** (gamma_avg / ((gamma_avg - 1.0) * n_flow))
+
+    return T_t_out, P_t_out, h_t_out
 
 
 def turbine_performance(

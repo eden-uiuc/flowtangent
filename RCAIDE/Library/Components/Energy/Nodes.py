@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import init_field
 from RCAIDE.Library import Component, Units
+from RCAIDE.Library.Gases import IdealGas, Air
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -132,6 +133,8 @@ class FlowNode(EnergyNode):
 
     rotation_speed:             float = 0.0
     noise_speed:                float = 0.0
+
+    working_fluid:              IdealGas = init_field(Air)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mechanical Nodes

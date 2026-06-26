@@ -354,11 +354,10 @@ def vehicle_setup():
         lengths=ComponentDimensions(total=2.71),
         design_parameters=DesignParameters(
             total_thrust=24000.,
-            SLS_thrust=24000.,
             altitude=10668.,
             mach_number=0.78,
             turbine_intake_temperature=1450.
-            ),
+        ),
     )
 
     # Direct Replacement

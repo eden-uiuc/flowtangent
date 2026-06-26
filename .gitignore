@@ -43,6 +43,7 @@ nosetests.xml
 *.wpr
 
 # local directories
+/Tests/PyCycle
 /workspace
 .idea
  
@@ -61,6 +62,7 @@ nosetests.xml
 
 *.csv
 *.dat
+*.openmdao_out
 
 # Geometry
 *.geo

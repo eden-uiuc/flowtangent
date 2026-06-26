@@ -25,13 +25,12 @@ if TYPE_CHECKING:
 def func_isentropic_nozzle_performance(
     T_t, P_t,
     P0, gamma,
-    PR, n_r, n_p
+    PR, n_r,
 ):
 
     # Isentropic Outputs
-
-    P_t_out = jnp.maximum(P_t * PR * n_r, P0)                       # Output stagnation pressure, minimum is freestream pressure
-    T_t_out = T_t * (PR * n_r) ** ((gamma - 1.) / (gamma * n_p))    # Output stagnation temperature
+    P_t_out = jnp.maximum(P_t * PR * n_r, P0)   # Output stagnation pressure, minimum is freestream pressure
+    T_t_out = T_t                               # Output stagnation temperature, adiabatically conserved
 
     M_out   = jnp.sqrt((((P_t_out / P0) ** ((gamma - 1.) / gamma)) - 1.) * 2. / (gamma - 1.))  # Output Mach number
     T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2)                                  # Output temperature
@@ -40,20 +39,21 @@ def func_isentropic_nozzle_performance(
 
 
 def func_compression_nozzle_performance(
+    gas,          # Replaces Cp, gamma
     T_t, P_t,
     P0, M0,
-    Cp, gamma,
-    PR, n_r, n_p
+    PR, n_r
 ):
+    # Dynamically evaluate gamma for the isentropic and shock relations
+    gamma = gas.compute_gamma(T_t)
 
     (P_t_out, T_t_out,
      T_out, M_out) = func_isentropic_nozzle_performance(
        T_t, P_t,
        P0, gamma,
-       PR, n_r, n_p)
+       PR, n_r)
 
-    # Normal Shock Outputs
-
+    # Normal Shock Outputs (Evaluated dynamically)
     ns_M    = jnp.sqrt((1. + (gamma - 1.) / 2. * M0 ** 2.) / (gamma * M0 ** 2 - (gamma - 1.) / 2.))
     ns_T    = T_t_out / (1. + (gamma - 1.) / 2 * ns_M ** 2)
     ns_P_t  = (PR *
@@ -63,55 +63,62 @@ def func_compression_nozzle_performance(
                )
 
     # Combine Outputs
-
     P_t_out = jnp.where(M0 > 1.0, ns_P_t, P_t_out)
     T_out   = jnp.where(M0 > 1.0, ns_T, T_out)
     M_out   = jnp.where(M0 > 1.0, ns_M, M_out)
 
-    h_out   = Cp * T_out                        # Output static enthalpy
-    h_t_out = Cp * T_t_out                      # Output stagnation enthalpy
-    u_out   = jnp.sqrt(2. * (h_t_out - h_out))  # Output velocity
+    # Calculate Velocity using Absolute Enthalpy (Strictly enforces First Law)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out   = gas.compute_enthalpy(T_out)                     
+    u_out   = jnp.sqrt(2. * (h_t_out - h_out))  
 
     return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
 
-
 def func_expansion_nozzle_performance(
+    gas,          # Local working fluid (e.g., BurnedGas)
     T_t, T_t0,
     P_t, P_t0,
     P0, M0,
-    Cp, gamma, R,
-    PR, n_p
+    gamma_0,      # Explicit freestream gamma
+    PR,
 ):
+    # Dynamic gas properties for the exhaust flow
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
 
     (P_t_out, T_t_out,
-     T_out, M_isn) = func_isentropic_nozzle_performance(
+     T_out_isn, M_isn) = func_isentropic_nozzle_performance(
          T_t, P_t,
          P0, gamma,
-         PR, 1., n_p
+         PR, 1.0
     )
 
-    # Supersonic Expansion
-    sup     = M_isn > 1
+    # Supersonic Expansion / Choking Logic
+    sup     = M_isn > 1.0
     M_out   = jnp.maximum(jnp.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
+    
+    # Recalculate static conditions based on the bounded Mach number
     P       = P_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2) ** (gamma / (gamma - 1.))
     P_out   = jnp.where(sup, P, P0)
 
     T_out   = T_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2)
 
-    h_t_out = Cp * T_t_out
-    h_out   = Cp * T_out
+    # High-fidelity absolute enthalpy and velocity
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out   = gas.compute_enthalpy(T_out)
     u_out   = jnp.sqrt(2. * (h_t_out - h_out))
-    r_out   = P_out/(R * T_out)
+    
+    # Gas density based on the specific gas constant
+    r_out   = P_out / (R * T_out)
 
     def fm(M, g):
-
         m0 = (g + 1.) / (2. * (g - 1.))
         m1 = ((g + 1.) / 2.) ** m0
         m2 = (1. + (g - 1.) / 2. * M * M) ** m0
-
         return m1 * M / m2
 
-    AR      = (fm(M0, gamma) / fm(M_out, gamma) * (1 / (P_t_out / P_t0)) * (jnp.sqrt(T_t_out / T_t0)))
+    # Area Ratio calculation rigorously separates freestream and exhaust gammas
+    AR = (fm(M0, gamma_0) / fm(M_out, gamma) * (1. / (P_t_out / P_t0)) * (jnp.sqrt(T_t_out / T_t0)))
 
     return AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 

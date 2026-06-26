@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
+import jax.numpy as jnp
+
 # RCAIDE imports
 if TYPE_CHECKING:
     import RCAIDE.Framework as rcf
@@ -19,22 +22,22 @@ if TYPE_CHECKING:
 
 
 def func_fan_compressor_performance(
-        gamma,
-        Cp,
+        gas, 
         T_t,
         P_t,
         PR,
-        n_p
+        n_p,
 ):
+    # 1. Total state thermodynamics ONLY
+    gamma_in = gas.compute_gamma(T_t)
+    T_t_out = T_t * (PR ** ((gamma_in - 1.) / (gamma_in * n_p)))
 
-    T_t_out = T_t * (PR ** ((gamma - 1.) / (gamma * n_p)))
-
-    h_t     = T_t * Cp
-    h_t_out = T_t_out * Cp
+    h_t     = gas.compute_enthalpy(T_t)
+    h_t_out = gas.compute_enthalpy(T_t_out)
     work    = h_t_out - h_t
-
     P_t_out = P_t * PR
 
+    # Look at how clean that is!
     return work, P_t_out, T_t_out, h_t_out
 
 

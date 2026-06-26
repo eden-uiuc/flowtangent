@@ -34,7 +34,7 @@ class Atmosphere(eqx.Module):
 
     tag: str = init_field("Atmosphere", static=True)
 
-    fluid: rcl.Gases.Gas = init_field(rcl.Gases.Air)
+    fluid: rcl.Gases.IdealGas = init_field(rcl.Gases.Air)
 
     planet: rcl.Planets.Planet = init_field(rcl.Planets.Earth)
 

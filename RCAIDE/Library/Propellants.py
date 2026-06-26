@@ -37,7 +37,7 @@ class Propellant(eqx.Module):
 
     tag: str = init_field('Propellant', static=True)
 
-    oxidizer: rcl.Gases.Gas = init_field(rcl.Gases.Gas)
+    oxidizer: rcl.Gases.IdealGas = init_field(rcl.Gases.IdealGas)
 
     density:            float = init_field(0.0, static=True)
     specific_energy:    float = init_field(0.0, static=True)
@@ -63,7 +63,7 @@ def _JetATemperatures():
 
 class JetA(Propellant):
 
-    oxidizer: rcl.Gases.Gas = init_field(rcl.Gases.O2)
+    oxidizer: rcl.Gases.IdealGas = init_field(rcl.Gases.O2)
 
     density         : float = init_field(820., static=True)
     specific_energy : float = init_field(43.02e6, static=True)

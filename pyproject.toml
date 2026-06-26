@@ -1,3 +1,55 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+# Scientific codebases often need longer lines for complex equations
+line-length = 120 
+
+# Assume Python 3.10 as the minimum (adjust if RCAIDE targets 3.9 or 3.11)
+target-version = "py310"
+
+[tool.ruff.lint]
+# Which rule sets to enable
+select = [
+    "E",  # pycodestyle errors (spacing, indentation)
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes (bugs, unused imports, undefined variables)
+    "I",  # isort (automatically sorts your imports alphabetically)
+    "N",  # pep8-naming (checks variable and class names)
+]
+
+# Which specific rules to turn off
+ignore = [
+    # Scientific code often uses single letters like 'I', 'O', or 'l'
+    "E741", 
+    # Math heavily relies on capital letters for matrices and thermodynamic states (PR, Wc, T_t).
+    # These rules force all variables to be lowercase, which ruins math readability.
+    "N803", 
+    "N806", 
+]
+
+[tool.ruff.format]
+# Use double quotes for strings (standard Python convention)
+quote-style = "double"
+# Indent with 4 spaces
+indent-style = "space"
+
+[tool.ruff.lint.isort]
+# 1. Define the exact top-to-bottom order of your import blocks
+section-order = [
+    "future",
+    "standard-library",   # Native Python (os, sys, etc.)
+    "third-party",        # Non-RCAIDE packages (jax, equinox, numpy, etc.)
+    "rcaide-utils",       # Custom section 1
+    "rcaide-library",     # Custom section 2
+    "rcaide-framework",   # Custom section 3
+    "first-party",        # Catch-all for any other RCAIDE imports
+    "local-folder"        # Relative imports (e.g., from . import utils)
+]
+
+# 2. Map specific import paths to your custom sections
+[tool.ruff.lint.isort.sections]
+"rcaide-utils" = ["RCAIDE.utils"] 
+"rcaide-library" = ["RCAIDE.Library"]
+"rcaide-framework" = ["RCAIDE.Framework"]

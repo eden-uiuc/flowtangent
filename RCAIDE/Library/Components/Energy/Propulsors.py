@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Callable
 if TYPE_CHECKING:
     from RCAIDE.Framework import State, System, Settings
 
@@ -21,7 +21,7 @@ from RCAIDE.utils import init_field
 import RCAIDE.utils as ru
 
 from RCAIDE.Library.Propellants import Propellant, JetA
-from RCAIDE.Library.Gases import Gas, Air
+from RCAIDE.Library.Gases import IdealGas, Air, BurnedJetA
 from RCAIDE.Library.Components.Energy.Nodes import EnergySplitter, FlowNode, EnergyInput
 
 from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import func_compression_nozzle_performance
@@ -104,15 +104,13 @@ class InletNozzle(FlowNode):
         fs = state.freestream
 
         M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out = func_compression_nozzle_performance(
+            gas=fs.atmosphere.fluid,
             T_t=fs.stagnation_temperature,
             P_t=fs.stagnation_pressure,
             P0=fs.pressure,
             M0=fs.mach_number,
-            Cp=fs.Cp,
-            gamma=fs.gamma,
             PR=self.pressure_ratio,
             n_r=self.pressure_recovery,
-            n_p=self.efficiencies.flow,
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
@@ -129,9 +127,16 @@ class InletNozzle(FlowNode):
 
         return updated_state, system, settings
 
+def _alpha_schedule(Nc, Nc_design):
+    return jnp.where(Nc_design > 0.0, 
+                     jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), 
+                     0.0)
+
 class Compressor(FlowNode):
 
     tag: str = init_field("Compressor", static=True)
+    Nc_design: float = 0.0
+    alpha_schedule: Callable = init_field(_alpha_schedule, static=True)
     
     @ru.inputs(
         "state.freestream.Cp",
@@ -148,15 +153,13 @@ class Compressor(FlowNode):
         "state.energy.nodes[Compressor].mechanical.work"
     )
     def transmit(self, state: State, system: System, settings: Settings):
-        fs  = state.freestream
 
         work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(
-            gamma=fs.gamma,
-            Cp=fs.Cp,
-            T_t=self.sum_inputs(state, "flow", "stagnation_temperature"),
-            P_t=self.sum_inputs(state, "flow", "stagnation_pressure"),
+            gas=self.working_fluid,
+            T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
+            P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             PR=self.pressure_ratio,
-            n_p=self.efficiencies.flow
+            n_p=self.efficiencies.flow,
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs
@@ -199,11 +202,11 @@ class TurbojetCombustor(FlowNode):
         T_t_ref     = jnp.atleast_2d(jet.design_parameters.turbine_intake_temperature)
 
         P_t_out, h_t_out, f = func_combustor_performance(
-            T_t_in = self.sum_inputs(state, "flow", "stagnation_temperature"),
-            P_t_in=self.sum_inputs(state, "flow", "stagnation_pressure"),
+            gas=self.working_fluid,
+            T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
+            P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             T_t_out=T_t_ref,
             h_t_f=jet.fuel.specific_energy,
-            Cp=state.freestream.Cp,
             PR=self.pressure_ratio,
             n_b=self.efficiencies.flow,
         )
@@ -245,11 +248,12 @@ class Turbine(FlowNode):
         "state.energy.nodes[Turbine].outputs.flow.stagnation_enthalpy",
     )
     def transmit(self, state: State, system: System, settings: Settings):
+        
+        FAR = self.average_inputs(state, "fuel", "fuel_air_ratio")
 
         T_t_out, P_t_out, h_t_out = func_turbine_performance(
-            gamma=state.freestream.gamma,
-            Cp=state.freestream.Cp,
-            f=self.average_inputs(state, "fuel", "fuel_air_ratio"),
+            gas=BurnedJetA(FAR),
+            FAR=FAR,
             input_work=self.sum_inputs(state, "mechanical", "work"),
             n_mech=self.efficiencies.mechanical,
             n_flow=self.efficiencies.flow,
@@ -299,19 +303,18 @@ class ExpansionNozzle(FlowNode):
     def transmit(self, state: State, system: System, settings: Settings):
 
         fs = state.freestream
+        FAR = self.average_inputs(state, "fuel", "fuel_air_ratio")
 
         AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = func_expansion_nozzle_performance(
+            gas=BurnedJetA(FAR),
             T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
             T_t0=fs.stagnation_temperature,
             P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             P_t0=fs.stagnation_pressure,
             P0=fs.pressure,
             M0=fs.mach_number,
-            Cp=fs.Cp,
-            gamma=fs.gamma,
-            R=fs.R,
+            gamma_0=fs.gamma,
             PR=self.pressure_ratio,
-            n_p=self.efficiencies.flow
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
@@ -340,10 +343,10 @@ def _TurbojetSetup():
 
     comb = TurbojetCombustor()
 
-    HPT = Turbine(tag="HPT", inputs=(EnergyInput("mechanical", "HPC",), EnergyInput("flow", "Combustor")))
-    LPT = Turbine(tag="LPT", inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT")))
+    HPT = Turbine(tag="HPT", inputs=(EnergyInput("mechanical", "HPC",), EnergyInput("flow", "Combustor"), EnergyInput("fuel", "Combustor")))
+    LPT = Turbine(tag="LPT", inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT"), EnergyInput("fuel", "Combustor")))
 
-    nozz = ExpansionNozzle(tag="Core Nozzle", inputs=(EnergyInput("flow", "LPT"),))
+    nozz = ExpansionNozzle(tag="Core Nozzle", inputs=(EnergyInput("flow", "LPT"), EnergyInput("fuel", "Combustor"),))
 
     return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
 
@@ -355,7 +358,7 @@ class TurbojetEngine(Propulsor):
     plug_diameter:  float           = 0.0
 
     fuel:           Propellant      = init_field(JetA)
-    working_fluid:  Gas             = init_field(Air)
+    working_fluid:  IdealGas             = init_field(Air)
 
     inputs = init_field((
         EnergyInput("flow", "self.core_nozzle"),
@@ -401,7 +404,7 @@ class TurbojetEngine(Propulsor):
         fs = state.freestream
         
         F, F_sp, I_sp, TSFC, mdot_c, p, ff = func_thrust_and_power(
-                gamma=fs.gamma,
+                gamma_0=fs.gamma,
                 u0=fs.speed,
                 a0=fs.speed_of_sound,
                 M0=fs.mach_number,
@@ -463,8 +466,7 @@ class Fan(FlowNode):
     def transmit(self, state: State, system: System, settings: Settings):
 
         work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(
-            gamma=state.freestream.gamma,
-            Cp=state.freestream.Cp,
+            gas=self.working_fluid,
             T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
             P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             PR=self.pressure_ratio,

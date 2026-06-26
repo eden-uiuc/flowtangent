@@ -17,6 +17,7 @@ import jax.numpy as np
 
 # RCAIDE imports
 
+from RCAIDE.Library.Gases import O2, CO2, Steam, IdealGas
 from RCAIDE.Library.Methods.Energy.Transmission import fM, Rayleigh
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,22 +26,36 @@ from RCAIDE.Library.Methods.Energy.Transmission import fM, Rayleigh
 
 
 def func_combustor_performance(
-        T_t_in,
-        P_t_in,
+        gas: IdealGas,
+        T_t,
+        P_t,
         T_t_out,
         h_t_f,
-        Cp,
         PR,
         n_b,
 ):
 
-    P_t_out = P_t_in * PR                                   # Output stagnation pressure
+    h_t = gas.compute_enthalpy(T_t)
+    P_t_out = P_t * PR
 
-    h_t_in  = Cp * T_t_in                                   # Input stagnation enthalpy
-    h_t_out = Cp * T_t_out                                  # Output stagnation enthalpy
-    f       = (h_t_out - h_t_in) / (n_b * h_t_f - h_t_out)  # Fuel-to-air ratio
+    # Enthalpy of gases at exit temp
+    h_gas_out = gas.compute_enthalpy(T_t_out)
+    h_O2 = O2().compute_enthalpy(T_t_out)
+    h_CO2 = CO2().compute_enthalpy(T_t_out)
+    h_H2O = Steam().compute_enthalpy(T_t_out)
 
-    return P_t_out, h_t_out, f
+    # Jet-A Reaction Enthalpy
+    dh_react = (3.155 * h_CO2) + (1.242 * h_H2O) - (3.396 * h_O2)
+
+    numerator = h_gas_out - h_t
+    denominator = (n_b * h_t_f) - dh_react - h_gas_out
+    
+    FAR = numerator / denominator
+
+    # 6. Final output mixture enthalpy
+    h_t_out = (h_gas_out + FAR * dh_react) / (1. + FAR)
+
+    return P_t_out, h_t_out, FAR
 
 
 def jet_combustor_transmission(
