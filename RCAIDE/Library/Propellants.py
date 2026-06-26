@@ -13,7 +13,7 @@ import equinox as eqx
 from RCAIDE.utils import init_field
 
 # RCAIDE imports
-import RCAIDE.Library as rcl
+from RCAIDE.Library.Gases import O2, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants
@@ -38,7 +38,7 @@ class Propellant(eqx.Module):
 
     tag: str = init_field('Propellant', static=True)
 
-    oxidizer: rcl.Gases.IdealGas = init_field(rcl.Gases.IdealGas)
+    oxidizer: IdealGas = init_field(IdealGas)
 
     density:            float = init_field(0.0, static=True)
     specific_energy:    float = init_field(0.0, static=True)
@@ -64,7 +64,7 @@ def _JetATemperatures():
 
 class JetA(Propellant):
 
-    oxidizer: rcl.Gases.IdealGas = init_field(rcl.Gases.O2)
+    oxidizer: IdealGas = init_field(O2)
 
     density         : float = init_field(820., static=True)
     specific_energy : float = init_field(43.02e6, static=True)

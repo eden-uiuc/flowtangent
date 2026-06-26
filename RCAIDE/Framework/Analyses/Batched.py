@@ -182,7 +182,7 @@ class BatchAnalysis:
                         v_np = jac_arr[:actual_size, out_idx, in_idx]
                         all_grads[key].append(v_np)
 
-            except Exception as e:
+            except Exception:
                 logger.error(f"Failed at states {i} to {i + batch_size}. Injecting NaNs...", exc_info=True)
                 nan_array = np.full((actual_size, 1), np.nan, dtype=np.float64)
 
@@ -442,7 +442,7 @@ class ShardedDatasetGenerator:
 
                     self.shard_manager.append_data(conformed_dict)
 
-                except Exception as e:
+                except Exception:
                     self.logger.error(f"Failuire on system {s_idx}. Skipping.", exc_info=True)
                     continue
 

@@ -30,6 +30,7 @@ ignore = [
     "N802",
     "N803", 
     "N806",
+    "N999"
 ]
 
 [tool.ruff.format]
@@ -60,3 +61,8 @@ section-order = [
 # Catch numpy tracer errors
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "numpy".msg = "Use jax.numpy as jnp in all computational modules to prevent XLA tracer crashes"
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py files are designed to re-export modules. 
+# Ignore unused imports (F401) in all of them globally.
+"__init__.py" = ["F401"]

@@ -247,7 +247,7 @@ def find_circular_references(obj, path="root", visited=None):
 
     # If we've seen this exact object ID in this branch, we found the loop
     if obj_id in visited:
-        print(f"CIRCULARITY FOUND:")
+        print("CIRCULARITY FOUND:")
         print(f"Path: {path} loops back to an already visited {type(obj).__name__}")
         return True
 

@@ -158,7 +158,7 @@ class Vortices(eqx.Module):
         """Validates discretization inputs and resolves global vs separate routing."""
 
         if self.chordwise_cosine:
-            warnings.warn(f"Chordwise cosine spacing is currently unsupported. Defaulting to linear spacing.")
+            warnings.warn("Chordwise cosine spacing is currently unsupported. Defaulting to linear spacing.")
             object.__setattr__(self, "chordwise_cosine", False)
 
         # Check if the user explicitly provided separate definitions

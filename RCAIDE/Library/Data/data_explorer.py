@@ -97,7 +97,7 @@ def apply_filters(data, ar, sweep, taper, mach, alpha):
 def wing_generator(aspect_ratio, taper, sweep, dihedral, twist):
 
     wing = Wing(
-        tag=f"W1",
+        tag="W1",
         symmetric=True,
         taper=taper,
         dihedral=dihedral,

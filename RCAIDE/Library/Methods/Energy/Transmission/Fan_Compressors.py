@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-
 # RCAIDE imports
 if TYPE_CHECKING:
     import RCAIDE.Framework as rcf

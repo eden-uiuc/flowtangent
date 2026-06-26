@@ -74,14 +74,14 @@ def build_controls_from_system(state:State, system: System|Component, settings:S
 
                 if settings.DEBUG_MODE:
                     if surface_controls:
-                        print(f"Added the following aerodynamic surface controls:" +
+                        print("Added the following aerodynamic surface controls:" +
                               "\n\t- ".join(surface_controls))
                     if direct_controls:
-                        print(f"Added the following direct controls:" +
+                        print("Added the following direct controls:" +
                               "\n\t- ".join(direct_controls))
                     if unbound_controls:
-                        print(f"The following control components were found, but without path information."
-                              f"They may not function as intended:"
+                        print("The following control components were found, but without path information."
+                              "They may not function as intended:"
                               "\n\t- ".join(unbound_controls))
 
         if settings.DEBUG_MODE:

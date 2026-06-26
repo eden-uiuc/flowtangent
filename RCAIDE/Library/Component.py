@@ -146,7 +146,7 @@ class Component(eqx.Module):
         elif isinstance(item, str):
             return getattr(self, item.replace(' ', '_').lower())
         else:
-            raise TypeError(f"Indices must be int, slice, or str.")
+            raise TypeError("Indices must be int, slice, or str.")
 
     def __getattr__(self, item: str):
         if item.startswith("__") and item.endswith("__"):

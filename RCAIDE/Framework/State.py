@@ -79,11 +79,11 @@ class State(Conditions):
             else:
                 print("Number of active controls does not match number of active dynamics residuals.")
 
-            print(f"\nCurrent active controls:")
+            print("\nCurrent active controls:")
             for control in self.controls.get_active_controls():
                 print(f"- {control.tag}")
 
-            print(f"\nCurrent active dynamics residuals:")
+            print("\nCurrent active dynamics residuals:")
             for residual in self.dynamics.get_active_residuals():
                 print(f"- {residual.tag}")
 
