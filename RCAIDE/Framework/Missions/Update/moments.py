@@ -20,18 +20,18 @@ import RCAIDE.Framework as rcf
 
 
 def update_moments(
-        state: "rcf.State",
-        system: "rcf.Systems",
-        settings: "rcf.Settings",
-        ):
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
-        wind    = state.frames.wind.total_moment_vector
-        thrust  = state.energy.total_moment_vector
+    wind = state.frames.wind.total_moment_vector
+    thrust = state.energy.total_moment_vector
 
-        TW2I    = state.frames.wind.transform_to_inertial
+    TW2I = state.frames.wind.transform_to_inertial
 
-        M = jnp.einsum('nij,nj->ni', TW2I, wind)
+    M = jnp.einsum("nij,nj->ni", TW2I, wind)
 
-        state = eqx.tree_at(lambda s: s.frames.inertial.total_moment_vector, state, M + thrust)
+    state = eqx.tree_at(lambda s: s.frames.inertial.total_moment_vector, state, M + thrust)
 
-        return state, system, settings
+    return state, system, settings

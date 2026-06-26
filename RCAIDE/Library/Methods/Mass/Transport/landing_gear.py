@@ -18,9 +18,8 @@ if TYPE_CHECKING:
 #  Functional/Library Version
 # -------------------------------------------------------------------------------
 
-def func_landing_gear(
-    MTOW: float,
-    lg_wt_factor: float = 0.04):
+
+def func_landing_gear(MTOW: float, lg_wt_factor: float = 0.04):
 
     return MTOW * lg_wt_factor
 
@@ -29,9 +28,8 @@ def func_landing_gear(
 #  Stateful/Framework Version
 # -------------------------------------------------------------------------------
 
-def landing_gear(state: "State",
-                 system: "Aircraft",
-                 settings: "Settings"):
+
+def landing_gear(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Framework version of landing_gear
 

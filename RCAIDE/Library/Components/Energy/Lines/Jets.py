@@ -37,12 +37,11 @@ def _TurbojetLineSetup():
 
     tank = FuelTank()
 
-    return (E1, E2, S1, S2,tank)
+    return (E1, E2, S1, S2, tank)
 
 
 class TurbojetEnergyLine(EnergyLine):
-
-    tag: str = init_field('Turbojet Energy Line', static=True)
+    tag: str = init_field("Turbojet Energy Line", static=True)
 
     fuel_inputs: tuple[str, ...] = init_field(("self.engine_1", "self.engine_2"), static=True)
 
@@ -50,23 +49,19 @@ class TurbojetEnergyLine(EnergyLine):
 
     subcomponents: tuple = init_field(_TurbojetLineSetup())
 
-    _bookkeeping: dict = init_field(lambda: {
-        "engines": TurbojetEngine,
-        "stores": FuelTank,
-        "fuel_tanks": FuelTank,
-        "offtakes": OfftakeShaft
-    }, static=True)
+    _bookkeeping: dict = init_field(
+        lambda: {"engines": TurbojetEngine, "stores": FuelTank, "fuel_tanks": FuelTank, "offtakes": OfftakeShaft},
+        static=True,
+    )
 
     @inputs(
-            "state.energy.nodes[Line_fuel_tanks].mass",
-            "state.energy.nodes[Line_fuel_inputs].outputs.fuel.flow_rate",
-            "system.energy.nodes[Line_fuel_tanks].selector_ratio",
-            "system.energy.nodes[Line_fuel_tanks].mass_properties.total",
-            "system.energy.nodes[Line].tank_draw_ratios"
+        "state.energy.nodes[Line_fuel_tanks].mass",
+        "state.energy.nodes[Line_fuel_inputs].outputs.fuel.flow_rate",
+        "system.energy.nodes[Line_fuel_tanks].selector_ratio",
+        "system.energy.nodes[Line_fuel_tanks].mass_properties.total",
+        "system.energy.nodes[Line].tank_draw_ratios",
     )
-    @outputs(
-        "state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate"
-    )
+    @outputs("state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate")
     def transmit(self, state: State, system: System, settings: Settings):
 
         # Manage Fuel --------------------------------------------------------------------------------------------------
@@ -99,33 +94,26 @@ class TurbojetEnergyLine(EnergyLine):
         updated_state = eqx.tree_at(
             lambda s: tuple(s.energy.nodes[t.network_ID].outputs.fuel.flow_rate for t in self.fuel_tanks),
             state,
-            tank_burns
+            tank_burns,
         )
 
         updated_state = eqx.tree_at(
-            lambda s: s.mass.rate_of_change,
-            updated_state,
-            updated_state.mass.rate_of_change - total_fuel_burn
+            lambda s: s.mass.rate_of_change, updated_state, updated_state.mass.rate_of_change - total_fuel_burn
         )
 
         # Manage Electrical Power --------------------------------------------------------------------------------------
 
-        for idx, offtake in enumerate(self.offtakes): # type: ignore
-
+        for idx, offtake in enumerate(self.offtakes):  # type: ignore
             offtake: OfftakeShaft
-            engine_ID = self.engines[idx].network_ID  #type: ignore
+            engine_ID = self.engines[idx].network_ID  # type: ignore
 
             updated_state = eqx.tree_at(
                 lambda s: (
                     s.energy.nodes[offtake.network_ID].outputs.electical.power,
                     s.energy.nodes[offtake.network_ID].outputs.mechanical.work,
-                    ),
+                ),
                 updated_state,
-                (
-                    offtake.power_draw,
-                    offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate
-                )
+                (offtake.power_draw, offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate),
             )
 
         return updated_state, system, settings
-

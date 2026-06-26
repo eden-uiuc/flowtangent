@@ -42,9 +42,10 @@ from .Profiles import *
 if TYPE_CHECKING:
     from RCAIDE.Framework import Settings, State, System
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Mission Spinner
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 class Spinner:
     def __init__(self, message="JIT compiling and solving...", enabled=True):
@@ -77,14 +78,16 @@ class Spinner:
             sys.stdout.write(f"\r{self.message} Done!    \n")
             sys.stdout.flush()
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Segment Subfunctions
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def _activate_control(control: str | ControlVariable, state):
 
     if isinstance(control, str):
-        control_name = control.replace(' ', '_').lower()
+        control_name = control.replace(" ", "_").lower()
 
         if control_name not in state.controls.__dataclass_fields__:
             # It's a custom control:
@@ -105,19 +108,14 @@ def _activate_control(control: str | ControlVariable, state):
     return eqx.tree_at(lambda s: s.controls, state, new_controls)
 
 
-
 def _activate_residual(res: str | DynamicResidual, state):
 
-    if isinstance(res, str) and res in  NamedResidual:
+    if isinstance(res, str) and res in NamedResidual:
         current_residual = getattr(state.dynamics, res)
         active_residual = replace(current_residual, active=True)
 
         # Safely inject it using getattr path tracing
-        new_dynamics = eqx.tree_at(
-            lambda d: getattr(d, res),
-            state.dynamics,
-            active_residual
-        )
+        new_dynamics = eqx.tree_at(lambda d: getattr(d, res), state.dynamics, active_residual)
     elif isinstance(res, DynamicResidual):
         active_res = replace(res, active=True)
         new_dynamics = state.dynamics.add_subcondition(active_res)
@@ -129,32 +127,33 @@ def _activate_residual(res: str | DynamicResidual, state):
 # Initialize Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def _initialization_steps():
     return (
-        ProcessStep(tag="State",                function=expand_state),
-        ProcessStep(tag="Time",                 function=initialize_time),
-        ProcessStep(tag="Mass",                 function=initialize_mass),
-        ProcessStep(tag="Energy",               function=initialize_energy),
-        ProcessStep(tag="Inertial Position",    function=initialize_inertial_position),
-        ProcessStep(tag="Planetary Position",   function=initialize_planetary_position),
-        ProcessStep(tag="Analyses",             function=null_step),
+        ProcessStep(tag="State", function=expand_state),
+        ProcessStep(tag="Time", function=initialize_time),
+        ProcessStep(tag="Mass", function=initialize_mass),
+        ProcessStep(tag="Energy", function=initialize_energy),
+        ProcessStep(tag="Inertial Position", function=initialize_inertial_position),
+        ProcessStep(tag="Planetary Position", function=initialize_planetary_position),
+        ProcessStep(tag="Analyses", function=null_step),
     )
 
+
 class InitializeSegment(Process):
+    tag: str = "Segment Initialization"
 
-    tag: str = 'Segment Initialization'
+    active_controls: tuple[str | ControlVariable, ...] = init_field(tuple)
+    active_residuals: tuple[NamedResidual, ...] = init_field(tuple)
 
-    active_controls:   tuple[str|ControlVariable, ...]  = init_field(tuple)
-    active_residuals:  tuple[NamedResidual, ...]        = init_field(tuple)
-
-    controls_initial_guess: tuple[jnp.ndarray|float,...] = (0., 0.)
+    controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
 
     steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
 
     def __call__(self, state: State, system: System, settings: Settings, validate_controls=False):
 
         if settings.DEBUG_MODE:
-            scan_for_invalid_JAX_types(state,  f"Pre-{self.tag} State")
+            scan_for_invalid_JAX_types(state, f"Pre-{self.tag} State")
             scan_for_invalid_JAX_types(system, f"Pre-{self.tag} System")
 
         current_state = state
@@ -166,7 +165,7 @@ class InitializeSegment(Process):
         active_controls = current_state.controls.get_active_controls()
         if settings.analysis.energy.use_network_controls:
             for network in system.energy_network:
-                active_controls += network.controls # type: ignore
+                active_controls += network.controls  # type: ignore
         routing_table = tuple((ctrl.path, ctrl.path_indices) for ctrl in active_controls)
         new_controls = replace(current_state.controls, active_routing_table=routing_table)
         current_state = eqx.tree_at(lambda s: s.controls, current_state, new_controls)
@@ -174,7 +173,7 @@ class InitializeSegment(Process):
         active_residuals = self.active_residuals
         if settings.analysis.energy.use_network_controls:
             for network in system.energy_network:
-                active_residuals += network.residuals # type: ignore
+                active_residuals += network.residuals  # type: ignore
         for res in self.active_residuals:
             current_state = _activate_residual(res, current_state)
 
@@ -188,9 +187,7 @@ class InitializeSegment(Process):
         new_residuals = jnp.zeros((n_cp, len(self.active_residuals)))
 
         current_state = eqx.tree_at(
-            lambda s: (s.solver.unknowns, s.solver.residuals),
-            current_state,
-            (new_unknowns, new_residuals)
+            lambda s: (s.solver.unknowns, s.solver.residuals), current_state, (new_unknowns, new_residuals)
         )
 
         if validate_controls:
@@ -205,29 +202,31 @@ class InitializeSegment(Process):
 
         return current_state, system, settings
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Analyze Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def _default_analyses():
     return (
-        ProcessStep(tag="Time Differentials",   function=update_time_differentials),
-        ProcessStep(tag="Acceleration",         function=update_acceleration),
+        ProcessStep(tag="Time Differentials", function=update_time_differentials),
+        ProcessStep(tag="Acceleration", function=update_acceleration),
         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
-        ProcessStep(tag="Freestream",           function=update_freestream),
-        ProcessStep(tag="Orientations",         function=update_orientations),
-        ProcessStep(tag="Energy",               function=null_step),
-        ProcessStep(tag="Aerodynamics",         function=null_step),
-        ProcessStep(tag="Stability",            function=null_step),
-        ProcessStep(tag="Mass",                 function=update_mass_and_weight),
-        ProcessStep(tag="Forces",               function=update_forces),
-        ProcessStep(tag="Moments",              function=update_moments),
-        ProcessStep(tag="Planetary Position",   function=update_planetary_position),
-        ProcessStep(tag="Calculate Residuals",  function=flight_dynamics_residuals)
+        ProcessStep(tag="Freestream", function=update_freestream),
+        ProcessStep(tag="Orientations", function=update_orientations),
+        ProcessStep(tag="Energy", function=null_step),
+        ProcessStep(tag="Aerodynamics", function=null_step),
+        ProcessStep(tag="Stability", function=null_step),
+        ProcessStep(tag="Mass", function=update_mass_and_weight),
+        ProcessStep(tag="Forces", function=update_forces),
+        ProcessStep(tag="Moments", function=update_moments),
+        ProcessStep(tag="Planetary Position", function=update_planetary_position),
+        ProcessStep(tag="Calculate Residuals", function=flight_dynamics_residuals),
     )
 
-class AnalyzeSegment(Process):
 
+class AnalyzeSegment(Process):
     tag: str = init_field("Segment Analysis", static=True)
 
     steps: tuple[ProcessStep, ...] = init_field(_default_analyses)
@@ -240,7 +239,7 @@ def find_circular_references(obj, path="root", visited=None):
     # Skip basic types and arrays (they don't hold other objects)
     if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
         return
-    if type(obj).__name__ in ('ndarray', 'ArrayImpl', 'DynamicJaxprTracer'):
+    if type(obj).__name__ in ("ndarray", "ArrayImpl", "DynamicJaxprTracer"):
         return
 
     obj_id = id(obj)
@@ -267,22 +266,22 @@ def find_circular_references(obj, path="root", visited=None):
                 return True
 
     # Recursively check custom objects and dataclasses
-    elif hasattr(obj, '__dict__'):
+    elif hasattr(obj, "__dict__"):
         for k, v in vars(obj).items():
             if find_circular_references(v, f"{path}.{k}", visited.copy()):
                 return True
 
     return False
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Iterate Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class IterateSegment(Process):
-
-    tag:            str     = init_field('Segment Convergence', static=True)
-    analyze:        Process = init_field(AnalyzeSegment)
-
+    tag: str = init_field("Segment Convergence", static=True)
+    analyze: Process = init_field(AnalyzeSegment)
 
     def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
 
@@ -308,7 +307,7 @@ class IterateSegment(Process):
         root = GaussNewton(
             residual_fun=self._get_residuals,
             tol=state.numerics.solution_tolerance,
-            maxiter=state.numerics.max_evaluations
+            maxiter=state.numerics.max_evaluations,
         )
 
         return root.run(x0, state, system, settings)
@@ -318,10 +317,8 @@ class IterateSegment(Process):
         root_finder = settings.mission.root_finder
 
         with Spinner(enabled=not settings.DEBUG_MODE):
-
             match root_finder:
                 case cls if cls == "GaussNewton":
-
                     x0 = state.solver.unknowns
 
                     # 2. Start the clock
@@ -332,24 +329,22 @@ class IterateSegment(Process):
 
                     # 4. Wait for the final answer to come back across the PCIe bus
 
-
                     if settings.DEBUG_MODE:
-
                         unknowns.block_until_ready()
 
-                        print("\n" + "="*30)
+                        print("\n" + "=" * 30)
                         print("JAXOPT SOLVER DIAGNOSTICS")
-                        print("="*30)
+                        print("=" * 30)
                         # JAX arrays need to be cast or formatted to print cleanly
                         print(f"Iterations taken: {opt_state.iter_num}")
                         print(f"Final Error/Residual: {opt_state.error: .3e}")
 
                         # Depending on the specific JAXopt solver, you might also have:
-                        if hasattr(opt_state, 'stepsize'):
+                        if hasattr(opt_state, "stepsize"):
                             print(f"Final Stepsize: {opt_state.stepsize}")
-                        if hasattr(opt_state, 'value'):
+                        if hasattr(opt_state, "value"):
                             print(f"Objective Value: {opt_state.value: .3e}")
-                        print("="*30 + "\n")
+                        print("=" * 30 + "\n")
 
                     # 5. Stop the clock
                     # t1 = timeit.default_timer()
@@ -362,21 +357,22 @@ class IterateSegment(Process):
                     return self.analyze(current_state, system, settings)
 
                 case cls if cls == "ScipyRootFinding":
-
                     x0 = state.unknowns
 
                     root = ScipyRootFinding(
-                        method='hybr',
+                        method="hybr",
                         optimality_fun=self._get_residuals,
-                        tol = state.numerics.solution_tolerance,
-                        jit=True
+                        tol=state.numerics.solution_tolerance,
+                        jit=True,
                     )
                     if settings.DEBUG_MODE:
-                        if any([
-                            find_circular_references(state, path="state"),
-                            find_circular_references(system, path="system"),
-                            find_circular_references(settings, path="settings")
-                        ]):
+                        if any(
+                            [
+                                find_circular_references(state, path="state"),
+                                find_circular_references(system, path="system"),
+                                find_circular_references(settings, path="settings"),
+                            ]
+                        ):
                             raise RecursionError("Circularity found in mission data structures. Terminating mission.")
 
                     t0 = timeit.default_timer()
@@ -417,63 +413,55 @@ class IterateSegment(Process):
 
                     return self.analyze(current_state, system, settings)
 
-
                 case _:
                     return state, system, settings
 
     def run_with_history(self, state, system, settings):
         conv_state, conv_system, conv_settings = self(state, system, settings)
         return self.analyze.run_with_history(conv_state, conv_system, conv_settings)
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Finalize Segment
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 def _reset_controls_and_residuals(
-            state: State,
-            system: System,
-            settings: Settings,
-    ):
-        current_state = state
+    state: State,
+    system: System,
+    settings: Settings,
+):
+    current_state = state
 
-        def _turn_off_control(node):
-            if isinstance(node, ControlVariable):
-                return eqx.tree_at(lambda c: c.active, node, False)
-            return node
+    def _turn_off_control(node):
+        if isinstance(node, ControlVariable):
+            return eqx.tree_at(lambda c: c.active, node, False)
+        return node
 
-        def _turn_off_residual(node):
-            if isinstance(node, DynamicResidual):
-                return replace(node, active=False)
-            return node
+    def _turn_off_residual(node):
+        if isinstance(node, DynamicResidual):
+            return replace(node, active=False)
+        return node
 
-        new_controls = jax.tree_util.tree_map(
-            _turn_off_control,
-            current_state.controls,
-            is_leaf=lambda x: isinstance(x, ControlVariable)
-        )
-
-        new_dynamics = jax.tree_util.tree_map(
-            _turn_off_residual,
-            current_state.dynamics,
-            is_leaf=lambda x: isinstance(x, DynamicResidual)
-        )
-
-        current_state = eqx.tree_at(
-            lambda s: (s.controls, s.dynamics),
-            current_state,
-            (new_controls, new_dynamics)
-        )
-
-        return current_state, system, settings
-
-def _default_finalize():
-    return (
-        ProcessStep(tag="Deactivate Controls & Residuals", function=_reset_controls_and_residuals),
+    new_controls = jax.tree_util.tree_map(
+        _turn_off_control, current_state.controls, is_leaf=lambda x: isinstance(x, ControlVariable)
     )
 
-class FinalizeSegment(Process):
+    new_dynamics = jax.tree_util.tree_map(
+        _turn_off_residual, current_state.dynamics, is_leaf=lambda x: isinstance(x, DynamicResidual)
+    )
 
-    tag: str = init_field('Segment Finalization', static=True)
+    current_state = eqx.tree_at(lambda s: (s.controls, s.dynamics), current_state, (new_controls, new_dynamics))
+
+    return current_state, system, settings
+
+
+def _default_finalize():
+    return (ProcessStep(tag="Deactivate Controls & Residuals", function=_reset_controls_and_residuals),)
+
+
+class FinalizeSegment(Process):
+    tag: str = init_field("Segment Finalization", static=True)
     steps: tuple[ProcessStep, ...] = init_field(_default_finalize)
 
 
@@ -483,24 +471,23 @@ class FinalizeSegment(Process):
 
 
 class Segment(Process):
-
     tag: str = init_field("Segment", static=True)
 
     # Pass-through configuration for InitializeSegment
-    active_controls:  tuple[str | ControlVariable, ...]     = init_field(tuple)
-    active_residuals: tuple[NamedResidual, ...]             = init_field(tuple)
-    controls_initial_guess: tuple[jnp.ndarray|float, ...]   = (0., 0.)
+    active_controls: tuple[str | ControlVariable, ...] = init_field(tuple)
+    active_residuals: tuple[NamedResidual, ...] = init_field(tuple)
+    controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
 
-    course_profile:     CourseProfile   = init_field(ConstantCourse)
-    position_profile:   PositionProfile = init_field(ConstantAltitude)
-    speed_profile:      SpeedProfile    = init_field(ConstantSpeed)
-    velocity_profile:   VelocityProfile = init_field(ConstantAltitudeChangeRate)
-    duration_profile:   DurationProfile = init_field(FixedDistance)
+    course_profile: CourseProfile = init_field(ConstantCourse)
+    position_profile: PositionProfile = init_field(ConstantAltitude)
+    speed_profile: SpeedProfile = init_field(ConstantSpeed)
+    velocity_profile: VelocityProfile = init_field(ConstantAltitudeChangeRate)
+    duration_profile: DurationProfile = init_field(FixedDistance)
 
     # Global dynamics variables
-    sideslip_angle:         float = 0.0
-    temperature_deviation:  float = 0.0
-    true_course:            float = 0.0
+    sideslip_angle: float = 0.0
+    temperature_deviation: float = 0.0
+    true_course: float = 0.0
 
     # Start with an empty tuple. We will populate it securely in __post_init__
     steps: tuple = init_field(tuple)
@@ -508,7 +495,6 @@ class Segment(Process):
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones
         if len(self.steps) == 0:
-
             # 1. Build the steps, passing the controls configuration directly into InitializeSegment
             init_step = InitializeSegment(
                 tag=f"{self.tag} Initialization",
@@ -519,11 +505,20 @@ class Segment(Process):
 
             # Add profile initialization
             init_step = eqx.tree_at(
-                lambda i:i.steps, init_step,
-                init_step.steps + (self.course_profile, self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
+                lambda i: i.steps,
+                init_step,
+                init_step.steps
+                + (
+                    self.course_profile,
+                    self.position_profile,
+                    self.speed_profile,
+                    self.velocity_profile,
+                    self.duration_profile,
+                ),
+            )
 
             iter_step = IterateSegment(tag=f"{self.tag} Iteration")
-            fin_step  = FinalizeSegment(tag=f"{self.tag} Finalization")
+            fin_step = FinalizeSegment(tag=f"{self.tag} Finalization")
 
             # 2. Safely lock them into the frozen object
             object.__setattr__(self, "steps", (init_step, iter_step, fin_step))
@@ -562,12 +557,12 @@ class Segment(Process):
         return super().__call__(state, system, settings)
 
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Fixed/Unconverged Segments
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 class FixedSegment(Segment):
-
     tag: str = init_field("Fixed Segment", static=True)
 
     def __post_init__(self):
@@ -583,13 +578,21 @@ class FixedSegment(Segment):
 
             # Add profile initialization
             init_step = eqx.tree_at(
-                lambda i: i.steps, init_step,
-                init_step.steps + (self.course_profile, self.position_profile, self.speed_profile,
-                                   self.velocity_profile, self.duration_profile))
+                lambda i: i.steps,
+                init_step,
+                init_step.steps
+                + (
+                    self.course_profile,
+                    self.position_profile,
+                    self.speed_profile,
+                    self.velocity_profile,
+                    self.duration_profile,
+                ),
+            )
 
             iter_step = AnalyzeSegment(
                 tag=f"{self.tag} Analysis",
-                steps=_default_analyses()[:-1]  # Skip Residual Calculation
+                steps=_default_analyses()[:-1],  # Skip Residual Calculation
             )
             fin_step = FinalizeSegment(tag=f"{self.tag} Finalization")
 
@@ -600,9 +603,10 @@ class FixedSegment(Segment):
     def analyze(self) -> AnalyzeSegment:
         return self.steps[1]
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------
 # Optimal Segments
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 
 
 # @chex.dataclass(kw_only=True)

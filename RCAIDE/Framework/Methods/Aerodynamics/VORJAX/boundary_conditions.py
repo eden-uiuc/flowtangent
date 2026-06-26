@@ -35,12 +35,9 @@ from RCAIDE.utils import inputs, outputs
     "state.freestream.speed",
     "state.stability.static.roll_rate",
     "state.stability.static.pitch_rate",
-    "state.stability.static.yaw_rate"
+    "state.stability.static.yaw_rate",
 )
-@outputs(
-    "system.analysis_data['boundary_conditions']",
-    "system.analysis_data['relative_velocity']"
-)
+@outputs("system.analysis_data['boundary_conditions']", "system.analysis_data['relative_velocity']")
 def compute_boundary_conditions(state: "State", system: "System", settings: "Settings"):
     """
     Computes the Neumann boundary condition (RHS) for the VLM.
@@ -52,7 +49,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
 
     # Extract State Conditions
     alpha = state.aerodynamics.angles.alpha
-    beta  = state.aerodynamics.angles.beta
+    beta = state.aerodynamics.angles.beta
     v_inf = state.freestream.speed
 
     p = state.stability.static.roll_rate
@@ -64,11 +61,9 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     omega = jnp.concatenate([p, q, r], axis=1)
 
     # Build Freestream Velocity Vector (Wind Speed in Body Frame)
-    v_fs = v_inf * jnp.concatenate([
-        jnp.cos(alpha) * jnp.cos(beta),
-        jnp.sin(beta),
-        jnp.sin(alpha) * jnp.cos(beta)
-    ], axis=1)
+    v_fs = v_inf * jnp.concatenate(
+        [jnp.cos(alpha) * jnp.cos(beta), jnp.sin(beta), jnp.sin(alpha) * jnp.cos(beta)], axis=1
+    )
 
     # Compute Rotational Velocity at every control point: V_rot = -(Omega x r)
     moment_center = system.reference_geometry.center_of_gravity
@@ -81,7 +76,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     if vlm_settings.model_propeller_wake:
         # TODO: Convert BEMT and add wake calculation to VLM Process
         raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in RCAIDE.")
-        v_total = v_total + system.analysis_data["induced_wake"] #type: ignore
+        v_total = v_total + system.analysis_data["induced_wake"]  # type: ignore
 
     # Take the Dot Product with the Panel Normals
     # Normalize by V_inf to match the standard VLM coefficient formulation

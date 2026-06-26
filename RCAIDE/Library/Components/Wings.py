@@ -21,25 +21,23 @@ from RCAIDE.Library.Components.Airfoils import Airfoil
 
 
 class WingDimensions(ComponentDimensions):
-
     root: float = 0.0
-    tip:  float = 0.0
+    tip: float = 0.0
 
 
 class WingSweeps(WingDimensions):
-    leading_edge:   float = 0.0
-    quarter_chord:  float = 0.0
-    half_chord:     float = 0.0
+    leading_edge: float = 0.0
+    quarter_chord: float = 0.0
+    half_chord: float = 0.0
 
 
 class WingChords(WingDimensions):
-    mean_aerodynamic:   float = 0.0
-    mean_geometric:     float = 0.0
+    mean_aerodynamic: float = 0.0
+    mean_geometric: float = 0.0
 
 
 class WingSegment(Component):
-
-    tag: str = init_field('Wing Segment', static=True)
+    tag: str = init_field("Wing Segment", static=True)
     airfoil: Airfoil | None = None
     control_surfaces: tuple = init_field(tuple)
 
@@ -58,64 +56,67 @@ class WingSegment(Component):
     def taper(self):
 
         # Sidestep Equinox LeafWrappers
-        if hasattr(self.chords.root, "value"): safe_root = jnp.maximum(self.chords.root.value, 1e-8) # type: ignore
-        else: safe_root = jnp.maximum(self.chords.root, 1e-8)
+        if hasattr(self.chords.root, "value"):
+            safe_root = jnp.maximum(self.chords.root.value, 1e-8)  # type: ignore
+        else:
+            safe_root = jnp.maximum(self.chords.root, 1e-8)
 
-        if hasattr(self.chords.tip, "value"): safe_tip = self.chords.tip.value
-        else: safe_tip = self.chords.tip
+        if hasattr(self.chords.tip, "value"):
+            safe_tip = self.chords.tip.value
+        else:
+            safe_tip = self.chords.tip
 
         return safe_tip / safe_root
 
 
 class WingControlSurface(Component):
+    tag: str = init_field("Wing Control Surface", static=True)
 
-    tag: str = init_field('Wing Control Surface', static=True)
-
-    span_fraction_start: float  = 0.0
-    span_fraction_end: float    = 0.0
+    span_fraction_start: float = 0.0
+    span_fraction_end: float = 0.0
 
     chord_fraction_start: float = 0.0
-    chord_fraction_end: float   = 1.0
+    chord_fraction_end: float = 1.0
 
-    hinge_fraction: float       = 0.0
-    root_chord_percent: float   = 0.0
+    hinge_fraction: float = 0.0
+    root_chord_percent: float = 0.0
 
-    sign_duplicate: float       = 1.0
-    deflection: float           = 0.0
-    configuration_type: str     = init_field('single_slotted', static=True)
+    sign_duplicate: float = 1.0
+    deflection: float = 0.0
+    configuration_type: str = init_field("single_slotted", static=True)
 
-    gain: float                 = 1.0  # deflection multiplier used only for AVL
+    gain: float = 1.0  # deflection multiplier used only for AVL
 
     def __post_init__(self):
         if not (self.chord_fraction_start == 0.0 or self.chord_fraction_end == 1.0):
-            raise ValueError("Control surface chord fractions must terminate at either 0.0 or 1.0. "
-                             "Got: ({}, {})".format(self.chord_fraction_start, self.chord_fraction_end))
+            raise ValueError(
+                "Control surface chord fractions must terminate at either 0.0 or 1.0. Got: ({}, {})".format(
+                    self.chord_fraction_start, self.chord_fraction_end
+                )
+            )
 
 
 class Wing(Component):
+    tag: str = init_field("Wing", static=True)
+    airfoil: Airfoil | None = None
 
-    tag:                str             = init_field('Wing', static=True)
-    airfoil:            Airfoil | None  = None
-
-    _bookkeeping: dict = init_field(lambda: {
-        "control_surfaces": WingControlSurface
-    }, static=True)
+    _bookkeeping: dict = init_field(lambda: {"control_surfaces": WingControlSurface}, static=True)
 
     # Specialty Attributes
 
-    symmetric: bool     = init_field(True, static=True)
-    vertical: bool      = init_field(False, static=True)
-    t_tail: bool        = init_field(False, static=True)
-    high_lift: bool     = init_field(False, static=True)
-    symbolic: bool      = init_field(False, static=True)
-    high_mach: bool     = init_field(False, static=True)
-    vortex_lift: bool   = init_field(False, static=True)
+    symmetric: bool = init_field(True, static=True)
+    vertical: bool = init_field(False, static=True)
+    t_tail: bool = init_field(False, static=True)
+    high_lift: bool = init_field(False, static=True)
+    symbolic: bool = init_field(False, static=True)
+    high_mach: bool = init_field(False, static=True)
+    vortex_lift: bool = init_field(False, static=True)
 
-    taper:                      float   = 0.0
-    dihedral:                   float   = 0.0
-    aspect_ratio:               float   = 0.0
-    thickness_to_chord:         float   = 0.0
-    exposed_root_chord_offset:  float   = 0.0
+    taper: float = 0.0
+    dihedral: float = 0.0
+    aspect_ratio: float = 0.0
+    thickness_to_chord: float = 0.0
+    exposed_root_chord_offset: float = 0.0
 
     single_side_aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
@@ -126,10 +127,10 @@ class Wing(Component):
 
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
-    spans:  WingDimensions  = init_field(lambda: WingDimensions(ordinal_direction=True))
-    twists: WingDimensions  = init_field(WingDimensions)
-    chords: WingChords      = init_field(WingDimensions)
-    sweeps: WingSweeps      = init_field(WingSweeps)
+    spans: WingDimensions = init_field(lambda: WingDimensions(ordinal_direction=True))
+    twists: WingDimensions = init_field(WingDimensions)
+    chords: WingChords = init_field(WingDimensions)
+    sweeps: WingSweeps = init_field(WingSweeps)
 
     def __post_init__(self):
         new_taper, new_chords = self.validate_chords()
@@ -140,7 +141,7 @@ class Wing(Component):
 
         for idx, seg in enumerate(self.segments):
             root = new_chords.root * seg.root_chord_percent
-            if idx == len(self.segments) -1:
+            if idx == len(self.segments) - 1:
                 tip = new_chords.tip
             else:
                 tip = new_chords.root * self.segments[idx + 1].root_chord_percent
@@ -178,7 +179,7 @@ class Wing(Component):
             elif taper == 0.0:
                 new_taper = tip / root
             elif root == 0.0:
-                new_chords = eqx.tree_at(lambda c:c.root, new_chords, tip / taper)
+                new_chords = eqx.tree_at(lambda c: c.root, new_chords, tip / taper)
 
             return new_taper, new_chords
 
@@ -194,18 +195,15 @@ class Wing(Component):
 
     @staticmethod
     def _compute_segment_properties(
-        seg_span_fractions: jnp.ndarray,       # Shape: (N+1,)
-        seg_root_chord_fractions: jnp.ndarray, # Shape: (N+1,)
+        seg_span_fractions: jnp.ndarray,  # Shape: (N+1,)
+        seg_root_chord_fractions: jnp.ndarray,  # Shape: (N+1,)
         wing_root_chord: float,
         wing_projected_span: float,
         is_symmetric: float,
         wing_exposed_root_offset: float,
         wing_t_c: float,
-        seg_t_c: jnp.ndarray                   # Shape: (N,)
-    ) -> tuple[
-        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray,
-        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
-    ]:
+        seg_t_c: jnp.ndarray,  # Shape: (N,)
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         """Computes basic geometries for each individual segment."""
         symm_mult = 1.0 if is_symmetric else 0.0
         wing_semispan = wing_projected_span / (1.0 + symm_mult)
@@ -241,30 +239,23 @@ class Wing(Component):
             seg_s_exposed = seg_s_exposed * 2.0
 
         # Segment Wetted Area
-        seg_s_wet = jnp.where(
-            wing_t_c < 0.05,
-            2.003 * seg_s_exposed,
-            (1.977 + 0.52 * seg_t_c) * seg_s_exposed
-        )
+        seg_s_wet = jnp.where(wing_t_c < 0.05, 2.003 * seg_s_exposed, (1.977 + 0.52 * seg_t_c) * seg_s_exposed)
 
         return seg_dy, seg_c_root, seg_c_tip, seg_tapers, seg_macs, seg_s_ref, seg_s_exposed, seg_s_wet
 
     @staticmethod
     def _compute_global_planform(
-        seg_dy: jnp.ndarray,                   # Shape: (N,)
-        seg_c_root: jnp.ndarray,               # Shape: (N,)
-        seg_c_tip: jnp.ndarray,                # Shape: (N,)
-        seg_s_ref: jnp.ndarray,                # Shape: (N,)
-        seg_s_wet: jnp.ndarray,                # Shape: (N,)
-        seg_span_fractions: jnp.ndarray,       # Shape: (N+1,)
-        seg_quarter_chord_sweeps: jnp.ndarray, # Shape: (N,)
-        seg_dihedrals: jnp.ndarray,            # Shape: (N+1,)
+        seg_dy: jnp.ndarray,  # Shape: (N,)
+        seg_c_root: jnp.ndarray,  # Shape: (N,)
+        seg_c_tip: jnp.ndarray,  # Shape: (N,)
+        seg_s_ref: jnp.ndarray,  # Shape: (N,)
+        seg_s_wet: jnp.ndarray,  # Shape: (N,)
+        seg_span_fractions: jnp.ndarray,  # Shape: (N+1,)
+        seg_quarter_chord_sweeps: jnp.ndarray,  # Shape: (N,)
+        seg_dihedrals: jnp.ndarray,  # Shape: (N+1,)
         wing_projected_span: float,
-        is_symmetric: bool
-    ) -> tuple[
-        float, float, float, float, float, float,
-        jnp.ndarray, float, float, jnp.ndarray, jnp.ndarray, float
-    ]:
+        is_symmetric: bool,
+    ) -> tuple[float, float, float, float, float, float, jnp.ndarray, float, float, jnp.ndarray, jnp.ndarray, float]:
         """Rolls up segment properties into global wing metrics."""
         symm_mult = 1.0 if is_symmetric else 0.0
         wing_semispan = wing_projected_span / (1.0 + symm_mult)
@@ -284,20 +275,22 @@ class Wing(Component):
         B = (seg_c_root - seg_c_tip) / (-seg_span_fractions_diff + 1e-6)
         C = seg_span_fractions[:-1]
 
-        integral_term_1 = (seg_c_root + B * (seg_span_fractions[1:] - C))**3
-        integral_term_2 = (seg_c_root + B * (seg_span_fractions[:-1] - C))**3
+        integral_term_1 = (seg_c_root + B * (seg_span_fractions[1:] - C)) ** 3
+        integral_term_2 = (seg_c_root + B * (seg_span_fractions[:-1] - C)) ** 3
         integral = (integral_term_1 - integral_term_2) / (3.0 * B + 1e-6)
 
         # Fallback for rectangular segments where B is 0 (NaN prevention)
         rec_mac = (seg_c_root**2) * seg_span_fractions_diff
         integral = jnp.where(jnp.isnan(integral), rec_mac, integral)
-        integral = jnp.where(integral == 0., rec_mac, integral)
+        integral = jnp.where(integral == 0.0, rec_mac, integral)
         wing_mac = (wing_semispan * (1.0 + symm_mult) / wing_s_ref) * jnp.sum(integral)
 
         # Sweeps
         r_offsets = seg_c_root / 4.0
         t_offsets = seg_c_tip / 4.0
-        seg_le_sweeps = jnp.arctan((r_offsets + jnp.tan(seg_quarter_chord_sweeps) * seg_dy - t_offsets) / (seg_dy + 1e-6))
+        seg_le_sweeps = jnp.arctan(
+            (r_offsets + jnp.tan(seg_quarter_chord_sweeps) * seg_dy - t_offsets) / (seg_dy + 1e-6)
+        )
 
         wing_c4_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_quarter_chord_sweeps)))
         wing_le_sweep = jnp.arctan(jnp.sum(seg_span_fractions_diff * jnp.tan(seg_le_sweeps)))
@@ -309,7 +302,9 @@ class Wing(Component):
 
         # Vectorized Centroid Calculation
         c = jnp.tan(seg_le_sweeps) * seg_dy
-        cx = (2 * seg_c_tip * c + seg_c_tip**2 + c * seg_c_root + seg_c_tip * seg_c_root + seg_c_root**2) / (3 * (seg_c_tip + seg_c_root))
+        cx = (2 * seg_c_tip * c + seg_c_tip**2 + c * seg_c_root + seg_c_tip * seg_c_root + seg_c_root**2) / (
+            3 * (seg_c_tip + seg_c_root)
+        )
         tapers = seg_c_tip / seg_c_root
         cy = seg_dy / 3.0 * ((1.0 + 2.0 * tapers) / (1.0 + tapers))
         cz = cy * jnp.tan(seg_dihedrals[:-1])
@@ -326,26 +321,32 @@ class Wing(Component):
         wing_total_length = jnp.tan(wing_le_sweep) * wing_semispan + seg_c_tip[-1]
 
         return (
-            wing_s_ref, wing_s_wet, wing_aspect_ratio, wing_total_span,
-            wing_mgc, wing_mac, seg_le_sweeps, wing_c4_sweep,
-            wing_le_sweep, wing_ac, wing_ss_ac, wing_total_length
-        ) # type: ignore
+            wing_s_ref,
+            wing_s_wet,
+            wing_aspect_ratio,
+            wing_total_span,
+            wing_mgc,
+            wing_mac,
+            seg_le_sweeps,
+            wing_c4_sweep,
+            wing_le_sweep,
+            wing_ac,
+            wing_ss_ac,
+            wing_total_length,
+        )  # type: ignore
 
     def convert_to_segmented_wing(self):
-        """ Returns a tuple of (root_segment, tip_segment) for unsegmented wings. """
+        """Returns a tuple of (root_segment, tip_segment) for unsegmented wings."""
 
         # If it already has segments, just return them as-is
-        if hasattr(self, 'segments') and len(self.segments) > 0:
+        if hasattr(self, "segments") and len(self.segments) > 0:
             return self.segments
 
         # 1. Build Root Segment
-        root_sweeps = WingSweeps(
-            quarter_chord=self.sweeps.quarter_chord,
-            leading_edge=self.sweeps.leading_edge
-        )
+        root_sweeps = WingSweeps(quarter_chord=self.sweeps.quarter_chord, leading_edge=self.sweeps.leading_edge)
 
         root_segment = WingSegment(
-            tag='root_segment',
+            tag="root_segment",
             percent_span_location=0.0,
             twist=self.twists.root,
             root_chord_percent=1.0,
@@ -353,7 +354,7 @@ class Wing(Component):
             sweeps=root_sweeps,
             thickness_to_chord=self.thickness_to_chord,
         )
-        if hasattr(self, 'airfoil') and self.airfoil is not None:
+        if hasattr(self, "airfoil") and self.airfoil is not None:
             root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, self.airfoil)
 
         # 2. Build Tip Segment
@@ -363,7 +364,7 @@ class Wing(Component):
         )
 
         tip_segment = WingSegment(
-            tag='tip_segment',
+            tag="tip_segment",
             percent_span_location=1.0,
             twist=self.twists.tip,
             root_chord_percent=self.taper,
@@ -372,7 +373,7 @@ class Wing(Component):
             thickness_to_chord=self.thickness_to_chord,
         )
 
-        if hasattr(self, 'airfoil') and self.airfoil is not None:
+        if hasattr(self, "airfoil") and self.airfoil is not None:
             tip_segment = eqx.tree_at(lambda s: s.airfoil, tip_segment, self.airfoil)
 
         return (root_segment, tip_segment)
@@ -393,20 +394,45 @@ class Wing(Component):
 
         # 2. Compute Segment Geometries
         dy, c_root, c_tip, tapers, macs, s_ref_seg, s_exposed_seg, s_wet_seg = self._compute_segment_properties(
-            span_locs, root_chords_pct, self.chords.root, self.spans.projected,
-            symm, self.exposed_root_chord_offset, self.thickness_to_chord, t_cs
+            span_locs,
+            root_chords_pct,
+            self.chords.root,
+            self.spans.projected,
+            symm,
+            self.exposed_root_chord_offset,
+            self.thickness_to_chord,
+            t_cs,
         )
 
         # 3. Compute Global Geometries
-        (total_s_ref, total_s_wet, ar, total_span, mgc, global_mac, le_sweeps, c_4_sweep,
-         le_sweep_total, ac, ss_ac, total_length) = self._compute_global_planform(
-            dy, c_root, c_tip, s_ref_seg, s_wet_seg, span_locs, sweeps, dihedrals,
-            self.spans.projected, symm,
+        (
+            total_s_ref,
+            total_s_wet,
+            ar,
+            total_span,
+            mgc,
+            global_mac,
+            le_sweeps,
+            c_4_sweep,
+            le_sweep_total,
+            ac,
+            ss_ac,
+            total_length,
+        ) = self._compute_global_planform(
+            dy,
+            c_root,
+            c_tip,
+            s_ref_seg,
+            s_wet_seg,
+            span_locs,
+            sweeps,
+            dihedrals,
+            self.spans.projected,
+            symm,
         )
 
         total_s_ref = jnp.where(calculate_reference_area, total_s_ref, self.areas.reference)
         total_s_wet = jnp.where(calculate_wetted_area, total_s_wet, self.areas.wetted)
-
 
         # 4. Create updated segments (Pure functional update)
         updated_segments = []
@@ -416,26 +442,46 @@ class Wing(Component):
             new_seg = eqx.tree_at(
                 lambda s: (s.chords.mean_aerodynamic, s.areas.reference, s.areas.exposed, s.areas.wetted),
                 seg,
-                (macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i])
+                (macs[i], s_ref_seg[i], s_exposed_seg[i], s_wet_seg[i]),
             )
             updated_segments.append(new_seg)
-        updated_segments.append(new_segments[-1]) # Append the tip node unaltered
+        updated_segments.append(new_segments[-1])  # Append the tip node unaltered
 
         # 5. Create and return the updated wing
         return eqx.tree_at(
             lambda w: (
-                w.segments, w.areas.reference, w.areas.wetted, w.aspect_ratio,
-                w.spans.total, w.chords.mean_geometric, w.chords.mean_aerodynamic, w.chords.tip,
-                w.taper, w.sweeps.quarter_chord, w.sweeps.leading_edge,
-                w.aerodynamic_center, w.single_side_aerodynamic_center, w.lengths.total
+                w.segments,
+                w.areas.reference,
+                w.areas.wetted,
+                w.aspect_ratio,
+                w.spans.total,
+                w.chords.mean_geometric,
+                w.chords.mean_aerodynamic,
+                w.chords.tip,
+                w.taper,
+                w.sweeps.quarter_chord,
+                w.sweeps.leading_edge,
+                w.aerodynamic_center,
+                w.single_side_aerodynamic_center,
+                w.lengths.total,
             ),
             self,
             (
-                updated_segments, total_s_ref, total_s_wet, ar,
-                total_span, mgc, global_mac, c_tip[-1],
-                tapers[-1] * (c_root[-1] / c_root[0]), c_4_sweep, le_sweep_total,
-                ac, ss_ac, total_length
-            )
+                updated_segments,
+                total_s_ref,
+                total_s_wet,
+                ar,
+                total_span,
+                mgc,
+                global_mac,
+                c_tip[-1],
+                tapers[-1] * (c_root[-1] / c_root[0]),
+                c_4_sweep,
+                le_sweep_total,
+                ac,
+                ss_ac,
+                total_length,
+            ),
         )
 
     def add_subcomponent(self, subcomponent: Component, update_geometry=True):
@@ -450,6 +496,5 @@ class Wing(Component):
         elif isinstance(subcomponent, WingControlSurface):
             new_controls = self.control_surfaces.add_subcomponent(subcomponent)
             return eqx.tree_at(lambda s: s.control_surfaces, self, new_controls)
-
 
         return super().add_subcomponent(subcomponent)

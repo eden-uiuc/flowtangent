@@ -36,27 +36,41 @@ from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps
 # VortexDistribution Data Structure
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class VortexDistribution(eqx.Module):
     """
     A globally unstructured VLM mesh.
     N = total number of panels across the entire aircraft.
     """
+
     # --- Base Geometric State ---
-    panel_vertices: jnp.ndarray     # (N, 4, 3), CCW from Front-Left
-    camber_slopes: jnp.ndarray      # (N,) Camber slope at each panel
-    wedge_angles: jnp.ndarray       # (N_s,) Leading edge wedge angle for supersonic correction
+    panel_vertices: jnp.ndarray  # (N, 4, 3), CCW from Front-Left
+    camber_slopes: jnp.ndarray  # (N,) Camber slope at each panel
+    wedge_angles: jnp.ndarray  # (N_s,) Leading edge wedge angle for supersonic correction
 
     # --- Identity & Topology (Calculated before flattening!) ---
-    surface_id: jnp.ndarray         # (N,) ID of the originating wing/fuselage
-    control_surface_id: jnp.ndarray # (N,) ID of the control surface (-1 for solid wing)
-    is_leading_edge: jnp.ndarray    # (N,) Boolean mask
-    is_trailing_edge: jnp.ndarray   # (N,) Boolean mask
+    surface_id: jnp.ndarray  # (N,) ID of the originating wing/fuselage
+    control_surface_id: jnp.ndarray  # (N,) ID of the control surface (-1 for solid wing)
+    is_leading_edge: jnp.ndarray  # (N,) Boolean mask
+    is_trailing_edge: jnp.ndarray  # (N,) Boolean mask
 
     # --- Static Structural Integers (NOT traced by JAX) ---
     total_panels: int = eqx.field(static=True)
     total_strips: int = eqx.field(static=True)
 
-    def __init__(self, panel_vertices, camber_slopes, wedge_angles, surface_id, control_surface_id, is_leading_edge, is_trailing_edge, total_panels=None, total_strips=None, **kwargs):
+    def __init__(
+        self,
+        panel_vertices,
+        camber_slopes,
+        wedge_angles,
+        surface_id,
+        control_surface_id,
+        is_leading_edge,
+        is_trailing_edge,
+        total_panels=None,
+        total_strips=None,
+        **kwargs,
+    ):
         self.panel_vertices = panel_vertices
         self.camber_slopes = camber_slopes
         self.wedge_angles = wedge_angles
@@ -188,8 +202,9 @@ class VortexDistribution(eqx.Module):
         stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=self.total_strips)
         return stripwise_panels[strip_ids]
 
+
 def mirror_distribution(vd: VortexDistribution) -> VortexDistribution:
-    """ Creates the symmetric left-side counterpart of a right-side wing. """
+    """Creates the symmetric left-side counterpart of a right-side wing."""
 
     # 1. Flip the Y coordinates (Index 1)
     flipped_verts = vd.panel_vertices.at[:, :, 1].multiply(-1.0)
@@ -211,6 +226,7 @@ def mirror_distribution(vd: VortexDistribution) -> VortexDistribution:
             mirrored_kwargs[key] = getattr(vd, key)
 
     return VortexDistribution(**mirrored_kwargs)
+
 
 def merge_vortex_distributions(vd_list: list[VortexDistribution]) -> VortexDistribution:
     """
@@ -258,25 +274,24 @@ def merge_vortex_distributions(vd_list: list[VortexDistribution]) -> VortexDistr
 
     return VortexDistribution(**merged_kwargs)
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Helper Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def convert_to_segmented_wing(wing):
-    """ Returns a tuple of (root_segment, tip_segment) for unsegmented wings. """
+    """Returns a tuple of (root_segment, tip_segment) for unsegmented wings."""
 
     # If it already has segments, just return them as-is
-    if hasattr(wing, 'segments') and len(wing.segments) > 0:
+    if hasattr(wing, "segments") and len(wing.segments) > 0:
         return wing.segments
 
     # 1. Build Root Segment
-    root_sweeps = WingSweeps(
-        quarter_chord=wing.sweeps.quarter_chord,
-        leading_edge=wing.sweeps.leading_edge
-    )
+    root_sweeps = WingSweeps(quarter_chord=wing.sweeps.quarter_chord, leading_edge=wing.sweeps.leading_edge)
 
     root_segment = WingSegment(
-        tag='root_segment',
+        tag="root_segment",
         percent_span_location=0.0,
         twist=wing.twists.root,
         root_chord_percent=1.0,
@@ -284,7 +299,7 @@ def convert_to_segmented_wing(wing):
         sweeps=root_sweeps,
         thickness_to_chord=wing.thickness_to_chord,
     )
-    if hasattr(wing, 'airfoil') and wing.airfoil is not None:
+    if hasattr(wing, "airfoil") and wing.airfoil is not None:
         root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, wing.airfoil)
 
     # 2. Build Tip Segment
@@ -294,7 +309,7 @@ def convert_to_segmented_wing(wing):
     )
 
     tip_segment = WingSegment(
-        tag='tip_segment',
+        tag="tip_segment",
         percent_span_location=1.0,
         twist=wing.twists.tip,
         root_chord_percent=wing.taper,
@@ -303,14 +318,15 @@ def convert_to_segmented_wing(wing):
         thickness_to_chord=wing.thickness_to_chord,
     )
 
-    if hasattr(wing, 'airfoil') and wing.airfoil is not None:
+    if hasattr(wing, "airfoil") and wing.airfoil is not None:
         tip_segment = eqx.tree_at(lambda s: s.airfoil, tip_segment, wing.airfoil)
 
     return (root_segment, tip_segment)
 
+
 def validate_airfoil_resolutions(wing):
     # Semi=proofing against future Airfoil subclasses by checking name instead of isinstance
-    is_airfoil = lambda node: hasattr(node, '__class__') and 'Airfoil' in node.__class__.__name__
+    is_airfoil = lambda node: hasattr(node, "__class__") and "Airfoil" in node.__class__.__name__
 
     # Get leaves with Airfoils as stopping points
     all_leaves = jax.tree_util.tree_leaves(wing, is_leaf=is_airfoil)
@@ -321,12 +337,15 @@ def validate_airfoil_resolutions(wing):
     if airfoils:
         resolutions = [af.coordinates.shape[0] for af in airfoils]
         if len(set(resolutions)) > 1:
-            raise ValueError(f"VLM discretization requires all airfoils on a wing to have the same number of points. "
-                             f"On wing '{wing.tag}' found resolutions: {set(resolutions)}.")
+            raise ValueError(
+                f"VLM discretization requires all airfoils on a wing to have the same number of points. "
+                f"On wing '{wing.tag}' found resolutions: {set(resolutions)}."
+            )
         else:
             return resolutions[0]
     else:
         return 2  # Number of airfoil coordinates, 2 if no airfoil for flat line
+
 
 def find_intervals(wing: Wing) -> tuple[jnp.ndarray, jnp.ndarray]:
     """
@@ -351,12 +370,12 @@ def find_intervals(wing: Wing) -> tuple[jnp.ndarray, jnp.ndarray]:
     midpoints = (eta_starts + eta_ends) / 2.0
     n_intervals = len(midpoints)
 
-    strip_segment_idx = jnp.searchsorted(jnp.array(segment_boundaries), midpoints, side='right') - 1
+    strip_segment_idx = jnp.searchsorted(jnp.array(segment_boundaries), midpoints, side="right") - 1
     strip_segment_idx = jnp.clip(strip_segment_idx, 0, len(wing.segments) - 1)
 
     # Escape CS handling if wing has no control surfaces
 
-    if not hasattr(wing, 'control_surfaces') or len(wing.control_surfaces) == 0:
+    if not hasattr(wing, "control_surfaces") or len(wing.control_surfaces) == 0:
         le_cuts = jnp.zeros(n_intervals)
         te_cuts = jnp.ones(n_intervals)
         le_ids = jnp.full(n_intervals, -1, dtype=jnp.int32)
@@ -364,10 +383,10 @@ def find_intervals(wing: Wing) -> tuple[jnp.ndarray, jnp.ndarray]:
         return jnp.stack([eta_starts, eta_ends, le_cuts, te_cuts, le_ids, te_ids], axis=1), strip_segment_idx
 
     # Convert CS info to arrays
-    cs_span_starts  = jnp.array(cs_span_starts)
-    cs_span_ends    = jnp.array(cs_span_ends)
+    cs_span_starts = jnp.array(cs_span_starts)
+    cs_span_ends = jnp.array(cs_span_ends)
     cs_chord_starts = jnp.array([cs.chord_fraction_start for cs in wing.control_surfaces])
-    cs_chord_ends   = jnp.array([cs.chord_fraction_end for cs in wing.control_surfaces])
+    cs_chord_ends = jnp.array([cs.chord_fraction_end for cs in wing.control_surfaces])
 
     # Find which control surfaces intersect each interval
     active_mask = (midpoints[:, None] > cs_span_starts[None, :]) & (midpoints[:, None] < cs_span_ends[None, :])
@@ -388,6 +407,7 @@ def find_intervals(wing: Wing) -> tuple[jnp.ndarray, jnp.ndarray]:
     te_id = jnp.where(jnp.any(te_active, axis=1), jnp.argmax(te_active, axis=1), -1)
 
     return jnp.stack([eta_starts, eta_ends, le_cuts, te_cuts, le_id, te_id], axis=1), strip_segment_idx
+
 
 def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine_spacing: bool = False) -> jnp.ndarray:
     """
@@ -428,7 +448,7 @@ def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine
     vertex_indices = jnp.arange(n_sw + 1)
 
     # Find which interval each vertex belongs to
-    interval_idx = jnp.searchsorted(cum_panels_adj, vertex_indices, side='right') - 1
+    interval_idx = jnp.searchsorted(cum_panels_adj, vertex_indices, side="right") - 1
 
     # Clip to prevent out-of-bounds on the very last vertex (n_sw)
     interval_idx = jnp.clip(interval_idx, 0, n_intervals - 1)
@@ -441,11 +461,7 @@ def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine
     f_linear = local_i / n_local
 
     # Apply Cosine Spacing if requested
-    f_spacing = jnp.where(
-        cosine_spacing,
-        0.5 * (1.0 - jnp.cos(jnp.pi * f_linear)),
-        f_linear
-    )
+    f_spacing = jnp.where(cosine_spacing, 0.5 * (1.0 - jnp.cos(jnp.pi * f_linear)), f_linear)
 
     # 4. Map back to global eta coordinates
     interval_starts = eta_starts[interval_idx]
@@ -458,26 +474,32 @@ def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine
     return eta_vertices, interval_mapping
 
 
-def generate_chordwise_coordinates(le_cut: float, te_cut: float, n_cw: int, cosine_spacing: bool = False) -> jnp.ndarray:
+def generate_chordwise_coordinates(
+    le_cut: float, te_cut: float, n_cw: int, cosine_spacing: bool = False
+) -> jnp.ndarray:
     """
     Generates piecewise chordwise coordinates (0.0 to 1.0) for a single strip.
     """
     # Define the 3 potential chordwise sections:
-    breaks = jnp.array([0.0, le_cut, te_cut, 1.0]) # [Leading Edge -> le_cut], [le_cut -> te_cut], [te_cut -> Trailing Edge]
+    breaks = jnp.array(
+        [0.0, le_cut, te_cut, 1.0]
+    )  # [Leading Edge -> le_cut], [le_cut -> te_cut], [te_cut -> Trailing Edge]
     widths = jnp.diff(breaks)  # Calculate physical widths of these sections
     n_cw = jnp.maximum(n_cw, 3)  # Safety catch
 
     # Proportional Allocation ()
     total_width = jnp.sum(widths)
     cum_fractions = jnp.cumsum(widths) / jnp.maximum(total_width, 1e-8)
-    cum_panels = jnp.round(cum_fractions * n_cw).astype(int) # We must distribute exactly n_c panels, rounding off 0-widths intervales
+    cum_panels = jnp.round(cum_fractions * n_cw).astype(
+        int
+    )  # We must distribute exactly n_c panels, rounding off 0-widths intervales
     panels_per_interval = jnp.diff(jnp.concatenate([jnp.array([0]), cum_panels]))
 
     # Global-to-Local Index Mapping
     cum_panels_adj = jnp.concatenate([jnp.array([0]), jnp.cumsum(panels_per_interval)])
     vertex_indices = jnp.arange(n_cw + 1)
 
-    interval_idx = jnp.searchsorted(cum_panels_adj, vertex_indices, side='right') - 1
+    interval_idx = jnp.searchsorted(cum_panels_adj, vertex_indices, side="right") - 1
     interval_idx = jnp.clip(interval_idx, 0, 2)
 
     # Calculate local fractions
@@ -486,11 +508,7 @@ def generate_chordwise_coordinates(le_cut: float, te_cut: float, n_cw: int, cosi
     f_linear = jnp.where(n_local > 0, local_i / jnp.maximum(n_local, 1), 0.0)
 
     # Chordwise cosine spacing is currently present, but unsupported
-    f_spacing = jnp.where(
-        cosine_spacing,
-        0.5 * (1.0 - jnp.cos(jnp.pi * f_linear)),
-        f_linear
-    )
+    f_spacing = jnp.where(cosine_spacing, 0.5 * (1.0 - jnp.cos(jnp.pi * f_linear)), f_linear)
 
     # Map back to global chord coordinates (0.0 to 1.0)
     interval_starts = breaks[interval_idx]
@@ -574,10 +592,10 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
     z_2d_R = jnp.zeros_like(x_2d_R)
 
     # 3. Apply Twist Rotation (Pitching around the Leading Edge pivot)
-    x_rot_L =  x_2d_L * jnp.cos(twist_L) + z_2d_L * jnp.sin(twist_L)
+    x_rot_L = x_2d_L * jnp.cos(twist_L) + z_2d_L * jnp.sin(twist_L)
     z_rot_L = -x_2d_L * jnp.sin(twist_L) + z_2d_L * jnp.cos(twist_L)
 
-    x_rot_R =  x_2d_R * jnp.cos(twist_R) + z_2d_R * jnp.sin(twist_R)
+    x_rot_R = x_2d_R * jnp.cos(twist_R) + z_2d_R * jnp.sin(twist_R)
     z_rot_R = -x_2d_R * jnp.sin(twist_R) + z_2d_R * jnp.cos(twist_R)
 
     # 4. Translate to the 3D Swept/Dihedraled Space
@@ -596,9 +614,9 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
     verts_R = jnp.stack([X_3D_R, Y_3D_R, Z_3D_R], axis=-1)
 
     # Slice them to define the 4 corners of each panel (Front to Back)
-    front_left  = verts_L[:, :-1, :]
-    back_left   = verts_L[:, 1:, :]
-    back_right  = verts_R[:, 1:, :]
+    front_left = verts_L[:, :-1, :]
+    back_left = verts_L[:, 1:, :]
+    back_right = verts_R[:, 1:, :]
     front_right = verts_R[:, :-1, :]
 
     # Stack into final panel array.
@@ -607,6 +625,7 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
 
     return panel_vertices
 
+
 @inputs(
     "settings.analysis.aerodynamics: VLMSettings",
     "settings.analysis.aerodynamics.discretize_control_surfaces",
@@ -614,10 +633,7 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
     "settings.analysis.aerodynamics.vortices.wing_chordwise_vortices",
     "system.wings",
 )
-@outputs(
-    "system.analysis_data['vortex_distribution']",
-    "settings.analysis.aerodynamics.vortices.chordwise_cosine"
-)
+@outputs("system.analysis_data['vortex_distribution']", "settings.analysis.aerodynamics.vortices.chordwise_cosine")
 def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"):
 
     # Pre-Processing ---------------------------------------------------------------------------------------------------
@@ -638,8 +654,10 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
             # TODO: Add support for All_Moving_Surface class
             for segment in wing.segments:
                 if len(segment.control_surfaces) > 0:
-                    raise ValueError(f"Found control surfaces on segment '{segment.tag}' of wing '{wing.tag}'. \
-                                     Control surfaces must be attributes of the wing itself.")
+                    raise ValueError(
+                        f"Found control surfaces on segment '{segment.tag}' of wing '{wing.tag}'. \
+                                     Control surfaces must be attributes of the wing itself."
+                    )
 
         # Non-Dimensional Panelization ---------------------------------------------------------------------------------
 
@@ -661,8 +679,8 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
 
         # Calculate strip eta (non-dimensional y-coordinate) (Shape: (n_sw +1,))
         eta, strip_interval_map = generate_spanwise_coordinates(
-            interval_data, n_sw,
-            vlm_settings.vortices.spanwise_cosine)
+            interval_data, n_sw, vlm_settings.vortices.spanwise_cosine
+        )
 
         # Calculate strip xi (non-dimensional x-coordinate) (Shape: (n_sw, n_cw + 1))
         strip_le_cuts = interval_data[:, 2][strip_interval_map]
@@ -670,23 +688,23 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
 
         vmap_chordwise = jax.vmap(generate_chordwise_coordinates, in_axes=(0, 0, None, None))
         xi_grid = vmap_chordwise(
-            strip_le_cuts, strip_te_cuts, n_cw,
-            False) # Force linear chordwise spacing for Pistolesi's theorem (assumed in coefficient integration)
+            strip_le_cuts, strip_te_cuts, n_cw, False
+        )  # Force linear chordwise spacing for Pistolesi's theorem (assumed in coefficient integration)
 
         # Map panels to control surfaces
         xi_mid = (xi_grid[:, :-1] + xi_grid[:, 1:]) / 2.0
         strip_le_ids = interval_data[:, 4][strip_interval_map]
         strip_te_ids = interval_data[:, 5][strip_interval_map]
 
-        panel_cs_id = jnp.full_like(xi_mid, -1, dtype=jnp.int32) # Default to -1 to indicate panel belongs to wing itself
+        panel_cs_id = jnp.full_like(
+            xi_mid, -1, dtype=jnp.int32
+        )  # Default to -1 to indicate panel belongs to wing itself
         panel_cs_id = jnp.where(
-            xi_mid < strip_le_cuts[:, None],
-            strip_le_ids[:, None],
-            panel_cs_id) # If xi < LE cut, assign local LE CS ID
+            xi_mid < strip_le_cuts[:, None], strip_le_ids[:, None], panel_cs_id
+        )  # If xi < LE cut, assign local LE CS ID
         panel_cs_id = jnp.where(
-            xi_mid > strip_te_cuts[:, None],
-            strip_te_ids[:, None],
-            panel_cs_id)  # If xi > TE cut, assign local TE CS ID
+            xi_mid > strip_te_cuts[:, None], strip_te_ids[:, None], panel_cs_id
+        )  # If xi > TE cut, assign local TE CS ID
 
         # Geometric Corrections ----------------------------------------------------------------------------------------
 
@@ -695,24 +713,21 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
         flat_x = jnp.linspace(0.0, 1.0, n_af_pts // 2)
         flat_z = jnp.zeros(n_af_pts // 2)
 
-        seg_camber_x = jnp.stack([
-            seg.airfoil.x_lower_surface if getattr(seg, 'airfoil', None) else flat_x
-            for seg in wing.segments
-        ]) # type: ignore
+        seg_camber_x = jnp.stack(
+            [seg.airfoil.x_lower_surface if getattr(seg, "airfoil", None) else flat_x for seg in wing.segments]
+        )  # type: ignore
 
-        seg_camber_z = jnp.stack([
-            seg.airfoil.camber if getattr(seg, 'airfoil', None) else flat_z
-            for seg in wing.segments
-        ])  # type: ignore
+        seg_camber_z = jnp.stack(
+            [seg.airfoil.camber if getattr(seg, "airfoil", None) else flat_z for seg in wing.segments]
+        )  # type: ignore
 
-        seg_wedge_angle = jnp.stack([
-            seg.airfoil.wedge_angle if getattr(seg, 'airfoil', None) else 0.0
-            for seg in wing.segments
-        ])  # type: ignore
+        seg_wedge_angle = jnp.stack(
+            [seg.airfoil.wedge_angle if getattr(seg, "airfoil", None) else 0.0 for seg in wing.segments]
+        )  # type: ignore
 
-        strip_camber_x      = seg_camber_x[strip_interval_map]
-        strip_camber_z      = seg_camber_z[strip_interval_map]
-        strip_wedge_angle   = seg_wedge_angle[strip_interval_map]
+        strip_camber_x = seg_camber_x[strip_interval_map]
+        strip_camber_z = seg_camber_z[strip_interval_map]
+        strip_wedge_angle = seg_wedge_angle[strip_interval_map]
 
         xi_colloc = 0.25 * xi_grid[:, :-1] + 0.75 * xi_grid[:, 1:]
 
@@ -737,7 +752,6 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
             morph_results = morph_results.at[:, :, :, 1].set(z_coords)
             morph_results = morph_results.at[:, :, :, 2].set(y_coords)
 
-
         # Flatten and pack into VortexDistribution ---------------------------------------------------------------------
         flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
 
@@ -754,14 +768,13 @@ def discretize_surfaces(state: "State", system: "Aircraft", settings: "Settings"
         VD_list.append(VD)
 
         if wing.symmetric:
-
             VD_list.append(mirror_distribution(VD))
 
     full_VD = merge_vortex_distributions(VD_list)
 
     updated_analysis_data = system.analysis_data | {"vortex_distribution": full_VD}
 
-    updated_system  = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
+    updated_system = eqx.tree_at(lambda s: s.analysis_data, updated_system, updated_analysis_data)
 
     updated_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, settings, vlm_settings)
 

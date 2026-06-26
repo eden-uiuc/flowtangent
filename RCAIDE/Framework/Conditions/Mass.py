@@ -20,6 +20,7 @@ from RCAIDE.Framework.Conditions import Conditions
 #  Mass
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class MassConditions(Conditions):
     """
     Represents the mass conditions for a vehicle or system.
@@ -50,14 +51,13 @@ class MassConditions(Conditions):
     """
 
     # Attribute             Type        Default Value
-    tag:                    str         = init_field('Mass Conditions', static=True)
+    tag: str = init_field("Mass Conditions", static=True)
 
-    total:                  jnp.ndarray  = empty_array((0))
-    rate_of_change:         jnp.ndarray  = empty_array((0))
-    volume:                 jnp.ndarray  = empty_array((0))
-    density:                jnp.ndarray  = empty_array((0))
-    center_of_gravity:      jnp.ndarray  = empty_array((0, 3))
-    moments_of_inertia:     jnp.ndarray  = empty_array((0, 3, 3))
+    total: jnp.ndarray = empty_array((0))
+    rate_of_change: jnp.ndarray = empty_array((0))
+    volume: jnp.ndarray = empty_array((0))
+    density: jnp.ndarray = empty_array((0))
+    center_of_gravity: jnp.ndarray = empty_array((0, 3))
+    moments_of_inertia: jnp.ndarray = empty_array((0, 3, 3))
 
-    breakdown:              Conditions  = init_field(lambda: Conditions(tag='Mass Breakdown'))
-
+    breakdown: Conditions = init_field(lambda: Conditions(tag="Mass Breakdown"))

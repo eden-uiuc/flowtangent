@@ -31,9 +31,9 @@ def euler_zyx_to_dcm(angles):
     cy, sy = jnp.cos(y), jnp.sin(y)
     cx, sx = jnp.cos(x), jnp.sin(x)
 
-    row1 = jnp.array([cy*cz, cz*sx*sy - cx*sz, cx*cz*sy + sx*sz])
-    row2 = jnp.array([cy*sz, cx*cz + sx*sy*sz, cx*sy*sz - cz*sx])
-    row3 = jnp.array([-sy,   cy*sx,            cx*cy])
+    row1 = jnp.array([cy * cz, cz * sx * sy - cx * sz, cx * cz * sy + sx * sz])
+    row2 = jnp.array([cy * sz, cx * cz + sx * sy * sz, cx * sy * sz - cz * sx])
+    row3 = jnp.array([-sy, cy * sx, cx * cy])
 
     return jnp.stack([row1, row2, row3])
 
@@ -41,10 +41,11 @@ def euler_zyx_to_dcm(angles):
 vmap_euler_to_dcm = vmap(euler_zyx_to_dcm)
 
 
-def update_orientations(state: "rcf.State",
-                        system: "rcf.Systems",
-                        settings: "rcf.Settings",
-                        ):
+def update_orientations(
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
     v_inertial = state.frames.inertial.velocity_vector
 
@@ -59,11 +60,11 @@ def update_orientations(state: "rcf.State",
     TI2B = jnp.swapaxes(TB2I, 1, 2)
 
     # Velocity Transformation
-    v_body = jnp.einsum('nij,nj->ni', TI2B, v_inertial)
+    v_body = jnp.einsum("nij,nj->ni", TI2B, v_inertial)
 
     # X-Z Projection of velocity
     v_xz = v_body.at[:, 1].set(0)
-    v_xz_mag = jnp.sqrt(jnp.sum(v_xz **2, axis=1))
+    v_xz_mag = jnp.sqrt(jnp.sum(v_xz**2, axis=1))
 
     # Angle of Attack
     alpha = jnp.arctan2(v_xz[:, 2], v_xz[:, 0])
@@ -74,32 +75,32 @@ def update_orientations(state: "rcf.State",
     # ---Wind Frame Rotations---
 
     wind_body_rotations = jnp.zeros_like(body_inertial_rotations)
-    wind_body_rotations = wind_body_rotations.at[:, 0].set(0.)        # No x-axis roll in wind frame
-    wind_body_rotations = wind_body_rotations.at[:, 1].set(alpha)     # Theta is Angle of Attack
-    wind_body_rotations = wind_body_rotations.at[:, 2].set(beta)      # Psi is Side Slip Angle
+    wind_body_rotations = wind_body_rotations.at[:, 0].set(0.0)  # No x-axis roll in wind frame
+    wind_body_rotations = wind_body_rotations.at[:, 1].set(alpha)  # Theta is Angle of Attack
+    wind_body_rotations = wind_body_rotations.at[:, 2].set(beta)  # Psi is Side Slip Angle
 
     TW2B = vmap_euler_to_dcm(wind_body_rotations)
     TW2I = jnp.matmul(TW2B, TB2I)
 
     # ---Pack Results---
     state = eqx.tree_at(
-            lambda s: (
-                s.aerodynamics.angles.alpha,
-                s.aerodynamics.angles.beta,
-                s.aerodynamics.angles.phi,
-                s.frames.body.transform_to_inertial,
-                s.frames.wind.transform_to_inertial,
-                s.frames.wind.body_rotations,
-            ),
-            state,
-            (
-                state.aerodynamics.angles.alpha.at[:, 0].set(alpha),
-                state.aerodynamics.angles.beta.at[:, 0].set(beta),
-                phi,
-                TB2I,
-                TW2I,
-                wind_body_rotations
-            )
-        )
+        lambda s: (
+            s.aerodynamics.angles.alpha,
+            s.aerodynamics.angles.beta,
+            s.aerodynamics.angles.phi,
+            s.frames.body.transform_to_inertial,
+            s.frames.wind.transform_to_inertial,
+            s.frames.wind.body_rotations,
+        ),
+        state,
+        (
+            state.aerodynamics.angles.alpha.at[:, 0].set(alpha),
+            state.aerodynamics.angles.beta.at[:, 0].set(beta),
+            phi,
+            TB2I,
+            TW2I,
+            wind_body_rotations,
+        ),
+    )
 
     return state, system, settings

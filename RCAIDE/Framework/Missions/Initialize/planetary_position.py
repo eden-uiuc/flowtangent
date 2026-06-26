@@ -17,15 +17,19 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def initialize_planetary_position(state: "rcf.State",
-                                  system: "rcf.Systems",
-                                  settings: "rcf.Settings",
-                                  ):
+def initialize_planetary_position(
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
     state = eqx.tree_at(
-        lambda s: (s.frames.planet.longitude, s.frames.planet.latitude), state,
-        (state.frames.planet.longitude.at[:, 0].set(state.initials.frames.planet.longitude[-1, 0]),
-         state.frames.planet.latitude.at[:, 0].set(state.initials.frames.planet.latitude[-1, 0]))
+        lambda s: (s.frames.planet.longitude, s.frames.planet.latitude),
+        state,
+        (
+            state.frames.planet.longitude.at[:, 0].set(state.initials.frames.planet.longitude[-1, 0]),
+            state.frames.planet.latitude.at[:, 0].set(state.initials.frames.planet.latitude[-1, 0]),
+        ),
     )
 
     return state, system, settings

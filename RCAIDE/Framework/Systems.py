@@ -32,8 +32,9 @@ from RCAIDE.Library.Components.Wings import Wing
 
 class VehicleEnvelope(eqx.Module):
     # Attribute             Type        Default Value
-    ultimate_load_factor:   float        = 0.0
-    limit_load_factor:      float        = 0.0
+    ultimate_load_factor: float = 0.0
+    limit_load_factor: float = 0.0
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  System
@@ -41,54 +42,54 @@ class VehicleEnvelope(eqx.Module):
 
 
 class System(Component):
+    tag: str = init_field("System", static=True)
 
-    tag: str = init_field('System', static=True)
+    configurations: Component = init_field(lambda: Component(tag="Configurations"))
 
-    configurations: Component = init_field(lambda: Component(tag='Configurations'))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Aircraft
 # ----------------------------------------------------------------------------------------------------------------------
 
-class AircraftReferenceGeometry(eqx.Module):
 
+class AircraftReferenceGeometry(eqx.Module):
     mean_aerodynamic_chord: jnp.ndarray = empty_array(0)
-    projected_span: jnp.ndarray         = empty_array(0)
-    aerodynamic_center: jnp.ndarray     = empty_array((0, 3))
-    center_of_gravity: jnp.ndarray      = empty_array((0, 3))
+    projected_span: jnp.ndarray = empty_array(0)
+    aerodynamic_center: jnp.ndarray = empty_array((0, 3))
+    center_of_gravity: jnp.ndarray = empty_array((0, 3))
 
 
 class AircraftMassProperties(MassProperties):
+    max_takeoff: float = 0.0
+    takeoff: float = 0.0
+    operating_empty: float = 0.0
+    max_zero_fuel: float = 0.0
+    cargo: float = 0.0
 
-    max_takeoff         :float = 0.
-    takeoff             :float = 0.
-    operating_empty     :float = 0.
-    max_zero_fuel       :float = 0.
-    cargo               :float = 0.
 
 class Aircraft(System):
+    tag: str = init_field("Aircraft", static=True)
 
-    tag:                str = init_field('Aircraft', static=True)
+    ac_class: AircraftClass = init_field(MediumRange, static=True)
+    envelope: VehicleEnvelope = init_field(VehicleEnvelope, static=True)
+    mass_properties: AircraftMassProperties = init_field(AircraftMassProperties)  # type: ignore
 
-    ac_class:           AircraftClass = init_field(MediumRange, static=True)
-    envelope:           VehicleEnvelope = init_field(VehicleEnvelope, static=True)
-    mass_properties:    AircraftMassProperties = init_field(AircraftMassProperties) #type: ignore
+    passengers: int = init_field(0, static=True)
 
-    passengers:         int     = init_field(0, static=True)
+    design_mach_number: float = init_field(0.0, static=True)
+    design_range: float = init_field(0.0, static=True)
+    design_cruise_alt: float = init_field(0.0, static=True)
 
-    design_mach_number: float   = init_field(0., static=True)
-    design_range:       float   = init_field(0., static=True)
-    design_cruise_alt:  float   = init_field(0., static=True)
+    _bookkeeping: dict = init_field(
+        lambda: {
+            "energy_networks": EnergyNetwork,
+            "wings": Wing,
+            "fuselages": Fuselage,
+            "nacelles": Nacelle,
+            "landing_gear": LandingGear,
+        },
+        static=True,
+    )
 
-    _bookkeeping: dict = init_field(lambda: {
-        "energy_networks": EnergyNetwork,
-        "wings": Wing,
-        "fuselages": Fuselage,
-        "nacelles": Nacelle,
-        "landing_gear": LandingGear
-    }, static=True)
-
-    reference_geometry:     AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
-    analysis_data:          dict = init_field(dict)
-
-
+    reference_geometry: AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
+    analysis_data: dict = init_field(dict)

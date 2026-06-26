@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 #  Transonic Spline
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 # ---------------------------------------------------------
 # 1. PURE LIBRARY FUNCTION (Math Only)
 # ---------------------------------------------------------
@@ -44,12 +45,10 @@ def transonic_spline(M, M_sub, M_sup, val_sub, val_sup, grad_sub, grad_sup):
     h11 = t**3 - t**2
 
     # Spline interpolation
-    blended_val = (val_sub * h00) + \
-                  (val_sup * h01) + \
-                  (grad_sub * delta_M * h10) + \
-                  (grad_sup * delta_M * h11)
+    blended_val = (val_sub * h00) + (val_sup * h01) + (grad_sub * delta_M * h10) + (grad_sup * delta_M * h11)
 
     return blended_val
+
 
 @jax.jit
 def transonic_CL_spline(M, M_sub, M_sup, CL_sub, CL_sup):
@@ -60,10 +59,11 @@ def transonic_CL_spline(M, M_sub, M_sup, CL_sub, CL_sup):
     CL = CL0 / sqrt(M_sup^2 - 1) -> dCL/dM_sup = -CL * M_sup / (M_sup^2 -1)
     """
 
-    grad_sub =  CL_sub * (M_sub / (1.0 - M_sub ** 2))
-    grad_sup = -CL_sup * (M_sup / (M_sup ** 2 - 1.0))
+    grad_sub = CL_sub * (M_sub / (1.0 - M_sub**2))
+    grad_sup = -CL_sup * (M_sup / (M_sup**2 - 1.0))
 
     return transonic_spline(M, M_sub, M_sup, CL_sub, CL_sup, grad_sub, grad_sup)
+
 
 @jax.jit
 def peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, val_peak=0.0, peak_multiplier=1.15):
@@ -97,6 +97,7 @@ def peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, val_peak=0.0, pe
     # 4. Blend them perfectly at the peak
     return jnp.where(M <= M_peak, spline_up, spline_down)
 
+
 @jax.jit
 def ensemble_CL_spline(M, M_sub, M_sup, val_sub, val_sup, peak_multiplier=1.15):
     """
@@ -121,11 +122,7 @@ def ensemble_CL_spline(M, M_sub, M_sup, val_sub, val_sup, peak_multiplier=1.15):
     discriminant = jnp.maximum(4.0 * b**2 - 12.0 * a * c, 0.0)
 
     # Protect against a=0 (a pure parabola) to keep AD safe
-    t_peak = jnp.where(
-        jnp.abs(a) > 1e-8,
-        (-2.0 * b - jnp.sqrt(discriminant)) / (6.0 * a),
-        -c / (2.0 * b + 1e-8)
-    )
+    t_peak = jnp.where(jnp.abs(a) > 1e-8, (-2.0 * b - jnp.sqrt(discriminant)) / (6.0 * a), -c / (2.0 * b + 1e-8))
 
     # Clip t_peak strictly between 5% and 95% of the transition zone
     # to prevent boundary collapse
@@ -147,6 +144,6 @@ def ensemble_CL_spline(M, M_sub, M_sup, val_sub, val_sup, peak_multiplier=1.15):
     # 5. Apply the User's Empirical Boost!
     val_peak = base_peak_val * peak_multiplier
 
-    return peaked_CL_spline(M, M_sub, M_peak, M_sup,
-                            val_sub, val_sup, val_peak=val_peak,
-                            peak_multiplier=peak_multiplier)
+    return peaked_CL_spline(
+        M, M_sub, M_peak, M_sup, val_sub, val_sup, val_peak=val_peak, peak_multiplier=peak_multiplier
+    )

@@ -22,9 +22,10 @@ from RCAIDE.Framework.Conditions import Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def chebyshev_matrices(n: int = 16,
-                       calculate_integration: bool = True,
-                       ):
+def chebyshev_matrices(
+    n: int = 16,
+    calculate_integration: bool = True,
+):
 
     assert n > 0, "Attempted to calculate Chebyshev matrices with non-positive number of control points."
 
@@ -38,9 +39,9 @@ def chebyshev_matrices(n: int = 16,
     # See Trefethen, L.N. "Spectral Methods in MATLAB"
 
     # c_neg = c_i*(-1)^i
-    c_neg = jnp.array([2.] + [1.] * (n - 2) + [2.])
-    c_neg *= (-1.) ** jnp.arange(n)
-    c_neg_inv = 1./c_neg
+    c_neg = jnp.array([2.0] + [1.0] * (n - 2) + [2.0])
+    c_neg *= (-1.0) ** jnp.arange(n)
+    c_neg_inv = 1.0 / c_neg
 
     # Calculate x_i - x_j as matrix operation
     A = jnp.tile(x, (n, 1)).T
@@ -69,35 +70,33 @@ def chebyshev_matrices(n: int = 16,
 
 
 class NumericalTime(Conditions):
-
     # Attribute     Type                Default Value
-    control_points: jnp.ndarray         = empty_array(0)
-    differentiate:  jnp.ndarray         = empty_array(0)
-    integrate:      jnp.ndarray | None  = None
+    control_points: jnp.ndarray = empty_array(0)
+    differentiate: jnp.ndarray = empty_array(0)
+    integrate: jnp.ndarray | None = None
 
     def __repr__(self):
         return ""
 
 
 class Numerics(Conditions):
-
     # Attribute                 Type                Default Value
-    tag:                        str                 = init_field('Numerics', static=True)
+    tag: str = init_field("Numerics", static=True)
 
-    number_of_control_points:   int                 = init_field(16, static=True)
-    control_point_spacing:      str                 = init_field('cosine', static=True)
-    calculate_integration:      bool                = init_field(True, static=True)
-    discretization_method:      Callable | None     = init_field(None, static=True)
+    number_of_control_points: int = init_field(16, static=True)
+    control_point_spacing: str = init_field("cosine", static=True)
+    calculate_integration: bool = init_field(True, static=True)
+    discretization_method: Callable | None = init_field(None, static=True)
 
-    solver_jacobian:            str | None          = init_field(None, static=True)
-    solution_tolerance:         float               = init_field(1e-8, static=True)
-    max_evaluations:            int                 = init_field(500,  static=True)
-    step_size:                  float | None        = init_field(None, static=True)
+    solver_jacobian: str | None = init_field(None, static=True)
+    solution_tolerance: float = init_field(1e-8, static=True)
+    max_evaluations: int = init_field(500, static=True)
+    step_size: float | None = init_field(None, static=True)
 
-    converged:                  bool                = False
+    converged: bool = False
 
-    dimensionless:              NumericalTime   = init_field(lambda: NumericalTime(tag='Dimensionless Time'))
-    time:                       NumericalTime   = init_field(lambda: NumericalTime(tag='Time'))
+    dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
+    time: NumericalTime = init_field(lambda: NumericalTime(tag="Time"))
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
@@ -109,15 +108,11 @@ class Numerics(Conditions):
             cps, diff, intg = self.discretization_method()
         else:
             cps, diff, intg = chebyshev_matrices(
-                 n=self.number_of_control_points,
-                 calculate_integration=self.calculate_integration
+                n=self.number_of_control_points, calculate_integration=self.calculate_integration
             )
 
         new_dimensionless = NumericalTime(
-            tag='Dimensionless Time',
-            control_points=cps,
-            differentiate=diff,
-            integrate=intg
+            tag="Dimensionless Time", control_points=cps, differentiate=diff, integrate=intg
         )
 
         object.__setattr__(self, "dimensionless", new_dimensionless)

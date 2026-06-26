@@ -35,7 +35,7 @@ from RCAIDE.utils import inputs, outputs
     "system.analysis_data['vortex_strengths']",
 )
 def compute_vortex_strength(state: "State", system: "System", settings: "Settings"):
-    """ Solves the linear system A * GAMMA = RHS for the vortex strengths. """
+    """Solves the linear system A * GAMMA = RHS for the vortex strengths."""
 
     analysis: dict[str, jnp.ndarray] = system.analysis_data
     VD = analysis["vortex_distribution"]

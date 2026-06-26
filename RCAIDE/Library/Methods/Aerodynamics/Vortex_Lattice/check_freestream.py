@@ -25,6 +25,7 @@ from RCAIDE.utils import inputs, outputs
 #  Check Freestream
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 # ---------------------------------------------------------
 # 1. PURE LIBRARY FUNCTION (Math Only)
 # ---------------------------------------------------------
@@ -38,6 +39,7 @@ def func_check_freestream(velocity):
 
     return safe_velocity, safe_speed
 
+
 # ---------------------------------------------------------
 # 2. STATEFUL FRAMEWORK ROUTER
 # ---------------------------------------------------------
@@ -49,12 +51,14 @@ def func_check_freestream(velocity):
     "state.freestream.speed",
 )
 def check_freestream_stateful(state: "State", system: "System", settings: "Settings"):
-    """ Unpacks PyTrees, calls pure math, repacks PyTrees. """
+    """Unpacks PyTrees, calls pure math, repacks PyTrees."""
 
     velocity = state.frames.inertial.velocity_vector
 
     safe_velocity, safe_speed = func_check_freestream(velocity)
 
-    current_state = eqx.tree_at(lambda s: (s.frames.inertial.velocity_vector, s.freestream.speed), state, (safe_velocity, safe_speed))
+    current_state = eqx.tree_at(
+        lambda s: (s.frames.inertial.velocity_vector, s.freestream.speed), state, (safe_velocity, safe_speed)
+    )
 
     return current_state, system, settings

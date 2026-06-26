@@ -34,20 +34,22 @@ from RCAIDE.utils import MERMAID_STYLES, DataPath, Token, init_field
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def null_step(*args):
     return args
 
+
 class ProcessStep(eqx.Module):
+    function: Callable | str = init_field(null_step, static=True)
+    tag: str = init_field("Process Step", static=True)
 
-    function:       Callable | str     = init_field(null_step, static=True)
-    tag:            str                = init_field("Process Step", static=True)
-
-    state_delta:          State | None     = None
-    system_delta:         System | None    = None
-    settings_delta:       Settings | None  = None
+    state_delta: State | None = None
+    system_delta: System | None = None
+    settings_delta: Settings | None = None
 
     def __call__(self, state, system, settings):
-        if settings.DEBUG_MODE: print(f"  Step: '{self.tag}'")
+        if settings.DEBUG_MODE:
+            print(f"  Step: '{self.tag}'")
         # Default calling behavior, assumes function is callable.
         # String overwrite only for steps with __call__ override
         return self.function(state, system, settings)  # type: ignore
@@ -69,29 +71,30 @@ class ProcessStep(eqx.Module):
     def outputs(self) -> set:
         return getattr(self.function, "_outputs", set())
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Gradient Map
 # ----------------------------------------------------------------------------------------------------------------------
 
-class GradientMap:
 
+class GradientMap:
     def __init__(
         self,
-        state_inputs:       tuple = (),
-        state_outputs:      tuple = (),
-        system_inputs:      tuple = (),
-        system_outputs:     tuple = (),
-        settings_inputs:    tuple = (),
-        settings_outputs:   tuple = (),
+        state_inputs: tuple = (),
+        state_outputs: tuple = (),
+        system_inputs: tuple = (),
+        system_outputs: tuple = (),
+        settings_inputs: tuple = (),
+        settings_outputs: tuple = (),
     ):
 
         # Sanitize inputs/oututs to PathTuples
-        self.state_inputs     = tuple(DataPath(p) for p in state_inputs)
-        self.system_inputs    = tuple(DataPath(p) for p in system_inputs)
-        self.settings_inputs  = tuple(DataPath(p) for p in settings_inputs)
+        self.state_inputs = tuple(DataPath(p) for p in state_inputs)
+        self.system_inputs = tuple(DataPath(p) for p in system_inputs)
+        self.settings_inputs = tuple(DataPath(p) for p in settings_inputs)
 
-        self.state_outputs    = tuple(DataPath(p) for p in state_outputs)
-        self.system_outputs   = tuple(DataPath(p) for p in system_outputs)
+        self.state_outputs = tuple(DataPath(p) for p in state_outputs)
+        self.system_outputs = tuple(DataPath(p) for p in system_outputs)
         self.settings_outputs = tuple(DataPath(p) for p in settings_outputs)
 
         # Count inputs
@@ -141,14 +144,13 @@ class GradientMap:
         self.unravel_function = unravel_function
         return flat_input_array
 
-
     def update_inputs(
-            self,
-            input_array,
-            base_state: Optional[State] = None,
-            base_system: Optional[System] = None,
-            base_settings: Optional[Settings] =  None,
-        ):
+        self,
+        input_array,
+        base_state: Optional[State] = None,
+        base_system: Optional[System] = None,
+        base_settings: Optional[Settings] = None,
+    ):
 
         st, sys, setts = base_state, base_system, base_settings
 
@@ -171,34 +173,22 @@ class GradientMap:
         # Inject flat array of inputs into the PyTrees
         # (Wrapped in lambdas, and replace inputs cast to tuples, slices stiched back into parents)
         if self._n_st > 0:
-            st_slices = reshaped_inputs[:self._n_st]
+            st_slices = reshaped_inputs[: self._n_st]
             updated_st_parents = stitch_parents(st, self.state_inputs, st_slices)
 
-            st = eqx.tree_at(
-                lambda t: ru.get_all_parents(t, self.state_inputs),
-                st,
-                updated_st_parents
-            )
+            st = eqx.tree_at(lambda t: ru.get_all_parents(t, self.state_inputs), st, updated_st_parents)
 
         if self._n_sys > 0:
-            sys_slices = reshaped_inputs[self._n_st: self._n_st + self._n_sys]
+            sys_slices = reshaped_inputs[self._n_st : self._n_st + self._n_sys]
             updated_sys_parents = stitch_parents(sys, self.system_inputs, sys_slices)
 
-            sys = eqx.tree_at(
-                lambda t: ru.get_all_parents(t, self.system_inputs),
-                sys,
-                updated_sys_parents
-            )
+            sys = eqx.tree_at(lambda t: ru.get_all_parents(t, self.system_inputs), sys, updated_sys_parents)
 
         if self._n_setts > 0:
-            setts_slices = reshaped_inputs[self._n_st + self._n_sys:]
+            setts_slices = reshaped_inputs[self._n_st + self._n_sys :]
             updated_setts_parents = stitch_parents(setts, self.settings_inputs, setts_slices)
 
-            setts = eqx.tree_at(
-                lambda t: ru.get_all_parents(t, self.settings_inputs),
-                setts,
-                updated_setts_parents
-            )
+            setts = eqx.tree_at(lambda t: ru.get_all_parents(t, self.settings_inputs), setts, updated_setts_parents)
 
         return st, sys, setts
 
@@ -217,28 +207,32 @@ class GradientMap:
 
         return out_array
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Process Class
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class Process(ProcessStep):
+    tag: str = init_field("Process", static=True)
 
-    tag:                str                     = init_field("Process", static=True)
+    steps: tuple[ProcessStep, ...] = init_field(tuple)
 
-    steps:              tuple[ProcessStep, ...] = init_field(tuple)
+    initial_step: int = init_field(0, static=True)
 
-    initial_step:       int                     = init_field(0, static=True)
+    initial_state: Optional[State] = None
+    initial_system: Optional[System] = None
+    initial_settings: Optional[Settings] = None
 
-    initial_state:      Optional[State]     = None
-    initial_system:     Optional[System]    = None
-    initial_settings:   Optional[Settings]  = None
+    _val_and_jac_fn: Optional[Callable] = init_field(None, static=True)
+    _cached_grad_map: Optional[GradientMap] = init_field(None, static=True)
 
-    _val_and_jac_fn:    Optional[Callable]      = init_field(None, static=True)
-    _cached_grad_map:   Optional[GradientMap]   = init_field(None, static=True)
-
-    _filter_map: dict = init_field(lambda: {
+    _filter_map: dict = init_field(
+        lambda: {
             "energy": r"state\.energy\.nodes\.\[*\].outputs",
-        },static=True)
+        },
+        static=True,
+    )
 
     def __getitem__(self, item):
         if isinstance(item, str):
@@ -258,30 +252,33 @@ class Process(ProcessStep):
         #  Search the steps using tracer-safe logic
         for step in steps:
             step_tag = step.tag
-            if not isinstance(step_tag, str) and hasattr(step_tag, 'value'):
+            if not isinstance(step_tag, str) and hasattr(step_tag, "value"):
                 step_tag = step_tag.value
 
             if isinstance(step_tag, str):
-                formatted_tag = step_tag.replace(' ', '_').lower()
+                formatted_tag = step_tag.replace(" ", "_").lower()
                 if key == formatted_tag:
                     return step
 
         raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
     def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
-        if settings.DEBUG_MODE: print(f"Beginning Process: '{self.tag}'")
+        if settings.DEBUG_MODE:
+            print(f"Beginning Process: '{self.tag}'")
 
-        for step in self.steps[self.initial_step:]:
+        for step in self.steps[self.initial_step :]:
             state, system, settings = step(state, system, settings)
 
-        if settings.DEBUG_MODE: print(f"Process '{self.tag}' Complete.")
+        if settings.DEBUG_MODE:
+            print(f"Process '{self.tag}' Complete.")
         return state, system, settings
 
     def _run_with_raw_history(self, state, system, settings):
-        if settings.DEBUG_MODE: print(f"Beginning Process: '{self.tag}'")
+        if settings.DEBUG_MODE:
+            print(f"Beginning Process: '{self.tag}'")
         history = [(state, system, settings)]
 
-        for step in self.steps[self.initial_step:]:
+        for step in self.steps[self.initial_step :]:
             state, system, settings = step(state, system, settings)
             history.append((state, system, settings))
 
@@ -306,9 +303,7 @@ class Process(ProcessStep):
         def batched_jacrev_fn(input_array, base_state, base_system, base_settings):
             # 1. Forward pass + VJP function generation
             out_array, vjp_fn, aux = jax.vjp(
-                objective_fn,
-                input_array, base_state, base_system, base_settings,
-                has_aux=True
+                objective_fn, input_array, base_state, base_system, base_settings, has_aux=True
             )
             B, N_o = out_array.shape
 
@@ -332,9 +327,8 @@ class Process(ProcessStep):
         """Cast all numeric leaves to 0D JAX scalars for gradient computations."""
 
         def _to_array(leaf):
-            if (
-                isinstance(leaf, (float, int)) or
-                (isinstance(leaf, list) and all(isinstance(i, (float, int)) for i in leaf))
+            if isinstance(leaf, (float, int)) or (
+                isinstance(leaf, list) and all(isinstance(i, (float, int)) for i in leaf)
             ):
                 return jnp.array(leaf, dtype=jnp.float64)
             else:
@@ -342,9 +336,9 @@ class Process(ProcessStep):
 
         return jax.tree_util.tree_map(_to_array, tree)
 
-    def run(self,
-            state, system, settings,
-            track_history: bool=False) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
+    def run(
+        self, state, system, settings, track_history: bool = False
+    ) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
 
         # Sanitize inputs (map floats/ints to JAX arrays)
         state = self._sanitize_inputs(state)
@@ -363,15 +357,13 @@ class Process(ProcessStep):
         # Grad map acts as flag to get gradients
         grad_map = settings.analysis.gradient_map
         if grad_map is not None:
-
             # Flatten inputs for Jacobian calculation
             flat_input_array = grad_map.flatten_inputs(state, system, settings)
 
             # Build Value and Jacobian function only if it doesn't exist or the cached grad_map is outdated
             if self._val_and_jac_fn is None or self._cached_grad_map != grad_map:
-
-                object.__setattr__(self, '_val_and_jac_fn', self._build_value_and_jacobian(grad_map, track_history))
-                object.__setattr__(self, '_cached_grad_map', grad_map)
+                object.__setattr__(self, "_val_and_jac_fn", self._build_value_and_jacobian(grad_map, track_history))
+                object.__setattr__(self, "_cached_grad_map", grad_map)
 
             jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings)  # type: ignore
             f_st, f_sys, f_setts, raw_hist = aux
@@ -385,29 +377,39 @@ class Process(ProcessStep):
         logged_process = None
         if track_history and raw_hist is not None:
             logged_steps = []
-            for i, step in enumerate(self.steps[self.initial_step:]):
-                logged_step = eqx.tree_at(lambda s: (s.state_delta, s.system_delta, s.settings_delta), step,
-                                          (ru.compute_tree_delta(raw_hist[i+1][0], raw_hist[i][0]),
-                                           ru.compute_tree_delta(raw_hist[i+1][1], raw_hist[i][1]),
-                                           ru.compute_tree_delta(raw_hist[i+1][2], raw_hist[i][2])
-                                           ))
+            for i, step in enumerate(self.steps[self.initial_step :]):
+                logged_step = eqx.tree_at(
+                    lambda s: (s.state_delta, s.system_delta, s.settings_delta),
+                    step,
+                    (
+                        ru.compute_tree_delta(raw_hist[i + 1][0], raw_hist[i][0]),
+                        ru.compute_tree_delta(raw_hist[i + 1][1], raw_hist[i][1]),
+                        ru.compute_tree_delta(raw_hist[i + 1][2], raw_hist[i][2]),
+                    ),
+                )
                 logged_steps.append(logged_step)
 
             logged_process = eqx.tree_at(
                 lambda p: (
                     p.steps,
-                    p.initial_state, p.initial_system, p.initial_settings,
-                    p.state_delta, p.system_delta, p.settings_delta
+                    p.initial_state,
+                    p.initial_system,
+                    p.initial_settings,
+                    p.state_delta,
+                    p.system_delta,
+                    p.settings_delta,
                 ),
                 self,
                 (
                     tuple(logged_steps),
-                    initial_state, initial_system, initial_settings,
+                    initial_state,
+                    initial_system,
+                    initial_settings,
                     ru.compute_tree_delta(state, initial_state),
                     ru.compute_tree_delta(system, initial_system),
-                    ru.compute_tree_delta(settings, initial_settings)
+                    ru.compute_tree_delta(settings, initial_settings),
                 ),
-                is_leaf=lambda x: x is None
+                is_leaf=lambda x: x is None,
             )
 
         # Always return final State, System, Settings, optionally return Jacobian matrix and logged Process
@@ -417,7 +419,7 @@ class Process(ProcessStep):
         if logged_process is not None:
             out_vals += (logged_process,)
 
-        return out_vals # type: ignore
+        return out_vals  # type: ignore
 
     def append(self, step: ProcessStep | Self):
         new_steps = self.steps + (step,)
@@ -458,7 +460,7 @@ class Process(ProcessStep):
         return eqx.tree_at(lambda c: c.steps, self, new_steps)
 
     def pop(self, index: int):
-        new_steps = self.steps[:index] + self.steps[index + 1:]
+        new_steps = self.steps[:index] + self.steps[index + 1 :]
         return eqx.tree_at(lambda p: p.steps, self, new_steps)
 
     def _remove_tag(self, tag: str):
@@ -527,7 +529,7 @@ class Process(ProcessStep):
                 if in_var in latest_producers:
                     producer_node = latest_producers[in_var]
                     if G.has_edge(producer_node, step_node):
-                        G.edges[producer_node, step_node]['variables'].append(in_var)
+                        G.edges[producer_node, step_node]["variables"].append(in_var)
                     else:
                         G.add_edge(producer_node, step_node, variables=[in_var])
                 else:
@@ -536,7 +538,7 @@ class Process(ProcessStep):
                         G.add_node(global_node)
 
                     if G.has_edge(global_node, step_node):
-                        G.edges[global_node, step_node]['variables'].append(in_var)
+                        G.edges[global_node, step_node]["variables"].append(in_var)
                     else:
                         G.add_edge(global_node, step_node, variables=[in_var])
 
@@ -553,7 +555,7 @@ class Process(ProcessStep):
         layout: str = "LR",
         exclude: list[str] = None,
         save_path: str = None,
-        style: str = "modern"
+        style: str = "modern",
     ) -> str:
         """
         Generates a Mermaid.js flowchart string from the Process DAG.
@@ -566,12 +568,9 @@ class Process(ProcessStep):
         """
         # 1. Setup the exclusion filters using the shared class attribute
         if exclude is None:
-            exclude = ['energy']
+            exclude = ["energy"]
 
-        compiled_patterns = [
-            re.compile(self._filter_map[k])
-            for k in exclude if k in self._filter_map
-        ]
+        compiled_patterns = [re.compile(self._filter_map[k]) for k in exclude if k in self._filter_map]
 
         def is_filtered(var_name: str) -> bool:
             return any(pat.search(var_name) for pat in compiled_patterns)
@@ -594,13 +593,13 @@ class Process(ProcessStep):
             if node_name == "User Inputs":
                 mermaid_lines.append(f"    {safe_id}([{node_name}])")
             else:
-                step_obj = G.nodes[node_name].get('step_obj')
+                step_obj = G.nodes[node_name].get("step_obj")
                 display_label = step_obj.tag if step_obj else str(node_name)
                 mermaid_lines.append(f"    {safe_id}[{display_label}]")
 
         # 4. Build edges and apply filters to the variable lists
         for u, v, data in G.edges(data=True):
-            raw_vars = data.get('variables', [])
+            raw_vars = data.get("variables", [])
 
             # Apply the filter to strip out unwanted phantom paths
             vars_list = [var for var in raw_vars if not is_filtered(var)]
@@ -609,7 +608,7 @@ class Process(ProcessStep):
                 if len(vars_list) > 4:
                     label = f"{len(vars_list)} variables"
                 else:
-                    clean_vars = [var.split('.')[-1] for var in vars_list]
+                    clean_vars = [var.split(".")[-1] for var in vars_list]
                     label = "<br>".join(clean_vars)
 
                 # Sanitize any stray double quotes to single quotes
@@ -649,7 +648,7 @@ class Process(ProcessStep):
         """
 
         if exclude is None:
-            exclude = ['energy']
+            exclude = ["energy"]
 
         exclude_patterns = [self._filter_map[k] for k in exclude if k in self._filter_map]
 
@@ -749,17 +748,16 @@ class Process(ProcessStep):
 
         # Leverage our recursive flattener to get every atomic step
         for step_name, step in self._get_flattened_steps():
-
             # Check Inputs (Consumed)
             for in_var in step.inputs:
                 # Strip type hints for a clean comparison
-                base_var = in_var.split(':')[0].strip()
+                base_var = in_var.split(":")[0].strip()
                 if search_term in base_var:
                     consumers.append((step_name, in_var))
 
             # Check Outputs (Produced)
             for out_var in step.outputs:
-                base_var = out_var.split(':')[0].strip()
+                base_var = out_var.split(":")[0].strip()
                 if search_term in base_var:
                     producers.append((step_name, out_var))
 
@@ -794,7 +792,7 @@ class Process(ProcessStep):
         for step in steps:
             # Handle tracer proxies safely
             tag = step.tag
-            if not isinstance(tag, str) and hasattr(tag, 'value'):
+            if not isinstance(tag, str) and hasattr(tag, "value"):
                 tag = tag.value
             step_tags.append(str(tag))
 
@@ -803,7 +801,7 @@ class Process(ProcessStep):
                 step_func_names.append(f"<Process>: {len(step.steps)} Step(s)")
             elif isinstance(step, ProcessStep):
                 func = step.function
-                name = getattr(func, '__name__', func.__class__.__name__)
+                name = getattr(func, "__name__", func.__class__.__name__)
                 step_func_names.append(name)
 
         # Handle edge case where process has steps but they have empty tags
@@ -811,21 +809,29 @@ class Process(ProcessStep):
 
         process_str = self.tag
         for idx in range(len(step_tags)):
-            process_str += f"\n\t{idx+1:>2}) {step_tags[idx]:<{max_tag_length}} : {step_func_names[idx]}"
+            process_str += f"\n\t{idx + 1:>2}) {step_tags[idx]:<{max_tag_length}} : {step_func_names[idx]}"
 
         return process_str
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Legacy Optimizer Interface
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class OptimizerInterface:
     """Interface with legacy optimizers to separate value and gradient function for RCAIDE Processes."""
 
-    def __init__(self, process: Process,
-                 base_state: State, base_system: System, base_settings: Settings,
-                 grad_map: GradientMap, objective_path: DataPath,
-                 **kwargs):
+    def __init__(
+        self,
+        process: Process,
+        base_state: State,
+        base_system: System,
+        base_settings: Settings,
+        grad_map: GradientMap,
+        objective_path: DataPath,
+        **kwargs,
+    ):
 
         self.process = process
 
@@ -846,7 +852,9 @@ class OptimizerInterface:
 
     def _update_cache(self, x):
         if self.last_x is None or not np.allclose(x, self.last_x):
-            state, system, settings = self.grad_map.update_inputs(x, self.base_state, self.base_system, self.base_settings)
+            state, system, settings = self.grad_map.update_inputs(
+                x, self.base_state, self.base_system, self.base_settings
+            )
             f_st, f_sys, f_setts, jac = self.process.run(state, system, settings, grad_map=self.grad_map)
             token = Token(state=f_st, system=f_sys, settings=f_setts)
 
@@ -861,5 +869,3 @@ class OptimizerInterface:
     def jac(self, x):
         self._update_cache(x)
         return self.last_jac
-
-

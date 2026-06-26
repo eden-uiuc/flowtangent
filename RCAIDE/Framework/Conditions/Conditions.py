@@ -23,8 +23,7 @@ from RCAIDE.utils import init_field
 
 
 class Conditions(eqx.Module):
-
-    tag: str = init_field('Conditions', static=True)
+    tag: str = init_field("Conditions", static=True)
 
     subconditions: tuple = init_field(tuple)
 
@@ -41,7 +40,7 @@ class Conditions(eqx.Module):
         if isinstance(item, (int, slice)):
             return self.subconditions[item]
         elif isinstance(item, str):
-            attr_name = item.replace(' ', '_').lower()
+            attr_name = item.replace(" ", "_").lower()
             return getattr(self, attr_name)
         else:
             raise TypeError(f"Conditions indices must be slices, integers or strings, not {type(item).__name__}")
@@ -51,14 +50,10 @@ class Conditions(eqx.Module):
 
     def expand_rows(self, n: int):
 
-        CLASSES_TO_SKIP = (
-            'AtmosphericBreakpoints',
-            'SolverConditions'
-        )
+        CLASSES_TO_SKIP = ("AtmosphericBreakpoints", "SolverConditions")
 
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray)):
-
                 # 1. Intercept the empty placeholders
                 if leaf.size == 0:
                     if leaf.ndim == 1:
@@ -80,7 +75,7 @@ class Conditions(eqx.Module):
             return leaf
 
         def _is_static_node(node):
-            return hasattr(node, '__class__') and node.__class__.__name__ in CLASSES_TO_SKIP
+            return hasattr(node, "__class__") and node.__class__.__name__ in CLASSES_TO_SKIP
 
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
 
@@ -97,10 +92,10 @@ class Conditions(eqx.Module):
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
     def replace_subcondition(self, subcondition: "Conditions", index: int):
-        new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1:]
+        new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1 :]
 
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
     def __repr__(self):
-        repr_str = self.tag + " - Subconditions: [" + ', '.join([sc.tag for sc in self.subconditions])+"]"
+        repr_str = self.tag + " - Subconditions: [" + ", ".join([sc.tag for sc in self.subconditions]) + "]"
         return repr_str

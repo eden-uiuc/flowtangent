@@ -22,20 +22,22 @@ if TYPE_CHECKING:
 #  Compressibility Drag Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 # ---------------------------------------------------------
 # 1. PURE LIBRARY FUNCTION (Math Only)
 # ---------------------------------------------------------
 @jax.jit
 def func_compute_something(array_1, array_2):
-    """ Pure JAX mathematical evaluation. """
+    """Pure JAX mathematical evaluation."""
 
     return jnp.zeros_like(array_1)
+
 
 # ---------------------------------------------------------
 # 2. STATEFUL FRAMEWORK ROUTER
 # ---------------------------------------------------------
 def compute_something_stateful(state: "State", system: "System", settings: "Settings"):
-    """ Unpacks PyTrees, calls pure math, repacks PyTrees. """
+    """Unpacks PyTrees, calls pure math, repacks PyTrees."""
 
     # 1. Unpack
     # val = state.aerodynamics.something

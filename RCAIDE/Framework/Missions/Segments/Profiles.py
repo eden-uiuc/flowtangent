@@ -28,8 +28,8 @@ from RCAIDE.Framework import ProcessStep
 
 # Course Profiles
 
-class ConstantCourse(ProcessStep):
 
+class ConstantCourse(ProcessStep):
     tag: str = init_field("Set Constant Course", static=True)
 
     true_course: float = 0.0 * Units.deg
@@ -40,9 +40,11 @@ class ConstantCourse(ProcessStep):
 
         return updated_state, system, settings
 
+
 CourseProfile = ConstantCourse
 
 # Position Profiles
+
 
 class ConstantAltitude(ProcessStep):
     tag: str = init_field("Set Constant Altitude", static=True)
@@ -54,10 +56,13 @@ class ConstantAltitude(ProcessStep):
         updated_position = state.frames.inertial.position_vector.at[:, 2].set(-altitude_arr.flatten())
 
         updated_state = eqx.tree_at(
-            lambda s: (s.freestream.altitude, s.frames.inertial.position_vector), state,
-            (altitude_arr, updated_position))
+            lambda s: (s.freestream.altitude, s.frames.inertial.position_vector),
+            state,
+            (altitude_arr, updated_position),
+        )
 
         return updated_state, system, settings
+
 
 class AltitudeChange(ProcessStep):
     tag: str = init_field("Set Altitude Change", static=True)
@@ -71,19 +76,23 @@ class AltitudeChange(ProcessStep):
         updated_position = state.frames.inertial.position_vector.at[:, 2].set(-altitude_profile.flatten())
 
         updated_state = eqx.tree_at(
-            lambda s:(s.freestream.altitude, s.frames.inertial.position_vector), state,
-            (altitude_profile, updated_position))
+            lambda s: (s.freestream.altitude, s.frames.inertial.position_vector),
+            state,
+            (altitude_profile, updated_position),
+        )
 
         return updated_state, system, settings
+
 
 PositionProfile = ConstantAltitude | AltitudeChange
 
 # Speed Profiles
 # TODO: Add sideslip calculation and/or deprecate in favor of full 6-DOF
 
+
 class ConstantSpeed(ProcessStep):
     tag: str = init_field("Set Constant Speed", static=True)
-    speed: float = 1.0 * Units.m/Units.s
+    speed: float = 1.0 * Units.m / Units.s
 
     def __call__(self, state, system, settings):
         new_speed = jnp.full_like(state.freestream.speed, self.speed)
@@ -92,11 +101,10 @@ class ConstantSpeed(ProcessStep):
         new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(new_speed.flatten())
 
         updated_state = eqx.tree_at(
-            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector),
-            state,
-            (new_speed, new_velocity)
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), state, (new_speed, new_velocity)
         )
         return updated_state, system, settings
+
 
 class ConstantMach(ProcessStep):
     tag: str = init_field("Set Constant Mach Number", static=True)
@@ -113,30 +121,30 @@ class ConstantMach(ProcessStep):
         new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_mag.flatten())
 
         updated_state = eqx.tree_at(
-            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector),
-            state,
-            (v_mag, new_velocity)
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), state, (v_mag, new_velocity)
         )
         return updated_state, system, settings
+
 
 SpeedProfile = ConstantSpeed | ConstantMach
 
 # Velocity Profiles
 
+
 class ConstantAltitudeChangeRate(ProcessStep):
     tag: str = init_field("Set Constant Alt. Change Rate", static=True)
 
-    change_rate: float = 0.0 * Units.m/Units.s
+    change_rate: float = 0.0 * Units.m / Units.s
 
     def __call__(self, state, system, settings):
         v_mag = state.freestream.speed
-        v_z = -self.change_rate # Z points down, so positive rate (climb) is negative and vice-versa
-        v_x = jnp.sqrt(v_mag **2 - v_z ** 2)
+        v_z = -self.change_rate  # Z points down, so positive rate (climb) is negative and vice-versa
+        v_x = jnp.sqrt(v_mag**2 - v_z**2)
 
         updated_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_x.squeeze(-1))
         updated_velocity = updated_velocity.at[:, 2].set(v_z)
 
-        updated_state = eqx.tree_at(lambda s:s.frames.inertial.velocity_vector, state, updated_velocity)
+        updated_state = eqx.tree_at(lambda s: s.frames.inertial.velocity_vector, state, updated_velocity)
         return updated_state, system, settings
 
 
@@ -144,12 +152,13 @@ VelocityProfile = ConstantAltitudeChangeRate
 
 # Duration Profiles
 
+
 class FixedDistance(ProcessStep):
     tag: str = init_field("Set Fixed Distance Duration", static=True)
     distance: float = 1.0 * Units.km
 
     def __call__(self, state, system, settings):
-        v_avg   = jnp.linalg.norm(jnp.average(state.frames.inertial.velocity_vector, axis=0))
+        v_avg = jnp.linalg.norm(jnp.average(state.frames.inertial.velocity_vector, axis=0))
 
         t_0 = state.frames.inertial.time[0, 0]
         t_f = t_0 + self.distance / v_avg
@@ -157,9 +166,10 @@ class FixedDistance(ProcessStep):
         t_nondim = state.numerics.dimensionless.control_points
         time = t_nondim * (t_f - t_0) + t_0
 
-        updated_state = eqx.tree_at(lambda s:s.frames.inertial.time, state, time)
+        updated_state = eqx.tree_at(lambda s: s.frames.inertial.time, state, time)
 
         return updated_state, system, settings
+
 
 class FixedTime(ProcessStep):
     tag: str = init_field("Set Fixed Time Duration", static=True)
@@ -172,8 +182,9 @@ class FixedTime(ProcessStep):
         t_nondim = state.numerics.dimensionless.control_points
         time = t_nondim * (t_f - t_0) + t_0
 
-        updated_state = eqx.tree_at(lambda s:s.frames.inertial.time, state, time)
+        updated_state = eqx.tree_at(lambda s: s.frames.inertial.time, state, time)
 
         return updated_state, system, settings
+
 
 DurationProfile = FixedDistance | FixedTime

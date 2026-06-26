@@ -23,9 +23,7 @@ if TYPE_CHECKING:
 
 
 def func_propulsor_moment(
-        propulsor_thrust: np.ndarray,
-        propulsor_origin: np.ndarray,
-        vehicle_center_of_gravity: np.ndarray
+    propulsor_thrust: np.ndarray, propulsor_origin: np.ndarray, vehicle_center_of_gravity: np.ndarray
 ):
 
     moment_arm = propulsor_origin - vehicle_center_of_gravity
@@ -34,15 +32,15 @@ def func_propulsor_moment(
     return moment
 
 
-def propulsor_moment(state: "rcf.State",
-                     system: "rcf.Systems",
-                     settings: "rcf.Settings",
-                     ):
+def propulsor_moment(
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
     vehicle_center_of_gravity = system.mass_properties.center_of_gravity
 
     for idx, propulsor in enumerate(system.energy.propulsors):
-
         propulsor_thrust = state.energy.propulsors[idx].thrust
         propulsor_origin = system.energy.propulsors[idx].origin
 

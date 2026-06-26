@@ -21,19 +21,19 @@ if TYPE_CHECKING:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_freestream(state: "State",
-                      system: "System",
-                      settings: "Settings",
-                      ):
-
+def update_freestream(
+    state: "State",
+    system: "System",
+    settings: "Settings",
+):
 
     # Update Altitude
-    alt = -state.frames.inertial.position_vector[:, 2][:, None] # Z is negative by right hand rule convention
-    state = eqx.tree_at(lambda s:s.freestream.altitude, state, alt)
+    alt = -state.frames.inertial.position_vector[:, 2][:, None]  # Z is negative by right hand rule convention
+    state = eqx.tree_at(lambda s: s.freestream.altitude, state, alt)
 
     # Update gravity
     G = state.freestream.planet.compute_gravity()
-    state = eqx.tree_at(lambda s:s.freestream.gravity, state, state.freestream.gravity.at[:,0].set(G))
+    state = eqx.tree_at(lambda s: s.freestream.gravity, state, state.freestream.gravity.at[:, 0].set(G))
 
     # Update Atmospheric Properties
     atmo = state.freestream.atmosphere
@@ -45,31 +45,25 @@ def update_freestream(state: "State",
     g = atmo.compute_gamma(alt)
     Cp = atmo.compute_Cp(alt)
 
-    updated_fs = eqx.tree_at(lambda f:(
-        f.density,
-        f.pressure,
-        f.temperature,
-        f.speed_of_sound,
-        f.dynamic_viscosity,
-        f.gamma,
-        f.Cp
+    updated_fs = eqx.tree_at(
+        lambda f: (f.density, f.pressure, f.temperature, f.speed_of_sound, f.dynamic_viscosity, f.gamma, f.Cp),
+        state.freestream,
+        (
+            r,
+            P,
+            T,
+            a,
+            m,
+            g,
+            Cp,
         ),
-        state.freestream,(
-        r,
-        P,
-        T,
-        a,
-        m,
-        g,
-        Cp,
-        )
     )
     state = eqx.tree_at(lambda s: s.freestream, state, updated_fs)
 
     # Speed
     v = state.frames.inertial.velocity_vector
-    v_mag_sq = jnp.sum(v ** 2, axis=1)[:, None]
-    v_mag    = jnp.sqrt(v_mag_sq)
+    v_mag_sq = jnp.sum(v**2, axis=1)[:, None]
+    v_mag = jnp.sqrt(v_mag_sq)
 
     # Dynamic Pressure
     q = 0.5 * r * v_mag_sq
@@ -78,28 +72,30 @@ def update_freestream(state: "State",
     M = v_mag / a
 
     # Stagnation
-    P_t = P * (1 + (g - 1)/2 * M**2) ** (g / (g - 1))   # Stagnation Pressure
-    T_t = T * (1 + (g - 1)/2 * M**2)                    # Stagnation Temperature
+    P_t = P * (1 + (g - 1) / 2 * M**2) ** (g / (g - 1))  # Stagnation Pressure
+    T_t = T * (1 + (g - 1) / 2 * M**2)  # Stagnation Temperature
 
     # Reynolds Number (per meter)
     Re = r * v_mag / m
 
-    state = eqx.tree_at(lambda s:(
-        s.freestream.speed,
-        s.freestream.mach_number,
-        s.freestream.reynolds_number,
-        s.freestream.dynamic_pressure,
-        s.freestream.stagnation_pressure,
-        s.freestream.stagnation_temperature,
+    state = eqx.tree_at(
+        lambda s: (
+            s.freestream.speed,
+            s.freestream.mach_number,
+            s.freestream.reynolds_number,
+            s.freestream.dynamic_pressure,
+            s.freestream.stagnation_pressure,
+            s.freestream.stagnation_temperature,
         ),
-        state, (
-        v_mag,
-        M,
-        Re,
-        q,
-        P_t,
-        T_t,
-        )
+        state,
+        (
+            v_mag,
+            M,
+            Re,
+            q,
+            P_t,
+            T_t,
+        ),
     )
 
     return state, system, settings

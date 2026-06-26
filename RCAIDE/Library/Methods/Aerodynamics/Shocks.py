@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 #  Shock Relations
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 # ---------------------------------------------------------
 # Normal Shock Relations
 # ---------------------------------------------------------
@@ -39,7 +40,7 @@ def theta_beta_mach(M0, theta, gamma=1.4, weak_shock=True):
     b = ((gamma + 1.0) / 2.0 + (gamma + 3.0) * c / 2.0) * jnp.tan(theta_safe)
 
     # Protect the square root from negative values if theta > theta_max
-    inner_d = (4.0 * (1.0 - 3.0 * a * b)**3) / jnp.square(27.0 * a**2 * c + 9.0 * a * b - 2.0) - 1.0
+    inner_d = (4.0 * (1.0 - 3.0 * a * b) ** 3) / jnp.square(27.0 * a**2 * c + 9.0 * a * b - 2.0) - 1.0
     d = jnp.sqrt(jnp.maximum(inner_d, 1e-8))
 
     # Select weak (0) or strong (1) shock root
@@ -47,11 +48,15 @@ def theta_beta_mach(M0, theta, gamma=1.4, weak_shock=True):
 
     atan_term = jnp.arctan(1.0 / d)
 
-    beta = jnp.arctan((b + 9.0 * a * c) / (2.0 * (1.0 - 3.0 * a * b)) -
-                      (d * (27.0 * a**2 * c + 9.0 * a * b - 2.0)) / (6.0 * a * (1.0 - 3.0 * a * b)) *
-                      jnp.tan(n * jnp.pi / 3.0 + 1.0 / 3.0 * atan_term))
+    beta = jnp.arctan(
+        (b + 9.0 * a * c) / (2.0 * (1.0 - 3.0 * a * b))
+        - (d * (27.0 * a**2 * c + 9.0 * a * b - 2.0))
+        / (6.0 * a * (1.0 - 3.0 * a * b))
+        * jnp.tan(n * jnp.pi / 3.0 + 1.0 / 3.0 * atan_term)
+    )
 
     return jnp.where(M0 > 1.0, beta, 0.0)
+
 
 @jax.jit
 def oblique_shock(M0, theta, beta, gamma=1.4):
@@ -67,25 +72,27 @@ def oblique_shock(M0, theta, beta, gamma=1.4):
     M1_n = jnp.sqrt(((gamma - 1.0) * M0_n_sq + 2.0) / (2.0 * gamma * M0_n_sq - (gamma - 1.0)))
 
     # Determine flow quantities and ratios
-    M1  = M1_n / jnp.sin(beta - theta)
-    Pr  = (2.0 * gamma * M0_n_sq - (gamma - 1.0)) / (gamma + 1.0)
-    Tr  = Pr * (((gamma - 1.0) * M0_n_sq + 2.0) / ((gamma + 1.0) * M0_n_sq))
+    M1 = M1_n / jnp.sin(beta - theta)
+    Pr = (2.0 * gamma * M0_n_sq - (gamma - 1.0)) / (gamma + 1.0)
+    Tr = Pr * (((gamma - 1.0) * M0_n_sq + 2.0) / ((gamma + 1.0) * M0_n_sq))
 
     term1 = ((gamma + 1.0) * M0_n_sq) / ((gamma - 1.0) * M0_n_sq + 2.0)
     term2 = (gamma + 1.0) / (2.0 * gamma * M0_n_sq - (gamma - 1.0))
-    Ptr   = (term1 ** (gamma / (gamma - 1.0))) * (term2 ** (1.0 / (gamma - 1.0)))
+    Ptr = (term1 ** (gamma / (gamma - 1.0))) * (term2 ** (1.0 / (gamma - 1.0)))
 
     return M1, Pr, Tr, Ptr
 
+
 @jax.jit
 def normal_shock(M0, gamma=1.4):
-    return oblique_shock(M0, theta=0., beta=jnp.pi/2, gamma=gamma)
+    return oblique_shock(M0, theta=0.0, beta=jnp.pi / 2, gamma=gamma)
+
 
 @jax.jit
 def shock_train(M0, thetas, gamma=1.4, weak_shock=True):
 
     def shock_step(carry, theta):
-        M0, P0, T0, Pt0= carry
+        M0, P0, T0, Pt0 = carry
         beta = theta_beta_mach(M0, theta, gamma, weak_shock)
         M1, Pr, Tr, Ptr = oblique_shock(M0, theta, beta, gamma)
         new_carry = (M1, P0 * Pr, T0 * Tr, Pt0 * Ptr)
@@ -94,8 +101,9 @@ def shock_train(M0, thetas, gamma=1.4, weak_shock=True):
     init_carry = (M0, 1.0, 1.0, 1.0)
     final_carry, _ = scan(shock_step, init_carry, thetas)
 
-    return final_carry  #(Mf, Pr, Tr, Ptr)
+    return final_carry  # (Mf, Pr, Tr, Ptr)
 
-if __name__ == '__main__':
-    beta = theta_beta_mach(1.5, -jnp.pi/4)
-    print(oblique_shock(1.5, -jnp.pi/4, beta))
+
+if __name__ == "__main__":
+    beta = theta_beta_mach(1.5, -jnp.pi / 4)
+    print(oblique_shock(1.5, -jnp.pi / 4, beta))

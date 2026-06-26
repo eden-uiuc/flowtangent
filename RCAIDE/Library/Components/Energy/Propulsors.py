@@ -41,45 +41,43 @@ from RCAIDE.Library.Propellants import JetA, Propellant
 
 
 class DesignParameters(eqx.Module):
+    total_thrust: float = 0.0
+    delta_SFC: float = 0.0
 
-    total_thrust:                   float = 0.0
-    delta_SFC:                      float = 0.0
+    altitude: float = 0.0
+    mach_number: float = 0.01
 
-    altitude:                       float = 0.0
-    mach_number:                    float = 0.01
+    temperature: float = 288.15  # Kelvin
+    stagnation_temperature: float = 288.15  # Kelvin
 
-    temperature:                    float = 288.15      # Kelvin
-    stagnation_temperature:         float = 288.15      # Kelvin
+    pressure: float = 101325.0  # Pascal
+    stagnation_pressure: float = 101325.0  # Pascal
 
-    pressure:                       float = 101325.0    # Pascal
-    stagnation_pressure:            float = 101325.0    # Pascal
+    isa_deviation: float = 0.0
 
-    isa_deviation:                  float = 0.0
+    SLS_thrust: float = 0.0
 
-    SLS_thrust:                     float = 0.0
-
-    mass_flow_through_rate:         float = 0.0
-    fuel_air_ratio:                 float = 0.0
-    turbine_intake_temperature:     float = 0.0
+    mass_flow_through_rate: float = 0.0
+    fuel_air_ratio: float = 0.0
+    turbine_intake_temperature: float = 0.0
 
 
 class Propulsor(FlowNode):
-
-    design_parameters:  DesignParameters    = init_field(DesignParameters)
+    design_parameters: DesignParameters = init_field(DesignParameters)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbojet Engine
 # ----------------------------------------------------------------------------------------------------------------------
 
-class JetInstallationGeometry(eqx.Module):
 
-    xe: float = 1.
-    ye: float = 1.
-    Ce: float = 2.
+class JetInstallationGeometry(eqx.Module):
+    xe: float = 1.0
+    ye: float = 1.0
+    Ce: float = 2.0
+
 
 class InletNozzle(FlowNode):
-
     tag: str = init_field("Inlet Nozzle", static=True)
 
     @ru.inputs(
@@ -91,7 +89,7 @@ class InletNozzle(FlowNode):
         "state.freestream.gamma",
         "system.energy.nodes[InletNozzle].pressure_ratio",
         "system.energy.nodes[InletNozzle].pressure_recovery",
-        "system.energy.nodes[InletNozzle].efficiencies.flow"
+        "system.energy.nodes[InletNozzle].efficiencies.flow",
     )
     @ru.outputs(
         "state.energy.nodes[InletNozzle].outputs.flow.mach_number",
@@ -101,9 +99,8 @@ class InletNozzle(FlowNode):
         "state.energy.nodes[InletNozzle].outputs.flow.stagnation_temperature",
         "state.energy.nodes[InletNozzle].outputs.flow.enthalpy",
         "state.energy.nodes[InletNozzle].outputs.flow.stagnation_enthalpy",
-
     )
-    def transmit(self, state: State, system: Aircraft, settings: Settings): #type: ignore
+    def transmit(self, state: State, system: Aircraft, settings: Settings):  # type: ignore
 
         fs = state.freestream
 
@@ -119,25 +116,24 @@ class InletNozzle(FlowNode):
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
 
-        outputs = eqx.tree_at(lambda o: o.mach_number           , outputs, M_out)
-        outputs = eqx.tree_at(lambda o: o.speed                 , outputs, u_out)
-        outputs = eqx.tree_at(lambda o: o.stagnation_pressure   , outputs, P_t_out)
+        outputs = eqx.tree_at(lambda o: o.mach_number, outputs, M_out)
+        outputs = eqx.tree_at(lambda o: o.speed, outputs, u_out)
+        outputs = eqx.tree_at(lambda o: o.stagnation_pressure, outputs, P_t_out)
         outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs, T_t_out)
-        outputs = eqx.tree_at(lambda o: o.temperature           , outputs, T_out)
-        outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy   , outputs, h_t_out)
-        outputs = eqx.tree_at(lambda o: o.enthalpy              , outputs, h_out)
+        outputs = eqx.tree_at(lambda o: o.temperature, outputs, T_out)
+        outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy, outputs, h_t_out)
+        outputs = eqx.tree_at(lambda o: o.enthalpy, outputs, h_out)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs.flow, state, outputs)
 
         return updated_state, system, settings
 
+
 def _alpha_schedule(Nc, Nc_design):
-    return jnp.where(Nc_design > 0.0,
-                     jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0),
-                     0.0)
+    return jnp.where(Nc_design > 0.0, jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), 0.0)
+
 
 class Compressor(FlowNode):
-
     tag: str = init_field("Compressor", static=True)
     Nc_design: float = 0.0
     alpha_schedule: Callable = init_field(_alpha_schedule, static=True)
@@ -148,13 +144,13 @@ class Compressor(FlowNode):
         "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_temperature",
         "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_pressure",
         "system.energy.nodes[Compressor].pressure_ratio",
-        "system.energy.nodes[Compressor].efficiencies.flow"
+        "system.energy.nodes[Compressor].efficiencies.flow",
     )
     @ru.outputs(
         "state.energy.nodes[Compressor].flow.stagnation_temperature"
         "state.energy.nodes[Compressor].flow.stagnation_pressure",
         "state.energy.nodes[Compressor].flow.stagnation_enthalpy",
-        "state.energy.nodes[Compressor].mechanical.work"
+        "state.energy.nodes[Compressor].mechanical.work",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
@@ -178,11 +174,11 @@ class Compressor(FlowNode):
 
         return updated_state, system, settings
 
-class TurbojetCombustor(FlowNode):
 
+class TurbojetCombustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
-    inputs = init_field((EnergyInput("flow", 'HPC'),), static=True)
+    inputs = init_field((EnergyInput("flow", "HPC"),), static=True)
 
     @ru.inputs(
         "state.freestream.Cp",
@@ -201,9 +197,9 @@ class TurbojetCombustor(FlowNode):
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
-        jet_tag     = '.'.join(self.network_ID.split('.')[:-1])
-        jet         = system.energy_networks[0].nodes[jet_tag]
-        T_t_ref     = jnp.atleast_2d(jet.design_parameters.turbine_intake_temperature)
+        jet_tag = ".".join(self.network_ID.split(".")[:-1])
+        jet = system.energy_networks[0].nodes[jet_tag]
+        T_t_ref = jnp.atleast_2d(jet.design_parameters.turbine_intake_temperature)
 
         P_t_out, h_t_out, f = func_combustor_performance(
             gas=self.working_fluid,
@@ -227,14 +223,17 @@ class TurbojetCombustor(FlowNode):
 
         return updated_state, system, settings
 
-class Turbine(FlowNode):
 
+class Turbine(FlowNode):
     tag: str = init_field("Turbine", static=True)
 
-    inputs = init_field((
-        EnergyInput("mechanical", "Offtake Shaft"),
-        EnergyInput("fuel", "Combustor"),
-    ), static=True)
+    inputs = init_field(
+        (
+            EnergyInput("mechanical", "Offtake Shaft"),
+            EnergyInput("fuel", "Combustor"),
+        ),
+        static=True,
+    )
 
     @ru.inputs(
         "state.freestream.gamma",
@@ -276,8 +275,8 @@ class Turbine(FlowNode):
 
         return updated_state, system, settings
 
-class ExpansionNozzle(FlowNode):
 
+class ExpansionNozzle(FlowNode):
     tag: str = init_field("Nozzle", static=True)
 
     @ru.inputs(
@@ -323,16 +322,16 @@ class ExpansionNozzle(FlowNode):
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
 
-        outputs = eqx.tree_at(lambda o: o.area_ratio            , outputs , AR)
-        outputs = eqx.tree_at(lambda o: o.mach_number           , outputs , M_out)
-        outputs = eqx.tree_at(lambda o: o.density               , outputs , r_out)
-        outputs = eqx.tree_at(lambda o: o.speed                 , outputs , u_out)
-        outputs = eqx.tree_at(lambda o: o.pressure              , outputs , P_out)
-        outputs = eqx.tree_at(lambda o: o.stagnation_pressure   , outputs , P_t_out)
-        outputs = eqx.tree_at(lambda o: o.temperature           , outputs , T_out)
-        outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs , T_t_out)
-        outputs = eqx.tree_at(lambda o: o.enthalpy              , outputs , h_out)
-        outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy   , outputs , h_t_out)
+        outputs = eqx.tree_at(lambda o: o.area_ratio, outputs, AR)
+        outputs = eqx.tree_at(lambda o: o.mach_number, outputs, M_out)
+        outputs = eqx.tree_at(lambda o: o.density, outputs, r_out)
+        outputs = eqx.tree_at(lambda o: o.speed, outputs, u_out)
+        outputs = eqx.tree_at(lambda o: o.pressure, outputs, P_out)
+        outputs = eqx.tree_at(lambda o: o.stagnation_pressure, outputs, P_t_out)
+        outputs = eqx.tree_at(lambda o: o.temperature, outputs, T_out)
+        outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs, T_t_out)
+        outputs = eqx.tree_at(lambda o: o.enthalpy, outputs, h_out)
+        outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy, outputs, h_t_out)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs.flow, state, outputs)
 
@@ -347,34 +346,47 @@ def _TurbojetSetup():
 
     comb = TurbojetCombustor()
 
-    HPT = Turbine(tag="HPT", inputs=(EnergyInput("mechanical", "HPC",), EnergyInput("flow", "Combustor"), EnergyInput("fuel", "Combustor")))
-    LPT = Turbine(tag="LPT", inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT"), EnergyInput("fuel", "Combustor")))
+    HPT = Turbine(
+        tag="HPT",
+        inputs=(
+            EnergyInput(
+                "mechanical",
+                "HPC",
+            ),
+            EnergyInput("flow", "Combustor"),
+            EnergyInput("fuel", "Combustor"),
+        ),
+    )
+    LPT = Turbine(
+        tag="LPT",
+        inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT"), EnergyInput("fuel", "Combustor")),
+    )
 
-    nozz = ExpansionNozzle(tag="Core Nozzle", inputs=(EnergyInput("flow", "LPT"), EnergyInput("fuel", "Combustor"),))
+    nozz = ExpansionNozzle(
+        tag="Core Nozzle",
+        inputs=(
+            EnergyInput("flow", "LPT"),
+            EnergyInput("fuel", "Combustor"),
+        ),
+    )
 
     return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
 
+
 class TurbojetEngine(Propulsor):
+    tag: str = init_field("Turbojet", static=True)
+    subcomponents: tuple = init_field(_TurbojetSetup())
 
-    tag:            str             = init_field('Turbojet', static=True)
-    subcomponents:  tuple           = init_field(_TurbojetSetup())
+    plug_diameter: float = 0.0
 
-    plug_diameter:  float           = 0.0
+    fuel: Propellant = init_field(JetA)
+    working_fluid: IdealGas = init_field(Air)
 
-    fuel:           Propellant      = init_field(JetA)
-    working_fluid:  IdealGas             = init_field(Air)
+    inputs = init_field((EnergyInput("flow", "self.core_nozzle"), EnergyInput("fuel", "self.combustor")), static=True)
 
-    inputs = init_field((
-        EnergyInput("flow", "self.core_nozzle"),
-        EnergyInput("fuel", "self.combustor")
-    ), static=True)
+    installation_geometry: JetInstallationGeometry = init_field(JetInstallationGeometry)
 
-    installation_geometry:          JetInstallationGeometry     = init_field(JetInstallationGeometry)
-
-    _bookkeeping: dict = init_field(lambda: {
-        "compressors": Compressor,
-        "turbines": Turbine
-    }, static=True)
+    _bookkeeping: dict = init_field(lambda: {"compressors": Compressor, "turbines": Turbine}, static=True)
 
     @ru.inputs(
         "state.freestream.gamma",
@@ -402,39 +414,39 @@ class TurbojetEngine(Propulsor):
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
-        cn_out      = state.energy.nodes[self.network_ID + ".core_nozzle"].outputs.flow
-        comb_out    = state.energy.nodes[self.network_ID + ".combustor"].outputs.fuel
+        cn_out = state.energy.nodes[self.network_ID + ".core_nozzle"].outputs.flow
+        comb_out = state.energy.nodes[self.network_ID + ".combustor"].outputs.fuel
 
         fs = state.freestream
 
         F, F_sp, I_sp, TSFC, mdot_c, p, ff = func_thrust_and_power(
-                gamma_0=fs.gamma,
-                u0=fs.speed,
-                a0=fs.speed_of_sound,
-                M0=fs.mach_number,
-                P0=fs.pressure,
-                g=fs.gravity,
-                F_ref =self.design_parameters.total_thrust,
-                delta_SFC=self.design_parameters.delta_SFC,
-                v_fan_nozzle=0.,
-                AR_fan_nozzle=0.,
-                P_fan_nozzle=0.,
-                v_core_nozzle=cn_out.speed,
-                AR_core_nozzle=cn_out.area_ratio,
-                P_core_nozzle= cn_out.pressure,
-                fuel_air_ratio=comb_out.fuel_air_ratio,
-                BPR=0.,
-                throttle=state.energy.nodes[self.network_ID].throttle,
-            )
+            gamma_0=fs.gamma,
+            u0=fs.speed,
+            a0=fs.speed_of_sound,
+            M0=fs.mach_number,
+            P0=fs.pressure,
+            g=fs.gravity,
+            F_ref=self.design_parameters.total_thrust,
+            delta_SFC=self.design_parameters.delta_SFC,
+            v_fan_nozzle=0.0,
+            AR_fan_nozzle=0.0,
+            P_fan_nozzle=0.0,
+            v_core_nozzle=cn_out.speed,
+            AR_core_nozzle=cn_out.area_ratio,
+            P_core_nozzle=cn_out.pressure,
+            fuel_air_ratio=comb_out.fuel_air_ratio,
+            BPR=0.0,
+            throttle=state.energy.nodes[self.network_ID].throttle,
+        )
 
         outputs = state.energy.nodes[self.network_ID].outputs
 
-        outputs = eqx.tree_at(lambda o: o.force.thrust                , outputs, F)
+        outputs = eqx.tree_at(lambda o: o.force.thrust, outputs, F)
         outputs = eqx.tree_at(lambda o: o.force.non_dimensional_thrust, outputs, F_sp)
-        outputs = eqx.tree_at(lambda o: o.force.specific_impulse      , outputs, I_sp)
+        outputs = eqx.tree_at(lambda o: o.force.specific_impulse, outputs, I_sp)
 
-        outputs = eqx.tree_at(lambda o: o.fuel.TSFC,                    outputs, TSFC)
-        outputs = eqx.tree_at(lambda o: o.fuel.fuel_flow_rate,          outputs, ff)
+        outputs = eqx.tree_at(lambda o: o.fuel.TSFC, outputs, TSFC)
+        outputs = eqx.tree_at(lambda o: o.fuel.fuel_flow_rate, outputs, ff)
 
         outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, mdot_c)
 
@@ -444,12 +456,13 @@ class TurbojetEngine(Propulsor):
 
         return updated_state, system, settings
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbofan Engine
 # ----------------------------------------------------------------------------------------------------------------------
 
-class Fan(FlowNode):
 
+class Fan(FlowNode):
     tag: str = init_field("Fan", static=True)
     inputs = init_field((EnergyInput("flow", "Inlet Nozzle"),), static=True)
 
@@ -474,7 +487,7 @@ class Fan(FlowNode):
             T_t=self.average_inputs(state, "flow", "stagnation_temperature"),
             P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             PR=self.pressure_ratio,
-            n_p=self.efficiencies.flow
+            n_p=self.efficiencies.flow,
         )
 
         # Set Output State
@@ -482,21 +495,22 @@ class Fan(FlowNode):
 
         outputs = eqx.tree_at(lambda o: o.mechanical.work, outputs, work)
 
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure   , outputs, P_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure, outputs, P_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_out)
-        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy   , outputs, h_t_out)
+        outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
 
         return updated_state, system, settings
 
+
 def _TurbofanSetup(BPR):
 
     inlet = InletNozzle()
-    fan   = Fan()
+    fan = Fan()
 
-    core_flow = EnergySplitter(tag="Core Duct", flow_inputs=("Fan",), extraction_fraction=1./(1.+BPR))
-    bypass_flow = EnergySplitter(tag="Bypass Duct", flow_inputs=("Fan",), extraction_fraction=BPR/(1.+BPR))
+    core_flow = EnergySplitter(tag="Core Duct", flow_inputs=("Fan",), extraction_fraction=1.0 / (1.0 + BPR))
+    bypass_flow = EnergySplitter(tag="Bypass Duct", flow_inputs=("Fan",), extraction_fraction=BPR / (1.0 + BPR))
 
     LPC = Compressor(tag="LPC", flow_inputs=("Core Duct",))
     HPC = Compressor(tag="HPC", flow_inputs=("LPC",))
@@ -511,12 +525,12 @@ def _TurbofanSetup(BPR):
 
     return (inlet, fan, core_flow, bypass_flow, LPC, HPC, comb, HPT, LPT, core_nozz, fan_nozz)
 
-class TurbofanEngine(TurbojetEngine):
 
-    tag: str = init_field('Turbofan', static=True)
+class TurbofanEngine(TurbojetEngine):
+    tag: str = init_field("Turbofan", static=True)
 
     bypass_ratio: float = 1.0
-    exa: float = 1.0                # Fan Face-to-Exit Distance
+    exa: float = 1.0  # Fan Face-to-Exit Distance
 
     def __post_init__(self):
         object.__setattr__(self, "subcomponents", _TurbofanSetup(self.bypass_ratio))
@@ -537,7 +551,7 @@ class TurbofanEngine(TurbojetEngine):
         "state.energy.nodes[Turbofan_fan_nozzle].outputs.flow.area_ratio",
         "state.energy.nodes[Turbofan_fan_nozzle].outputs.flow.pressure",
         "state.energy.nodes[Turbofan_combustor].outputs.fuel.fuel_air_ratio",
-        "system.energy.nodes[Turbofan].bypass_ratio"
+        "system.energy.nodes[Turbofan].bypass_ratio",
     )
     @ru.outputs(
         "state.energy.nodes[Turbofan].outputs.force.thrust",
@@ -550,31 +564,31 @@ class TurbofanEngine(TurbojetEngine):
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
-        cn_out      = state.energy.nodes[self.network_ID + ".core_nozzle"].outputs.flow
-        fn_out      = state.energy.nodes[self.network_ID + ".fan_nozzle"].outputs.flow
-        comb_out    = state.energy.nodes[self.network_ID + ".combustor"].outputs.fuel
+        cn_out = state.energy.nodes[self.network_ID + ".core_nozzle"].outputs.flow
+        fn_out = state.energy.nodes[self.network_ID + ".fan_nozzle"].outputs.flow
+        comb_out = state.energy.nodes[self.network_ID + ".combustor"].outputs.fuel
 
         fs = state.freestream
 
         F, F_sp, I_sp, TSFC, mdot_c, p, ff = func_thrust_and_power(
-                gamma=fs.gamma,
-                u0=fs.speed,
-                a0=fs.speed_of_sound,
-                M0=fs.mach_number,
-                P0=fs.pressure,
-                g=fs.gravity,
-                F_ref =self.design_parameters.total_thrust,
-                delta_SFC=self.design_parameters.delta_SFC,
-                v_fan_nozzle=fn_out.speed,
-                AR_fan_nozzle=fn_out.area_ratio,
-                P_fan_nozzle=fn_out.pressure,
-                v_core_nozzle=cn_out.speed,
-                AR_core_nozzle=cn_out.area_ratio,
-                P_core_nozzle= cn_out.pressure,
-                fuel_air_ratio=comb_out.fuel_air_ratio,
-                BPR=self.bypass_ratio,
-                throttle=state.energy.throttle,
-            )
+            gamma=fs.gamma,
+            u0=fs.speed,
+            a0=fs.speed_of_sound,
+            M0=fs.mach_number,
+            P0=fs.pressure,
+            g=fs.gravity,
+            F_ref=self.design_parameters.total_thrust,
+            delta_SFC=self.design_parameters.delta_SFC,
+            v_fan_nozzle=fn_out.speed,
+            AR_fan_nozzle=fn_out.area_ratio,
+            P_fan_nozzle=fn_out.pressure,
+            v_core_nozzle=cn_out.speed,
+            AR_core_nozzle=cn_out.area_ratio,
+            P_core_nozzle=cn_out.pressure,
+            fuel_air_ratio=comb_out.fuel_air_ratio,
+            BPR=self.bypass_ratio,
+            throttle=state.energy.throttle,
+        )
 
         outputs = state.energy.nodes[self.network_ID].outputs
 

@@ -25,6 +25,7 @@ from RCAIDE.utils import inputs, outputs
 #  Compute VLM Pressure Coefficients
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 # ---------------------------------------------------------
 # Helper Functions
 # ---------------------------------------------------------
@@ -44,15 +45,14 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
     strip_chord_array = jax.ops.segment_sum(dx, strip_ids, num_segments=VD.total_strips)
     strip_chord = strip_chord_array[strip_ids]
 
-
     # Front edge sweep (Front-Left [0] to Front-Right [3])
     dx_A = VD.panel_vertices[:, 3, 0] - VD.panel_vertices[:, 0, 0]
     dy_A = VD.panel_vertices[:, 3, 1] - VD.panel_vertices[:, 0, 1]
     dz_A = VD.panel_vertices[:, 3, 2] - VD.panel_vertices[:, 0, 2]
     dy_z_A = jnp.maximum(jnp.sqrt(dy_A**2 + dz_A**2), 1e-12)  # Prevent DivByZero
 
-    tan_A   = dx_A / dy_z_A
-    cos_DL  = dy_A / dy_z_A  # Cosine of local dihedral
+    tan_A = dx_A / dy_z_A
+    cos_DL = dy_A / dy_z_A  # Cosine of local dihedral
 
     # Back edge sweep (Back-Left [1] to Back-Right [2])
     dx_B = VD.panel_vertices[:, 2, 0] - VD.panel_vertices[:, 1, 0]
@@ -71,14 +71,18 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
         # If element 'b' is a leading edge, it resets the sum to just v2
         return jnp.where(le2, v2, v1 + v2), le1 | le2
 
-    gamma_over_c = Gamma / strip_chord[None, :]                                           # Circulation per unit chord
-    is_le = jnp.broadcast_to(VD.is_leading_edge[None, :], gamma_over_c.shape)             # Broadcast the 1D LE flag to match the (n_time, N) matrix
-    gamma_anterior, _ = jax.lax.associative_scan(scan_fn, (gamma_over_c, is_le), axis=1)  # Associative scan w/ binary switch on leading edge
+    gamma_over_c = Gamma / strip_chord[None, :]  # Circulation per unit chord
+    is_le = jnp.broadcast_to(
+        VD.is_leading_edge[None, :], gamma_over_c.shape
+    )  # Broadcast the 1D LE flag to match the (n_time, N) matrix
+    gamma_anterior, _ = jax.lax.associative_scan(
+        scan_fn, (gamma_over_c, is_le), axis=1
+    )  # Associative scan w/ binary switch on leading edge
     Gamma_anterior = jnp.where(is_le, 0.0, jnp.roll(gamma_anterior, shift=1, axis=1))
 
     # Sweep / Sideslip Correction --------------------------------------------------------------------------------------
-    Gamma_lateral   = Gamma_anterior * (tan_A - tan_B)[None, :] - gamma_over_c * tan_B[None, :]
-    dCp_sideslip    = 2.0 * Vy_local * cos_DL[None, :] * Gamma_lateral / dx[None, :]
+    Gamma_lateral = Gamma_anterior * (tan_A - tan_B)[None, :] - gamma_over_c * tan_B[None, :]
+    dCp_sideslip = 2.0 * Vy_local * cos_DL[None, :] * Gamma_lateral / dx[None, :]
 
     # Net Circulation --------------------------------------------------------------------------------------------------
     Gamma_net = Gamma * Vx_local / dx
@@ -88,6 +92,7 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
 
     return dCp
 
+
 # ---------------------------------------------------------
 #  STATEFUL VERSION
 # ---------------------------------------------------------
@@ -95,11 +100,13 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
     "system.analysis_data['vortex_distribution']",
     "system.analysis_data['relative_velocity']",
     "system.analysis_data['vortex_strengths']",
-    "state.freestream.speed"
+    "state.freestream.speed",
 )
-@outputs("system.analysis_data['dCp']",)
+@outputs(
+    "system.analysis_data['dCp']",
+)
 def compute_panel_pressures(state: "State", system: "System", settings: "Settings"):
-    """ Calculates the differential pressure coefficient (Delta C_P) for all VLM panels. """
+    """Calculates the differential pressure coefficient (Delta C_P) for all VLM panels."""
 
     analysis = system.analysis_data
     VD = analysis["vortex_distribution"]

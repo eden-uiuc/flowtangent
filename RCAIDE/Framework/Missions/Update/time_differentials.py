@@ -18,10 +18,11 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def update_time_differentials(state: "rcf.State",
-                              system: "rcf.Systems",
-                              settings: "rcf.Settings",
-                              ):
+def update_time_differentials(
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
     x = state.numerics.dimensionless.control_points
     D = state.numerics.dimensionless.differentiate
@@ -36,7 +37,8 @@ def update_time_differentials(state: "rcf.State",
     state = eqx.tree_at(
         lambda s: (s.numerics.time.control_points, s.numerics.time.differentiate, s.numerics.time.integrate),
         state,
-        (t_scaled, D_scaled, I_scaled), is_leaf=lambda x: x is None
+        (t_scaled, D_scaled, I_scaled),
+        is_leaf=lambda x: x is None,
     )
 
     return state, system, settings

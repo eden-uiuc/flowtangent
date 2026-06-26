@@ -25,10 +25,11 @@ def compute_payload_power_consumption(payload):
 
     return payload.power_draw
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_avionics_power_consumption
 # ----------------------------------------------------------------------------------------------------------------------
-def  compute_avionics_power_consumption(avionics):
+def compute_avionics_power_consumption(avionics):
     """This gives the power draw from avionics.
 
     Assumptions:
@@ -43,6 +44,6 @@ def  compute_avionics_power_consumption(avionics):
     Returns:
         avionics.outputs.power_draw  (float): power consumed by avionics [Watts]
     """
-    avionics.inputs.power =  avionics.power_draw
+    avionics.inputs.power = avionics.power_draw
 
-    return  avionics.power_draw
+    return avionics.power_draw

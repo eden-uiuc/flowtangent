@@ -44,14 +44,14 @@ from RCAIDE.Framework import Process, State
 # ----------------------------------------------------------------------------------------------------------------------
 class BatchAnalysis:
     def __init__(
-            self,
-            tag: str="BatchProcess",
-            initialize: Process=Process(),
-            compute: Process=Process(),
-            inputs: dict={},
-            outputs: dict={},
-            db_path: Optional[str | Path] = None
-        ):
+        self,
+        tag: str = "BatchProcess",
+        initialize: Process = Process(),
+        compute: Process = Process(),
+        inputs: dict = {},
+        outputs: dict = {},
+        db_path: Optional[str | Path] = None,
+    ):
 
         self.tag = tag
 
@@ -70,33 +70,34 @@ class BatchAnalysis:
         system: System,
         settings: Settings,
         mode="zip",
-        batch_size: Optional[int]=None,
-        handle: Optional[str]=None,
-        **kwargs
+        batch_size: Optional[int] = None,
+        handle: Optional[str] = None,
+        **kwargs,
     ):
 
         if handle is not None:  # Inherit logger from dataset generator
             logger = logging.getLogger(handle)
         else:  # Self logging
-            logger = logging.getLogger(self.tag+"_Logger")
+            logger = logging.getLogger(self.tag + "_Logger")
 
             ch = logging.StreamHandler()
             ch.setLevel(logging.INFO)
 
-            formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            formatter = logging.Formatter("[%(asctime)s] - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
             ch.setFormatter(formatter)
             logger.addHandler(ch)
 
         # Set up base state
         from RCAIDE.Framework.Conditions import Numerics
-        state       = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
-        initials    = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-        base_state  = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
 
-        input_keys  = []
+        state = State(numerics=Numerics(number_of_control_points=1, calculate_integration=False))
+        initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
+        base_state = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
+
+        input_keys = []
         active_keys = []
-        target_map  = []
-        raw_arrays  = []
+        target_map = []
+        raw_arrays = []
 
         # Validate inputs, convert to JAX arrays
         all_outputs = {k: [] for k in self.output_mappings.keys()}
@@ -106,8 +107,9 @@ class BatchAnalysis:
 
         for k, v in kwargs.items():
             if k.lower() not in self.input_mappings:
-                logger.warning(f"Unrecognized variable {k} ignored. "
-                              f"Allowed variables: {list(self.input_mappings.keys())}")
+                logger.warning(
+                    f"Unrecognized variable {k} ignored. Allowed variables: {list(self.input_mappings.keys())}"
+                )
             else:
                 input_keys.append(k.lower())
                 active_keys.append(k.lower())
@@ -150,11 +152,13 @@ class BatchAnalysis:
         settings = init_results[2]
 
         # Batch over computation
-        if handle is not None: pbar = range(0, total_states, batch_size)
-        else: pbar = trange(0, total_states, batch_size, desc=f"Running {self.tag} Analysis")
+        if handle is not None:
+            pbar = range(0, total_states, batch_size)
+        else:
+            pbar = trange(0, total_states, batch_size, desc=f"Running {self.tag} Analysis")
         for i in pbar:
-            batch_arrays = tuple(arr[i:i+batch_size].reshape(-1, 1) for arr in processed_arrays)
-            actual_size  = len(batch_arrays[0])
+            batch_arrays = tuple(arr[i : i + batch_size].reshape(-1, 1) for arr in processed_arrays)
+            actual_size = len(batch_arrays[0])
 
             clean_batch_arrays = jax.device_get(batch_arrays)
             for j, ik in enumerate(input_keys):
@@ -196,7 +200,7 @@ class BatchAnalysis:
         merged_results = all_inputs | all_outputs | all_grads
 
         if self.db_path is not None:
-            db_root = zarr.open_group(self.db_path, mode='a', zarr_format=2)
+            db_root = zarr.open_group(self.db_path, mode="a", zarr_format=2)
             for key, list_of_arrays in merged_results.items():
                 # Concatenate the individual batch arrays
                 full_array = np.concatenate(list_of_arrays, axis=0)
@@ -207,7 +211,7 @@ class BatchAnalysis:
                         shape=(0,) + full_array.shape[1:],
                         chunks=(100_000,) + full_array.shape[1:],
                         dtype=full_array.dtype,
-                        compressor=Blosc(cname='zstd', clevel=5, shuffle=Blosc.BITSHUFFLE)
+                        compressor=Blosc(cname="zstd", clevel=5, shuffle=Blosc.BITSHUFFLE),
                     )
                 db_root[key].append(full_array, axis=0)
 
@@ -218,17 +222,16 @@ class BatchAnalysis:
 #  Sharded Dataset Generator
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class JAXCompileFilter(logging.Filter):
     def filter(self, record):
         msg = record.getMessage()
 
         # 1. Identify if this is a compilation/tracing log
-        is_compile_log = any(keyword in msg for keyword in [
-            "Compiling",
-            "tracing + transforming",
-            "Finished jaxpr to MLIR",
-            "Finished XLA compilation"
-        ])
+        is_compile_log = any(
+            keyword in msg
+            for keyword in ["Compiling", "tracing + transforming", "Finished jaxpr to MLIR", "Finished XLA compilation"]
+        )
 
         # 2. If it IS a compile log, apply our strict whitelist & formatting
         if is_compile_log:
@@ -250,18 +253,13 @@ class JAXCompileFilter(logging.Filter):
         # 3. If it's NOT a compile log (e.g., GPU memory warning), let it through untouched
         return True
 
+
 class ShardManager:
-    def __init__(
-            self,
-            cache_dir,
-            storage_dir,
-            max_rows=3_000_000,
-            handle="rcaide_dataset.manager"
-    ):
+    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="rcaide_dataset.manager"):
         self.local_dir = Path(cache_dir)
         self.hdd_dir = Path(storage_dir)
         self.max_rows = max_rows
-        self.prefix = handle.split('.')[0]
+        self.prefix = handle.split(".")[0]
 
         self.local_dir.mkdir(parents=True, exist_ok=True)
         self.hdd_dir.mkdir(parents=True, exist_ok=True)
@@ -270,14 +268,15 @@ class ShardManager:
         self.current_shard_idx = self._find_resume_shard()
         self.current_rows = 0
         self.active_root = None
-        self.compressor = Blosc(cname='zstd', clevel=5, shuffle=Blosc.BITSHUFFLE)
+        self.compressor = Blosc(cname="zstd", clevel=5, shuffle=Blosc.BITSHUFFLE)
 
         self._open_active_shard()
 
     def _find_resume_shard(self):
         existing = list(self.hdd_dir.glob(f"{self.prefix}_shard_*.zarr"))
-        if not existing: return 0
-        indices = [int(p.stem.split('_')[-1]) for p in existing]
+        if not existing:
+            return 0
+        indices = [int(p.stem.split("_")[-1]) for p in existing]
         return max(indices) + 1
 
     def _open_active_shard(self):
@@ -287,7 +286,7 @@ class ShardManager:
         if self.active_path.exists() and self.current_rows == 0:
             shutil.rmtree(self.active_path)
 
-        self.active_root = zarr.open_group(str(self.active_path), mode='a', zarr_format=2)
+        self.active_root = zarr.open_group(str(self.active_path), mode="a", zarr_format=2)
 
     def offload_and_rollover(self):
         self.logger.info(f"Sealing Shard {self.current_shard_idx:04d}...")
@@ -308,8 +307,11 @@ class ShardManager:
         for key, arr in data_dict.items():
             if key not in self.active_root:
                 self.active_root.create_array(
-                    name=key, shape=(0,) + arr.shape[1:], chunks=(100_000,) + arr.shape[1:],
-                    dtype=arr.dtype, compressor=self.compressor
+                    name=key,
+                    shape=(0,) + arr.shape[1:],
+                    chunks=(100_000,) + arr.shape[1:],
+                    dtype=arr.dtype,
+                    compressor=self.compressor,
                 )
             self.active_root[key].append(arr, axis=0)
 
@@ -322,6 +324,7 @@ class ShardedDatasetGenerator:
     Slices total design space into manageable shards, executes them locally,
     and offloads them to medium-term storage.
     """
+
     def __init__(
         self,
         batch_analysis: Any,
@@ -338,13 +341,13 @@ class ShardedDatasetGenerator:
         self.batch_process = batch_analysis
 
         self.tag = tag
-        self.dataset_prefix = '_'.join(tag.split(' ')).lower()
+        self.dataset_prefix = "_".join(tag.split(" ")).lower()
 
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
         self._setup_logger()
-        self.shard_manager = ShardManager(cache_dir, storage_dir, shard_size, self.dataset_prefix+".manager")
+        self.shard_manager = ShardManager(cache_dir, storage_dir, shard_size, self.dataset_prefix + ".manager")
 
     def _setup_logger(self):
         self.logger = logging.getLogger(self.dataset_prefix)
@@ -360,7 +363,7 @@ class ShardedDatasetGenerator:
             ch.setLevel(logging.INFO)
 
             # Format: [2026-06-05 10:45:12] - INFO - Generating epoch 3...
-            formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+            formatter = logging.Formatter("[%(asctime)s] - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
             fh.setFormatter(formatter)
             ch.setFormatter(formatter)
 
@@ -381,7 +384,6 @@ class ShardedDatasetGenerator:
         else:
             jax_logger.setLevel(logging.WARNING)
 
-
     def run(
         self,
         settings,
@@ -396,10 +398,10 @@ class ShardedDatasetGenerator:
         raw_states = [np.atleast_1d(v) for v in state_kwargs.values()]
         state_keys = list(state_kwargs.keys())
 
-        if state_mode == 'zip':
+        if state_mode == "zip":
             proc_states = np.broadcast_arrays(*raw_states)
-        elif state_mode == 'mesh':
-            grids = np.meshgrid(*raw_states, indexing='ij')
+        elif state_mode == "mesh":
+            grids = np.meshgrid(*raw_states, indexing="ij")
             proc_states = [grid.ravel() for grid in grids]
         else:
             raise ValueError("State mode must be 'zip' or 'mesh'")
@@ -413,7 +415,7 @@ class ShardedDatasetGenerator:
             system_iter = [(system, {})]
 
         if getattr(jax.config, "jax_log_compiles", False):
-            os.system('cls' if os.name == 'nt' else 'clear')
+            os.system("cls" if os.name == "nt" else "clear")
 
         self.logger.info("=== INITIALIZING SHARDED GENERATION ===")
         self.logger.info(f"Initialized Generalized Generator. {states_per_system} states per geometry.")
@@ -427,8 +429,9 @@ class ShardedDatasetGenerator:
                         settings=settings,
                         mode="zip",
                         batch_size=batch_size,
-                        handle=self.dataset_prefix+".analysis",
-                        **flat_state_kwargs)
+                        handle=self.dataset_prefix + ".analysis",
+                        **flat_state_kwargs,
+                    )
 
                     for k, v in meta.items():
                         res[k] = np.full((states_per_system, 1), v, dtype=np.float64)
@@ -455,9 +458,10 @@ class ShardedDatasetGenerator:
         shutil.rmtree(self.cache_dir)
         self.logger.info(f"{self.tag} Complete.")
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------
 # Compression Benchmarking
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 
 
 def benchmark_zarr_compression(num_states=1_000_000, chunk_size=100_000):
@@ -477,12 +481,12 @@ def benchmark_zarr_compression(num_states=1_000_000, chunk_size=100_000):
     # 2. Define the competitors
     compressors = {
         "Uncompressed": None,
-        "LZ4 (Speed focus)": Blosc(cname='lz4', clevel=5, shuffle=Blosc.NOSHUFFLE),
-        "LZ4 + BitShuffle": Blosc(cname='lz4', clevel=5, shuffle=Blosc.BITSHUFFLE),
-        "Zstd Lvl 1 + BitShuffle": Blosc(cname='zstd', clevel=1, shuffle=Blosc.BITSHUFFLE),
-        "Zstd Lvl 5 + BitShuffle (Default)": Blosc(cname='zstd', clevel=5, shuffle=Blosc.BITSHUFFLE),
-        "Zstd Lvl 9 + BitShuffle (Max)": Blosc(cname='zstd', clevel=9, shuffle=Blosc.BITSHUFFLE),
-        "Zstd Lvl 5 + ByteShuffle": Blosc(cname='zstd', clevel=5, shuffle=Blosc.SHUFFLE),
+        "LZ4 (Speed focus)": Blosc(cname="lz4", clevel=5, shuffle=Blosc.NOSHUFFLE),
+        "LZ4 + BitShuffle": Blosc(cname="lz4", clevel=5, shuffle=Blosc.BITSHUFFLE),
+        "Zstd Lvl 1 + BitShuffle": Blosc(cname="zstd", clevel=1, shuffle=Blosc.BITSHUFFLE),
+        "Zstd Lvl 5 + BitShuffle (Default)": Blosc(cname="zstd", clevel=5, shuffle=Blosc.BITSHUFFLE),
+        "Zstd Lvl 9 + BitShuffle (Max)": Blosc(cname="zstd", clevel=9, shuffle=Blosc.BITSHUFFLE),
+        "Zstd Lvl 5 + ByteShuffle": Blosc(cname="zstd", clevel=5, shuffle=Blosc.SHUFFLE),
     }
 
     results = []
@@ -495,12 +499,7 @@ def benchmark_zarr_compression(num_states=1_000_000, chunk_size=100_000):
             # --- WRITE TEST ---
             t0 = time.perf_counter()
             z = zarr.array(
-                data,
-                chunks=(chunk_size, data.shape[1]),
-                compressor=comp,
-                store=path,
-                overwrite=True,
-                zarr_format=2
+                data, chunks=(chunk_size, data.shape[1]), compressor=comp, store=path, overwrite=True, zarr_format=2
             )
             write_time = time.perf_counter() - t0
 
@@ -511,22 +510,25 @@ def benchmark_zarr_compression(num_states=1_000_000, chunk_size=100_000):
 
             # --- READ TEST ---
             t0 = time.perf_counter()
-            _ = z[:] # Read entire array into memory
+            _ = z[:]  # Read entire array into memory
             read_time = time.perf_counter() - t0
 
-            results.append({
-                "Compressor": name,
-                "Size (MB)": compressed_bytes / (1024**2),
-                "Ratio": ratio,
-                "Write Speed (MB/s)": (raw_bytes / (1024**2)) / write_time,
-                "Read Speed (MB/s)": (raw_bytes / (1024**2)) / read_time,
-            })
+            results.append(
+                {
+                    "Compressor": name,
+                    "Size (MB)": compressed_bytes / (1024**2),
+                    "Ratio": ratio,
+                    "Write Speed (MB/s)": (raw_bytes / (1024**2)) / write_time,
+                    "Read Speed (MB/s)": (raw_bytes / (1024**2)) / read_time,
+                }
+            )
 
     # 4. Display Results
     df = pd.DataFrame(results).round(2)
     df = df.sort_values(by="Read Speed (MB/s)", ascending=False)
     print("\n--- Benchmark Results ---")
     print(df.to_string(index=False))
+
 
 if __name__ == "__main__":
     benchmark_zarr_compression()

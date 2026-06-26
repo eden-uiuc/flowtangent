@@ -24,31 +24,31 @@ from RCAIDE.Library import Component
 #  Airfoil Data Locator
 # ----------------------------------------------------------------------------------------------------------------------
 
-AirfoilData = Path(path.join(path.dirname(__file__), 'Airfoil_Data'))
+AirfoilData = Path(path.join(path.dirname(__file__), "Airfoil_Data"))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
 
-class Airfoil(Component):
 
-    tag:                str = init_field("Airfoil", static=True)
+class Airfoil(Component):
+    tag: str = init_field("Airfoil", static=True)
 
     thickness_to_chord: float = 0.0
-    max_thickness:      float = 0.0
-    wedge_angle:        float = 0.0
+    max_thickness: float = 0.0
+    wedge_angle: float = 0.0
 
-    coordinates:        jnp.ndarray = empty_array((0, 2))
-    camber:             jnp.ndarray = empty_array(0)
+    coordinates: jnp.ndarray = empty_array((0, 2))
+    camber: jnp.ndarray = empty_array(0)
 
-    x_coordinates:      jnp.ndarray = empty_array(0)
-    y_coordinates:      jnp.ndarray = empty_array(0)
+    x_coordinates: jnp.ndarray = empty_array(0)
+    y_coordinates: jnp.ndarray = empty_array(0)
 
-    x_upper_surface:    jnp.ndarray = empty_array(0)
-    x_lower_surface:    jnp.ndarray = empty_array(0)
+    x_upper_surface: jnp.ndarray = empty_array(0)
+    x_lower_surface: jnp.ndarray = empty_array(0)
 
-    y_upper_surface:    jnp.ndarray = empty_array(0)
-    y_lower_surface:    jnp.ndarray = empty_array(0)
+    y_upper_surface: jnp.ndarray = empty_array(0)
+    y_lower_surface: jnp.ndarray = empty_array(0)
 
     @classmethod
     def NACA_4_Series(cls, series_number: str | int, n_pts: int = 201, edge_factor: float = 1.5):
@@ -89,18 +89,18 @@ class Airfoil(Component):
 
         # Compute chordwise thickness distribution
         def _x2t(x):
-            return (0.2969 * jnp.sqrt(x)
-                    - 0.126 * x
-                    - 0.3516 * (x ** 2)
-                    + 0.2843 * (x ** 3)
-                    - 0.1015 * (x ** 4)) * thickness / 0.2
+            return (
+                (0.2969 * jnp.sqrt(x) - 0.126 * x - 0.3516 * (x**2) + 0.2843 * (x**3) - 0.1015 * (x**4))
+                * thickness
+                / 0.2
+            )
 
         t_lower = _x2t(x_lower)
         t_upper = _x2t(x_upper)
 
         # Compute chordwise camber distribution
         def _x2c(x):
-            return camber / (1 - camber_location) ** 2 * ((1 - 2 * camber_location) + 2 * camber_location * x - x ** 2)
+            return camber / (1 - camber_location) ** 2 * ((1 - 2 * camber_location) + 2 * camber_location * x - x**2)
 
         c_upper = _x2c(x_upper)
         c_lower = _x2c(x_lower)
@@ -110,7 +110,7 @@ class Airfoil(Component):
             def x2c_corrected(x, c):
 
                 idx = jnp.where(x < camber_location)[0]
-                c = c.at[idx].set(camber / camber_location ** 2 * (2 * camber_location * x[idx] - x[idx] ** 2))
+                c = c.at[idx].set(camber / camber_location**2 * (2 * camber_location * x[idx] - x[idx] ** 2))
 
                 return c
 
@@ -119,16 +119,16 @@ class Airfoil(Component):
 
         # Compute surface coordinates
 
-        x_lo    = jnp.flip(x_lower)
-        x_up    = x_upper[1:]
-        x       = jnp.hstack((x_lo, x_up))
+        x_lo = jnp.flip(x_lower)
+        x_up = x_upper[1:]
+        x = jnp.hstack((x_lo, x_up))
 
-        y_lo    = jnp.flip(c_lower - t_lower)
-        y_up    = (c_upper + t_upper)[1:]
-        y       = jnp.hstack((y_lo, y_up))
+        y_lo = jnp.flip(c_lower - t_lower)
+        y_up = (c_upper + t_upper)[1:]
+        y = jnp.hstack((y_lo, y_up))
 
         return cls(
-            tag='NACA ' + str(series_number),
+            tag="NACA " + str(series_number),
             camber=camber,
             max_thickness=thickness,
             thickness_to_chord=thickness / (max(x) - min(x)),
@@ -138,7 +138,7 @@ class Airfoil(Component):
             x_upper_surface=x_up,
             x_lower_surface=x_lo,
             y_upper_surface=y_up,
-            y_lower_surface=y_lo
+            y_lower_surface=y_lo,
         )
 
     @classmethod
@@ -151,7 +151,7 @@ class Airfoil(Component):
         file_path = Path(file_path)
 
         # 1. Read all non-empty lines
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             lines = [line.strip() for line in f if line.strip()]
 
         is_lednicer = False
@@ -162,7 +162,7 @@ class Airfoil(Component):
         # Lednicer files uniquely define the number of upper/lower points in the header
         # (e.g., "30.0  30.0" or "30  30")
         for i, line in enumerate(lines[:5]):
-            parts = line.replace(',', ' ').split()
+            parts = line.replace(",", " ").split()
             if len(parts) == 2:
                 try:
                     val1, val2 = float(parts[0]), float(parts[1])
@@ -178,7 +178,7 @@ class Airfoil(Component):
         # If it's not Lednicer, it's Selig. Find the first line that is numeric coordinates.
         if not is_lednicer:
             for i, line in enumerate(lines):
-                parts = line.replace(',', ' ').split()
+                parts = line.replace(",", " ").split()
                 if len(parts) >= 2:
                     try:
                         float(parts[0]), float(parts[1])
@@ -190,7 +190,7 @@ class Airfoil(Component):
         # 3. Extract Raw Coordinates
         raw_coords = []
         for line in lines[data_start_idx:]:
-            parts = line.replace(',', ' ').split()
+            parts = line.replace(",", " ").split()
             if len(parts) >= 2:
                 try:
                     raw_coords.append([float(parts[0]), float(parts[1])])
@@ -204,13 +204,13 @@ class Airfoil(Component):
         if is_lednicer:
             # Lednicer: Upper first, then Lower. Both inherently LE -> TE.
             x_up, y_up = x_raw[:n_up], y_raw[:n_up]
-            x_lo, y_lo = x_raw[n_up:n_up + n_lo], y_raw[n_up:n_up + n_lo]
+            x_lo, y_lo = x_raw[n_up : n_up + n_lo], y_raw[n_up : n_up + n_lo]
 
         else:
             # Selig: TE -> Upper -> LE -> Lower -> TE
             le_idx = jnp.argmin(x_raw)
 
-            x_up, y_up = x_raw[:le_idx + 1], y_raw[:le_idx + 1]
+            x_up, y_up = x_raw[: le_idx + 1], y_raw[: le_idx + 1]
             x_lo, y_lo = x_raw[le_idx:], y_raw[le_idx:]
 
             # Reverse upper to make it LE -> TE
@@ -262,5 +262,5 @@ class Airfoil(Component):
             x_upper_surface=jnp.array(common_x),
             x_lower_surface=jnp.array(common_x),
             y_upper_surface=jnp.array(y_up_interp),
-            y_lower_surface=jnp.array(y_lo_interp)
+            y_lower_surface=jnp.array(y_lo_interp),
         )

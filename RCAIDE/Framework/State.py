@@ -33,34 +33,33 @@ from RCAIDE.Framework.Conditions import (
 #  State
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class SolverConditions(Conditions):
+    tag: str = init_field("Solver Conditions", static=True)
 
-    tag: str = init_field('Solver Conditions', static=True)
-
-    unknowns:           jnp.ndarray                 = empty_array(0)
-    residuals:          jnp.ndarray                 = empty_array(0)
+    unknowns: jnp.ndarray = empty_array(0)
+    residuals: jnp.ndarray = empty_array(0)
 
 
 class State(Conditions):
-
     # Attribute         Type                        Default Value
-    tag:                str                         = init_field('State', static=True)
+    tag: str = init_field("State", static=True)
 
-    initials:           eqx.Module | None           = None
-    numerics:           Numerics                    = init_field(Numerics)
+    initials: eqx.Module | None = None
+    numerics: Numerics = init_field(Numerics)
 
-    frames:             FrameConditions             = init_field(FrameConditions)
-    freestream:         FreestreamConditions        = init_field(FreestreamConditions)
+    frames: FrameConditions = init_field(FrameConditions)
+    freestream: FreestreamConditions = init_field(FreestreamConditions)
 
-    mass:               MassConditions              = init_field(MassConditions)
-    energy:             EnergyNetworkConditions     = init_field(EnergyNetworkConditions)
-    aerodynamics:       AerodynamicsConditions      = init_field(AerodynamicsConditions)
-    stability:          StabilityConditions         = init_field(StabilityConditions)
+    mass: MassConditions = init_field(MassConditions)
+    energy: EnergyNetworkConditions = init_field(EnergyNetworkConditions)
+    aerodynamics: AerodynamicsConditions = init_field(AerodynamicsConditions)
+    stability: StabilityConditions = init_field(StabilityConditions)
 
-    controls:           ControlsConditions          = init_field(ControlsConditions)
-    dynamics:           DynamicsConditions          = init_field(DynamicsConditions)
+    controls: ControlsConditions = init_field(ControlsConditions)
+    dynamics: DynamicsConditions = init_field(DynamicsConditions)
 
-    solver:             SolverConditions            = init_field(SolverConditions)
+    solver: SolverConditions = init_field(SolverConditions)
 
     def __post_init__(self):
         frozen_initials = eqx.tree_at(lambda s: s.initials, self, None, is_leaf=lambda x: x is None)
@@ -71,7 +70,7 @@ class State(Conditions):
         Checks that the number of active controls is equal to the number of active dynamics residuals.
         """
 
-        valid_controls = (self.controls.count_active_controls() == self.dynamics.count_active_residuals())
+        valid_controls = self.controls.count_active_controls() == self.dynamics.count_active_residuals()
 
         if verbose:
             if valid_controls:
@@ -134,5 +133,3 @@ class State(Conditions):
             stacked_residuals = jnp.empty((0,))
 
         return eqx.tree_at(lambda s: s.solver.residuals, self, stacked_residuals)
-
-

@@ -33,16 +33,20 @@ from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 
 
 class EnergyLine(EnergyNode):
+    _bookkeeping: dict = init_field(
+        lambda: {
+            "propulsors": Propulsor,
+            "splitters": EnergySplitter,
+            "stores": EnergyStore,
+        },
+        static=True,
+    )
 
-    _bookkeeping: dict = init_field(lambda: {
-        "propulsors": Propulsor,
-        "splitters": EnergySplitter,
-        "stores": EnergyStore,
-    }, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 def _resolve_namespaces(node, parent_prefix=""):
     """
@@ -51,13 +55,12 @@ def _resolve_namespaces(node, parent_prefix=""):
     # Define this node's absolute ID
     absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
 
-    def parse_input(input:str):
-        flat_input_parts = input.replace(' ','_').lower().split('.')
-        if flat_input_parts[0]=="self" or node.get_field_name() in flat_input_parts:
-            return absolute_id+"."+flat_input_parts[-1]
+    def parse_input(input: str):
+        flat_input_parts = input.replace(" ", "_").lower().split(".")
+        if flat_input_parts[0] == "self" or node.get_field_name() in flat_input_parts:
+            return absolute_id + "." + flat_input_parts[-1]
         else:
-            return parent_prefix+"."+flat_input_parts[-1]
-
+            return parent_prefix + "." + flat_input_parts[-1]
 
     # Resolve the input/output connection strings
     # We rebuild the interfaces so they point to the absolute paths
@@ -75,7 +78,7 @@ def _resolve_namespaces(node, parent_prefix=""):
     node = replace(
         node,
         network_ID=absolute_id,
-        inputs=new_inputs
+        inputs=new_inputs,
         # mechanical_inputs=new_inputs['mechanical'],
         # electrical_inputs=new_inputs['electrical'],
         # flow_inputs=new_inputs['flow'],
@@ -84,24 +87,19 @@ def _resolve_namespaces(node, parent_prefix=""):
     )
 
     # Recurse through any subcomponents
-    if hasattr(node, 'subcomponents') and node.subcomponents:
-        resolved_children = tuple(
-            _resolve_namespaces(child, parent_prefix=absolute_id)
-            for child in node.subcomponents
-        )
+    if hasattr(node, "subcomponents") and node.subcomponents:
+        resolved_children = tuple(_resolve_namespaces(child, parent_prefix=absolute_id) for child in node.subcomponents)
         node = eqx.tree_at(lambda n: n.subcomponents, node, resolved_children)
 
     return node
 
-class EnergyNetwork(EnergyNode):
 
-    tag: str = init_field('Energy Network', static=True)
+class EnergyNetwork(EnergyNode):
+    tag: str = init_field("Energy Network", static=True)
 
     domains: tuple[EnergyDomain, ...] = init_field(tuple, static=True)
 
-    _bookkeeping: dict = init_field(lambda: {
-        "lines": EnergyLine
-    }, static=True)
+    _bookkeeping: dict = init_field(lambda: {"lines": EnergyLine}, static=True)
 
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
@@ -113,15 +111,19 @@ class EnergyNetwork(EnergyNode):
         """Rebalances fractions directly within the subcomponents tree."""
         # Grab a temporary flat dict just to look at the hierarchy
         temp_dict = {}
+
         def _temp_recurse(subs):
             for c in subs:
-                if isinstance(c, EnergyNode): temp_dict[c.network_ID] = c
-                if hasattr(c, "subcomponents") and c.subcomponents: _temp_recurse(c.subcomponents)
+                if isinstance(c, EnergyNode):
+                    temp_dict[c.network_ID] = c
+                if hasattr(c, "subcomponents") and c.subcomponents:
+                    _temp_recurse(c.subcomponents)
+
         _temp_recurse(self.subcomponents)
 
         source_to_splitters = {}
         for ID, node in temp_dict.items():
-            if hasattr(node, 'extraction_fraction') and node.inputs:
+            if hasattr(node, "extraction_fraction") and node.inputs:
                 upstream_source = node.inputs[0]
                 source_to_splitters.setdefault(upstream_source, []).append(node)
 
@@ -148,21 +150,19 @@ class EnergyNetwork(EnergyNode):
         resolved_lines = []
 
         for line in updated_network.lines:
-
             # Resolve the namespace for this entire line and all its nested children
             resolved_line = _resolve_namespaces(line, parent_prefix=f"{updated_network.get_field_name()}")
             resolved_lines.append(resolved_line)
 
         updated_network = eqx.tree_at(
-            lambda e: e.subcomponents,
-            updated_network,
-            tuple(resolved_lines)
+            lambda e: e.subcomponents, updated_network, tuple(resolved_lines)
         ).sort_network_topology()
 
         return updated_network
 
     def _get_all_nodes(self) -> "EnergyNetwork":
         nodes_dict = {}
+
         def _recurse(subcomponents):
             for comp in subcomponents:
                 if isinstance(comp, EnergyNode):
@@ -179,19 +179,13 @@ class EnergyNetwork(EnergyNode):
 
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()
-        dependency_graph = {
-            ID: set(node.inputs)
-            for ID, node in updated_network.nodes.items()
-        }
+        dependency_graph = {ID: set(node.inputs) for ID, node in updated_network.nodes.items()}
 
         try:
             sorter = TopologicalSorter(dependency_graph)
             updated_order = tuple(sorter.static_order())
 
-            return replace(
-                updated_network,
-                _execution_order=updated_order
-            )
+            return replace(updated_network, _execution_order=updated_order)
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
 

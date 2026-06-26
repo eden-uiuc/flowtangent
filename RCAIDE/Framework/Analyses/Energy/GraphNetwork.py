@@ -26,13 +26,13 @@ from RCAIDE.Framework import Process, ProcessStep
 #  Graph Energy Network Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-class GraphEnergyAnalysis(Process):
 
+class GraphEnergyAnalysis(Process):
     analysis_network: EnergyNetwork = init_field(EnergyNetwork)
 
     def graph(self, **kwargs) -> nx.DiGraph:
 
-        G   = nx.DiGraph()
+        G = nx.DiGraph()
         net = self.analysis_network
 
         for e_idx, network_ID in enumerate(net._execution_order):
@@ -52,8 +52,8 @@ def build_analysis_from_network(network: EnergyNetwork):
 
     def make_node_function(node_ID: str):
         node_func = analysis_network.nodes[node_ID].__class__.transmit
-        node_inputs = getattr(node_func, '_inputs', set())
-        node_outputs = getattr(node_func, '_outputs', set())
+        node_inputs = getattr(node_func, "_inputs", set())
+        node_outputs = getattr(node_func, "_outputs", set())
 
         @inputs(*node_inputs)
         @outputs(*node_outputs)
@@ -62,14 +62,11 @@ def build_analysis_from_network(network: EnergyNetwork):
 
         return _pure_transmit
 
-    network_analysis =  GraphEnergyAnalysis(
+    network_analysis = GraphEnergyAnalysis(
         tag=f"{network.tag} Analysis",
         steps=tuple(
-            ProcessStep(
-                tag=f"{ID}",
-                function=make_node_function(ID)
-            ) for ID in analysis_network._execution_order
-        )
+            ProcessStep(tag=f"{ID}", function=make_node_function(ID)) for ID in analysis_network._execution_order
+        ),
     )
 
     return network_analysis

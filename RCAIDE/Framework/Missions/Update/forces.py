@@ -20,23 +20,23 @@ import RCAIDE.Framework as rcf
 
 
 def update_forces(
-        state: "rcf.State",
-        system: "rcf.Systems",
-        settings: "rcf.Settings",
-        ):
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
-        wind    = state.frames.wind.total_force_vector
-        thrust  = state.frames.body.thrust_force_vector
-        weight  = state.frames.inertial.gravity_force_vector
+    wind = state.frames.wind.total_force_vector
+    thrust = state.frames.body.thrust_force_vector
+    weight = state.frames.inertial.gravity_force_vector
 
-        TB2I = state.frames.body.transform_to_inertial
-        TW2I = state.frames.wind.transform_to_inertial
+    TB2I = state.frames.body.transform_to_inertial
+    TW2I = state.frames.wind.transform_to_inertial
 
-        wind_force      = jnp.einsum('nij,nj->ni', TW2I, wind)
-        thrust_force    = jnp.einsum('nij,nj->ni', TB2I, thrust)
+    wind_force = jnp.einsum("nij,nj->ni", TW2I, wind)
+    thrust_force = jnp.einsum("nij,nj->ni", TB2I, thrust)
 
-        total_force = weight + wind_force + thrust_force
+    total_force = weight + wind_force + thrust_force
 
-        state = eqx.tree_at(lambda s: s.frames.inertial.total_force_vector, state, total_force)
+    state = eqx.tree_at(lambda s: s.frames.inertial.total_force_vector, state, total_force)
 
-        return state, system, settings
+    return state, system, settings

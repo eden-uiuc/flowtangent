@@ -58,21 +58,20 @@ class StaticCoefficients(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = init_field('Static Stability Coefficients', static=True)
+    tag: str = init_field("Static Stability Coefficients", static=True)
 
-    lift:           jnp.ndarray = empty_array(0)
-    drag:           jnp.ndarray = empty_array(0)
+    lift: jnp.ndarray = empty_array(0)
+    drag: jnp.ndarray = empty_array(0)
 
-    X:              jnp.ndarray = empty_array(0)
-    Y:              jnp.ndarray = empty_array(0)
-    Z:              jnp.ndarray = empty_array(0)
+    X: jnp.ndarray = empty_array(0)
+    Y: jnp.ndarray = empty_array(0)
+    Z: jnp.ndarray = empty_array(0)
 
-    L:              jnp.ndarray = empty_array(0)
-    M:              jnp.ndarray = empty_array(0)
-    N:              jnp.ndarray = empty_array(0)
+    L: jnp.ndarray = empty_array(0)
+    M: jnp.ndarray = empty_array(0)
+    N: jnp.ndarray = empty_array(0)
 
-    e:              jnp.ndarray = empty_array(0)
-
+    e: jnp.ndarray = empty_array(0)
 
 
 class StaticForces(Conditions):
@@ -104,15 +103,14 @@ class StaticForces(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:           str         = init_field('Static Stability Forces', static=True)
+    tag: str = init_field("Static Stability Forces", static=True)
 
-    lift:           jnp.ndarray  = empty_array(0)
-    drag:           jnp.ndarray  = empty_array(0)
+    lift: jnp.ndarray = empty_array(0)
+    drag: jnp.ndarray = empty_array(0)
 
-    X:              jnp.ndarray  = empty_array(0)
-    Y:              jnp.ndarray  = empty_array(0)
-    Z:              jnp.ndarray  = empty_array(0)
-
+    X: jnp.ndarray = empty_array(0)
+    Y: jnp.ndarray = empty_array(0)
+    Z: jnp.ndarray = empty_array(0)
 
 
 class StaticMoments(Conditions):
@@ -140,12 +138,11 @@ class StaticMoments(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = init_field('Static Stability Moments', static=True)
+    tag: str = init_field("Static Stability Moments", static=True)
 
-    L:              jnp.ndarray  = empty_array(0)
-    M:              jnp.ndarray  = empty_array(0)
-    N:              jnp.ndarray  = empty_array(0)
-
+    L: jnp.ndarray = empty_array(0)
+    M: jnp.ndarray = empty_array(0)
+    N: jnp.ndarray = empty_array(0)
 
 
 class CoefficientDerivatives(Conditions):
@@ -198,31 +195,30 @@ class CoefficientDerivatives(Conditions):
     """
 
     # Attribute     Type        Default Value
-    tag:            str         = init_field('Coefficient Static Stability Derivatives', static=True)
+    tag: str = init_field("Coefficient Static Stability Derivatives", static=True)
 
     # Throttle Derivative
-    throttle:       jnp.ndarray = empty_array(0)
+    throttle: jnp.ndarray = empty_array(0)
 
     # Stability Axis Derivatives
-    beta:           jnp.ndarray = empty_array(0)
-    alpha:          jnp.ndarray = empty_array(0)
+    beta: jnp.ndarray = empty_array(0)
+    alpha: jnp.ndarray = empty_array(0)
 
-    delta_a:        jnp.ndarray = empty_array(0)
-    delta_e:        jnp.ndarray = empty_array(0)
-    delta_r:        jnp.ndarray = empty_array(0)
-    delta_f:        jnp.ndarray = empty_array(0)
-    delta_s:        jnp.ndarray = empty_array(0)
+    delta_a: jnp.ndarray = empty_array(0)
+    delta_e: jnp.ndarray = empty_array(0)
+    delta_r: jnp.ndarray = empty_array(0)
+    delta_f: jnp.ndarray = empty_array(0)
+    delta_s: jnp.ndarray = empty_array(0)
 
     # Body Axis Derivatives
 
-    u:              jnp.ndarray = empty_array(0)
-    v:              jnp.ndarray = empty_array(0)
-    w:              jnp.ndarray = empty_array(0)
+    u: jnp.ndarray = empty_array(0)
+    v: jnp.ndarray = empty_array(0)
+    w: jnp.ndarray = empty_array(0)
 
-    p:              jnp.ndarray = empty_array(0)
-    q:              jnp.ndarray = empty_array(0)
-    r:              jnp.ndarray = empty_array(0)
-
+    p: jnp.ndarray = empty_array(0)
+    q: jnp.ndarray = empty_array(0)
+    r: jnp.ndarray = empty_array(0)
 
 
 class StaticDerivatives(Conditions):
@@ -260,64 +256,65 @@ class StaticDerivatives(Conditions):
     """
 
     # Attribute     Type            Default Value
-    tag:            str             = init_field('Static Stability Coefficients Derivatives', static=True)
+    tag: str = init_field("Static Stability Coefficients Derivatives", static=True)
 
-    Clift:  CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='Lift Coefficient Static Stability Derivatives'))
-    Cdrag:  CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='Drag Coefficient Static Stability Derivatives'))
+    Clift: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="Lift Coefficient Static Stability Derivatives")
+    )
+    Cdrag: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="Drag Coefficient Static Stability Derivatives")
+    )
 
-    CX:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='X Coefficient Static Stability Derivatives'))
-    CY:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='Y Coefficient Static Stability Derivatives'))
-    CZ:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='Z Coefficient Static Stability Derivatives'))
+    CX: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="X Coefficient Static Stability Derivatives")
+    )
+    CY: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="Y Coefficient Static Stability Derivatives")
+    )
+    CZ: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="Z Coefficient Static Stability Derivatives")
+    )
 
-    CL:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='L Coefficient Static Stability Derivatives'))
-    CM:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='M Coefficient Static Stability Derivatives'))
-    CN:     CoefficientDerivatives  = init_field(lambda:
-                                            CoefficientDerivatives(tag='N Coefficient Static Stability Derivatives'))
-
+    CL: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="L Coefficient Static Stability Derivatives")
+    )
+    CM: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="M Coefficient Static Stability Derivatives")
+    )
+    CN: CoefficientDerivatives = init_field(
+        lambda: CoefficientDerivatives(tag="N Coefficient Static Stability Derivatives")
+    )
 
 
 class StaticStability(Conditions):
+    tag: str = init_field("Static Stability", static=True)
 
-    tag:                str                 = init_field('Static Stability', static=True)
+    forces: StaticForces = init_field(StaticForces)
+    moments: StaticMoments = init_field(StaticMoments)
 
-    forces:             StaticForces        = init_field(StaticForces)
-    moments:            StaticMoments       = init_field(StaticMoments)
+    coefficients: StaticCoefficients = init_field(StaticCoefficients)
+    derivatives: StaticDerivatives = init_field(StaticDerivatives)
 
-    coefficients:       StaticCoefficients  = init_field(StaticCoefficients)
-    derivatives:        StaticDerivatives   = init_field(StaticDerivatives)
+    static_margin: jnp.ndarray = empty_array(0)
+    neutral_point: jnp.ndarray = empty_array(0)
+    spiral_criteria: jnp.ndarray = empty_array(0)
 
-    static_margin:      jnp.ndarray         = empty_array(0)
-    neutral_point:      jnp.ndarray         = empty_array(0)
-    spiral_criteria:    jnp.ndarray         = empty_array(0)
-
-    pitch_rate:         jnp.ndarray         = empty_array(0)
-    roll_rate:          jnp.ndarray         = empty_array(0)
-    yaw_rate:           jnp.ndarray         = empty_array(0)
-
+    pitch_rate: jnp.ndarray = empty_array(0)
+    roll_rate: jnp.ndarray = empty_array(0)
+    yaw_rate: jnp.ndarray = empty_array(0)
 
 
 class DynamicStability(Conditions):
+    # Attribute      Type        Default Value
+    tag: str = init_field("Dynamic Stability", static=True)
 
-    #Attribute      Type        Default Value
-    tag:            str         = init_field('Dynamic Stability', static=True)
-
-    LongModes:      Conditions  = init_field(lambda: Conditions(tag='Longitudinal Modes'))
-    LatModes:       Conditions  = init_field(lambda: Conditions(tag='Lateral Modes'))
-
-
+    LongModes: Conditions = init_field(lambda: Conditions(tag="Longitudinal Modes"))
+    LatModes: Conditions = init_field(lambda: Conditions(tag="Lateral Modes"))
 
 
 class StabilityConditions(Conditions):
-
     # Attribute     Type                Default Value
-    tag:            str                 = init_field('Stability', static=True)
+    tag: str = init_field("Stability", static=True)
 
-    static:         StaticStability     = init_field(StaticStability)
-    dynamic:        DynamicStability    = init_field(DynamicStability)
+    static: StaticStability = init_field(StaticStability)
+    dynamic: DynamicStability = init_field(DynamicStability)

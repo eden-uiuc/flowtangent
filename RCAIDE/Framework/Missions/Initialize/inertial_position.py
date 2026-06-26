@@ -16,10 +16,11 @@ import equinox as eqx
 import RCAIDE.Framework as rcf
 
 
-def initialize_inertial_position(state: "rcf.State",
-                                 system: "rcf.Systems",
-                                 settings: "rcf.Settings",
-                                 ):
+def initialize_inertial_position(
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
+):
 
     # Extract current arrays
     p_initial = state.initials.frames.inertial.position_vector
@@ -40,8 +41,7 @@ def initialize_inertial_position(state: "rcf.State",
     state = eqx.tree_at(
         lambda s: (s.frames.inertial.position_vector, s.frames.inertial.system_range),
         state,
-        (new_position_vector, new_system_range)
+        (new_position_vector, new_system_range),
     )
 
     return state, system, settings
-

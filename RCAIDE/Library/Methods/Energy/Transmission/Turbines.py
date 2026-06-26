@@ -20,13 +20,13 @@ if TYPE_CHECKING:
 
 
 def func_turbine_performance(
-        gas,           # The BurnedGas mixture
-        FAR,             # Fuel-to-air ratio from the combustor
-        input_work,    # Work required by the compressor (per kg of core air)
-        n_mech,        # Mechanical efficiency of the shaft
-        n_flow,        # Polytropic flow efficiency
-        T_t,
-        P_t,
+    gas,  # The BurnedGas mixture
+    FAR,  # Fuel-to-air ratio from the combustor
+    input_work,  # Work required by the compressor (per kg of core air)
+    n_mech,  # Mechanical efficiency of the shaft
+    n_flow,  # Polytropic flow efficiency
+    T_t,
+    P_t,
 ):
     # Calculate the target specific enthalpy drop across the turbine
     # Mass flow through the turbine is (1 + f) times the compressor flow
@@ -67,28 +67,27 @@ def turbine_performance(
 
     # Get inputs
 
-    g       = state.freestream.gamma
-    Cp      = state.freestream.Cp
+    g = state.freestream.gamma
+    Cp = state.freestream.Cp
 
     for l_idx, line in enumerate(system.energy.lines):
         for p_idx, prop in enumerate(line.propulsors):
-            f       = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.fuel_air_ratio
+            f = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.fuel_air_ratio
 
-            w_s     = state.energy.lines[l_idx].propulsors[p_idx].converters.offtake_shaft.outputs.work
-            w_f     = state.energy.lines[l_idx].propulsors[p_idx].converters.fan.outputs.work
+            w_s = state.energy.lines[l_idx].propulsors[p_idx].converters.offtake_shaft.outputs.work
+            w_f = state.energy.lines[l_idx].propulsors[p_idx].converters.fan.outputs.work
 
-            T_t     = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_temperature
-            P_t     = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_pressure
+            T_t = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_temperature
+            P_t = state.energy.lines[l_idx].propulsors[p_idx].converters.combustor.outputs.stagnation_pressure
 
             for idx, turb in enumerate(prop.converters.turbines)[:-1]:
+                w_c = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[-(idx + 1)].outputs.work
 
-                w_c     = state.energy.lines[l_idx].propulsors[p_idx].converters.compressors[-(idx + 1)].outputs.work
-
-                n_m     = turb.efficiencies.mechanical
-                n_p     = turb.efficiencies.flow
+                n_m = turb.efficiencies.mechanical
+                n_p = turb.efficiencies.flow
 
                 # Call Functions
-                T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, 0., w_c, w_s, w_f, n_m, T_t, P_t, n_p)
+                T_t_out, P_t_out, h_t_out = func_turbine_performance(g, Cp, f, 0.0, w_c, w_s, w_f, n_m, T_t, P_t, n_p)
 
                 turb_state = state.energy.lines[l_idx].propulsors[p_idx].converters.turbines[idx]
 
@@ -97,7 +96,7 @@ def turbine_performance(
                 inputs.gamma = g
                 inputs.Cp = Cp
                 inputs.fuel_air_ratio = f
-                inputs.bypass_ratio = 0.
+                inputs.bypass_ratio = 0.0
                 inputs.shaft_work = w_s
                 inputs.fan_work = w_f
                 inputs.compressor_work = w_c
@@ -129,21 +128,21 @@ def turbine_performance(
             # Set Input State
             inputs = turb_state.inputs
 
-            inputs.gamma                    = g
-            inputs.Cp                       = Cp
-            inputs.fuel_air_ratio           = f
-            inputs.bypass_ratio             = a
-            inputs.shaft_work               = w_s
-            inputs.fan_work                 = w_f
-            inputs.compressor_work          = w_c
-            inputs.stagnation_temperature   = T_t
-            inputs.stagnation_pressure      = P_t
+            inputs.gamma = g
+            inputs.Cp = Cp
+            inputs.fuel_air_ratio = f
+            inputs.bypass_ratio = a
+            inputs.shaft_work = w_s
+            inputs.fan_work = w_f
+            inputs.compressor_work = w_c
+            inputs.stagnation_temperature = T_t
+            inputs.stagnation_pressure = P_t
 
             # Set Output State
             outputs = turb_state.outputs
 
-            outputs.stagnation_temperature  = T_t_out
-            outputs.stagnation_pressure     = P_t_out
-            outputs.stagnation_enthalpy     = h_t_out
+            outputs.stagnation_temperature = T_t_out
+            outputs.stagnation_pressure = P_t_out
+            outputs.stagnation_enthalpy = h_t_out
 
     return state, system, settings

@@ -26,16 +26,14 @@ from RCAIDE.utils import inputs, outputs
 #  VLM Initialization
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 @inputs(
     "settings.analysis.aerodynamics: VLMSettings",
     "system.wings.[Wing].chords.mean_aerodynamic",
     "system.wings.[Wing].spans.projected",
     "system.mass_properties.center_of_gravity",
 )
-@outputs(
-    "system.reference_geometry",
-    "system.analysis_data"
-)
+@outputs("system.reference_geometry", "system.analysis_data")
 def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settings"):
     """
     Parses the vehicle geometry to find the primary reference parameters
@@ -43,14 +41,16 @@ def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settin
     """
 
     if "VORJAX" not in settings.analysis.aerodynamics.__class__.__name__:
-        raise ValueError("settings.analysis.aerodynamics are not VORJAX Settings."\
-        "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings")
+        raise ValueError(
+            "settings.analysis.aerodynamics are not VORJAX Settings."
+            "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings"
+        )
 
     # Standard Python Control Flow (Safe outside of @jax.jit)
     wings = system.wings
 
     ref_wing = None
-    if hasattr(wings, 'main_wing'):
+    if hasattr(wings, "main_wing"):
         ref_wing = wings.main_wing
     elif len(wings) > 0:
         ref_wing = wings[0]
@@ -87,28 +87,26 @@ def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settin
     # 3. Pack into strict JAX arrays
     # We use jnp.atleast_1d and explicit array shapes to match your jnp.empty structures
     new_ref_geom = system.reference_geometry.__class__(
-        mean_aerodynamic_chord = jnp.atleast_1d(c_bar), #type: ignore
-        projected_span         = jnp.atleast_1d(b_ref), #type: ignore
-        aerodynamic_center     = jnp.array([[x_mac, 0.0, z_mac]]), #type: ignore
-        center_of_gravity      = jnp.array([[x_m,   0.0, z_m]]) #type: ignore
+        mean_aerodynamic_chord=jnp.atleast_1d(c_bar),  # type: ignore
+        projected_span=jnp.atleast_1d(b_ref),  # type: ignore
+        aerodynamic_center=jnp.array([[x_mac, 0.0, z_mac]]),  # type: ignore
+        center_of_gravity=jnp.array([[x_m, 0.0, z_m]]),  # type: ignore
     )
 
     # Add analysis data keys
     initial_analysis_data = {
-            "vortex_distribution": None,
-            "VICs": None,
-            "induced_wake": None,
-            "boundary_conditions": None,
-            "relative_velocity": None,
-            "singularities": None,
-            "vortex_strengths": None,
-            "dCp": None,
-        }
+        "vortex_distribution": None,
+        "VICs": None,
+        "induced_wake": None,
+        "boundary_conditions": None,
+        "relative_velocity": None,
+        "singularities": None,
+        "vortex_strengths": None,
+        "dCp": None,
+    }
 
     updated_system = eqx.tree_at(
-        lambda s: (s.reference_geometry, s.analysis_data),
-        system,
-        (new_ref_geom, initial_analysis_data)
+        lambda s: (s.reference_geometry, s.analysis_data), system, (new_ref_geom, initial_analysis_data)
     )
 
     return state, updated_system, settings

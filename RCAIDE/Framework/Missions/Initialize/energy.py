@@ -24,19 +24,20 @@ from RCAIDE.Framework.Conditions.Energy import EnergyNodeConditions, FuelTankCon
 # Initialize Energy
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def initialize_energy(state: State, system: System, settings: Settings):
 
     flat_state_nodes = {}
-    conditions_map = {
-        "FuelTank": FuelTankConditions
-    }
+    conditions_map = {"FuelTank": FuelTankConditions}
 
     def _extract_to_flat_state(n):
         if str(n.__class__.__name__) in conditions_map:
-            flat_state_nodes[n.network_ID] = conditions_map[str(n.__class__.__name__)](tag=n.network_ID) # Initialize the state
+            flat_state_nodes[n.network_ID] = conditions_map[str(n.__class__.__name__)](
+                tag=n.network_ID
+            )  # Initialize the state
         else:
-            flat_state_nodes[n.network_ID] = EnergyNodeConditions(tag=n.network_ID) # Initialize the state
-        if hasattr(n, 'subcomponents'):
+            flat_state_nodes[n.network_ID] = EnergyNodeConditions(tag=n.network_ID)  # Initialize the state
+        if hasattr(n, "subcomponents"):
             for child in n.subcomponents:
                 _extract_to_flat_state(child)
 
@@ -44,7 +45,6 @@ def initialize_energy(state: State, system: System, settings: Settings):
     updated_system = system
 
     for network in updated_system.energy_networks:
-
         network: EnergyNetwork
         network_sc_idx = updated_system.subcomponents.index(network)
         updated_network = network.assign_network_IDs()

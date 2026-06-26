@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 #  Initialize/Expand State
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def expand_state(state: "State", system: "System", settings: "Settings"):
 
     updated_state = state.expand_rows(state.numerics.number_of_control_points)

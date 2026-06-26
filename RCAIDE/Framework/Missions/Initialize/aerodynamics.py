@@ -27,21 +27,14 @@ from RCAIDE.Framework.Conditions.Aerodynamics import ComponentCoefficients
 #  Initialize Aerodynamic Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
-@inputs(
-    "system.wings",
-    "system.fuselages",
-    "system.nacelles"
-)
+
+@inputs("system.wings", "system.fuselages", "system.nacelles")
 @outputs(
     "state.aerodynamics.coefficients.[ComponentCoefficients].wings",
     "state.aerodynamics.coefficients.[ComponentCoefficients].fuselages",
-    "state.aerodynamics.coefficients.[ComponentCoefficients].nacelles"
+    "state.aerodynamics.coefficients.[ComponentCoefficients].nacelles",
 )
-def initialize_aerodynamics(
-    state: "State",
-    system: "Aircraft",
-    settings: "Settings"
-):
+def initialize_aerodynamics(state: "State", system: "Aircraft", settings: "Settings"):
 
     aero_conditions = state.aerodynamics
 
@@ -55,23 +48,19 @@ def initialize_aerodynamics(
             n_time = leaf.wings.shape[0]
 
             # 2. Instantiate the component arrays
-            new_wings     = jnp.zeros((n_time, n_wings))
+            new_wings = jnp.zeros((n_time, n_wings))
             new_fuselages = jnp.zeros((n_time, n_fuselages))
-            new_nacelles  = jnp.zeros((n_time, n_nacelles))
+            new_nacelles = jnp.zeros((n_time, n_nacelles))
 
             # 3. Functionally update the leaf
             return eqx.tree_at(
-                lambda l: (l.wings, l.fuselages, l.nacelles),
-                leaf,
-                (new_wings, new_fuselages, new_nacelles)
+                lambda l: (l.wings, l.fuselages, l.nacelles), leaf, (new_wings, new_fuselages, new_nacelles)
             )
         else:
             return leaf
 
     updated_aero = jax.tree_util.tree_map(
-        _expand_col,
-        aero_conditions,
-        is_leaf=lambda leaf: isinstance(leaf, ComponentCoefficients)
+        _expand_col, aero_conditions, is_leaf=lambda leaf: isinstance(leaf, ComponentCoefficients)
     )
 
     updated_state = eqx.tree_at(lambda s: s.aerodynamics, state, updated_aero)

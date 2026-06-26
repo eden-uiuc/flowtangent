@@ -15,56 +15,50 @@ from typing import TYPE_CHECKING
 import jax.numpy as np
 
 if TYPE_CHECKING:
-        import RCAIDE.Framework as rcf
+    import RCAIDE.Framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # shaft_offtake
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def func_shaft_offtake(
-        power,
-        T_ref,
-        P_ref,
-        T_t_ref,
-        P_t_ref,
-        mdhc
-):
+def func_shaft_offtake(power, T_ref, P_ref, T_t_ref, P_t_ref, mdhc):
 
-        core_massflow = mdhc * np.sqrt(T_ref / T_t_ref) * (P_t_ref / P_ref)
-        work = np.divide(power, core_massflow,
-                         out=np.zeros_like(power), where=core_massflow != 0)  # Handle div-by-zero with ufunc
+    core_massflow = mdhc * np.sqrt(T_ref / T_t_ref) * (P_t_ref / P_ref)
+    work = np.divide(
+        power, core_massflow, out=np.zeros_like(power), where=core_massflow != 0
+    )  # Handle div-by-zero with ufunc
 
-        return work
+    return work
 
 
 def shaft_offtake(
-        state: "rcf.State",
-        system: "rcf.Systems",
-        settings: "rcf.Settings",
+    state: "rcf.State",
+    system: "rcf.Systems",
+    settings: "rcf.Settings",
 ) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
-        # Get Inputs
-        shaft = system.energy.propulsors.shaft_offtake
-        power = shaft.power_draw
-        T_ref = shaft.reference_temperature
-        P_ref = shaft.reference_pressure
+    # Get Inputs
+    shaft = system.energy.propulsors.shaft_offtake
+    power = shaft.power_draw
+    T_ref = shaft.reference_temperature
+    P_ref = shaft.reference_pressure
 
-        T_t_ref = system.energy.reference_temperature
-        P_t_ref = system.energy.reference_pressure
+    T_t_ref = system.energy.reference_temperature
+    P_t_ref = system.energy.reference_pressure
 
-        mdhc    = system.energy.compressor_nondimensional_massflow
+    mdhc = system.energy.compressor_nondimensional_massflow
 
-        # Call Function
+    # Call Function
 
-        work = func_shaft_offtake(power, T_ref, P_ref, T_t_ref, P_t_ref, mdhc)
+    work = func_shaft_offtake(power, T_ref, P_ref, T_t_ref, P_t_ref, mdhc)
 
-        # Set Input State
-        # N/A - Shaft offtake is derived from system parameters, not performance state
+    # Set Input State
+    # N/A - Shaft offtake is derived from system parameters, not performance state
 
-        # Set Output State
+    # Set Output State
 
-        outputs = state.energy.converters.shaft_offtake.outputs
-        outputs.work = work
+    outputs = state.energy.converters.shaft_offtake.outputs
+    outputs.work = work
 
-        return state, system, settings
+    return state, system, settings

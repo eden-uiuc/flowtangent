@@ -2,8 +2,7 @@
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
 
-"""RCAIDE Package Setup
-"""
+"""RCAIDE Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

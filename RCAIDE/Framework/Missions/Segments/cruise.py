@@ -28,9 +28,9 @@ from .Profiles import *
 #  Cruise
 # ----------------------------------------------------------------------------------------------------------------------
 
-class Cruise(Segment):
 
-    tag: str = 'Cruise'
+class Cruise(Segment):
+    tag: str = "Cruise"
 
     distance: float = 0.0
 
@@ -39,28 +39,30 @@ class Cruise(Segment):
 #  Test CSA Cruise
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def _test_cruise_controls():
     return (
         DirectControlVariable(
-            tag='Lift Coefficient',
+            tag="Lift Coefficient",
             path=("aerodynamics", "coefficients", "lift", "total"),
             path_indices=(slice(None), 0),
-            active=True
+            active=True,
         ),
         DirectControlVariable(
-            tag='Drag Coefficient',
+            tag="Drag Coefficient",
             path=("aerodynamics", "coefficients", "drag", "total"),
             path_indices=(slice(None), 0),
-            active=True
-        )
+            active=True,
+        ),
     )
 
+
 def _build_dynamics(
-        altitude: float,
-        distance: float,
-        air_speed: float,
-        sideslip: float,
-    ):
+    altitude: float,
+    distance: float,
+    air_speed: float,
+    sideslip: float,
+):
 
     def initialize_dynamics(state: "State", system: "System", settings: "Settings"):
         alt = altitude
@@ -91,10 +93,10 @@ def _build_dynamics(
                 s.freestream.altitude,
                 s.frames.inertial.position_vector,
                 s.frames.inertial.velocity_vector,
-                s.frames.inertial.time
+                s.frames.inertial.time,
             ),
             state,
-            (new_alt, new_pos, new_vel, time)
+            (new_alt, new_pos, new_vel, time),
         )
 
         return new_state, system, settings
@@ -103,29 +105,24 @@ def _build_dynamics(
 
 
 class TestCSACruise(Cruise):
+    tag: str = "Constant Speed & Altitude Cruise"
 
-    tag: str = 'Constant Speed & Altitude Cruise'
+    altitude: float = 1.0
+    air_speed: float = 1.0
 
-    altitude:   float = 1.0
-    air_speed:  float = 1.0
-
-    active_controls:  tuple[str | ControlVariable, ...]   = init_field(_test_cruise_controls)
-    active_residuals: tuple[NamedResidual, ...]           = init_field(('force_x', 'force_z'), static=True)
-    controls_initial_guess : tuple[jnp.ndarray|float,...] = (1.0, 0.05)
+    active_controls: tuple[str | ControlVariable, ...] = init_field(_test_cruise_controls)
+    active_residuals: tuple[NamedResidual, ...] = init_field(("force_x", "force_z"), static=True)
+    controls_initial_guess: tuple[jnp.ndarray | float, ...] = (1.0, 0.05)
 
     def __post_init__(self):
 
         super().__post_init__()
 
         # 2. Build the pure, detached physics function
-        initialize_dynamics = _build_dynamics(
-            self.altitude, self.distance, self.air_speed, self.sideslip_angle
-        )
+        initialize_dynamics = _build_dynamics(self.altitude, self.distance, self.air_speed, self.sideslip_angle)
 
         # 3. Functionally append to the InitializeSegment
-        new_init = self.initialize.append(
-            ProcessStep(tag='Dynamics and Controls', function=initialize_dynamics)
-        )
+        new_init = self.initialize.append(ProcessStep(tag="Dynamics and Controls", function=initialize_dynamics))
 
         # 4. Overwrite the underlying tuple, NOT the `@property`
         new_steps = (new_init, self.iterate, self.finalize)

@@ -78,29 +78,29 @@ class FreestreamConditions(Conditions):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    tag:                    str          = init_field('Freestream', static=True)
-    atmosphere:             Atmosphere   = init_field(USStandard1976)
-    planet:                 Planet       = init_field(Earth)
+    tag: str = init_field("Freestream", static=True)
+    atmosphere: Atmosphere = init_field(USStandard1976)
+    planet: Planet = init_field(Earth)
 
-    speed:                  jnp.ndarray  = empty_array(0)
-    altitude:               jnp.ndarray  = empty_array(0)
-    gravity:                jnp.ndarray  = empty_array(0)
+    speed: jnp.ndarray = empty_array(0)
+    altitude: jnp.ndarray = empty_array(0)
+    gravity: jnp.ndarray = empty_array(0)
 
-    speed_of_sound:         jnp.ndarray  = empty_array(0)
-    pressure:               jnp.ndarray  = empty_array(0)
-    temperature:            jnp.ndarray  = empty_array(0)
-    density:                jnp.ndarray  = empty_array(0)
+    speed_of_sound: jnp.ndarray = empty_array(0)
+    pressure: jnp.ndarray = empty_array(0)
+    temperature: jnp.ndarray = empty_array(0)
+    density: jnp.ndarray = empty_array(0)
 
-    dynamic_viscosity:      jnp.ndarray  = empty_array(0)
-    dynamic_pressure:       jnp.ndarray  = empty_array(0)
+    dynamic_viscosity: jnp.ndarray = empty_array(0)
+    dynamic_pressure: jnp.ndarray = empty_array(0)
 
-    stagnation_pressure:    jnp.ndarray  = empty_array(0)
-    stagnation_temperature: jnp.ndarray  = empty_array(0)
+    stagnation_pressure: jnp.ndarray = empty_array(0)
+    stagnation_temperature: jnp.ndarray = empty_array(0)
 
-    mach_number:            jnp.ndarray  = empty_array(0)
-    reynolds_number:        jnp.ndarray  = empty_array(0)
+    mach_number: jnp.ndarray = empty_array(0)
+    reynolds_number: jnp.ndarray = empty_array(0)
 
-    delta_ISA:              jnp.ndarray  = empty_array(0)
-    gamma:                  jnp.ndarray  = empty_array(0)
-    Cp:                     jnp.ndarray  = empty_array(0)
-    R:                      jnp.ndarray  = empty_array(0)
+    delta_ISA: jnp.ndarray = empty_array(0)
+    gamma: jnp.ndarray = empty_array(0)
+    Cp: jnp.ndarray = empty_array(0)
+    R: jnp.ndarray = empty_array(0)

@@ -52,16 +52,20 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
 
     # Build the 3D Mesh
     mesh_trace = go.Mesh3d(
-        x=x, y=y, z=z,
-        i=i_idx, j=j_idx, k=k_idx,
+        x=x,
+        y=y,
+        z=z,
+        i=i_idx,
+        j=j_idx,
+        k=k_idx,
         intensity=facecolor_intensities if panel_values is not None else None,
-        intensitymode='cell',
-        colorscale='Plasma',
-        color='lightgrey',  # Fallback color changed to light grey
+        intensitymode="cell",
+        colorscale="Plasma",
+        color="lightgrey",  # Fallback color changed to light grey
         showscale=panel_values is not None,
         flatshading=True,
-        name='VLM Mesh',
-        hovertemplate='Value: %{intensity:.5f}<extra></extra>' if panel_values is not None else None
+        name="VLM Mesh",
+        hovertemplate="Value: %{intensity:.5f}<extra></extra>" if panel_values is not None else None,
     )
 
     data = [mesh_trace]
@@ -69,11 +73,13 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
     # If no values are passed, overlay the black wireframe
     if panel_values is None:
         edge_trace = go.Scatter3d(
-            x=edge_x, y=edge_y, z=edge_z,
-            mode='lines',
-            line=dict(color='black', width=2),
-            name='Panel Edges',
-            hoverinfo='skip'  # Don't clutter the hover box with line coordinates
+            x=edge_x,
+            y=edge_y,
+            z=edge_z,
+            mode="lines",
+            line=dict(color="black", width=2),
+            name="Panel Edges",
+            hoverinfo="skip",  # Don't clutter the hover box with line coordinates
         )
         data.append(edge_trace)
 
@@ -84,21 +90,21 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
         up=dict(x=0, y=0, z=1),
         center=dict(x=0, y=0, z=0),
         eye=dict(x=1.5, y=-1.5, z=1.5),
-        projection=dict(type='orthographic')
+        projection=dict(type="orthographic"),
     )
 
     # Apply the styling and camera to the layout
     fig.update_layout(
         title=title,
-        template='plotly_white',
+        template="plotly_white",
         scene=dict(
-            aspectmode='data',
+            aspectmode="data",
             camera=isometric_camera,
-            xaxis=dict(title='X (Streamwise)', showbackground=False),
-            yaxis=dict(title='Y (Spanwise)', showbackground=False),
-            zaxis=dict(title='Z (Vertical)', showbackground=False)
+            xaxis=dict(title="X (Streamwise)", showbackground=False),
+            yaxis=dict(title="Y (Spanwise)", showbackground=False),
+            zaxis=dict(title="Z (Vertical)", showbackground=False),
         ),
-        margin=dict(l=0, r=0, b=0, t=40)
+        margin=dict(l=0, r=0, b=0, t=40),
     )
 
     return fig

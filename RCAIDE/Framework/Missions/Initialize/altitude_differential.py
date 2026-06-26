@@ -18,11 +18,7 @@ import RCAIDE.Framework as rcf
 # -------------------------------------------------------------------------------
 
 
-def initialize_altitude_differential(
-    state: "rcf.State",
-    settings: "rcf.Settings",
-    system: "rcf.Systems"):
-
+def initialize_altitude_differential(state: "rcf.State", settings: "rcf.Settings", system: "rcf.Systems"):
     """
     Framework version of initialize_altitude_differential
 
@@ -39,8 +35,8 @@ def initialize_altitude_differential(
     v = state.frames.inertial.velocity_vector
 
     # Get altitude and time step
-    dz = r[-1,2] - r[0,2]
-    dt = jnp.dot(I[-1, :] * dz, 1/v[:, 2])
+    dz = r[-1, 2] - r[0, 2]
+    dt = jnp.dot(I[-1, :] * dz, 1 / v[:, 2])
 
     # Rescale operator
     t = t * dt

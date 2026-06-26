@@ -24,17 +24,18 @@ from RCAIDE.Framework.Systems import Aircraft
 # AVL Interface Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def parse_avl_file(filepath: str | Path) -> dict:
     """
     Parses an AVL geometry file into a structured Python dictionary.
     """
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         lines = f.readlines()
 
     # 1. Clean the file: strip whitespace and comments (# or !)
     cleaned_lines = []
     for line in lines:
-        line = line.split('#')[0].split('!')[0].strip()
+        line = line.split("#")[0].split("!")[0].strip()
         if line:  # Keep only non-empty lines
             cleaned_lines.append(line)
 
@@ -53,9 +54,9 @@ def parse_avl_file(filepath: str | Path) -> dict:
         "filepath": str(Path(filepath).absolute()),
         "mach": float(cleaned_lines[1].split()[0]),
         "symmetry": [float(x) for x in cleaned_lines[2].split()[:3]],
-        "reference_area": [float(x) * Units.ft **2 for x in cleaned_lines[3].split()[:3]],
-        "reference_point": [float(x) * Units. ft for x in cleaned_lines[4].split()[:3]],
-        "surfaces": []
+        "reference_area": [float(x) * Units.ft**2 for x in cleaned_lines[3].split()[:3]],
+        "reference_point": [float(x) * Units.ft for x in cleaned_lines[4].split()[:3]],
+        "surfaces": [],
     }
 
     # 3. State Machine for Surfaces and Sections
@@ -75,7 +76,7 @@ def parse_avl_file(filepath: str | Path) -> dict:
                 "y_duplicate": None,
                 "translate": [0.0, 0.0, 0.0],
                 "scale": [1.0, 1.0, 1.0],
-                "sections": []
+                "sections": [],
             }
             # The line after the name is Nchordwise Cspace Nspanwise Sspace
             i += 1
@@ -98,15 +99,17 @@ def parse_avl_file(filepath: str | Path) -> dict:
             i += 1
             section_data = [float(x) for x in cleaned_lines[i].split()]
 
-            current_surface["sections"].append({
-                "x_le": section_data[0] * current_surface['scale'][0] * Units.ft,
-                "y_le": section_data[1] * current_surface['scale'][1] * Units.ft,
-                "z_le": section_data[2] * current_surface['scale'][2] * Units.ft,
-                "chord": section_data[3] * Units.ft,
-                "twist": section_data[4] * Units.deg,
-                "airfoil_naca": None,
-                "airfoil_file": None
-            })
+            current_surface["sections"].append(
+                {
+                    "x_le": section_data[0] * current_surface["scale"][0] * Units.ft,
+                    "y_le": section_data[1] * current_surface["scale"][1] * Units.ft,
+                    "z_le": section_data[2] * current_surface["scale"][2] * Units.ft,
+                    "chord": section_data[3] * Units.ft,
+                    "twist": section_data[4] * Units.deg,
+                    "airfoil_naca": None,
+                    "airfoil_file": None,
+                }
+            )
 
         elif token == "NACA":
             i += 1
@@ -197,7 +200,7 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
                 # twist=sec_in["twist"],
                 dihedral_outboard=dihedral,
                 sweeps=WingSweeps(quarter_chord=qc_sweep),
-                airfoil=airfoil
+                airfoil=airfoil,
             )
             segments_list.append(segment)
 
@@ -209,7 +212,7 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
                 twist=tip_sec["twist"],
                 dihedral_outboard=0.0,
                 sweeps=WingSweeps(quarter_chord=0.0),
-                airfoil=airfoil
+                airfoil=airfoil,
             )
         )
 
@@ -223,8 +226,9 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
             spans=WingDimensions(projected=total_span),
             # twists=WingDimensions(root=root_sec["twist"], tip=tip_sec["twist"]),
             chords=WingChords(root=root_chord, tip=tip_chord, mean_aerodynamic=cref),
-            origin=jnp.array(surf_data["translate"]) + jnp.array([[root_sec["x_le"], root_sec["y_le"], root_sec["z_le"]]]),
-            aerodynamic_center=jnp.array([[xref, yref, zref]])
+            origin=jnp.array(surf_data["translate"])
+            + jnp.array([[root_sec["x_le"], root_sec["y_le"], root_sec["z_le"]]]),
+            aerodynamic_center=jnp.array([[xref, yref, zref]]),
         )
 
         # 4. Trigger RCAIDE's internal geometry engine to fill in the rest
@@ -238,4 +242,3 @@ def convert_to_RCAIDE(avl_data: dict) -> Aircraft:
 def read_and_convert(file_path: str | Path) -> Aircraft:
     avl_data = parse_avl_file(file_path)
     return convert_to_RCAIDE(avl_data)
-

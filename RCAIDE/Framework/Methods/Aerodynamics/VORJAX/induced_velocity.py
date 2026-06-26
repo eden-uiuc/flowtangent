@@ -113,8 +113,29 @@ def supersonic_in_plane(r1, r2, y1, y2, tol, x_ty, C_pi):
 
 
 @jax.jit
-def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_sq, tol, tol_sq2, x1, y1, x2, y2, r_tv1, r_tv2,
-                         c, sonic_mask, recv_idx):
+def supersonic_induction(
+    z,
+    x_sq1,
+    r_o1,
+    x_sq2,
+    r_o2,
+    x_ty,
+    t,
+    B_sq,
+    z_sq,
+    tol_sq,
+    tol,
+    tol_sq2,
+    x1,
+    y1,
+    x2,
+    y2,
+    r_tv1,
+    r_tv2,
+    c,
+    sonic_mask,
+    recv_idx,
+):
     """
     Pure JAX translation of the VORLAX supersonic Biot-Savart induction.
 
@@ -178,18 +199,14 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_s
 
     # W_wave: Principal Part of the Integral (Self-Influence / Wave Drag)
     N = U.shape[1]
-    t_sq = t ** 2
+    t_sq = t**2
     cos_sweep = 1.0 / jnp.sqrt(1.0 + t_sq[None, :])
 
     W_wave_cond = B_sq > t_sq[None, :]
     W_wave_output = -0.5 * jnp.sqrt(jnp.where(W_wave_cond, B_sq - t_sq[None, :], 1.0)) / jnp.maximum(c, 1e-12)
 
     # Calculate W_wave for all senders (Shape: n_time, N)
-    W_wave_val = jnp.where(
-        W_wave_cond,
-        W_wave_output,
-        0.0
-    )
+    W_wave_val = jnp.where(W_wave_cond, W_wave_output, 0.0)
 
     # Create a boolean mask for the diagonal element of this specific row
     j_indices = jnp.arange(N)
@@ -200,9 +217,9 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_s
 
     # Build the 1D slice of the Laplacian stencil for THIS receiver row
     sonic_row = jnp.where(
-        j_indices == recv_idx, 2.0,
-        jnp.where(j_indices == recv_idx - 1, -1.0,
-        jnp.where(j_indices == recv_idx + 1, -1.0, 0.0))
+        j_indices == recv_idx,
+        2.0,
+        jnp.where(j_indices == recv_idx - 1, -1.0, jnp.where(j_indices == recv_idx + 1, -1.0, 0.0)),
     )[None, :]
 
     is_recv_sonic = sonic_mask[:, recv_idx][:, None]
@@ -211,6 +228,7 @@ def supersonic_induction(z, x_sq1, r_o1, x_sq2, r_o2, x_ty, t, B_sq, z_sq, tol_s
     W = jnp.where(is_recv_sonic, sonic_row, W)
 
     return U, V, W
+
 
 @jax.jit
 @jax.checkpoint
@@ -230,7 +248,7 @@ def compute_C_ij(VD, Mach):
     dy = vortex_B[:, 1] - vortex_A[:, 1]
     dz = vortex_B[:, 2] - vortex_A[:, 2]
 
-    norm_yz = jnp.maximum(jnp.sqrt(dy ** 2 + dz ** 2), 1e-16)
+    norm_yz = jnp.maximum(jnp.sqrt(dy**2 + dz**2), 1e-16)
     costheta = dy / norm_yz
     sintheta = dz / norm_yz
 
@@ -240,8 +258,8 @@ def compute_C_ij(VD, Mach):
 
     # s = local half-span, t = tangent of the sweep angle
     s = jnp.abs(dy_vortex)
-    t = (dx_vortex / jnp.maximum(dy_vortex, 1e-16))
-    t_sq = t ** 2
+    t = dx_vortex / jnp.maximum(dy_vortex, 1e-16)
+    t_sq = t**2
 
     # Beta-Squared = Mach^2 - 1.0 --------------------------------------------------------------------------------------
     beta_sq = (Mach.squeeze(1) ** 2 - 1.0).astype(jnp.float32)
@@ -265,7 +283,7 @@ def compute_C_ij(VD, Mach):
     # C_mn Calculation -------------------------------------------------------------------------------------------------
 
     tol = s / 500.0
-    tol_sq = tol ** 2
+    tol_sq = tol**2
     tol_sq_scl = 2500.0 * tol_sq
 
     # Row-wise vector-mapping to minimize peak memory usage
@@ -285,11 +303,11 @@ def compute_C_ij(VD, Mach):
         y_dist_right = y_dist - s
 
         # Arrays are (N,) instead of (N, N)
-        x_sq1 = x_dist_left ** 2
-        x_sq2 = x_dist_right ** 2
-        y_sq1 = y_dist_left ** 2
-        y_sq2 = y_dist_right ** 2
-        z_sq  = z_dist ** 2
+        x_sq1 = x_dist_left**2
+        x_sq2 = x_dist_right**2
+        y_sq1 = y_dist_left**2
+        y_sq2 = y_dist_right**2
+        z_sq = z_dist**2
 
         r_tv1 = y_sq1 + z_sq
         r_tv2 = y_sq2 + z_sq
@@ -340,7 +358,7 @@ def compute_C_ij(VD, Mach):
             tol_sq2=tol_sq_scl,
             c=VD.chord_lengths,
             sonic_mask=sonic_mask,
-            recv_idx=recv_idx
+            recv_idx=recv_idx,
         )
 
         # --- Blending ---
@@ -356,11 +374,14 @@ def compute_C_ij(VD, Mach):
         EW_row = W_ind * COS_RS[None, :] - V_ind * SIN_RS[None, :]
 
         # --- Rotate to Global Frame ---
-        C_ij_row = jnp.stack([
+        C_ij_row = jnp.stack(
+            [
                 U_ind,
                 V_ind * costheta[None, :] - W_ind * sintheta[None, :],
-                V_ind * sintheta[None, :] + W_ind * costheta[None, :]
-            ], axis=-1)
+                V_ind * sintheta[None, :] + W_ind * costheta[None, :],
+            ],
+            axis=-1,
+        )
 
         # Return the tuple!
         return C_ij_row, EW_row
@@ -386,21 +407,19 @@ def compute_C_ij(VD, Mach):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-@inputs(
-    "system.analysis_data['vortex_distribution']",
-    "state.freestream.mach_number"
-)
+@inputs("system.analysis_data['vortex_distribution']", "state.freestream.mach_number")
 @outputs(
-    "system.analysis_data['VICs']",
-    "system.analysis_data['singularities']",
-    "system.analysis_data['le_normalwash']"
+    "system.analysis_data['VICs']", "system.analysis_data['singularities']", "system.analysis_data['le_normalwash']"
 )
 def compute_induced_velocity(state: "State", system: "System", settings: "Settings"):
 
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
 
-    C_ij, singularity_flag, = compute_C_ij(VD, Mach)
+    (
+        C_ij,
+        singularity_flag,
+    ) = compute_C_ij(VD, Mach)
 
     updated_analysis_data = system.analysis_data | {
         "VICs": C_ij,

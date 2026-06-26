@@ -14,12 +14,15 @@ import RCAIDE.Framework as rcf
 # Converge Roots
 # ----------------------------------------------------------------------------------------------------------------------
 
-def converge_roots(State: "rcf.State",
-                   System: "rcf.Systems",
-                   Settings: "rcf.Settings",
-                   ):
+
+def converge_roots(
+    State: "rcf.State",
+    System: "rcf.Systems",
+    Settings: "rcf.Settings",
+):
 
     root_finder = Settings.root_finder
+
 
 def _single_iteration(unknowns):
 

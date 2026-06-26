@@ -16,9 +16,8 @@ import RCAIDE.Framework as rcf
 # Functional/Library Version
 # -----------------------------------------------------------------------
 
-def func_passenger_payload(n_passengers,
-                           m_passenger=195. * Units.lbm,
-                           m_baggage=30. * Units.lbm):
+
+def func_passenger_payload(n_passengers, m_passenger=195.0 * Units.lbm, m_baggage=30.0 * Units.lbm):
     """
     Calculate the total mass of passengers and their baggage.
 
@@ -46,27 +45,26 @@ def func_passenger_payload(n_passengers,
 # Stateful/Framework Version
 # -----------------------------------------------------------------------
 
-def passenger_payload(state: "rcf.State",
-                      system: "rcf.Systems",
-                      settings: "rcf.Settings"):
 
-    n_passengers    = system.number_of_passengers
+def passenger_payload(state: "rcf.State", system: "rcf.Systems", settings: "rcf.Settings"):
+
+    n_passengers = system.number_of_passengers
 
     passenger_mass, baggage_mass = func_passenger_payload(n_passengers)
 
     def _build_payload(payload: "rcl.Component"):
 
-        if hasattr(payload, 'passengers'):
+        if hasattr(payload, "passengers"):
             payload.passengers.mass_properties.total = passenger_mass
         else:
-            passengers = rcl.Component(tag='passengers')
+            passengers = rcl.Component(tag="passengers")
             passengers.mass_properties.total = passenger_mass
             payload.add_subcomponent(passengers)
 
-        if hasattr(payload, 'baggage'):
+        if hasattr(payload, "baggage"):
             payload.baggage.mass_properties.total = baggage_mass
         else:
-            baggage = rcl.Component(tag='baggage')
+            baggage = rcl.Component(tag="baggage")
             baggage.mass_properties.total = baggage_mass
             payload.add_subcomponent(baggage)
 
@@ -74,12 +72,12 @@ def passenger_payload(state: "rcf.State",
 
         return payload
 
-    if hasattr(system, 'payload'):
+    if hasattr(system, "payload"):
         _payload = system.payload
         system.payload = _build_payload(_payload)
         system.sum_mass()
     else:
-        _payload = rcl.Component(tag='payload')
+        _payload = rcl.Component(tag="payload")
         payload = _build_payload(_payload)
         system.add_subcomponent(payload)
 

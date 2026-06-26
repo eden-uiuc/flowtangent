@@ -24,35 +24,37 @@ from RCAIDE.Library import Units
 #  Update Planetary Position
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def update_planetary_position(state: "State", system: "System", settings: "Settings"):
 
     # Unpack state
-    v       = state.frames.inertial.velocity_vector[:, 0] # Velocity over ground along true course
-    alt     = state.freestream.altitude
+    v = state.frames.inertial.velocity_vector[:, 0]  # Velocity over ground along true course
+    alt = state.freestream.altitude
 
-    theta   = state.frames.body.inertial_rotations[:, 1]
-    psi     = state.frames.planet.true_course
-    Re      = state.freestream.planet.mean_radius
+    theta = state.frames.body.inertial_rotations[:, 1]
+    psi = state.frames.planet.true_course
+    Re = state.freestream.planet.mean_radius
 
-    alpha   = state.aerodynamics.angles.alpha
+    alpha = state.aerodynamics.angles.alpha
 
-    I       = state.numerics.time.integrate
+    I = state.numerics.time.integrate
 
     #  Calculate flight path and radius
-    gamma   = theta - alpha
-    R       = alt + Re
+    gamma = theta - alpha
+    R = alt + Re
 
     # Find local velocities and integrate position
-    lamdadot  = (v/R) * jnp.cos(gamma) * jnp.cos(psi)
-    lamda     = jnp.dot(I, lamdadot) / Units.deg  # Latitude
+    lamdadot = (v / R) * jnp.cos(gamma) * jnp.cos(psi)
+    lamda = jnp.dot(I, lamdadot) / Units.deg  # Latitude
 
-    mudot     = (v/R) * jnp.cos(gamma) * jnp.sin(psi) / jnp.cos(lamda)
-    mu        = jnp.dot(I, mudot) / Units.deg     # Longitude
+    mudot = (v / R) * jnp.cos(gamma) * jnp.sin(psi) / jnp.cos(lamda)
+    mu = jnp.dot(I, mudot) / Units.deg  # Longitude
 
-    lat_0     = state.frames.planet.latitude[0, 0]
-    lon_0     = state.frames.planet.longitude[0, 0]
+    lat_0 = state.frames.planet.latitude[0, 0]
+    lon_0 = state.frames.planet.longitude[0, 0]
 
-    updated_state = eqx.tree_at(lambda s:(s.frames.planet.latitude, s.frames.planet.longitude),
-                                state, (lat_0 + lamda, lon_0 + mu))
+    updated_state = eqx.tree_at(
+        lambda s: (s.frames.planet.latitude, s.frames.planet.longitude), state, (lat_0 + lamda, lon_0 + mu)
+    )
 
     return updated_state, system, settings

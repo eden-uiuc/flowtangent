@@ -20,13 +20,12 @@ from RCAIDE.Library import Component
 
 
 class LandingGear(Component):
+    tag: str = init_field("Landing Gear", static=True)
 
-    tag:                str     = init_field('Landing Gear', static=True)
+    deployed: bool = False
 
-    deployed:           bool    = False
+    number_of_units: int = init_field(1, static=True)
+    number_of_wheels: int = init_field(0, static=True)
 
-    number_of_units:    int     = init_field(1, static=True)
-    number_of_wheels:   int     = init_field(0, static=True)
-
-    strut_length:       float   = 0.
-    tire_diameter:      float   = 0.
+    strut_length: float = 0.0
+    tire_diameter: float = 0.0

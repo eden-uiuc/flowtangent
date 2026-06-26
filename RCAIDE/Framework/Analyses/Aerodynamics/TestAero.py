@@ -17,12 +17,7 @@ from RCAIDE.Framework.Methods.Aerodynamics.Test_Aero import direct_aero
 # 1. Define the builder function outside the class
 def _build_test_aero_steps():
     """Builds and returns the default tuple of process steps."""
-    return (
-        ProcessStep(
-            tag="Direct Aero Calculation",
-            function=direct_aero
-        ),
-    )
+    return (ProcessStep(tag="Direct Aero Calculation", function=direct_aero),)
 
 
 class TestAero(Process):

@@ -29,64 +29,74 @@ from RCAIDE.Framework.Conditions.Controls import DirectControlVariable, SurfaceC
 # Initialize
 # ----------------------------------------------------------------------------------------------------------------------
 
-def build_controls_from_system(state:State, system: System|Component, settings:Settings):
 
-        new_controls = state.controls
-        surface_controls = []
-        direct_controls = []
-        unbound_controls = []
+def build_controls_from_system(state: State, system: System | Component, settings: Settings):
 
+    new_controls = state.controls
+    surface_controls = []
+    direct_controls = []
+    unbound_controls = []
 
-        if settings.DEBUG_MODE:
-            print(f"Building controls from {system.tag}...")
+    if settings.DEBUG_MODE:
+        print(f"Building controls from {system.tag}...")
 
-        for component in system.subcomponents:
-            state, component, settings = build_controls_from_system(state, component, settings)
+    for component in system.subcomponents:
+        state, component, settings = build_controls_from_system(state, component, settings)
 
-            if component.is_control_component:
-                if isinstance(component, Wing):
-                    new_controls = state.controls.add_control_variable(
-                        SurfaceControlVariable(
-                            tag=component.tag + "_deflection",
-                            surfaces=(system,),
-                        )
+        if component.is_control_component:
+            if isinstance(component, Wing):
+                new_controls = state.controls.add_control_variable(
+                    SurfaceControlVariable(
+                        tag=component.tag + "_deflection",
+                        surfaces=(system,),
                     )
-                    surface_controls.append(component.tag + "_deflection")
+                )
+                surface_controls.append(component.tag + "_deflection")
 
+            else:
+                unbound = False
+                if hasattr(component, "control_path"):
+                    path = component.control_path
                 else:
-                    unbound = False
-                    if hasattr(component, "control_path"): path = component.control_path
-                    else: path = (); unbound = True
+                    path = ()
+                    unbound = True
 
-                    if hasattr(component, "control_path_indices"): indices = component.control_path_indices
-                    else: indices = (slice(None), 0); unbound = True
+                if hasattr(component, "control_path_indices"):
+                    indices = component.control_path_indices
+                else:
+                    indices = (slice(None), 0)
+                    unbound = True
 
-                    if unbound: unbound_controls.append(component.tag)
+                if unbound:
+                    unbound_controls.append(component.tag)
 
-                    new_controls = state.controls.add_control_variable(
-                        DirectControlVariable(
-                            tag=component.tag,
-                            path=path,
-                            path_indices=indices,
-                        )
+                new_controls = state.controls.add_control_variable(
+                    DirectControlVariable(
+                        tag=component.tag,
+                        path=path,
+                        path_indices=indices,
                     )
-                    if not unbound: direct_controls.append(component.tag)
+                )
+                if not unbound:
+                    direct_controls.append(component.tag)
 
-                if settings.DEBUG_MODE:
-                    if surface_controls:
-                        print("Added the following aerodynamic surface controls:" +
-                              "\n\t- ".join(surface_controls))
-                    if direct_controls:
-                        print("Added the following direct controls:" +
-                              "\n\t- ".join(direct_controls))
-                    if unbound_controls:
-                        print("The following control components were found, but without path information."
-                              "They may not function as intended:"
-                              "\n\t- ".join(unbound_controls))
+            if settings.DEBUG_MODE:
+                if surface_controls:
+                    print("Added the following aerodynamic surface controls:" + "\n\t- ".join(surface_controls))
+                if direct_controls:
+                    print("Added the following direct controls:" + "\n\t- ".join(direct_controls))
+                if unbound_controls:
+                    print(
+                        "The following control components were found, but without path information."
+                        "They may not function as intended:"
+                        "\n\t- ".join(unbound_controls)
+                    )
 
-        if settings.DEBUG_MODE:
-            print(f"Completed building controls from {system.tag}.\n"
-                  f"Controls may be activated for mission segments by setting "
-                  f"segment.active_controls = ('control_variable', ...)")
+    if settings.DEBUG_MODE:
+        print(
+            f"Completed building controls from {system.tag}.\n"
+            f"Controls may be activated for mission segments by setting "
+            f"segment.active_controls = ('control_variable', ...)"
+        )
 
-        return eqx.tree_at(lambda s: s.controls, state, new_controls), system, settings
+    return eqx.tree_at(lambda s: s.controls, state, new_controls), system, settings
