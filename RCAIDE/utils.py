@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 def init_field(initializer: Any, as_value: bool = False, **kwargs):
     """
-    Smart wrapper for eqx.field that automatically routes the initializer 
+    Smart wrapper for eqx.field that automatically routes the initializer
     to `default` (for immutables) or `default_factory` (for classes/callables).
     """
     # Handle factories and classes (e.g., list, dict, MediumRange)
@@ -85,27 +85,27 @@ def outputs(*outputs: str):
 MERMAID_STYLES = {
     "default": "",
 
-    "formal": """%%{init: {'theme': 'base', 'themeVariables': { 
-        'primaryColor': '#ffffff', 
-        'primaryBorderColor': '#000000', 
-        'primaryTextColor': '#000000', 
-        'lineColor': '#000000', 
+    "formal": """%%{init: {'theme': 'base', 'themeVariables': {
+        'primaryColor': '#ffffff',
+        'primaryBorderColor': '#000000',
+        'primaryTextColor': '#000000',
+        'lineColor': '#000000',
         'fontFamily': 'Times New Roman, serif'
     }}}%%""",
 
-    "modern": """%%{init: {'theme': 'base', 'themeVariables': { 
-        'primaryColor': '#f8fafc', 
-        'primaryBorderColor': '#3b82f6', 
-        'primaryTextColor': '#0f172a', 
-        'lineColor': '#94a3b8', 
+    "modern": """%%{init: {'theme': 'base', 'themeVariables': {
+        'primaryColor': '#f8fafc',
+        'primaryBorderColor': '#3b82f6',
+        'primaryTextColor': '#0f172a',
+        'lineColor': '#94a3b8',
         'fontFamily': 'Inter, system-ui, sans-serif'
     }}}%%""",
 
-    "dark": """%%{init: {'theme': 'dark', 'themeVariables': { 
-        'primaryColor': '#1e1e1e', 
-        'primaryBorderColor': '#10b981', 
-        'primaryTextColor': '#e5e7eb', 
-        'lineColor': '#10b981', 
+    "dark": """%%{init: {'theme': 'dark', 'themeVariables': {
+        'primaryColor': '#1e1e1e',
+        'primaryBorderColor': '#10b981',
+        'primaryTextColor': '#e5e7eb',
+        'lineColor': '#10b981',
         'fontFamily': 'Fira Code, monospace'
     }}}%%"""
 }

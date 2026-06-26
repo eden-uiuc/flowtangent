@@ -79,7 +79,7 @@ class StaticForces(Conditions):
     """
     Static forces acting on an aircraft.
 
-    This class encapsulates the static forces that are relevant to aircraft 
+    This class encapsulates the static forces that are relevant to aircraft
     stability analysis, including lift, drag, and forces in the X, Y, and Z directions.
 
     Attributes
@@ -119,7 +119,7 @@ class StaticMoments(Conditions):
     """
     Represents the static moments acting on an aircraft.
 
-    This class encapsulates the static moments that are relevant to aircraft 
+    This class encapsulates the static moments that are relevant to aircraft
     stability analysis, including rolling, pitching, and yawing moments.
 
     Attributes
@@ -160,12 +160,12 @@ class CoefficientDerivatives(Conditions):
     ----------
     name : str
         The name of the coefficient derivatives set. Default is 'Coefficient Static Stability Derivatives'.
-    
+
     alpha : jnp.ndarray
         Derivative with respect to angle of attack. Shape: (1, 1)
     beta : jnp.ndarray
         Derivative with respect to sideslip angle. Shape: (1, 1)
-    
+
     delta_a : jnp.ndarray
         Derivative with respect to aileron deflection. Shape: (1, 1)
     delta_e : jnp.ndarray
@@ -176,14 +176,14 @@ class CoefficientDerivatives(Conditions):
         Derivative with respect to flap deflection. Shape: (1, 1)
     delta_s : jnp.ndarray
         Derivative with respect to spoiler deflection. Shape: (1, 1)
-    
+
     u : jnp.ndarray
         Derivative with respect to forward velocity. Shape: (1, 1)
     v : jnp.ndarray
         Derivative with respect to lateral velocity. Shape: (1, 1)
     w : jnp.ndarray
         Derivative with respect to vertical velocity. Shape: (1, 1)
-    
+
     p : jnp.ndarray
         Derivative with respect to roll rate. Shape: (1, 1)
     q : jnp.ndarray

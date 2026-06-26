@@ -16,10 +16,10 @@ def compute_payload_power_consumption(payload):
         None
 
     Args:
-        payload.power_draw (float): power consumed by payload [Watts] 
+        payload.power_draw (float): power consumed by payload [Watts]
 
     Returns:
-        payload.outputs.power_draw (float): power consumed by payload [Watts] 
+        payload.outputs.power_draw (float): power consumed by payload [Watts]
     """
     payload.inputs.power = payload.power_draw
 
@@ -37,11 +37,11 @@ def  compute_avionics_power_consumption(avionics):
     Source:
         None
 
-    Args: 
-        avionics.power_draw (float): power consumed by avionics [Watts]     
+    Args:
+        avionics.power_draw (float): power consumed by avionics [Watts]
 
     Returns:
-        avionics.outputs.power_draw  (float): power consumed by avionics [Watts] 
+        avionics.outputs.power_draw  (float): power consumed by avionics [Watts]
     """
     avionics.inputs.power =  avionics.power_draw
 

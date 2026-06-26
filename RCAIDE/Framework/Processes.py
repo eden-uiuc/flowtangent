@@ -554,7 +554,7 @@ class Process(ProcessStep):
     ) -> str:
         """
         Generates a Mermaid.js flowchart string from the Process DAG.
-        
+
         Args:
             recursive: Whether to flatten nested Processes.
             show_edges: Whether to label the edges with the variables passed between steps.

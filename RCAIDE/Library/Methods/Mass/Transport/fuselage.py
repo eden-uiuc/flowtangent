@@ -30,7 +30,7 @@ def func_fuselage(
                  ):
     """
     Library version of fuselage.
-    
+
     Parameters
     ----------
     fuselage_wetted_area : np.ndarray
@@ -67,23 +67,23 @@ def func_fuselage(
     -------
     fuselage_mass : np.ndarray
         Fuselage mass in kilograms
-       
+
     See Also
     --------
     N/A
-    
+
     Notes
     -----
     Correlation of fuselage mass with differential pressure or limit load as appropriate.
-    
+
     References
     ----------
-    
+
     Examples
     --------
     func_fuselage(*args):
         82000.0
-    
+
     """
 
     # Unit Conversion
@@ -118,10 +118,10 @@ def fuselage(state: "rcf.State",
              settings: "rcf.Settings"):
     """
     Framework version of fuselage
-    
+
     See Also
     --------
-    func_fuselage: 
+    func_fuselage:
         Functional implementation which this method calls.
     """
 

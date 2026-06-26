@@ -45,10 +45,10 @@ def tf_mass_from_SLS(
     ):
     """
     Framework version of tf_mass_from_SLS. Assumes a turbofan engine.
-    
+
     See Also
     --------
-    func_tf_Mass_from_SLS: 
+    func_tf_Mass_from_SLS:
         Functional implementation which this method calls.
     """
 

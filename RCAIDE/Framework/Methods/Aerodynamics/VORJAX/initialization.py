@@ -38,7 +38,7 @@ from RCAIDE.utils import inputs, outputs
 )
 def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settings"):
     """
-    Parses the vehicle geometry to find the primary reference parameters 
+    Parses the vehicle geometry to find the primary reference parameters
     and packs them into JAX arrays for the VLM solver.
     """
 

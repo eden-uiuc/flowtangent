@@ -102,7 +102,7 @@ def peaked_CL_spline(M, M_sub, M_peak, M_sup, val_sub, val_sup, val_peak=0.0, pe
 @jax.jit
 def ensemble_CL_spline(M, M_sub, M_sup, val_sub, val_sup, peak_multiplier=1.15):
     """
-    Analytically finds the peak of a wide Hermite spline, boosts it, 
+    Analytically finds the peak of a wide Hermite spline, boosts it,
     and bridges the transonic gap using a 3-node spline.
     """
     # 1. Analytical gradients at the wide boundaries

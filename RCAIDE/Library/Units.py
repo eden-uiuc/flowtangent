@@ -1,12 +1,12 @@
 """
 Units.py
 
-A pure-float SI unit conversion module. 
-Usage: 
+A pure-float SI unit conversion module.
+Usage:
     Multiply by a unit to convert FROM that unit to base SI.
     Divide by a unit to convert TO that unit from base SI.
-    
-    Example: 
+
+    Example:
     span_meters = 50 * ft
     span_feet = span_meters / ft
 """
@@ -117,7 +117,7 @@ R = 5.0 / 9.0 * K                # Rankine
 def parse(unit_string: str) -> float:
     """
     Evaluates a string of units and returns the float multiplier.
-    
+
     Example:
         Units.parse("kg * m**2 / s**3")
         Units.parse("lbf / inch**2")

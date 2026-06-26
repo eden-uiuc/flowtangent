@@ -34,7 +34,7 @@ from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps, WingD
 # ----------------------------------------------------------------------------------------------------------------------
 
 class VortexDistribution(eqx.Module):
-    """ 
+    """
     A globally unstructured VLM mesh.
     N = total number of panels across the entire aircraft.
     """
@@ -389,12 +389,12 @@ def find_intervals(wing: Wing) -> tuple[jnp.ndarray, jnp.ndarray]:
 def generate_spanwise_coordinates(intervals_data: jnp.ndarray, n_sw: int, cosine_spacing: bool = False) -> jnp.ndarray:
     """
     Generates piecewise spanwise coordinates (eta) guaranteeing breaks at the interval boundaries.
-    
+
     Args:
         intervals_data: jnp.ndarray of shape (N_intervals, 4) -> [eta_start, eta_end, le_cut, te_cut]
         n_sw: int, total number of spanwise panels requested.
         cosine_spacing: bool, whether to cluster panels at interval boundaries.
-        
+
     Returns:
         eta_vertices: jnp.ndarray of shape (n_sw + 1,)
     """

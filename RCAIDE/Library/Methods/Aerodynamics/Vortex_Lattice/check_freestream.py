@@ -28,7 +28,7 @@ from RCAIDE.utils import inputs, outputs
 # ---------------------------------------------------------
 @jax.jit
 def func_check_freestream(velocity):
-    """ 
+    """
     Unpacks and safeguards aerodynamic conditions for the VLM.
     """
     safe_velocity = jnp.where(velocity == 0.0, 1e-6, velocity)

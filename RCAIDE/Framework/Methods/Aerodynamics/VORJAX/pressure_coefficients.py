@@ -28,7 +28,7 @@ from RCAIDE.utils import inputs, outputs
 # ---------------------------------------------------------
 @jax.jit
 def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
-    """ 
+    """
     Computes the differential pressure coefficient (Delta C_P) for all panels.
     Input shapes: v_total (n_time, N, 3), GAMMA (n_time, N)
     """

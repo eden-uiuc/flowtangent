@@ -320,7 +320,7 @@ class ShardManager:
 class ShardedDatasetGenerator:
     """
     Orchestrates batched runs for any RCAIDE BatchProcess.
-    Slices total design space into manageable shards, executes them locally, 
+    Slices total design space into manageable shards, executes them locally,
     and offloads them to medium-term storage.
     """
     def __init__(

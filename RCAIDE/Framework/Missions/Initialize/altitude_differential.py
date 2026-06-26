@@ -26,10 +26,10 @@ def initialize_altitude_differential(
 
     """
     Framework version of initialize_altitude_differential
-    
+
     See Also
     --------
-    func_altitude_differential: 
+    func_altitude_differential:
         Functional implementation which this method calls.
     """
 

@@ -34,10 +34,10 @@ def landing_gear(state: "State",
                  settings: "Settings"):
     """
     Framework version of landing_gear
-    
+
     See Also
     --------
-    func_landing_gear: 
+    func_landing_gear:
         Functional implementation which this method calls.
     """
 
