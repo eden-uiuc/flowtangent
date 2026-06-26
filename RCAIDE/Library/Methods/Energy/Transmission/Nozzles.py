@@ -69,8 +69,8 @@ def func_compression_nozzle_performance(
 
     # Calculate Velocity using Absolute Enthalpy (Strictly enforces First Law)
     h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out   = gas.compute_enthalpy(T_out)                     
-    u_out   = jnp.sqrt(2. * (h_t_out - h_out))  
+    h_out   = gas.compute_enthalpy(T_out)
+    u_out   = jnp.sqrt(2. * (h_t_out - h_out))
 
     return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
 
@@ -96,7 +96,7 @@ def func_expansion_nozzle_performance(
     # Supersonic Expansion / Choking Logic
     sup     = M_isn > 1.0
     M_out   = jnp.maximum(jnp.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
-    
+
     # Recalculate static conditions based on the bounded Mach number
     P       = P_t_out / (1. + (gamma - 1.) / 2. * M_out ** 2) ** (gamma / (gamma - 1.))
     P_out   = jnp.where(sup, P, P0)
@@ -107,7 +107,7 @@ def func_expansion_nozzle_performance(
     h_t_out = gas.compute_enthalpy(T_t_out)
     h_out   = gas.compute_enthalpy(T_out)
     u_out   = jnp.sqrt(2. * (h_t_out - h_out))
-    
+
     # Gas density based on the specific gas constant
     r_out   = P_out / (R * T_out)
 

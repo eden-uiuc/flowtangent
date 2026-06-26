@@ -27,12 +27,12 @@ from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
 #-----------------------------------------------------------------------------------------------------------------------
 
 def filter_widget(
-    label: str, 
-    min_val: float, 
-    max_val: float, 
-    default_val: float, 
-    key_prefix: str, 
-    step: float = None, 
+    label: str,
+    min_val: float,
+    max_val: float,
+    default_val: float,
+    key_prefix: str,
+    step: float = None,
     allow_exact_toggle: bool = True
 ):
     # Dynamically allocate columns based on whether we allow the Exact toggle
@@ -67,7 +67,7 @@ def filter_widget(
             )
         tol = 1e-4
         return (val - tol, val + tol)
-        
+
     else:
         # --- RANGE BOUNDS MODE ---
         if is_manual:
@@ -135,20 +135,20 @@ def wing_renderer(wing_system):
 @st.cache_data
 def load_mock_data():
     np.random.seed(42)
-    n_points = 100 
+    n_points = 100
     data = {
         "AR": np.random.uniform(5, 30, n_points),
         "taper": np.random.uniform(0.1, 1.0, n_points),
         "QC_Sweep": np.random.uniform(0, 60, n_points),
     }
-    
+
     # Force mock data to align with our discrete grid!
     raw_alpha = np.random.uniform(-5, 15, n_points)
     data["alpha"] = np.round(raw_alpha / 0.25) * 0.25
-    
+
     raw_mach = np.random.uniform(0.1, 2.0, n_points)
     data["mach"] = np.round(raw_mach / 0.05) * 0.05
-    
+
     data["CL"] = 0.1 * data["alpha"] * (1 + 0.1 * data["AR"])
     data["CD"] = 0.02 + (data["CL"]**2) / (np.pi * data["AR"]) + 0.05 * (data["mach"] > 1.0)
     return data
@@ -160,13 +160,13 @@ def get_zarr_root():
     Zero RAM used for the actual data arrays here.
     """
     data_dir = "/media/jordan/Ashley_Backup/Wing Data Generation/W1/"
-    
+
     # Grab all shards and sort them so row indices remain perfectly consistent
     shard_paths = sorted(glob.glob(os.path.join(data_dir, "*_shard_*.zarr")))
-    
+
     if not shard_paths:
         raise FileNotFoundError(f"No shards found in {data_dir}")
-        
+
     # The variables we want to load
     available_cols = [
         "alpha",
@@ -191,15 +191,15 @@ def get_zarr_root():
         "dCD_db",
         "dCD_dM",
         ]
-    
+
     stitched_data = {}
     for col in available_cols:
         # Create a lazy Dask array for this column across all shards
         lazy_arrays = [da.from_zarr(p, component=col) for p in shard_paths]
-        
+
         # Concatenate them along the row axis
         stitched_data[col] = da.concatenate(lazy_arrays, axis=0)
-        
+
     return stitched_data
 
 @st.cache_data
@@ -207,42 +207,42 @@ def load_exploration_sample(sample_size=5000):
     """Pulls a randomized downsample into a Pandas DataFrame for the UI."""
     root = get_zarr_root()
     total_rows = root["alpha"].shape[0]
-    
+
     rng = np.random.default_rng(42)
     sample_idx = np.sort(rng.choice(total_rows, size=min(sample_size, total_rows), replace=False))
-    
+
     data = {}
     for key, dask_arr in root.items():
         # .compute() pulls it into RAM
         # .ravel() squashes it from (N, 1) to (N,) so Pandas doesn't freak out!
         data[key] = dask_arr[sample_idx].compute().ravel()
-        
+
     df = pd.DataFrame(data)
-    
+
     # --- ROUGH OUTLIER REJECTION ---
     # Filter out physically impossible aerodynamic coefficients
     valid_aero = (
         (df["CL"] > -5.0) & (df["CL"] < 5.0) &
         (df["CD"] > -0.1) & (df["CD"] < 2.0) # CD can occasionally be slightly negative in bad VLM meshes
     )
-    
+
     # Apply the mask and drop the invalid rows
     df_clean = df[valid_aero].copy()
-    
+
     return df_clean
 
 @st.cache_data
 def get_states_per_wing():
     """Dynamically calculates how many flight states exist per geometry."""
     root = get_zarr_root()
-    
+
     # Grab a slice large enough to contain at least one full wing's states
     chunk_size = min(20000, root["AR"].shape[0])
     ar_chunk = root["AR"][:chunk_size].compute()
-    
+
     # Find all indices where the Aspect Ratio differs from row 0
     changes = np.where(ar_chunk != ar_chunk[0])[0]
-    
+
     if len(changes) > 0:
         return int(changes[0])
     else:
@@ -253,19 +253,19 @@ def get_states_per_wing():
 def fetch_wing_polars(wing_id, states_per_wing):
     """Fetches all flight states for a specific wing ID."""
     root = get_zarr_root()
-    
+
     start_row = wing_id * states_per_wing
     end_row = start_row + states_per_wing
-    
+
     cols_to_fetch = ["alpha", "mach", "CL", "CD"]
-    
+
     data = {}
     for col in cols_to_fetch:
         # Pull only this wing's specific flight state block
         data[col] = root[col][start_row:end_row].compute().ravel()
-        
+
     df = pd.DataFrame(data)
-    
+
     # Rough outlier rejection for stability
     valid_aero = (df["CL"] > -5.0) & (df["CL"] < 5.0) & (df["CD"] > -0.1) & (df["CD"] < 2.0)
     return df[valid_aero]
@@ -273,19 +273,19 @@ def fetch_wing_polars(wing_id, states_per_wing):
 def fetch_wing_metadata(wing_id, states_per_wing):
     """Pulls the exact geometric metadata for a manually entered Wing ID."""
     root = get_zarr_root()
-    
+
     # Calculate the exact row index where this wing's flight states begin
     start_row = wing_id * states_per_wing
-    
+
     # Ensure the ID actually exists in the database
     if start_row >= root["AR"].shape[0]:
         return None
-        
+
     wing_data = {"Wing_ID": wing_id, "Row_ID": start_row}
     # We only need the geometric parameters to render VORJAX
     for col in ["AR", "taper", "QC_Sweep", "Dihedral"]:
         wing_data[col] = float(root[col][start_row].compute().ravel()[0])
-        
+
     return wing_data
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -320,7 +320,7 @@ with top_left_col:
         "📈 Data Distributions",
         "✈️ Hangar"
     ])
-    
+
     # Notice we are passing st.session_state.active_data to Plotly instead of raw_data!
     available_cols = list(st.session_state.active_data.keys())
 
@@ -328,40 +328,40 @@ with top_left_col:
 
     with viz_tab1:
         color_options = ["None"] + available_cols
-        
+
         # Split the main canvas into two side-by-side 3D plots
         plot_col1, plot_divider, plot_col2 = st.columns([0.48, 0.04, 0.48])
-        
+
         # --- LEFT 3D PLOT ---
         with plot_col1:
             # 8 micro-columns for inline labels and boxes
             c_lx1, cx1, c_ly1, cy1, c_lz1, cz1, c_lc1, cc1 = st.columns([1, 4, 1, 4, 1, 4, 1, 4])
-            
+
             with c_lx1: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
             with cx1: px1_x = st.selectbox("X Axis 1", available_cols, index=available_cols.index("alpha"), key="p1_x", label_visibility="collapsed")
-            
+
             with c_ly1: st.markdown("<div style='margin-top:8px;'><b>Y:</b></div>", unsafe_allow_html=True)
             with cy1: px1_y = st.selectbox("Y Axis 1", available_cols, index=available_cols.index("mach"), key="p1_y", label_visibility="collapsed")
-            
+
             with c_lz1: st.markdown("<div style='margin-top:8px;'><b>Z:</b></div>", unsafe_allow_html=True)
             with cz1: px1_z = st.selectbox("Z Axis 1", available_cols, index=available_cols.index("CL"), key="p1_z", label_visibility="collapsed")
-            
+
             with c_lc1: st.markdown("<div style='margin-top:8px;'><b>🎨</b></div>", unsafe_allow_html=True)
             with cc1: px1_c = st.selectbox("Color 1", color_options, index=color_options.index("None"), key="p1_c", label_visibility="collapsed")
-            
+
             actual_c1 = None if px1_c == "None" else px1_c
             hover_dict1 = {px1_x: ':.3f', px1_y: ':.3f', px1_z: ':.3f'}
             if actual_c1: hover_dict1[actual_c1] = ':.3f'
-            
+
             if len(st.session_state.active_data[px1_x]) > 0:
                 fig1 = px.scatter_3d(
-                    st.session_state.active_data, 
+                    st.session_state.active_data,
                     x=px1_x, y=px1_y, z=px1_z, color=actual_c1,
                     hover_data=hover_dict1
                 )
                 # Strip redundant axis titles from the 3D projection
                 fig1.update_layout(
-                    margin=dict(l=0, r=0, b=0, t=10), 
+                    margin=dict(l=0, r=0, b=0, t=10),
                     height=VIZ_HEIGHT
                 )
                 st.plotly_chart(fig1, width='stretch', key="3d_plot_1")
@@ -372,80 +372,80 @@ with top_left_col:
         # --- RIGHT 3D PLOT ---
         with plot_col2:
             c_lx2, cx2, c_ly2, cy2, c_lz2, cz2, c_lc2, cc2 = st.columns([1, 4, 1, 4, 1, 4, 1, 4])
-            
+
             with c_lx2: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
             with cx2: px2_x = st.selectbox("X Axis 2", available_cols, index=available_cols.index("AR"), key="p2_x", label_visibility="collapsed")
-            
+
             with c_ly2: st.markdown("<div style='margin-top:8px;'><b>Y:</b></div>", unsafe_allow_html=True)
             with cy2: px2_y = st.selectbox("Y Axis 2", available_cols, index=available_cols.index("QC_Sweep"), key="p2_y", label_visibility="collapsed")
-            
+
             with c_lz2: st.markdown("<div style='margin-top:8px;'><b>Z:</b></div>", unsafe_allow_html=True)
             with cz2: px2_z = st.selectbox("Z Axis 2", available_cols, index=available_cols.index("CD"), key="p2_z", label_visibility="collapsed")
-            
+
             with c_lc2: st.markdown("<div style='margin-top:8px;'><b>🎨</b></div>", unsafe_allow_html=True)
             with cc2: px2_c = st.selectbox("Color 2", color_options, index=color_options.index("None"), key="p2_c", label_visibility="collapsed")
-            
+
             actual_c2 = None if px2_c == "None" else px2_c
             hover_dict2 = {px2_x: ':.3f', px2_y: ':.3f', px2_z: ':.3f'}
             if actual_c2: hover_dict2[actual_c2] = ':.3f'
-            
+
             if len(st.session_state.active_data[px2_x]) > 0:
                 fig2 = px.scatter_3d(
-                    st.session_state.active_data, 
+                    st.session_state.active_data,
                     x=px2_x, y=px2_y, z=px2_z, color=actual_c2,
                     hover_data=hover_dict2
                 )
                 fig2.update_layout(
-                    margin=dict(l=0, r=0, b=0, t=10), 
+                    margin=dict(l=0, r=0, b=0, t=10),
                     height=VIZ_HEIGHT
                 )
                 st.plotly_chart(fig2, width='stretch', key="3d_plot_2")
-        
+
     with viz_tab2:
         if len(st.session_state.active_data["AR"]) > 0:
-            
+
             # Pre-select 4 interesting defaults for the grid
             hist_defaults = ["CL", "CD", "AR", "mach"]
-            
+
             # Generate a 2x2 grid
             for row in range(2):
                 grid_cols = st.columns(2)
-                
+
                 for col in range(2):
                     idx = row * 2 + col
                     with grid_cols[col]:
-                        
+
                         # Micro-columns for the variable selector
                         c_lbl, c_box = st.columns([1, 4])
-                        with c_lbl: 
+                        with c_lbl:
                             st.markdown("<div style='margin-top:8px;'><b>Var:</b></div>", unsafe_allow_html=True)
-                        with c_box: 
+                        with c_box:
                             hist_col = st.selectbox(
-                                f"Histogram {idx}", 
-                                available_cols, 
-                                index=available_cols.index(hist_defaults[idx]), 
-                                key=f"hist_{idx}", 
+                                f"Histogram {idx}",
+                                available_cols,
+                                index=available_cols.index(hist_defaults[idx]),
+                                key=f"hist_{idx}",
                                 label_visibility="collapsed"
                             )
-                        
+
                         # Generate the histogram
                         fig_hist = px.histogram(
-                            st.session_state.active_data, 
-                            x=hist_col, 
-                            nbins=20, 
+                            st.session_state.active_data,
+                            x=hist_col,
+                            nbins=20,
                             color_discrete_sequence=['#1f77b4']
                         )
-                        
+
                         # Strip axis titles to save massive amounts of vertical space
                         fig_hist.update_xaxes(title_text='')
                         fig_hist.update_yaxes(title_text='')
-                        
+
                         # Height set to 220px so two rows total ~440px (matching the 450px 3D plots)
                         fig_hist.update_layout(margin=dict(l=20, r=20, b=20, t=10), height=VIZ_HEIGHT//2)
                         st.plotly_chart(fig_hist, width='stretch', key=f"hist_chart_{idx}")
         else:
             st.warning("No data points match the current filter criteria!")
-    
+
     with viz_tab3:
         if not st.session_state.hangar:
             st.info("✈️ Your hangar is empty! Select wings from the Leaderboard below to add them here.")
@@ -464,7 +464,7 @@ with top_left_col:
 
             if selected_id in st.session_state.hangar:
                 wing = st.session_state.hangar[selected_id]
-                
+
                 # Display the precise geometric metadata
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Aspect Ratio", f"{wing['AR']:.3f}")
@@ -472,7 +472,7 @@ with top_left_col:
                 m3.metric("QC Sweep", f"{wing['QC_Sweep']:.2f}°")
                 m4.metric("Dihedral", f"{wing['Dihedral']:.2f}°")
 
-                
+
                 st.markdown("---")
                 st.markdown("#### 🔹 VORJAX 3D Geometry Viewer")
                 wing_fig = wing_renderer(wing_generator(wing['AR'], wing['taper'], wing['QC_Sweep'], wing['Dihedral'])[0])
@@ -480,19 +480,19 @@ with top_left_col:
 
 with top_right_col:
     st.subheader("🎯 Aero Performance Polars")
-    
+
     polar_tab1, polar_tab2 = st.tabs(["🌐 Dataset", "✈️ Selected Wing"])
-    
+
     # --- TAB 1: GLOBAL DATASET POLARS ---
     with polar_tab1:
         if len(st.session_state.active_data["AR"]) > 0:
             defaults = [
-                {"x": "CD", "y": "CL", "color": "alpha"},     
-                {"x": "alpha", "y": "CL", "color": "mach"},   
-                {"x": "mach", "y": "CD", "color": "alpha"}    
+                {"x": "CD", "y": "CL", "color": "alpha"},
+                {"x": "alpha", "y": "CL", "color": "mach"},
+                {"x": "mach", "y": "CD", "color": "alpha"}
             ]
             color_options = ["None"] + available_cols
-            
+
             for i in range(3):
                 c_lx, cx, c_ly, cy, c_lc, cc = st.columns([1, 4, 1, 4, 1, 4])
                 with c_lx: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
@@ -501,13 +501,13 @@ with top_right_col:
                 with cy: px_y = st.selectbox(f"Y{i}", available_cols, index=available_cols.index(defaults[i]["y"]), key=f"py_{i}", label_visibility="collapsed")
                 with c_lc: st.markdown("<div style='margin-top:8px;'><b>🎨:</b></div>", unsafe_allow_html=True)
                 with cc: px_c = st.selectbox(f"C{i}", color_options, index=color_options.index(defaults[i]["color"]), key=f"pc_{i}", label_visibility="collapsed")
-                
+
                 actual_color = None if px_c == "None" else px_c
                 hover_dict = {px_x: ':.3f', px_y: ':.3f'}
                 if actual_color: hover_dict[actual_color] = ':.3f'
-                
+
                 fig_2d = px.scatter(
-                    st.session_state.active_data, 
+                    st.session_state.active_data,
                     x=px_x, y=px_y, color=actual_color, hover_data=hover_dict
                 )
                 fig_2d.update_xaxes(title_text='')
@@ -521,23 +521,23 @@ with top_right_col:
     with polar_tab2:
         # Check if they actually have a wing selected in the Garage
         active_wing = st.session_state.get("active_hangar_id")
-        
+
         if active_wing is not None:
             # Fetch the isolated data for just this wing
             states_per_wing = get_states_per_wing()
             wing_df = fetch_wing_polars(active_wing, states_per_wing)
-            
+
             if len(wing_df) > 0:
                 # We restrict the options here to Flow variables since Geometry is constant
                 flow_cols = ["alpha", "mach", "CL", "CD"]
                 color_opts_wing = ["None"] + flow_cols
-                
+
                 defaults_wing = [
-                    {"x": "CD", "y": "CL", "color": "None"},     
-                    {"x": "alpha", "y": "CL", "color": "None"},   
-                    {"x": "mach", "y": "CD", "color": "None"}    
+                    {"x": "CD", "y": "CL", "color": "None"},
+                    {"x": "alpha", "y": "CL", "color": "None"},
+                    {"x": "mach", "y": "CD", "color": "None"}
                 ]
-                
+
                 for i in range(3):
                     c_lx, cx, c_ly, cy, c_lc, cc = st.columns([1, 4, 1, 4, 1, 4])
                     with c_lx: st.markdown("<div style='margin-top:8px;'><b>X:</b></div>", unsafe_allow_html=True)
@@ -546,13 +546,13 @@ with top_right_col:
                     with cy: wx_y = st.selectbox(f"wY{i}", flow_cols, index=flow_cols.index(defaults_wing[i]["y"]), key=f"wy_{i}", label_visibility="collapsed")
                     with c_lc: st.markdown("<div style='margin-top:8px;'><b>🎨:</b></div>", unsafe_allow_html=True)
                     with cc: wx_c = st.selectbox(f"wC{i}", color_opts_wing, index=color_opts_wing.index(defaults_wing[i]["color"]), key=f"wc_{i}", label_visibility="collapsed")
-                    
+
                     actual_wc = None if wx_c == "None" else wx_c
                     hover_w = {wx_x: ':.3f', wx_y: ':.3f'}
                     if actual_wc: hover_w[actual_wc] = ':.3f'
-                    
+
                     fig_w = px.scatter(
-                        wing_df, 
+                        wing_df,
                         x=wx_x, y=wx_y, color=actual_wc, hover_data=hover_w
                     )
                     fig_w.update_xaxes(title_text='')
@@ -589,66 +589,66 @@ with ctrl_col3:
     st.markdown("### 🚀 Execute Calculations")
     user_expr = st.text_input("Objective Expression", value="CL / CD")
     top_n = st.number_input("Top N Results", min_value=1, max_value=50, value=5, step=1)
-    
+
     if st.button("Apply Filters & Run Sweep", width='stretch'):
-        
+
         # ==========================================
         # TIER 1: THE VISUALIZATION PROXY (NumPy)
         # ==========================================
         # This uses your existing apply_filters function on the 50k in-memory sample
         filtered_sample = apply_filters(raw_data, ar_bounds, sweep_bounds, taper_bounds, mach_bounds, alpha_bounds)
         st.session_state.active_data = filtered_sample
-        
+
         # ==========================================
         # TIER 2: THE TRUE OPTIMIZER (Dask)
         # ==========================================
         try:
-            root = get_zarr_root() 
-            
+            root = get_zarr_root()
+
             # 1. Build the Dask lazy mask (Include the UI filters)
             global_mask = (root["AR"] >= ar_bounds[0]) & (root["AR"] <= ar_bounds[1])
             global_mask &= (root["QC_Sweep"] >= sweep_bounds[0]) & (root["QC_Sweep"] <= sweep_bounds[1])
             global_mask &= (root["taper"] >= taper_bounds[0]) & (root["taper"] <= taper_bounds[1])
             global_mask &= (root["mach"] >= mach_bounds[0]) & (root["mach"] <= mach_bounds[1])
             global_mask &= (root["alpha"] >= alpha_bounds[0]) & (root["alpha"] <= alpha_bounds[1])
-            
+
             # --- ROUGH OUTLIER REJECTION (Full Database) ---
             global_mask &= (root["CL"] >= -5.0) & (root["CL"] <= 5.0)
             global_mask &= (root["CD"] >= -0.1) & (root["CD"] <= 2.0)
-            
+
             # 2. Execute the mask search across the HDD
             valid_indices = da.where(global_mask)[0].compute().ravel()
-            
+
             if len(valid_indices) > 0:
                 # 3. Stream ONLY the required columns into RAM for the valid indices
                 available_cols = list(root.keys())
                 required_cols = [c for c in available_cols if c in user_expr]
-                
+
                 eval_dict = {}
                 for col in required_cols:
                     # Load only the data we strictly need for the math
                     eval_dict[col] = root[col][valid_indices].compute().ravel()
-                
+
                 # 4. Run Numexpr on the full dataset slice
                 raw_scores = ne.evaluate(user_expr, local_dict=eval_dict).ravel()
-                
+
                 finite_mask = np.isfinite(raw_scores)
                 scores = raw_scores[finite_mask]
                 safe_valid_indices = valid_indices[finite_mask]
-                
+
                 if len(scores) > 0:
                     # 4. Rank and pull the final Top N rows
                     n_actual = min(top_n, len(scores))
                     best_relative_idx = np.argsort(scores)[-n_actual:][::-1]
-                    
+
                     # FLATTEN 4: Map relative subset indices back to global index
                     best_global_idx = safe_valid_indices[best_relative_idx].ravel()
-                    
+
                     top_dict = {"Score": scores[best_relative_idx], "Row_ID": best_global_idx}
                     for col in available_cols:
                         # FLATTEN 5: Pull the final data safely
                         top_dict[col] = root[col][best_global_idx].compute().ravel()
-                        
+
                     st.session_state.top_results = pd.DataFrame(top_dict)
                     st.session_state.expr_error = None
                 else:
@@ -657,11 +657,11 @@ with ctrl_col3:
             else:
                 st.session_state.top_results = None
                 st.session_state.expr_error = "No data points in the full database matched the filters!"
-                
+
         except Exception as e:
             st.session_state.top_results = None
             st.session_state.expr_error = f"Computation Error: {e}"
-            
+
         st.rerun()
 
 # ==========================================
@@ -670,28 +670,28 @@ with ctrl_col3:
 if "top_results" in st.session_state and st.session_state.top_results is not None:
     st.markdown("---")
     st.subheader(f"🏆 Top {len(st.session_state.top_results)} Results for: `{user_expr}`")
-    
+
     selection_event = st.dataframe(
-        st.session_state.top_results, 
+        st.session_state.top_results,
         width='stretch',
         hide_index=True,
-        on_select="rerun",           
-        selection_mode="single-row"  
+        on_select="rerun",
+        selection_mode="single-row"
     )
-    
+
     # Garage Addition Interface
     c_add1, c_add2 = st.columns(2)
-    
+
     with c_add1:
         st.markdown("#### Leaderboard Selection")
         selected_rows = selection_event.selection.rows
-        
+
         if len(selected_rows) > 0:
             row_idx = selected_rows[0]
             selected_wing = st.session_state.top_results.iloc[row_idx]
             selected_wing_id = row_idx // get_states_per_wing()
             w_id = int(selected_wing_id)
-            
+
             if w_id in st.session_state.hangar:
                 st.success(f"✅ Wing {w_id} is already in your Hangar!")
             else:
@@ -701,7 +701,7 @@ if "top_results" in st.session_state and st.session_state.top_results is not Non
                     st.rerun()
         else:
             st.info("Click a row in the table above to save it.")
-            
+
     with c_add2:
         st.markdown("#### Manual Addition")
         m_col1, m_col2 = st.columns([0.7, 0.3])

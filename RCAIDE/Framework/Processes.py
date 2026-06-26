@@ -51,10 +51,10 @@ class ProcessStep(eqx.Module):
 
     def run(self, state, system, settings):
         return self(state, system, settings)
-    
+
     def _run_with_history(self, state, system, settings):
         return *self(state, system, settings), None
-    
+
     def __repr__(self):
         return self.tag
 
@@ -71,7 +71,7 @@ class ProcessStep(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class GradientMap:
-    
+
     def __init__(
         self,
         state_inputs:       tuple = (),
@@ -82,11 +82,11 @@ class GradientMap:
         settings_outputs:   tuple = (),
     ):
 
-        # Sanitize inputs/oututs to PathTuples  
+        # Sanitize inputs/oututs to PathTuples
         self.state_inputs     = tuple(DataPath(p) for p in state_inputs)
         self.system_inputs    = tuple(DataPath(p) for p in system_inputs)
         self.settings_inputs  = tuple(DataPath(p) for p in settings_inputs)
-        
+
         self.state_outputs    = tuple(DataPath(p) for p in state_outputs)
         self.system_outputs   = tuple(DataPath(p) for p in system_outputs)
         self.settings_outputs = tuple(DataPath(p) for p in settings_outputs)
@@ -137,8 +137,8 @@ class GradientMap:
 
         self.unravel_function = unravel_function
         return flat_input_array
-    
-    
+
+
     def update_inputs(
             self,
             input_array,
@@ -154,7 +154,7 @@ class GradientMap:
         def stitch_parents(base_tree, paths, new_slices):
             parents = ru.get_all_parents(base_tree, paths)
             updated_parents = []
-            
+
             for parent, new_val, path in zip(parents, new_slices, paths):
                 if path.slice_obj != slice(None):
                     # Stitch the updated slice into the original parent array
@@ -162,7 +162,7 @@ class GradientMap:
                 else:
                     # No slice, just use the whole new value
                     updated_parents.append(new_val)
-                    
+
             return tuple(updated_parents)
 
         # Inject flat array of inputs into the PyTrees
@@ -170,7 +170,7 @@ class GradientMap:
         if self._n_st > 0:
             st_slices = reshaped_inputs[:self._n_st]
             updated_st_parents = stitch_parents(st, self.state_inputs, st_slices)
-            
+
             st = eqx.tree_at(
                 lambda t: ru.get_all_parents(t, self.state_inputs),
                 st,
@@ -180,9 +180,9 @@ class GradientMap:
         if self._n_sys > 0:
             sys_slices = reshaped_inputs[self._n_st: self._n_st + self._n_sys]
             updated_sys_parents = stitch_parents(sys, self.system_inputs, sys_slices)
-            
+
             sys = eqx.tree_at(
-                lambda t: ru.get_all_parents(t, self.system_inputs), 
+                lambda t: ru.get_all_parents(t, self.system_inputs),
                 sys,
                 updated_sys_parents
             )
@@ -190,15 +190,15 @@ class GradientMap:
         if self._n_setts > 0:
             setts_slices = reshaped_inputs[self._n_st + self._n_sys:]
             updated_setts_parents = stitch_parents(setts, self.settings_inputs, setts_slices)
-            
+
             setts = eqx.tree_at(
-                lambda t: ru.get_all_parents(t, self.settings_inputs), 
+                lambda t: ru.get_all_parents(t, self.settings_inputs),
                 setts,
                 updated_setts_parents
             )
-            
+
         return st, sys, setts
-    
+
     def flatten_outputs(self, f_st, f_sys, f_setts):
         outputs = []
         if self.state_outputs:
@@ -257,7 +257,7 @@ class Process(ProcessStep):
             step_tag = step.tag
             if not isinstance(step_tag, str) and hasattr(step_tag, 'value'):
                 step_tag = step_tag.value
-            
+
             if isinstance(step_tag, str):
                 formatted_tag = step_tag.replace(' ', '_').lower()
                 if key == formatted_tag:
@@ -430,13 +430,13 @@ class Process(ProcessStep):
         if tag not in tags:
             raise AttributeError(f"Unable to locate step {tag} in steps of Process {self.tag}.")
         index = tags.index(tag)
-    
+
         return index
 
     def _index_function(self, function: Callable):
         functions = [step.function for step in self.steps]
         index = functions.index(function)
-    
+
         return index
 
     def index(self, value: str | Callable | ProcessStep | Self):
@@ -446,10 +446,10 @@ class Process(ProcessStep):
             return self._index_function(value)
         elif isinstance(value, ProcessStep):
             return self.steps.index(value)
-    
+
         else:
             raise ValueError("RCAIDE processes can only be indexed by name, function, or ProcessStep object.")
-    
+
     def insert(self, step: ProcessStep, index: int):
         new_steps = self.steps[:index] + (step,) + self.steps[index:]
         return eqx.tree_at(lambda c: c.steps, self, new_steps)
@@ -464,8 +464,8 @@ class Process(ProcessStep):
     def _remove_function(self, function: Callable):
         return self.pop(self._index_function(function))
 
-    def remove(self, value: str | Callable | ProcessStep | Self):    
-        idx_to_remove = self.index(value) 
+    def remove(self, value: str | Callable | ProcessStep | Self):
+        idx_to_remove = self.index(value)
         return self.pop(idx_to_remove)
 
     @property
@@ -542,12 +542,12 @@ class Process(ProcessStep):
                 latest_producers[out_var] = step_node
 
         return G
-    
+
     def to_mermaid(
-        self, 
-        recursive: bool = False, 
-        show_edges: bool = True, 
-        layout: str = "LR", 
+        self,
+        recursive: bool = False,
+        show_edges: bool = True,
+        layout: str = "LR",
         exclude: list[str] = None,
         save_path: str = None,
         style: str = "modern"
@@ -566,7 +566,7 @@ class Process(ProcessStep):
             exclude = ['energy']
 
         compiled_patterns = [
-            re.compile(self._filter_map[k]) 
+            re.compile(self._filter_map[k])
             for k in exclude if k in self._filter_map
         ]
 
@@ -579,7 +579,7 @@ class Process(ProcessStep):
 
         if style in MERMAID_STYLES and MERMAID_STYLES[style]:
             mermaid_lines.append(MERMAID_STYLES[style])
-            
+
         mermaid_lines.append(f"graph {layout}")
 
         # 3. Build safe Node IDs and visual shapes
@@ -587,9 +587,9 @@ class Process(ProcessStep):
         for i, node_name in enumerate(G.nodes()):
             safe_id = f"N{i}"
             node_id_map[node_name] = safe_id
-            
+
             if node_name == "User Inputs":
-                mermaid_lines.append(f"    {safe_id}([{node_name}])") 
+                mermaid_lines.append(f"    {safe_id}([{node_name}])")
             else:
                 step_obj = G.nodes[node_name].get('step_obj')
                 display_label = step_obj.tag if step_obj else str(node_name)
@@ -598,31 +598,31 @@ class Process(ProcessStep):
         # 4. Build edges and apply filters to the variable lists
         for u, v, data in G.edges(data=True):
             raw_vars = data.get('variables', [])
-            
+
             # Apply the filter to strip out unwanted phantom paths
             vars_list = [var for var in raw_vars if not is_filtered(var)]
-            
+
             if show_edges and vars_list:
                 if len(vars_list) > 4:
                     label = f"{len(vars_list)} variables"
                 else:
                     clean_vars = [var.split('.')[-1] for var in vars_list]
                     label = "<br>".join(clean_vars)
-                
+
                 # Sanitize any stray double quotes to single quotes
                 label = label.replace('"', "'")
-                    
+
                 # Wrap the final label in double quotes for Mermaid's parser
                 mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
             else:
                 mermaid_lines.append(f"    {node_id_map[u]} --> {node_id_map[v]}")
-                
+
         mermaid_str = "\n".join(mermaid_lines)
 
         if save_path:
             # Ensure the target directory exists
             os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
-            
+
             with open(save_path, "w", encoding="utf-8") as f:
                 # If it's a markdown file, wrap it in the mermaid code block
                 if save_path.lower().endswith(".md"):
@@ -632,9 +632,9 @@ class Process(ProcessStep):
                 else:
                     # For .mmd or .txt, just write the raw string
                     f.write(mermaid_str)
-        
+
         return mermaid_str
-    
+
     def print_io_tree(self, exclude: list[str] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
@@ -653,10 +653,10 @@ class Process(ProcessStep):
         def filter_paths(paths: set[str]) -> set[str]:
             if not exclude_patterns or not paths:
                 return paths
-                
+
             compiled_patterns = [re.compile(p) for p in exclude_patterns]
             return {p for p in paths if not any(pat.search(p) for pat in compiled_patterns)}
-        
+
         display_inputs = filter_paths(self.inputs)
         display_outputs = filter_paths(self.outputs)
 
@@ -821,11 +821,11 @@ class OptimizerInterface:
 
     def __init__(self, process: Process,
                  base_state: State, base_system: System, base_settings: Settings,
-                 grad_map: GradientMap, objective_path: DataPath, 
+                 grad_map: GradientMap, objective_path: DataPath,
                  **kwargs):
-        
+
         self.process = process
-    
+
         self.base_state = base_state
         self.base_system = base_system
         self.base_settings = base_settings
@@ -840,21 +840,21 @@ class OptimizerInterface:
         # Store additonal optimizer-specific settings
         for key, value in kwargs.items():
             setattr(self, key, value)
-    
+
     def _update_cache(self, x):
         if self.last_x is None or not np.allclose(x, self.last_x):
             state, system, settings = self.grad_map.update_inputs(x, self.base_state, self.base_system, self.base_settings)
             f_st, f_sys, f_setts, jac = self.process.run(state, system, settings, grad_map=self.grad_map)
             token = Token(state=f_st, system=f_sys, settings=f_setts)
-            
+
             self.last_val = ru.get_target(token, self.objective_path)
             self.last_jac = np.array(jac)
             self.last_x = x
-        
+
     def fun(self, x):
         self._update_cache(x)
         return self.last_val
-    
+
     def jac(self, x):
         self._update_cache(x)
         return self.last_jac

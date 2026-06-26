@@ -33,7 +33,7 @@ def func_check_freestream(velocity):
     """
     safe_velocity = jnp.where(velocity == 0.0, 1e-6, velocity)
     safe_speed = jnp.linalg.norm(safe_velocity, axis=-1, keepdims=True)
-    
+
     return safe_velocity, safe_speed
 
 # ---------------------------------------------------------
@@ -48,11 +48,11 @@ def func_check_freestream(velocity):
 )
 def check_freestream_stateful(state: "State", system: "System", settings: "Settings"):
     """ Unpacks PyTrees, calls pure math, repacks PyTrees. """
-    
+
     velocity = state.frames.inertial.velocity_vector
-    
+
     safe_velocity, safe_speed = func_check_freestream(velocity)
-    
+
     current_state = eqx.tree_at(lambda s: (s.frames.inertial.velocity_vector, s.freestream.speed), state, (safe_velocity, safe_speed))
-    
+
     return current_state, system, settings

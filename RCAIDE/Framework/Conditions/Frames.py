@@ -25,7 +25,7 @@ class Frame(Conditions):
 
     # Attribute             Type        Default Value
     tag:                    str         = init_field('Frame', static=True)
-    
+
     transform_to_inertial:  jnp.ndarray = empty_array((0, 3))
 
     total_force_vector:     jnp.ndarray = empty_array((0, 3))

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 @jax.jit
 def func_compute_something(array_1, array_2):
     """ Pure JAX mathematical evaluation. """
-    
+
     return jnp.zeros_like(array_1)
 
 # ---------------------------------------------------------
@@ -36,14 +36,14 @@ def func_compute_something(array_1, array_2):
 # ---------------------------------------------------------
 def compute_something_stateful(state: "State", system: "System", settings: "Settings"):
     """ Unpacks PyTrees, calls pure math, repacks PyTrees. """
-    
+
     # 1. Unpack
     # val = state.aerodynamics.something
-    
+
     # 2. Call pure function
     # result = func_compute_something(val)
-    
+
     # 3. Pack and return
     # current_state = eqx.tree_at(lambda s: s.aerodynamics.result, state, result)
-    
+
     return state, system, settings

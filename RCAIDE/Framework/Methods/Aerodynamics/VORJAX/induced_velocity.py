@@ -366,7 +366,7 @@ def compute_C_ij(VD, Mach):
 
     C_ij, _ = jax.vmap(compute_row, out_axes=(1, 0))(colloc, costheta, sintheta, jnp.arange(VD.total_panels))
     # C_mn = jnp.swapaxes(C_ij_mapped, 0, 1)
-    
+
     # If using chordwise cosine spacing, compute leading edge normalwash for Lan's method
     # (Currently unsupported, commented out to minimize memory footprint)
 
@@ -379,7 +379,7 @@ def compute_C_ij(VD, Mach):
 
     return C_ij.astype(jnp.float64), singularity_flag
 
-    
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Wing Induced Velocity Calculation
 # ----------------------------------------------------------------------------------------------------------------------
@@ -395,17 +395,17 @@ def compute_C_ij(VD, Mach):
     "system.analysis_data['le_normalwash']"
 )
 def compute_induced_velocity(state: "State", system: "System", settings: "Settings"):
-    
+
     VD = system.analysis_data["vortex_distribution"]
     Mach = state.freestream.mach_number
-    
+
     C_ij, singularity_flag, = compute_C_ij(VD, Mach)
-    
+
     updated_analysis_data = system.analysis_data | {
         "VICs": C_ij,
         "singularities": singularity_flag,
     }
 
     updated_system = eqx.tree_at(lambda s: s.analysis_data, system, updated_analysis_data)
-    
+
     return state, updated_system, settings

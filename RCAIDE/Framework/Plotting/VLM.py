@@ -15,7 +15,7 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
     x, y, z = [], [], []
     i_idx, j_idx, k_idx = [], [], []
     facecolor_intensities = []
-    
+
     # Lists to hold the wireframe boundary lines
     edge_x, edge_y, edge_z = [], [], []
 
@@ -56,14 +56,14 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
         i=i_idx, j=j_idx, k=k_idx,
         intensity=facecolor_intensities if panel_values is not None else None,
         intensitymode='cell',
-        colorscale='Plasma',  
+        colorscale='Plasma',
         color='lightgrey',  # Fallback color changed to light grey
         showscale=panel_values is not None,
         flatshading=True,
         name='VLM Mesh',
         hovertemplate='Value: %{intensity:.5f}<extra></extra>' if panel_values is not None else None
     )
-    
+
     data = [mesh_trace]
 
     # If no values are passed, overlay the black wireframe
@@ -81,18 +81,18 @@ def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
 
     # Define the isometric camera
     isometric_camera = dict(
-        up=dict(x=0, y=0, z=1),  
-        center=dict(x=0, y=0, z=0),  
-        eye=dict(x=1.5, y=-1.5, z=1.5),  
-        projection=dict(type='orthographic')  
+        up=dict(x=0, y=0, z=1),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=1.5, y=-1.5, z=1.5),
+        projection=dict(type='orthographic')
     )
 
     # Apply the styling and camera to the layout
     fig.update_layout(
         title=title,
-        template='plotly_white',  
+        template='plotly_white',
         scene=dict(
-            aspectmode='data',  
+            aspectmode='data',
             camera=isometric_camera,
             xaxis=dict(title='X (Streamwise)', showbackground=False),
             yaxis=dict(title='Y (Spanwise)', showbackground=False),

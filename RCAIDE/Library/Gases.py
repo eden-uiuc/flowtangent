@@ -32,7 +32,7 @@ class IdealGas(eqx.Module):
     nasa_low_coeffs:    tuple = init_field(tuple, static=True)
     nasa_high_coeffs:   tuple = init_field(tuple, static=True)
     nasa_T_mid:         float = init_field(1000., static=True)
-    
+
     thermal_coefficients:   tuple = init_field(tuple)
 
     def __post_init__(self):
@@ -51,12 +51,12 @@ class IdealGas(eqx.Module):
         cp_high = self.R_specific * jnp.polyval(high_poly, T_arr)
 
         cp_eval = jnp.where(T_arr > self.nasa_T_mid, cp_high, cp_low)
-        
+
         return cp_eval.squeeze()
-    
+
     def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
         T_arr = jnp.atleast_1d(T)
-        
+
         def _h(coeffs, t):
             # Create a polynomial array for: a5/5*T^4 + a4/4*T^3 + a3/3*T^2 + a2/2*T + a1
             # We multiply by T outside to get the T^5 to T terms, then add a6
@@ -71,13 +71,13 @@ class IdealGas(eqx.Module):
 
         h_low = _h(self.nasa_low_coeffs, T_arr)
         h_high = _h(self.nasa_high_coeffs, T_arr)
-        
+
         h_eval = jnp.where(T_arr > self.nasa_T_mid, h_high, h_low)
         return h_eval.squeeze()
 
     def compute_entropy(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.0):
         T_arr = jnp.atleast_1d(T)
-        
+
         def _s0(coeffs, t):
             # Create a polynomial array for: a5/4*T^4 + a4/3*T^3 + a3/2*T^2 + a2*T
             poly_coeffs = jnp.array([
@@ -88,21 +88,21 @@ class IdealGas(eqx.Module):
                 0.0 # Shift by 0 so polyval evaluates correctly without an offset
             ])
             poly_part = jnp.polyval(poly_coeffs, t)
-            
+
             # Combine with the ln(T) and a7 terms
             return self.R_specific * (coeffs[0] * jnp.log(t) + poly_part + coeffs[6])
 
         s0_low = _s0(self.nasa_low_coeffs, T_arr)
         s0_high = _s0(self.nasa_high_coeffs, T_arr)
-        
+
         s0_eval = jnp.where(T_arr > self.nasa_T_mid, s0_high, s0_low)
-        
+
         # Apply the pressure correction (assuming P is in Pascals)
         P_ref = 101325.0
         s_eval = s0_eval - self.R_specific * jnp.log(P / P_ref)
-        
+
         return s_eval.squeeze()
-    
+
     def compute_gamma(self, T: float|jnp.ndarray=298.15):
         cp = self.compute_Cp(T)
         return cp / (cp - self.R_specific)
@@ -198,9 +198,9 @@ class GasComposition(eqx.Module):
         object.__setattr__(self, "elements", new_elements)
 
         if not self.mole_fractions:
-        
+
             mm_mix = 1 / jnp.sum(jnp.asarray([self.mass_fractions[i]/e.molecular_mass for i, e in enumerate(self.elements)])).item()
-            
+
             object.__setattr__(self, "mole_fractions", tuple(self.mass_fractions[i] * mm_mix/e.molecular_mass for i, e in enumerate(self.elements)))
 
 
@@ -221,7 +221,7 @@ class MixedGas(IdealGas):
         mixed_Cp = jnp.sum(Cp_arr * frac_arr, axis=-1)
 
         return mixed_Cp
-    
+
     def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
         h_arr = jnp.stack([
             elem.compute_enthalpy(T)
@@ -236,21 +236,21 @@ class MixedGas(IdealGas):
 
     def compute_partial_pressures(self, P: float | jnp.ndarray = 101325.):
         return P * jnp.asarray(self.composition.mole_fractions)[None, :]
-    
+
     def compute_entropy(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.):
         X_arr = jnp.stack(self.composition.mole_fractions, axis=-1)
         S_arr = jnp.stack([
-            elem.compute_entropy(T, P * X_arr[..., i]) 
+            elem.compute_entropy(T, P * X_arr[..., i])
             for i, elem in enumerate(self.composition.elements)
         ], axis=-1)
         frac_arr = jnp.stack(self.composition.mass_fractions, axis=-1)
-        
+
         # Mass-weighted sum
         mixed_S = jnp.sum(S_arr * frac_arr, axis=-1)
 
-        return mixed_S 
+        return mixed_S
 
-def Air(): 
+def Air():
     return MixedGas(
         tag="Air",
         composition=GasComposition(
@@ -264,7 +264,7 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
     Dynamically generates the combustion product mass fractions for Jet-A.
     Assumes complete lean combustion.
     """
-    
+
     # Base air masses (kg) per 1 kg of inlet air
     m_O2_air  = 0.2314
     m_N2_air  = 0.7552
@@ -278,14 +278,14 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
 
     # Calculate new absolute masses
     # Using jnp.maximum prevents negative mass during aggressive solver iterations
-    m_O2  = jnp.maximum(m_O2_air - (O2_consumed * FAR), 0.0) 
+    m_O2  = jnp.maximum(m_O2_air - (O2_consumed * FAR), 0.0)
     m_CO2 = m_CO2_air + (CO2_produced * FAR)
     m_H2O = H2O_produced * FAR
     m_N2  = m_N2_air # Inert
     m_Ar  = m_Ar_air # Inert
-    
+
     m_total = 1.0 + FAR
-    
+
     # Return the dynamically mixed composition
     return GasComposition(
         elements=("O2", "Ar", "CO2", "N2", "Steam"),

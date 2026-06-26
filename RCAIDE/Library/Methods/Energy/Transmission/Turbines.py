@@ -4,7 +4,7 @@
 # Created: Mar, 2025, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
-# IMPORT 
+# IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def func_turbine_performance(
 ):
     # Calculate the target specific enthalpy drop across the turbine
     # Mass flow through the turbine is (1 + f) times the compressor flow
-    d_h_t = -1.0 / (1.0 + FAR) * (input_work / n_mech) 
+    d_h_t = -1.0 / (1.0 + FAR) * (input_work / n_mech)
 
     # Set the target exit enthalpy
     h_t_in = gas.compute_enthalpy(T_t)
@@ -42,8 +42,8 @@ def func_turbine_performance(
     for _ in range(4):
         # Evaluate current guess
         h_guess = gas.compute_enthalpy(T_t_out)
-        Cp_guess = gas.compute_Cp(T_t_out) 
-        
+        Cp_guess = gas.compute_Cp(T_t_out)
+
         # Newton step: T_new = T_old - (h_guess - h_target) / (dh/dT)
         T_t_out = T_t_out - ((h_guess - h_t_out) / Cp_guess)
 

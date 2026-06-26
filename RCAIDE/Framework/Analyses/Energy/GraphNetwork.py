@@ -27,7 +27,7 @@ class GraphEnergyAnalysis(Process):
     analysis_network: EnergyNetwork = init_field(EnergyNetwork)
 
     def graph(self, **kwargs) -> nx.DiGraph:
-       
+
         G   = nx.DiGraph()
         net = self.analysis_network
 
@@ -45,17 +45,17 @@ class GraphEnergyAnalysis(Process):
 def build_analysis_from_network(network: EnergyNetwork):
 
     analysis_network = network.assign_network_IDs()
-    
+
     def make_node_function(node_ID: str):
         node_func = analysis_network.nodes[node_ID].__class__.transmit
         node_inputs = getattr(node_func, '_inputs', set())
         node_outputs = getattr(node_func, '_outputs', set())
-        
+
         @inputs(*node_inputs)
         @outputs(*node_outputs)
         def _pure_transmit(state, system, settings):
             return analysis_network.nodes[node_ID].transmit(state, system, settings)
-        
+
         return _pure_transmit
 
     network_analysis =  GraphEnergyAnalysis(

@@ -86,10 +86,10 @@ class Spinner:
 # ----------------------------------------------------------------------------------------------------------------------
 
 def _activate_control(control: str | ControlVariable, state):
-    
+
     if isinstance(control, str):
         control_name = control.replace(' ', '_').lower()
-        
+
         if control_name not in state.controls.__dataclass_fields__:
             # It's a custom control:
             new_ctrl = ControlVariable(tag=control, active=True)
@@ -98,34 +98,34 @@ def _activate_control(control: str | ControlVariable, state):
             # It's a pre-existing control: grab the existing one, activate it, and replace it
             existing_ctrl = getattr(state.controls, control_name)
             active_ctrl = eqx.tree_at(lambda c: c.active, existing_ctrl, True)
-            
+
             # Use getattr to map the path
             new_controls = eqx.tree_at(lambda p: getattr(p, control_name), state.controls, active_ctrl)
-            
+
     elif isinstance(control, ControlVariable):
         active_ctrl = eqx.tree_at(lambda c: c.active, control, True)
         new_controls = state.controls.add_control_variable(active_ctrl)
-        
+
     return eqx.tree_at(lambda s: s.controls, state, new_controls)
 
 
 
 def _activate_residual(res: str | DynamicResidual, state):
-    
+
     if isinstance(res, str) and res in  NamedResidual:
         current_residual = getattr(state.dynamics, res)
         active_residual = replace(current_residual, active=True)
-        
+
         # Safely inject it using getattr path tracing
         new_dynamics = eqx.tree_at(
-            lambda d: getattr(d, res), 
-            state.dynamics, 
+            lambda d: getattr(d, res),
+            state.dynamics,
             active_residual
         )
     elif isinstance(res, DynamicResidual):
         active_res = replace(res, active=True)
         new_dynamics = state.dynamics.add_subcondition(active_res)
-        
+
     return eqx.tree_at(lambda s: s.dynamics, state, new_dynamics).expand_rows(state.numerics.number_of_control_points)
 
 
@@ -156,7 +156,7 @@ class InitializeSegment(Process):
     steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
 
     def __call__(self, state: State, system: System, settings: Settings, validate_controls=False):
-        
+
         if settings.DEBUG_MODE:
             scan_for_invalid_JAX_types(state,  f"Pre-{self.tag} State")
             scan_for_invalid_JAX_types(system, f"Pre-{self.tag} System")
@@ -181,16 +181,16 @@ class InitializeSegment(Process):
                 active_residuals += network.residuals # type: ignore
         for res in self.active_residuals:
             current_state = _activate_residual(res, current_state)
-        
+
         n_cp = int(current_state.numerics.number_of_control_points)
-        
+
         if self.controls_initial_guess is not None and len(self.controls_initial_guess) > 0:
             new_unknowns = jnp.concatenate([jnp.full((n_cp,), v) for v in self.controls_initial_guess])
         else:
             new_unknowns = jnp.zeros((n_cp * len(self.active_controls)))
 
         new_residuals = jnp.zeros((n_cp, len(self.active_residuals)))
-        
+
         current_state = eqx.tree_at(
             lambda s: (s.solver.unknowns, s.solver.residuals),
             current_state,
@@ -237,10 +237,10 @@ class AnalyzeSegment(Process):
     steps: tuple[ProcessStep, ...] = init_field(_default_analyses)
 
 
-def find_circular_references(obj, path="root", visited=None): 
+def find_circular_references(obj, path="root", visited=None):
     if visited is None:
         visited = set()
-    
+
     # Skip basic types and arrays (they don't hold other objects)
     if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
         return
@@ -248,7 +248,7 @@ def find_circular_references(obj, path="root", visited=None):
         return
 
     obj_id = id(obj)
-    
+
     # If we've seen this exact object ID in this branch, we found the loop
     if obj_id in visited:
         print(f"CIRCULARITY FOUND:")
@@ -263,19 +263,19 @@ def find_circular_references(obj, path="root", visited=None):
         for k, v in obj.items():
             if find_circular_references(v, f"{path}['{k}']", visited.copy()):
                 return True
-            
+
     # Recursively check lists
     elif isinstance(obj, list):
         for i, v in enumerate(obj):
             if find_circular_references(v, f"{path}[{i}]", visited.copy()):
                 return True
-            
+
     # Recursively check custom objects and dataclasses
     elif hasattr(obj, '__dict__'):
         for k, v in vars(obj).items():
             if find_circular_references(v, f"{path}.{k}", visited.copy()):
                 return True
-    
+
     return False
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -287,7 +287,7 @@ class IterateSegment(Process):
     tag:            str     = init_field('Segment Convergence', static=True)
     analyze:        Process = init_field(AnalyzeSegment)
 
-    
+
     def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
 
         current_state = state.unpack_unknowns(unknowns)
@@ -305,7 +305,7 @@ class IterateSegment(Process):
         )
 
         return root.run(x0, state, system, settings)
-    
+
     @eqx.filter_jit
     def _run_gauss_newton_solver(self, x0, state, system, settings):
         # Note the argument is `residual_fun` for the minimizer
@@ -314,18 +314,18 @@ class IterateSegment(Process):
             tol=state.numerics.solution_tolerance,
             maxiter=state.numerics.max_evaluations
         )
-        
+
         return root.run(x0, state, system, settings)
 
     def __call__(self, state: State, system: System, settings: Settings):
 
         root_finder = settings.mission.root_finder
-        
+
         with Spinner(enabled=not settings.DEBUG_MODE):
-            
+
             match root_finder:
                 case cls if cls == "GaussNewton":
-                    
+
                     x0 = state.solver.unknowns
 
                     # 2. Start the clock
@@ -333,9 +333,9 @@ class IterateSegment(Process):
 
                     # 3. Fire the compiled GPU kernel
                     unknowns, opt_state = self._run_gauss_newton_solver(x0, state, system, settings)
-                    
+
                     # 4. Wait for the final answer to come back across the PCIe bus
-                    
+
 
                     if settings.DEBUG_MODE:
 
@@ -347,7 +347,7 @@ class IterateSegment(Process):
                         # JAX arrays need to be cast or formatted to print cleanly
                         print(f"Iterations taken: {opt_state.iter_num}")
                         print(f"Final Error/Residual: {opt_state.error: .3e}")
-                        
+
                         # Depending on the specific JAXopt solver, you might also have:
                         if hasattr(opt_state, 'stepsize'):
                             print(f"Final Stepsize: {opt_state.stepsize}")
@@ -407,7 +407,7 @@ class IterateSegment(Process):
                     # 3. Fire the compiled GPU kernel
                     # (Note: jaxopt returns an (unknowns, state) tuple, we just need the unknowns)
                     unknowns, _ = self._run_broyden_solver(x0, state, system, settings)
-                    
+
                     # 4. Wait for the final answer to come back across the PCIe bus
                     unknowns.block_until_ready()
 
@@ -420,10 +420,10 @@ class IterateSegment(Process):
                     current_state = current_state.unpack_unknowns(unknowns)
 
                     return self.analyze(current_state, system, settings)
-                
+
 
                 case _:
-                    return state, system, settings     
+                    return state, system, settings
 
     def run_with_history(self, state, system, settings):
         conv_state, conv_system, conv_settings = self(state, system, settings)
@@ -443,31 +443,31 @@ def _reset_controls_and_residuals(
         def _turn_off_control(node):
             if isinstance(node, ControlVariable):
                 return eqx.tree_at(lambda c: c.active, node, False)
-            return node        
+            return node
 
         def _turn_off_residual(node):
             if isinstance(node, DynamicResidual):
                 return replace(node, active=False)
             return node
-        
+
         new_controls = jax.tree_util.tree_map(
-            _turn_off_control, 
-            current_state.controls, 
+            _turn_off_control,
+            current_state.controls,
             is_leaf=lambda x: isinstance(x, ControlVariable)
         )
 
         new_dynamics = jax.tree_util.tree_map(
-            _turn_off_residual, 
-            current_state.dynamics, 
+            _turn_off_residual,
+            current_state.dynamics,
             is_leaf=lambda x: isinstance(x, DynamicResidual)
         )
 
         current_state = eqx.tree_at(
-            lambda s: (s.controls, s.dynamics), 
-            current_state, 
+            lambda s: (s.controls, s.dynamics),
+            current_state,
             (new_controls, new_dynamics)
         )
-        
+
         return current_state, system, settings
 
 def _default_finalize():
@@ -479,7 +479,7 @@ class FinalizeSegment(Process):
 
     tag: str = init_field('Segment Finalization', static=True)
     steps: tuple[ProcessStep, ...] = init_field(_default_finalize)
-    
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Converged Segments
@@ -512,7 +512,7 @@ class Segment(Process):
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones
         if len(self.steps) == 0:
-            
+
             # 1. Build the steps, passing the controls configuration directly into InitializeSegment
             init_step = InitializeSegment(
                 tag=f"{self.tag} Initialization",
@@ -520,15 +520,15 @@ class Segment(Process):
                 active_residuals=self.active_residuals,
                 controls_initial_guess=self.controls_initial_guess,
             )
-            
+
             # Add profile initialization
             init_step = eqx.tree_at(
-                lambda i:i.steps, init_step, 
+                lambda i:i.steps, init_step,
                 init_step.steps + (self.course_profile, self.position_profile, self.speed_profile, self.velocity_profile, self.duration_profile))
-            
+
             iter_step = IterateSegment(tag=f"{self.tag} Iteration")
             fin_step  = FinalizeSegment(tag=f"{self.tag} Finalization")
-            
+
             # 2. Safely lock them into the frozen object
             object.__setattr__(self, "steps", (init_step, iter_step, fin_step))
 
@@ -555,14 +555,14 @@ class Segment(Process):
     # Execution
     # ----------------------------------------------------------------------------------
     def __call__(self, state, system, settings) -> tuple["State", "System", "Settings"]:
-        
+
         state = eqx.tree_at(lambda s: s.frames.planet.true_course, state, jnp.array([self.true_course]))
 
         if settings.DEBUG_MODE:
             for step in self.analyze.steps:
                 if isinstance(step, ProcessStep) and not isinstance(step, Process) and step.function is null_step:
                     print(f"Warning: Skipping {step.tag} analysis due to missing function.")
-        
+
         return super().__call__(state, system, settings)
 
 

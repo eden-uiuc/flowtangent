@@ -30,7 +30,7 @@ def func_compressible_mixed_flat_plate(Re, M, T, x_t):
     """Calculates coefficient of friction for a flat plate with given turbulent
     transition point, x_t.
     """
-    
+
     x_t = jnp.clip(x_t, 0.0, 1.0)
 
     Rex = jnp.maximum(Re * x_t, 1.01)
@@ -38,7 +38,7 @@ def func_compressible_mixed_flat_plate(Re, M, T, x_t):
     theta  = 0.671 * x_t / (Rex**0.5)
     x_eff  = (27.78 * theta * Re**0.2)**1.25
     Rext   = jnp.maximum(Re * (1 - x_t + x_eff), 1.01)
-    
+
     cf_turb  = 0.455 / (jnp.log10(Rext)**2.58)
     cf_lam   = 1.328 / (Rex**0.5)
 
@@ -49,46 +49,46 @@ def func_compressible_mixed_flat_plate(Re, M, T, x_t):
         0.455 / (jnp.log10(safe_re_xeff)**2.58),
         0.0
     )
-    
+
     cf_inc = cf_lam * x_t + cf_turb * (1 - x_t + x_eff) - cf_start * x_eff
-    
+
     # Compressibility correction
     Tw = T * (1. + 0.178 * M * M)
     Td = T * (1. + 0.035 * M * M + 0.45 * (Tw / T - 1.))
-    k_comp = (T / Td) 
-    
+    k_comp = (T / Td)
+
     # Reynolds correction
     Rd_w   = Re * (Td / T)**1.5 * ((Td + 216.) / (T + 216.))
     k_reyn = (Re / Rd_w)**0.2
-    
+
     # Calculate coefficient of friction
     cf_comp = cf_inc * k_comp * k_reyn
-    
+
     return cf_comp, k_comp, k_reyn
 
 
 @jax.jit
 def func_compressible_turbulent_flat_plate(Re, M, T):
     """Calculates coefficient of fricton for a fully turbulent flat plate.
-    """     
+    """
 
     Re = jnp.maximum(Re, 1.01)
 
     # Incompressible skin friction coefficient
     cf_inc = 0.455 / (jnp.log10(Re))**2.58
-    
+
     # Compressibility correction
     Tw = T * (1. + 0.178 * M**2.)
     Td = T * (1. + 0.035 * M**2. + 0.45 * (Tw / T - 1.))
-    k_comp = T / Td 
-    
+    k_comp = T / Td
+
     # Reynolds correction
     Rd_w   = Re * (Td / T)**1.5 * ((Td + 216.) / (T + 216.))
     k_reyn = (Re / Rd_w)**0.2
-    
+
     # Calculate coefficient of friction
     cf_comp = cf_inc * k_comp * k_reyn
-    
+
     return cf_comp, k_comp, k_reyn
 
 

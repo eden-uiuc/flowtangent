@@ -36,4 +36,4 @@ class Earth(Planet):
     sea_level_gravity:  float = init_field(9.80665 * Units.parse("m / s**2"), static=True)
     HitchHikersGuide:   str   = init_field('MostlyHarmless', static=True)
 
-    
+

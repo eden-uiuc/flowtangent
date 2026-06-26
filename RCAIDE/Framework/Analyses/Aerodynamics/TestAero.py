@@ -4,7 +4,7 @@
 # Created: Jan, 2026, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
-# IMPORT 
+# IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 import equinox as eqx
@@ -20,7 +20,7 @@ def _build_test_aero_steps():
     return (
         ProcessStep(
             tag="Direct Aero Calculation",
-            function=direct_aero 
+            function=direct_aero
         ),
     )
 

@@ -25,17 +25,17 @@ from RCAIDE.Library import Units
 # ----------------------------------------------------------------------------------------------------------------------
 
 def update_planetary_position(state: "State", system: "System", settings: "Settings"):
-    
+
     # Unpack state
     v       = state.frames.inertial.velocity_vector[:, 0] # Velocity over ground along true course
     alt     = state.freestream.altitude
-    
+
     theta   = state.frames.body.inertial_rotations[:, 1]
     psi     = state.frames.planet.true_course
     Re      = state.freestream.planet.mean_radius
-    
+
     alpha   = state.aerodynamics.angles.alpha
-    
+
     I       = state.numerics.time.integrate
 
     #  Calculate flight path and radius
@@ -45,7 +45,7 @@ def update_planetary_position(state: "State", system: "System", settings: "Setti
     # Find local velocities and integrate position
     lamdadot  = (v/R) * jnp.cos(gamma) * jnp.cos(psi)
     lamda     = jnp.dot(I, lamdadot) / Units.deg  # Latitude
-    
+
     mudot     = (v/R) * jnp.cos(gamma) * jnp.sin(psi) / jnp.cos(lamda)
     mu        = jnp.dot(I, mudot) / Units.deg     # Longitude
 

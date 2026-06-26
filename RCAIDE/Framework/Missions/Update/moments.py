@@ -4,7 +4,7 @@
 # Created: Aug, 2024, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
-# IMPORT 
+# IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
@@ -33,5 +33,5 @@ def update_moments(
         M = jnp.einsum('nij,nj->ni', TW2I, wind)
 
         state = eqx.tree_at(lambda s: s.frames.inertial.total_moment_vector, state, M + thrust)
-        
+
         return state, system, settings

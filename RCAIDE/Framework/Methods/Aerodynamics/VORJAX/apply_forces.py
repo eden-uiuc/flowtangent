@@ -35,7 +35,7 @@ from RCAIDE.utils import inputs, outputs
     "state.frames.wind.total_force_vector"
 )
 def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settings"):
-    
+
     # Get coefficients from analysis
     C_L = state.aerodynamics.coefficients.lift.total
     C_D = state.aerodynamics.coefficients.drag.total
@@ -43,9 +43,9 @@ def apply_aerodynamic_forces(state: "State", system: "System", settings: "Settin
     rho             = state.freestream.density
     flight_speed    = state.freestream.speed
     S               = system.areas.reference
-    
+
     qS = 0.5 * rho * (flight_speed ** 2) * S
-    
+
     F_Z = -qS * C_L # Z negative by right hand rule convention
     F_X = qS * C_D
 

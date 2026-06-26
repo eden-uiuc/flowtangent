@@ -1,7 +1,7 @@
 # RCAIDE/Library/Methods/Mass/Correlation/Transport/fuselage.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 # Created:  May 2024, J. Smart
-# Modified: 
+# Modified:
 #-------------------------------------------------------------------------------
 #  Imports
 #-------------------------------------------------------------------------------
@@ -85,7 +85,7 @@ def func_fuselage(
         82000.0
     
     """
-    
+
     # Unit Conversion
 
     dp  = fuselage_differential_pressure / (Units.lbf / Units.ft ** 2)
@@ -106,7 +106,7 @@ def func_fuselage(
         limit_idx = (pressure_idx**2 + geometry_idx**2)/(2*geometry_idx)
 
     fuselage_mass = ((1.051 + 0.102 * limit_idx) * S) * Units.lbm
-    
+
     return fuselage_mass
 
 #-------------------------------------------------------------------------------
@@ -148,12 +148,12 @@ def fuselage(state: "rcf.State",
                             vehicle_main_wing_mass,
                             vehicle_main_wing_root_chord,
                             vehicle_propulsion_mass)
-                           
+
     for idx, fuse in enumerate(fuses):
         fuse.mass_properties.total = results[idx]
 
     system.sum_mass()
-    
+
     return state, system, settings
-                           
-    
+
+

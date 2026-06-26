@@ -8,4 +8,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .auxillary_systems_power import compute_payload_power_consumption 
+from .auxillary_systems_power import compute_payload_power_consumption

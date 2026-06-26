@@ -30,7 +30,7 @@ from RCAIDE.Library.Gases import IdealGas, Air
 class EnergyEfficiencies(eqx.Module):
 
     total: float = 1.0
-    
+
     mechanical: float = 1.0
     electrical: float = 1.0
     fuel:       float = 1.0
@@ -51,16 +51,16 @@ class EnergyInput(eqx.Module):
     network_ID: str
 
 class EnergyNode(Component):
-    
+
     network_ID: str = init_field("energy_node", static=True)
-    
+
     efficiencies:   EnergyEfficiencies  = init_field(EnergyEfficiencies)
 
     inputs: tuple[EnergyInput, ...] = init_field(tuple, static=True)
 
     def _get_inputs_by_domain(self, domain: EnergyDomain):
         return tuple(i for i in self.inputs if i.domain == domain)
-    
+
     def __getattr__(self, name):
         if name.endswith("_inputs"):
             domain = name.replace("_inputs", "")
@@ -94,13 +94,13 @@ class EnergySplitter(EnergyNode):
 
     _splitter_type: str = init_field("flow", static=True)
     split_values: tuple[str] = init_field(("mass_flow_rate",), static=True)
-    
+
     def __post_init__(self):
         assert len(self.inputs) == 1 , f"Energy splitters can only have one input. Found: {self.inputs}"
         for splitter in ["flow", "mechanical", "electrical", "fuel", "force"]:
             if len(getattr(self, splitter+"_inputs")) > 0:
                 self._splitter_type = splitter
-    
+
     def transmit(self, state: State, system: System, settings: Settings):
 
         total_input = getattr(state.energy.nodes[self.inputs[0]].outputs, self._splitter_type)
@@ -163,7 +163,7 @@ class EnergyStore(EnergyNode):
     max_energy: float = 0.0
 
     specific_energy: float = 0.0
-    specific_volume: float = 0.0   
+    specific_volume: float = 0.0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -182,7 +182,7 @@ class FuelTank(EnergyStore):
             state: State,
             system: System,
             settings: Settings,
-    ):  
+    ):
         return state, system, settings
 
 # ----------------------------------------------------------------------------------------------------------------------

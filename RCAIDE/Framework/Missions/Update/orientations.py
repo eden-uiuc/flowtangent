@@ -28,15 +28,15 @@ def euler_zyx_to_dcm(angles):
     Pure JAX equivalent to SciPy's Rotation.from_euler('zyx', angles).as_matrix()
     """
     z, y, x = angles[0], angles[1], angles[2]
-    
+
     cz, sz = jnp.cos(z), jnp.sin(z)
     cy, sy = jnp.cos(y), jnp.sin(y)
     cx, sx = jnp.cos(x), jnp.sin(x)
-    
+
     row1 = jnp.array([cy*cz, cz*sx*sy - cx*sz, cx*cz*sy + sx*sz])
     row2 = jnp.array([cy*sz, cx*cz + sx*sy*sz, cx*sy*sz - cz*sx])
     row3 = jnp.array([-sy,   cy*sx,            cx*cy])
-    
+
     return jnp.stack([row1, row2, row3])
 
 
@@ -93,7 +93,7 @@ def update_orientations(state: "rcf.State",
                 s.frames.wind.transform_to_inertial,
                 s.frames.wind.body_rotations,
             ),
-            state, 
+            state,
             (
                 state.aerodynamics.angles.alpha.at[:, 0].set(alpha),
                 state.aerodynamics.angles.beta.at[:, 0].set(beta),
@@ -103,5 +103,5 @@ def update_orientations(state: "rcf.State",
                 wind_body_rotations
             )
         )
-                   
+
     return state, system, settings

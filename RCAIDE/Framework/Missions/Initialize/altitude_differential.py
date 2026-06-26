@@ -1,7 +1,7 @@
 # RCAIDE/Framework/Missions/Initialize/altitude_differential.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  Sep 2025, J. Smart
-# Modified: 
+# Modified:
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------

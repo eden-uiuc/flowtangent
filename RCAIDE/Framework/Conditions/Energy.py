@@ -46,7 +46,7 @@ class FlowOutputs(Conditions):
     speed:                  jnp.ndarray  = empty_array(0)
     speed_of_sound:         jnp.ndarray  = empty_array(0)
     area_ratio:             jnp.ndarray  = empty_array(0)
-    
+
     pressure:               jnp.ndarray  = empty_array(0)
     temperature:            jnp.ndarray  = empty_array(0)
     density:                jnp.ndarray  = empty_array(0)
@@ -78,7 +78,7 @@ class ForceOutputs(Conditions):
 class OutputConditions(Conditions):
 
     tag = "Energy Interface Conditons"
-    
+
     mechanical : MechanicalOutputs  = init_field(MechanicalOutputs)
     electrical : ElectricalOutputs  = init_field(ElectricalOutputs)
     fuel       : FuelOutputs        = init_field(FuelOutputs)
@@ -162,10 +162,10 @@ class EnergyNetworkConditions(Conditions):
 
     total_energy:           jnp.ndarray = empty_array(0)
     total_efficiency:       jnp.ndarray = empty_array(0)
-    
+
     throttle:               jnp.ndarray = empty_array(0)
     total_power:            jnp.ndarray = empty_array(0)
-    
+
     total_force_vector:     jnp.ndarray = empty_array((0, 3))
     total_moment_vector:    jnp.ndarray = empty_array((0, 3))
 

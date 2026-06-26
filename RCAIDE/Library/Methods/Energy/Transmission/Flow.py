@@ -1,7 +1,7 @@
 # RCAIDE/Library/Methods/Energy/Converters/flow.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  May 2025, J. Smart
-# Modified: 
+# Modified:
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------

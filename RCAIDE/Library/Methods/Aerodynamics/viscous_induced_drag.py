@@ -33,7 +33,7 @@ def func_viscous_induced_drag(
     viscous_lift_factor: float | jnp.ndarray = 0.38,
 ):
     """Evaluates viscous induced drag based on parasite drag and drag factor"""
-    
+
     return viscous_lift_factor * parasite_drag * (CL**2)
 
 # ---------------------------------------------------------
@@ -52,7 +52,7 @@ def func_viscous_induced_drag(
 )
 def compute_viscous_induced_drag(state: "State", system: "System", settings: "Settings"):
     """ Computes system and wing viscous induced drag """
-    
+
     # Total System
     CL_all      = state.aerodynamics.coefficients.lift.total
     CDp_all     = state.aerodynamics.coefficients.drag.parasite.total
@@ -71,5 +71,5 @@ def compute_viscous_induced_drag(state: "State", system: "System", settings: "Se
     )
 
     updated_state = eqx.tree_at(lambda s: s.aerodynamics.coefficients.drag.induced, state, updated_induced_drag)
-    
+
     return updated_state, system, settings

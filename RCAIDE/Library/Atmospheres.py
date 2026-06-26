@@ -24,10 +24,10 @@ import RCAIDE.Library as rcl
 
 class AtmosphericBreakpoints(eqx.Module):
 
-    altitude: jnp.ndarray     
-    temperature: jnp.ndarray  
-    pressure: jnp.ndarray     
-    density: jnp.ndarray      
+    altitude: jnp.ndarray
+    temperature: jnp.ndarray
+    pressure: jnp.ndarray
+    density: jnp.ndarray
 
 
 class Atmosphere(eqx.Module):
@@ -42,44 +42,44 @@ class Atmosphere(eqx.Module):
 
     def __repr__(self):
         return self.tag
-    
+
     def _compute_property(self, altitude, property: Literal["temperature", "pressure", "density"]):
         return jnp.interp(altitude, self.breaks.altitude, getattr(self.breaks, property))
-    
+
     def compute_temperature(self, altitude:jnp.ndarray|float):
         return self._compute_property(altitude, "temperature")
-    
+
     def compute_pressure(self, altitude:jnp.ndarray|float):
         return self._compute_property(altitude, "pressure")
-    
+
     def compute_density(self, altitude:jnp.ndarray|float):
         return self._compute_property(altitude, "density")
-    
+
     def compute_speed_of_sound(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_speed_of_sound(T)
-    
+
     def compute_dynamic_viscosity(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_absolute_viscosity(T)
-    
+
     def compute_kinematic_viscosity(self, altitude: jnp.ndarray|float):
         mu = self.compute_dynamic_viscosity(altitude)
         rho = self.compute_density(altitude)
         return mu/rho
-    
+
     def compute_thermal_conductivity(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_thermal_conductivity(T)
-    
+
     def compute_prandtl_number(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_prandtl_number(T)
-    
+
     def compute_gamma(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_gamma(T)
-    
+
     def compute_Cp(self, altitude: jnp.ndarray|float):
         T = self.compute_temperature(altitude)
         return self.fluid.compute_Cp(T)

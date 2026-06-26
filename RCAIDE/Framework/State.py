@@ -31,13 +31,13 @@ class SolverConditions(Conditions):
 
     unknowns:           jnp.ndarray                 = empty_array(0)
     residuals:          jnp.ndarray                 = empty_array(0)
-    
+
 
 class State(Conditions):
 
     # Attribute         Type                        Default Value
     tag:                str                         = init_field('State', static=True)
-    
+
     initials:           eqx.Module | None           = None
     numerics:           Numerics                    = init_field(Numerics)
 
@@ -80,10 +80,10 @@ class State(Conditions):
                 print(f"- {residual.tag}")
 
         return valid_controls
-    
+
     def unpack_unknowns(self, unknowns):
-        n_points = int(self.numerics.number_of_control_points) 
-        
+        n_points = int(self.numerics.number_of_control_points)
+
         # 1. Grab the perfectly static routing table
         routing_table = self.controls.active_routing_table
 
@@ -101,10 +101,10 @@ class State(Conditions):
         # 3. Slice and set
         for i, (_, path_indices) in enumerate(routing_table):
             values = unknowns[control_idx : control_idx + n_points]
-            
+
             current_array = current_targets[i]
             new_array = current_array.at[path_indices].set(values)
-            
+
             new_arrays.append(new_array)
             control_idx += n_points
 

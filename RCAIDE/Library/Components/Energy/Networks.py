@@ -55,8 +55,8 @@ def _resolve_namespaces(node, parent_prefix=""):
             return absolute_id+"."+flat_input_parts[-1]
         else:
             return parent_prefix+"."+flat_input_parts[-1]
-    
-        
+
+
     # Resolve the input/output connection strings
     # We rebuild the interfaces so they point to the absolute paths
     # new_inputs = {
@@ -68,7 +68,7 @@ def _resolve_namespaces(node, parent_prefix=""):
     # }
 
     new_inputs = tuple(EnergyInput(i.domain, parse_input(i.network_ID)) for i in node.inputs)
-    
+
     # Update the node itself
     node = replace(
         node,
@@ -80,15 +80,15 @@ def _resolve_namespaces(node, parent_prefix=""):
         # force_inputs=new_inputs['force'],
         # fuel_inputs=new_inputs['fuel'],
     )
-    
+
     # Recurse through any subcomponents
     if hasattr(node, 'subcomponents') and node.subcomponents:
         resolved_children = tuple(
-            _resolve_namespaces(child, parent_prefix=absolute_id) 
+            _resolve_namespaces(child, parent_prefix=absolute_id)
             for child in node.subcomponents
         )
         node = eqx.tree_at(lambda n: n.subcomponents, node, resolved_children)
-        
+
     return node
 
 class EnergyNetwork(EnergyNode):
@@ -100,7 +100,7 @@ class EnergyNetwork(EnergyNode):
     _bookkeeping: dict = init_field(lambda: {
         "lines": EnergyLine
     }, static=True)
-    
+
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
 
@@ -122,7 +122,7 @@ class EnergyNetwork(EnergyNode):
             if hasattr(node, 'extraction_fraction') and node.inputs:
                 upstream_source = node.inputs[0]
                 source_to_splitters.setdefault(upstream_source, []).append(node)
-                
+
         corrected_fractions = {}
         for source, splitters in source_to_splitters.items():
             total = sum(s.extraction_fraction for s in splitters)
@@ -139,14 +139,14 @@ class EnergyNetwork(EnergyNode):
             return node
 
         return jax.tree_util.tree_map(_apply, self, is_leaf=lambda x: isinstance(x, EnergyNode))
-    
+
     def assign_network_IDs(self):
 
         updated_network = replace(self, network_ID=self.get_field_name())
         resolved_lines = []
 
         for line in updated_network.lines:
-            
+
             # Resolve the namespace for this entire line and all its nested children
             resolved_line = _resolve_namespaces(line, parent_prefix=f"{updated_network.get_field_name()}")
             resolved_lines.append(resolved_line)
@@ -156,7 +156,7 @@ class EnergyNetwork(EnergyNode):
             updated_network,
             tuple(resolved_lines)
         ).sort_network_topology()
-        
+
         return updated_network
 
     def _get_all_nodes(self) -> "EnergyNetwork":
@@ -167,33 +167,33 @@ class EnergyNetwork(EnergyNode):
                     nodes_dict[comp.network_ID] = comp
                 if hasattr(comp, "subcomponents") and comp.subcomponents:
                     _recurse(comp.subcomponents)
-        
+
         _recurse(self.subcomponents)
         return eqx.tree_at(lambda n: n.nodes, self, nodes_dict)
-    
+
     def sort_network_topology(self) -> "EnergyNetwork":
         """The single entry point to finalize the network for execution.
         Use after running initialize_energy so parts are properly ID'd."""
-        
+
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()
         dependency_graph = {
-            ID: set(node.inputs) 
+            ID: set(node.inputs)
             for ID, node in updated_network.nodes.items()
         }
 
         try:
             sorter = TopologicalSorter(dependency_graph)
             updated_order = tuple(sorter.static_order())
-            
+
             return replace(
-                updated_network, 
+                updated_network,
                 _execution_order=updated_order
             )
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
-    
-    
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbojet Energy Network
 # ----------------------------------------------------------------------------------------------------------------------

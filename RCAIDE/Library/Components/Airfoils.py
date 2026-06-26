@@ -41,13 +41,13 @@ class Airfoil(Component):
 
     coordinates:        jnp.ndarray = empty_array((0, 2))
     camber:             jnp.ndarray = empty_array(0)
-    
+
     x_coordinates:      jnp.ndarray = empty_array(0)
     y_coordinates:      jnp.ndarray = empty_array(0)
-    
+
     x_upper_surface:    jnp.ndarray = empty_array(0)
     x_lower_surface:    jnp.ndarray = empty_array(0)
-    
+
     y_upper_surface:    jnp.ndarray = empty_array(0)
     y_lower_surface:    jnp.ndarray = empty_array(0)
 

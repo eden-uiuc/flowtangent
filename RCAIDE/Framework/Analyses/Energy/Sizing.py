@@ -33,12 +33,12 @@ from .GraphNetwork import build_analysis_from_network
 
 def update_design_parameters(turbojet: TurbojetEngine):
         design_thrust = turbojet.design_parameters.total_thrust
-        
+
         if design_thrust == 0.0:
             warnings.warn("Attempted to calculate sea-level static thrust without reference design thrust. "
             f"Please set {turbojet.tag}.design_parameters.total_thrust.")
             return turbojet
-        
+
         atmo = USStandard1976()
         T0 = atmo.compute_temperature(0.0)
         a0 = atmo.compute_speed_of_sound(0.0)
@@ -72,7 +72,7 @@ def update_design_parameters(turbojet: TurbojetEngine):
             jnp.atleast_2d(turbojet.working_fluid.compute_Cp(T0)),
             jnp.atleast_2d(turbojet.working_fluid.R_specific),
         ))
-        
+
         sls_line = TurbojetEnergyLine(subcomponents=(turbojet,), fuel_inputs=("self.engine_1",))
         sls_network = EnergyNetwork(subcomponents=(sls_line,))
         sls_system = Aircraft(subcomponents=(sls_network,))
@@ -84,7 +84,7 @@ def update_design_parameters(turbojet: TurbojetEngine):
              sls_state,
              jnp.atleast_2d(1.0)
         )
-        
+
         sls_analysis = build_analysis_from_network(sls_system.energy_networks[0])
 
         sls_state, sls_system, sls_settings = sls_analysis(sls_state, sls_system, sls_settings)

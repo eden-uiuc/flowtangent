@@ -27,16 +27,16 @@ from RCAIDE.Framework.Conditions.Controls import SurfaceControlVariable, DirectC
 # ----------------------------------------------------------------------------------------------------------------------
 
 def build_controls_from_system(state:State, system: System|Component, settings:Settings):
-        
+
         new_controls = state.controls
         surface_controls = []
         direct_controls = []
         unbound_controls = []
 
-        
+
         if settings.DEBUG_MODE:
             print(f"Building controls from {system.tag}...")
-        
+
         for component in system.subcomponents:
             state, component, settings = build_controls_from_system(state, component, settings)
 
@@ -80,10 +80,10 @@ def build_controls_from_system(state:State, system: System|Component, settings:S
                         print(f"The following control components were found, but without path information."
                               f"They may not function as intended:"
                               "\n\t- ".join(unbound_controls))
-        
+
         if settings.DEBUG_MODE:
             print(f"Completed building controls from {system.tag}.\n"
                   f"Controls may be activated for mission segments by setting "
                   f"segment.active_controls = ('control_variable', ...)")
-        
+
         return eqx.tree_at(lambda s: s.controls, state, new_controls), system, settings

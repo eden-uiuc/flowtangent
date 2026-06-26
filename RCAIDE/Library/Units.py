@@ -124,7 +124,7 @@ def parse(unit_string: str) -> float:
     """
     # Grab the dictionary of everything defined in this module
     module_dict = globals()
-    
+
     # Evaluate the string securely, using only this module's variables.
     # We disable Python's built-ins (like __import__) for security.
     try:

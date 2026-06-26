@@ -48,30 +48,30 @@ from RCAIDE.Framework.Methods.Aerodynamics import (compute_parasite_drag, comput
 
 
 class SupersonicSettings(eqx.Module):
-    
+
     begin_blend_mach:               float = 0.5
     end_blend_mach:                 float = 2.0
-    
+
     peak_CL_multiplier:             float = 1.15
     peak_mach_number:               Optional[float] = None
     _transonic_CL_blender:          Callable = init_field(ensemble_CL_spline, as_value=True, static=True)
-    
+
     begin_drag_rise_mach_number:    float = 0.95
     end_drag_rise_mach_number:      float = 1.2
-    
+
     transonic_drag_multiplier:      float = 1.25
     volume_wave_drag_scaling:       float = 3.2
-    
+
     cross_section_type:             str  = init_field('Fixed', static=True)
     wave_drag_type:                 str  = init_field('Raymer', static=True)
 
     def __post_init__(self):
         if self.peak_mach_number is not None:
             object.__setattr__(self, "_transonic_CL_blender", init_field(peaked_CL_spline, as_value=True, static=True))
-    
+
     def transonic_CL_blender(self, M, val_sub, val_sup):
         return self._transonic_CL_blender(
-            M, 
+            M,
             self.begin_blend_mach,
             self.peak_mach_number,
             self.end_blend_mach,
@@ -105,13 +105,13 @@ class FormFactors(eqx.Module):
 class Surrogate(eqx.Module):
 
     surrogate:              Optional[Any] = init_field(sklearn.gaussian_process.GaussianProcessRegressor, static=True)
-    
+
     blend_transonic:        bool          = True
 
     angle_of_attack:        jnp.ndarray  = init_field(lambda: jnp.linspace(-5., 15., 40) * Units.deg)
     sideslip_angle:         jnp.ndarray  = init_field(lambda: jnp.linspace(0.0, 15., 30) * Units.deg)
     mach:                   jnp.ndarray  = init_field(lambda: jnp.linspace(0., 0.85, 20))
-    
+
     aileron_deflection:     jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
     elevator_deflection:    jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
     rudder_deflection:      jnp.ndarray  = init_field(lambda: jnp.array([30, 10.0, 1E-12]) * Units.deg)
@@ -128,7 +128,7 @@ class Surrogate(eqx.Module):
 
     def fit(self, *args, **kwargs):
         return self.surrogate.fit(*args, **kwargs)
-    
+
     def predict(self, *args, **kwargs):
         return self.surrogate.predict(*args, **kwargs)
 
@@ -137,14 +137,14 @@ class Vortices(eqx.Module):
 
     model_fuselage:             bool = init_field(False, static=True)
     verbose:                    bool = init_field(False, static=True)
-    
+
     # Discretization Inputs (Optional, so the user can choose which to define)
     spanwise_cosine:    bool = init_field(True, static=True)
     chordwise_cosine:   bool = init_field(False, static=True) # Currently unsupported
 
     n_spanwise:         Optional[Iterable[int] | int] = init_field(8, static=True)  # Min value is number of wing segments (possibly more for control surfaces)
     n_chordwise:        Optional[Iterable[int] | int] = init_field(3, static=True)  # Min value 3 to allow front and rear control surfaces
-    
+
     # Can set separate values for each wing/fuselage (ex. [8, 4] for [wing, stab] and [4, 2] for [fuselage, nacelle]), else uses global value above
     wings_n_spanwise:   Optional[Iterable[int] | int] = init_field(None, static=True)
     wings_n_chordwise:  Optional[Iterable[int] | int] = init_field(None, static=True)
@@ -158,7 +158,7 @@ class Vortices(eqx.Module):
         if self.chordwise_cosine:
             warnings.warn(f"Chordwise cosine spacing is currently unsupported. Defaulting to linear spacing.")
             object.__setattr__(self, "chordwise_cosine", False)
-        
+
         # Check if the user explicitly provided separate definitions
         separate_provided = any([
             self.wings_n_spanwise is not None,
@@ -222,7 +222,7 @@ def _default_VORJAX_init_steps():
     )
 
 class InitializeVORJAX(Process):
-    
+
     tag: str = init_field("Initialize VORJAX", static=True)
     steps: tuple = init_field(_default_VORJAX_init_steps)
 
@@ -285,7 +285,7 @@ VORJAX_Outputs = {
 }
 
 class BatchVORJAX(BatchAnalysis):
-    
+
     def __init__(
             self,
             tag: str = "Batched VORJAX",

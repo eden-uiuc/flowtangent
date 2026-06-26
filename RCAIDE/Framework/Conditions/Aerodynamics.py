@@ -96,7 +96,7 @@ class AerodynamicCoefficients(Conditions):
 
     lift:               LiftCoefficients    = init_field(LiftCoefficients)
     drag:               DragCoefficients    = init_field(DragCoefficients)
-    
+
     moments:            MomentCoefficients  = init_field(MomentCoefficients)
 
     X:                  jnp.ndarray         = empty_array(0)

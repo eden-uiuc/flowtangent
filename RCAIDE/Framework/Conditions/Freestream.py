@@ -84,7 +84,7 @@ class FreestreamConditions(Conditions):
     speed:                  jnp.ndarray  = empty_array(0)
     altitude:               jnp.ndarray  = empty_array(0)
     gravity:                jnp.ndarray  = empty_array(0)
-    
+
     speed_of_sound:         jnp.ndarray  = empty_array(0)
     pressure:               jnp.ndarray  = empty_array(0)
     temperature:            jnp.ndarray  = empty_array(0)

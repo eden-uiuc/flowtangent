@@ -47,33 +47,33 @@ CourseProfile = ConstantCourse
 class ConstantAltitude(ProcessStep):
     tag: str = init_field("Set Constant Altitude", static=True)
     altitude: float = 1.0 * Units.km
-    
+
     def __call__(self, state, system, settings):
         # Z points down, so position vector gets negative altitude
         altitude_arr = jnp.full_like(state.freestream.altitude, self.altitude)
         updated_position = state.frames.inertial.position_vector.at[:, 2].set(-altitude_arr.flatten())
-        
+
         updated_state = eqx.tree_at(
             lambda s: (s.freestream.altitude, s.frames.inertial.position_vector), state,
-            (altitude_arr, updated_position)) 
-        
+            (altitude_arr, updated_position))
+
         return updated_state, system, settings
 
 class AltitudeChange(ProcessStep):
     tag: str = init_field("Set Altitude Change", static=True)
     initial_altitude: float = 1.0 * Units.km
     final_altitude: float = 10.0 * Units.km
-    
+
     def __call__(self, state, system, settings):
         t_nondim = state.numerics.dimensionless.control_points
         altitude_profile = t_nondim * (self.final_altitude - self.initial_altitude) + self.initial_altitude
-        
+
         updated_position = state.frames.inertial.position_vector.at[:, 2].set(-altitude_profile.flatten())
 
         updated_state = eqx.tree_at(
             lambda s:(s.freestream.altitude, s.frames.inertial.position_vector), state,
             (altitude_profile, updated_position))
-        
+
         return updated_state, system, settings
 
 PositionProfile = ConstantAltitude | AltitudeChange
@@ -87,13 +87,13 @@ class ConstantSpeed(ProcessStep):
 
     def __call__(self, state, system, settings):
         new_speed = jnp.full_like(state.freestream.speed, self.speed)
-        
+
         # Set the X-component of the inertial velocity vector
         new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(new_speed.flatten())
-        
+
         updated_state = eqx.tree_at(
-            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), 
-            state, 
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector),
+            state,
             (new_speed, new_velocity)
         )
         return updated_state, system, settings
@@ -107,14 +107,14 @@ class ConstantMach(ProcessStep):
         alt = state.freestream.altitude
         T = state.freestream.atmosphere.compute_temperatue(alt)
         a = state.freestream.atmosphere.gas.compute_speed_of_sound(T)
-        
+
         v_mag = self.mach_number * a
 
         new_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_mag.flatten())
-        
+
         updated_state = eqx.tree_at(
-            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector), 
-            state, 
+            lambda s: (s.freestream.speed, s.frames.inertial.velocity_vector),
+            state,
             (v_mag, new_velocity)
         )
         return updated_state, system, settings
@@ -125,17 +125,17 @@ SpeedProfile = ConstantSpeed | ConstantMach
 
 class ConstantAltitudeChangeRate(ProcessStep):
     tag: str = init_field("Set Constant Alt. Change Rate", static=True)
-    
+
     change_rate: float = 0.0 * Units.m/Units.s
 
     def __call__(self, state, system, settings):
         v_mag = state.freestream.speed
         v_z = -self.change_rate # Z points down, so positive rate (climb) is negative and vice-versa
         v_x = jnp.sqrt(v_mag **2 - v_z ** 2)
-        
+
         updated_velocity = state.frames.inertial.velocity_vector.at[:, 0].set(v_x.squeeze(-1))
         updated_velocity = updated_velocity.at[:, 2].set(v_z)
-        
+
         updated_state = eqx.tree_at(lambda s:s.frames.inertial.velocity_vector, state, updated_velocity)
         return updated_state, system, settings
 
@@ -168,7 +168,7 @@ class FixedTime(ProcessStep):
     def __call__(self, state, system, settings):
         t_0 = state.frames.inertial.time[0, 0]
         t_f = t_0 + self.time
-        
+
         t_nondim = state.numerics.dimensionless.control_points
         time = t_nondim * (t_f - t_0) + t_0
 

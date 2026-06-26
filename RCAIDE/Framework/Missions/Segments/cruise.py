@@ -31,7 +31,7 @@ class Cruise(Segment):
     tag: str = 'Cruise'
 
     distance: float = 0.0
-    
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Test CSA Cruise
@@ -59,7 +59,7 @@ def _build_dynamics(
         air_speed: float,
         sideslip: float,
     ):
-    
+
     def initialize_dynamics(state: "State", system: "System", settings: "Settings"):
         alt = altitude
         xf = distance
@@ -73,7 +73,7 @@ def _build_dynamics(
 
         v_x = jnp.cos(beta) * av
         v_y = jnp.sin(beta) * av
-        
+
         t_0 = state.frames.inertial.time[0, 0]
         t_f = t_0 + xf / av
 
@@ -96,9 +96,9 @@ def _build_dynamics(
         )
 
         return new_state, system, settings
-    
+
     return initialize_dynamics
-        
+
 
 class TestCSACruise(Cruise):
 

@@ -10,9 +10,9 @@
 
 from . import Energy
 from . import Aerodynamics
-from . import Propulsors 
+from . import Propulsors
 # from . import Costs
-# from . import Geometry 
+# from . import Geometry
 # from . import Performance
 # from . import Weights
 

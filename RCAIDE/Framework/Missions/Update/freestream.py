@@ -91,7 +91,7 @@ def update_freestream(state: "State",
         s.freestream.dynamic_pressure,
         s.freestream.stagnation_pressure,
         s.freestream.stagnation_temperature,
-        ), 
+        ),
         state, (
         v_mag,
         M,
@@ -101,5 +101,5 @@ def update_freestream(state: "State",
         T_t,
         )
     )
-                   
+
     return state, system, settings

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 def func_fan_compressor_performance(
-        gas, 
+        gas,
         T_t,
         P_t,
         PR,

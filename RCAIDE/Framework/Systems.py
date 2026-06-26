@@ -52,7 +52,7 @@ class System(Component):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class AircraftReferenceGeometry(eqx.Module):
-    
+
     mean_aerodynamic_chord: jnp.ndarray = empty_array(0)
     projected_span: jnp.ndarray         = empty_array(0)
     aerodynamic_center: jnp.ndarray     = empty_array((0, 3))
@@ -70,17 +70,17 @@ class AircraftMassProperties(MassProperties):
 class Aircraft(System):
 
     tag:                str = init_field('Aircraft', static=True)
-    
+
     ac_class:           AircraftClass = init_field(MediumRange, static=True)
     envelope:           VehicleEnvelope = init_field(VehicleEnvelope, static=True)
     mass_properties:    AircraftMassProperties = init_field(AircraftMassProperties) #type: ignore
 
     passengers:         int     = init_field(0, static=True)
-    
+
     design_mach_number: float   = init_field(0., static=True)
     design_range:       float   = init_field(0., static=True)
     design_cruise_alt:  float   = init_field(0., static=True)
-    
+
     _bookkeeping: dict = init_field(lambda: {
         "energy_networks": EnergyNetwork,
         "wings": Wing,

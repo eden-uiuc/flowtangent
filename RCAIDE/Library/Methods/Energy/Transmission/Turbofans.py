@@ -45,28 +45,28 @@ def func_thrust_and_power(
     # Normalized by Freestream Dynamic Pressure * Capture Area
     F_fan   = f_fan  * (gamma_0 * M0 ** 2 * (v_fan_nozzle / u0 - 1.) + AR_fan_nozzle * (P_fan_nozzle / P0 - 1.))
     F_core  = f_core * (gamma_0 * M0 ** 2 * (v_core_nozzle / u0 - 1.) + AR_core_nozzle * (P_core_nozzle / P0 - 1.))
-    F_total = F_fan + F_core                                                    
-    
+    F_total = F_fan + F_core
+
     # 2. Specific Thrust (F_sp_nondim is dimensionless)
-    F_sp_nondim = 1. / (gamma_0 * M0) * F_total                                        
-    
-    # Dimensional specific thrust evaluated for the whole engine relative to CORE mass flow 
+    F_sp_nondim = 1. / (gamma_0 * M0) * F_total
+
+    # Dimensional specific thrust evaluated for the whole engine relative to CORE mass flow
     # Units: N / (kg/s) or (m/s)
     specific_thrust_core = F_sp_nondim * a0 * (1. + BPR)
 
     # 3. Performance Metrics (Corrected to use gravity 'g' instead of 'gamma')
-    I_sp    = specific_thrust_core / (fuel_air_ratio * g)                             
-    TSFC    = fuel_air_ratio / specific_thrust_core * (1. - delta_SFC) * 3600.    
-    
+    I_sp    = specific_thrust_core / (fuel_air_ratio * g)
+    TSFC    = fuel_air_ratio / specific_thrust_core * (1. - delta_SFC) * 3600.
+
     # 4. Engine Sizing and Throttle State
     mdot_core = (F_ref * f_core) / (F_sp_nondim * a0 * throttle)
 
-    F       = specific_thrust_core * mdot_core * throttle                      
-    p       = F * u0                                                            
-    
+    F       = specific_thrust_core * mdot_core * throttle
+    p       = F * u0
+
     # 5. Fuel Flow Rate (Using JAX maximum)
     # TSFC is expected to be mass / (Thrust * hr)
-    ff      = jnp.maximum(F * TSFC, 0.) / 3600.                                   
+    ff      = jnp.maximum(F * TSFC, 0.) / 3600.
 
     return F, F_sp_nondim, I_sp, TSFC, mdot_core, p, ff
 

@@ -42,11 +42,11 @@ class TurbojetEnergyLine(EnergyLine):
     tag: str = init_field('Turbojet Energy Line', static=True)
 
     fuel_inputs: tuple[str, ...] = init_field(("self.engine_1", "self.engine_2"), static=True)
-    
+
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
-    
+
     subcomponents: tuple = init_field(_TurbojetLineSetup())
-    
+
     _bookkeeping: dict = init_field(lambda: {
         "engines": TurbojetEngine,
         "stores": FuelTank,
@@ -65,10 +65,10 @@ class TurbojetEnergyLine(EnergyLine):
         "state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate"
     )
     def transmit(self, state: State, system: System, settings: Settings):
-        
+
         # Manage Fuel --------------------------------------------------------------------------------------------------
         total_fuel_burn = self.sum_inputs(state, "fuel", "flow_rate")
-        
+
         #  Compute fuel fraction
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
         current_fuel_mass = jnp.sum(jnp.asarray([state.energy.nodes[t.network_ID].mass for t in self.fuel_tanks]))
@@ -80,13 +80,13 @@ class TurbojetEnergyLine(EnergyLine):
 
         # Create the active mask (1.0 if active, 0.0 if inactive)
         active_mask = jnp.where(selector_ratios[None, :] >= fuel_fraction, 1.0, 0.0)
-        
+
         # Mask the baseline draws
         masked_draws = baseline_draws * active_mask
-        
+
         # Normalize the draws (with a safeguard against division-by-zero if all tanks are inactive)
         sum_draws = jnp.sum(masked_draws)
-        safe_sum = jnp.where(sum_draws == 0.0, 1.0, sum_draws) 
+        safe_sum = jnp.where(sum_draws == 0.0, 1.0, sum_draws)
         balanced_draws = masked_draws / safe_sum
 
         # Distribute the burn across ALL tanks (inactive ones get multiplied by 0.0)
@@ -108,7 +108,7 @@ class TurbojetEnergyLine(EnergyLine):
         # Manage Electrical Power --------------------------------------------------------------------------------------
 
         for idx, offtake in enumerate(self.offtakes): # type: ignore
-            
+
             offtake: OfftakeShaft
             engine_ID = self.engines[idx].network_ID  #type: ignore
 
@@ -122,7 +122,7 @@ class TurbojetEnergyLine(EnergyLine):
                     offtake.power_draw,
                     offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate
                 )
-            )    
+            )
 
         return updated_state, system, settings
 

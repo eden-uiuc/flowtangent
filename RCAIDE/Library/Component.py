@@ -1,18 +1,18 @@
 # RCAIDE/Library/Compoments/Component.py
 # (c) Copyright 2023 Aerospace Research Community LLC
-# 
+#
 # Created: Jul 2024, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
-# ----------------------------------------------------------------------------------------------------------------------  
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 from __future__ import annotations
 from warnings import warn
 from typing import Any
 
-# package imports 
+# package imports
 import equinox as eqx
 import jax.numpy as jnp
 
@@ -22,7 +22,7 @@ from RCAIDE.Library.Attributes.Materials import Solid, Aluminum
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component
-# ----------------------------------------------------------------------------------------------------------------------         
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ComponentFineness(eqx.Module):
@@ -134,11 +134,11 @@ class Component(eqx.Module):
 
     _bookkeeping:           dict[str, Any] = init_field(dict, static=True)
 
-    
+
     def __repr__(self):
         repr_str = self.tag + " - Subcomponents: [" + ', '.join([sc.tag for sc in self.subcomponents])+"]"
         return repr_str
-    
+
     def __getitem__(self, item):
         if isinstance(item, (slice, int)):
             return self.subcomponents[item]
@@ -146,7 +146,7 @@ class Component(eqx.Module):
             return getattr(self, item.replace(' ', '_').lower())
         else:
             raise TypeError(f"Indices must be int, slice, or str.")
-    
+
     def __getattr__(self, item: str):
         if item.startswith("__") and item.endswith("__"):
             raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
@@ -170,22 +170,22 @@ class Component(eqx.Module):
 
     def __iter__(self):
         return iter(self.subcomponents)
-    
+
     def __contains__(self, item):
         if isinstance(item, str):
             return any(sc.get_field_name() == item for sc in self.subcomponents)
-        
+
         return item in self.subcomponents
 
     def get_field_name(self):
         actual_tag = self.tag
-        
+
         if not isinstance(actual_tag, str):
             if hasattr(actual_tag, 'value'):
                 actual_tag = actual_tag.value
             else:
                 raise AttributeError(f"Unable to resolve field name for {self}.")
-        
+
         return actual_tag.replace(' ', '_').lower()
 
     def add_segment(self, segment: "Component", index: int | None = None):
@@ -198,32 +198,32 @@ class Component(eqx.Module):
 
         # Functionally replace and return the new Component
         return eqx.tree_at(lambda c: c.segments, self, new_segments)
-    
+
     def insert_segment(self, segment: "Component", index: int):
         new_segments = self.segments[:index] + (segment,) + self.segments[index:]
-        
+
         return eqx.tree_at(lambda c: c.segments, self, new_segments)
 
     def replace_segment(self, segment: "Component", index: int):
         new_segments = self.segments[:index] + (segment,) + self.segments[index + 1:]
-        
+
         return eqx.tree_at(lambda c: c.segments, self, new_segments)
 
     def add_subcomponent(self, subcomponent: "Component"):
 
         new_subcomponents = self.subcomponents + (subcomponent,)
         new_self = eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
-    
+
         return new_self
-    
+
     def insert_subcomponent(self, subcomponent: "Component", index: int):
         new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index:]
-        
+
         return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
 
     def replace_subcomponent(self, subcomponent: "Component", index: int):
         new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index + 1:]
-        
+
         return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
 
     def remove_subcomponent(self, index: int):

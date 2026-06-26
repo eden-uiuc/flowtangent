@@ -29,13 +29,13 @@ class Conditions(eqx.Module):
 
     def __post_init__(self):
         subcons = tuple(
-            getattr(self, f.name) 
-            for f in fields(self) 
+            getattr(self, f.name)
+            for f in fields(self)
             if f.name != "subconditions" and isinstance(getattr(self, f.name), Conditions)
         )
-        
+
         object.__setattr__(self, "subconditions", subcons)
-    
+
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
             return self.subconditions[item]
@@ -57,7 +57,7 @@ class Conditions(eqx.Module):
 
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray)):
-                
+
                 # 1. Intercept the empty placeholders
                 if leaf.size == 0:
                     if leaf.ndim == 1:
@@ -67,7 +67,7 @@ class Conditions(eqx.Module):
                     elif leaf.ndim == 2:
                         base = jnp.zeros((1, leaf.shape[1]), dtype=leaf.dtype)
                         return jnp.broadcast_to(base, (n, leaf.shape[1]))
-                
+
                 # 2. Zero-copy expansion for actual data
                 if leaf.ndim == 1:
                     # e.g., Shape (X,) -> Shape (n, X)
@@ -75,31 +75,31 @@ class Conditions(eqx.Module):
                 elif leaf.ndim == 2 and leaf.shape[0] == 1:
                     # e.g., Shape (1, X) -> Shape (n, X)
                     return jnp.broadcast_to(leaf, (n, leaf.shape[1]))
-                    
+
             return leaf
-        
+
         def _is_static_node(node):
             return hasattr(node, '__class__') and node.__class__.__name__ in CLASSES_TO_SKIP
-        
+
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
-    
+
     def add_subcondition(self, subcondition: "Conditions"):
 
         new_subconditions = self.subconditions + (subcondition,)
         new_self = eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
-    
+
         return new_self
-    
+
     def insert_subcondition(self, subcondition: "Conditions", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index:]
-        
+
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
     def replace_subcondition(self, subcondition: "Conditions", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1:]
-        
+
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
-    
+
     def __repr__(self):
         repr_str = self.tag + " - Subconditions: [" + ', '.join([sc.tag for sc in self.subconditions])+"]"
         return repr_str

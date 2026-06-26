@@ -27,5 +27,5 @@ def update_acceleration(state: "rcf.State",
     D = state.numerics.time.differentiate
 
     state = eqx.tree_at(lambda s: s.frames.inertial.acceleration_vector, state, jnp.dot(D, v))
-                   
+
     return state, system, settings

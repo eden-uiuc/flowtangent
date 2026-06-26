@@ -4,7 +4,7 @@
 # Created: Aug, 2024, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
-# IMPORT 
+# IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
@@ -24,7 +24,7 @@ def update_forces(
         system: "rcf.Systems",
         settings: "rcf.Settings",
         ):
-        
+
         wind    = state.frames.wind.total_force_vector
         thrust  = state.frames.body.thrust_force_vector
         weight  = state.frames.inertial.gravity_force_vector

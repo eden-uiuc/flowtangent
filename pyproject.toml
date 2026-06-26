@@ -12,11 +12,13 @@ target-version = "py310"
 [tool.ruff.lint]
 # Which rule sets to enable
 select = [
-    "E",  # pycodestyle errors (spacing, indentation)
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes (bugs, unused imports, undefined variables)
-    "I",  # isort (automatically sorts your imports alphabetically)
-    "N",  # pep8-naming (checks variable and class names)
+    "E",   # pycodestyle errors (spacing, indentation)
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (bugs, unused imports, undefined variables)
+    "I",   # isort (automatically sorts your imports alphabetically)
+    "N",   # pep8-naming (checks variable and class names)
+    "NPY", # Numpy checks (function deprecation, legacy aliases)
+    "PD",  # Pandas checks
 ]
 
 # Which specific rules to turn off
@@ -36,7 +38,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-# 1. Define the exact top-to-bottom order of your import blocks
+# Import block order
 section-order = [
     "future",
     "standard-library",   # Native Python (os, sys, etc.)
@@ -48,8 +50,12 @@ section-order = [
     "local-folder"        # Relative imports (e.g., from . import utils)
 ]
 
-# 2. Map specific import paths to your custom sections
+# Custom Import Sections
 [tool.ruff.lint.isort.sections]
 "rcaide-utils" = ["RCAIDE.utils"] 
 "rcaide-library" = ["RCAIDE.Library"]
 "rcaide-framework" = ["RCAIDE.Framework"]
+
+# Catch numpy tracer errors
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"numpy".msg = "Use jax.numpy as jnp in all computational modules to prevent XLA tracer crashes"

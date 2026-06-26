@@ -4,13 +4,13 @@
 # Created: May, 2025, RCAIDE Team
 
 # ----------------------------------------------------------------------------------------------------------------------
-# IMPORT 
+# IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
 import equinox as eqx
 
-# RCAIDE imports  
+# RCAIDE imports
 from RCAIDE.utils import init_field
 from RCAIDE.Library import Component
 

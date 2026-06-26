@@ -286,17 +286,17 @@ class StaticDerivatives(Conditions):
 class StaticStability(Conditions):
 
     tag:                str                 = init_field('Static Stability', static=True)
-    
+
     forces:             StaticForces        = init_field(StaticForces)
     moments:            StaticMoments       = init_field(StaticMoments)
-    
+
     coefficients:       StaticCoefficients  = init_field(StaticCoefficients)
     derivatives:        StaticDerivatives   = init_field(StaticDerivatives)
-    
+
     static_margin:      jnp.ndarray         = empty_array(0)
     neutral_point:      jnp.ndarray         = empty_array(0)
     spiral_criteria:    jnp.ndarray         = empty_array(0)
-    
+
     pitch_rate:         jnp.ndarray         = empty_array(0)
     roll_rate:          jnp.ndarray         = empty_array(0)
     yaw_rate:           jnp.ndarray         = empty_array(0)

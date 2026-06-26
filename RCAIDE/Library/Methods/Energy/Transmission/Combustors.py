@@ -49,7 +49,7 @@ def func_combustor_performance(
 
     numerator = h_gas_out - h_t
     denominator = (n_b * h_t_f) - dh_react - h_gas_out
-    
+
     FAR = numerator / denominator
 
     # 6. Final output mixture enthalpy

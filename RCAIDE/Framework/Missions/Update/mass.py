@@ -1,7 +1,7 @@
 # RCAIDE/Framework/Missions/mass.py
 # (c) Copyright 2026 Aerospace Research Community LLC#
 # Created:  Jan 2026, E. Botero
-# Modified: 
+# Modified:
 # -------------------------------------------------------------------------------
 #  Imports
 # -------------------------------------------------------------------------------

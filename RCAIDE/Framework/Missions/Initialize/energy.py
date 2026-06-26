@@ -23,7 +23,7 @@ from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 # ----------------------------------------------------------------------------------------------------------------------
 
 def initialize_energy(state: State, system: System, settings: Settings):
-    
+
     flat_state_nodes = {}
     conditions_map = {
         "FuelTank": FuelTankConditions
@@ -47,10 +47,10 @@ def initialize_energy(state: State, system: System, settings: Settings):
         network_sc_idx = updated_system.subcomponents.index(network)
         updated_network = network.assign_network_IDs()
 
-        for line in updated_network.lines:            
+        for line in updated_network.lines:
             _extract_to_flat_state(line)
-    
+
         updated_system = updated_system.replace_subcomponent(updated_network, network_sc_idx)
         updated_state = eqx.tree_at(lambda s: s.energy.nodes, updated_state, flat_state_nodes)
-    
+
     return updated_state, updated_system, settings

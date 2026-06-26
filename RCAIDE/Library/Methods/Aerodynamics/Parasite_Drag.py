@@ -45,20 +45,20 @@ def func_wing_parasite_drag(
     M_low=0.91,
     M_high=0.99
 ):
-    """Computes the parasite drag due to wings"""  
-   
+    """Computes the parasite drag due to wings"""
+
     # Reynolds number
     Re_w = Re * w_mac
-    
+
     cf_w_u, k_comp_u, k_reyn_u = flat_plate_friction(Re_w, M, T, x_tu)
     cf_w_l, k_comp_l, k_reyn_l = flat_plate_friction(Re_w, M, T, x_tl)
-    
+
     # Sweep correciton
     cos_sweep = jnp.cos(w_sweep)
     cos2      = cos_sweep * cos_sweep
     M2        = M * M
     beta2     = jnp.maximum(1.0 - M2 * cos2, 1e-8)
-    
+
     k_w_subsonic = (
         1.0
         + (2.0 * form_factor * (w_tc * cos2)) / jnp.sqrt(beta2)
@@ -261,7 +261,7 @@ def compute_parasite_drag(state: "State", system: "Aircraft", settings: "Setting
     # Pack the final list into a JAX array
     packed_wings = jnp.column_stack(wing_drags)
     total_wing_parasite_drag = jnp.sum(packed_wings, axis=1)[:, None] if wing_drags else jnp.zeros_like(M)
-    
+
     updated_state = eqx.tree_at(
         lambda s: s.aerodynamics.coefficients.drag.parasite.wings,
         updated_state,
