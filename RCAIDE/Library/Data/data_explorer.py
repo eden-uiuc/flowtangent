@@ -16,7 +16,7 @@ from RCAIDE.Framework import Aircraft, Settings, State
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
 from RCAIDE.Framework.Plotting import plot_vlm_panels
-from RCAIDE.Framework.Settings import AnalysisSettings
+from RCAIDE.Framework.settings import AnalysisSettings
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Filter Functions

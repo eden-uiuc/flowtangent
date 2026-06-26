@@ -14,14 +14,14 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mass
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MassConditions(Conditions):
+class MassConditions(StateCondition):
     """
     Represents the mass conditions for a vehicle or system.
 
@@ -60,4 +60,4 @@ class MassConditions(Conditions):
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
     moments_of_inertia: jnp.ndarray = empty_array((0, 3, 3))
 
-    breakdown: Conditions = init_field(lambda: Conditions(tag="Mass Breakdown"))
+    breakdown: StateCondition = init_field(lambda: StateCondition(tag="Mass Breakdown"))

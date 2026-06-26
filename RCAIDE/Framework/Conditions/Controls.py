@@ -14,11 +14,11 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.utils import empty_array, init_field
+from RCAIDE.utils import empty_array, init_field, DataPath
 
 from RCAIDE.Library import Component
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 from RCAIDE.Framework.Conditions.Stability import StabilityConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -26,7 +26,7 @@ from RCAIDE.Framework.Conditions.Stability import StabilityConditions
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def get_active(cond: Conditions):
+def get_active(cond: StateCondition):
     """
     Returns the active controls/residuals
     """
@@ -42,7 +42,7 @@ def count_active(Conditions):
     return len(get_active(Conditions))
 
 
-class DynamicResidual(Conditions):
+class DynamicResidual(StateCondition):
     tag: str = init_field("Dynamic Residual", static=True)
     type: str | None = init_field(None, static=True)
     active: bool = init_field(False, static=True)
@@ -61,8 +61,7 @@ NamedResidual = Literal[
     "moment_z",
 ]
 
-
-class DynamicsConditions(Conditions):
+class DynamicsConditions(StateCondition):
     """
     Represents the dynamics variables for a simulation.
 
@@ -103,7 +102,7 @@ class DynamicsConditions(Conditions):
         return count_active(self)
 
 
-class ControlVariable(Conditions):
+class ControlVariable(StateCondition):
     """
     Represents a control variable in a simulation or control system.
 
@@ -140,8 +139,7 @@ class DirectControlVariable(ControlVariable):
     # Attribute     Type            Default Value
     tag: str = init_field("Direct Control Variable", static=True)
 
-    path: tuple[str, ...] = init_field(tuple, static=True)
-    path_indices: tuple | None = init_field(lambda: (slice(None), 0), static=True)
+    path: DataPath = init_field(DataPath, static=True)
 
 
 class SurfaceControlVariable(ControlVariable):
@@ -219,7 +217,7 @@ def _default_altitude():
     )
 
 
-class ControlsConditions(Conditions):
+class ControlsConditions(StateCondition):
     tag: str = init_field("Controls", static=True)
 
     bank_angle: DirectControlVariable = init_field(_default_bank_angle)

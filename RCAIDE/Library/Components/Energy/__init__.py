@@ -7,4 +7,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Lines, Networks, Nodes, Propulsors
+from . import TurboMaps, Lines, Networks, Nodes, Propulsors

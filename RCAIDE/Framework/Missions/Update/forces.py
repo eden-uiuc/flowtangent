@@ -20,9 +20,9 @@ import RCAIDE.Framework as rcf
 
 
 def update_forces(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     wind = state.frames.wind.total_force_vector

@@ -22,17 +22,17 @@ from RCAIDE.utils import init_field, inputs, outputs
 
 from RCAIDE.Library.Components.Energy.Networks import EnergyLine
 from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
-from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, TurbojetEngine
+from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
 def _TurbojetLineSetup():
-    E1 = TurbofanEngine(tag="Engine 1")
+    E1 = TurbojetEngine(tag="Engine 1")
     S1 = OfftakeShaft(tag="Shaft 1")
 
-    E2 = TurbofanEngine(tag="Engine 2")
+    E2 = TurbojetEngine(tag="Engine 2")
     S2 = OfftakeShaft(tag="Shaft 2")
 
     tank = FuelTank()

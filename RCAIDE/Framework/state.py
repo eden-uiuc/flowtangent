@@ -18,7 +18,7 @@ from RCAIDE.utils import empty_array, init_field
 
 from RCAIDE.Framework.Conditions import (
     AerodynamicsConditions,
-    Conditions,
+    StateCondition,
     ControlsConditions,
     DynamicsConditions,
     EnergyNetworkConditions,
@@ -34,14 +34,14 @@ from RCAIDE.Framework.Conditions import (
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SolverConditions(Conditions):
+class SolverConditions(StateCondition):
     tag: str = init_field("Solver Conditions", static=True)
 
     unknowns: jnp.ndarray = empty_array(0)
     residuals: jnp.ndarray = empty_array(0)
 
 
-class State(Conditions):
+class State(StateCondition):
     # Attribute         Type                        Default Value
     tag: str = init_field("State", static=True)
 

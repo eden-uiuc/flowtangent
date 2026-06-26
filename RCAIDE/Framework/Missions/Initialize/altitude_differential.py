@@ -18,7 +18,7 @@ import RCAIDE.Framework as rcf
 # -------------------------------------------------------------------------------
 
 
-def initialize_altitude_differential(state: "rcf.State", settings: "rcf.Settings", system: "rcf.Systems"):
+def initialize_altitude_differential(state: "rcf.state", settings: "rcf.settings", system: "rcf.systems"):
     """
     Framework version of initialize_altitude_differential
 

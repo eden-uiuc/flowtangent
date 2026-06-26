@@ -1,12 +1,13 @@
 import json
+from os import path
+from pathlib import Path
 
 import equinox as eqx
 import jax.numpy as jnp
 from jax.scipy.ndimage import map_coordinates
 
 from RCAIDE.utils import empty_array, init_field
-
-from RCAIDE.Library.Units import lbm, mins, rev, s
+from RCAIDE.Library import Units
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions
@@ -22,34 +23,7 @@ def get_fractional_coords(grid_1d, value):
     idx = jnp.interp(value, grid_1d, jnp.arange(len(grid_1d)))
     return idx
 
-def load_compressor_map(filepath: str) -> CompressorMap:
-    """Loads a JSON compressor map and initializes the Equinox module."""
-    
-    # Read raw JSON data
-    with open(filepath, "r") as f:
-        data = json.load(f)
-    
-    # Extract 1D grids
-    alpha_grid = jnp.array(data["alpha"])
-    Nc_grid    = jnp.array(data["Nc"])
-    Rline_grid = jnp.array(data["Rline"])
-    
-    # Define expected 3D shape
-    shape = (len(alpha_grid), len(Nc_grid), len(Rline_grid))
-    
-    # Extract and reshape 3D tables
-    Wc_table  = jnp.array(data["Wc"]).reshape(shape)
-    PR_table  = jnp.array(data["PR"]).reshape(shape)
-    eff_table = jnp.array(data["eff"]).reshape(shape)
-    
-    return CompressorMap3D(
-        alpha_grid=alpha_grid,
-        Nc_grid=Nc_grid,
-        Rline_grid=Rline_grid,
-        Wc_table=Wc_table,
-        PR_table=PR_table,
-        eff_table=eff_table
-    )
+
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Classes
@@ -60,7 +34,7 @@ class CompressorMap(eqx.Module):
     tag: str = init_field("Compressor Map", static=True)
 
     # 1D Grid Axes
-    alpha_grid: jnp.ndarray = init_field(jnp.ndarray([0.0, 90.0]))  # FADEC Inlet Guide Vane Angle
+    alpha_grid: jnp.ndarray = empty_array()  # FADEC Inlet Guide Vane Angle
     Nc_grid: jnp.ndarray = empty_array()  # Corrected Speed
     Rline_grid: jnp.ndarray = empty_array()  # Orthogonal Coordinate
 
@@ -70,10 +44,17 @@ class CompressorMap(eqx.Module):
     eff_table: jnp.ndarray = empty_array()  # Polytropic Efficiency
 
     # Map scaling values
+    Rline_stall: float = 1.0
+    
     s_WC: float = 1.0
     s_PR: float = 1.0
     s_eff: float = 1.0
     s_Nc: float = 1.0
+
+    Nc_des: float = 1.0
+    alpha_des: float = 0.0
+    Rline_des: float = 2.0
+    Rline_stall: float = 1.0
 
     def evaluate(
         self,
@@ -102,199 +83,202 @@ class CompressorMap(eqx.Module):
         eff = eff_map * self.s_eff
 
         return PR, Wc, eff
+    
+    @classmethod
+    def from_json(cls, filepath: str | Path):
+        """Loads a JSON compressor map and initializes the Equinox module."""
+        
+        # Read raw JSON data
+        with open(filepath, "r") as f:
+            data = json.load(f)
+        
+        # Extract 1D grids
+        alpha_grid = jnp.array(data["alpha"])
+        Nc_grid    = jnp.array(data["Nc"])
+        Rline_grid = jnp.array(data["Rline"])
+        
+        # Define expected 3D shape
+        shape = (len(alpha_grid), len(Nc_grid), len(Rline_grid))
+        
+        # Extract and reshape 3D tables
+        Wc_table  = jnp.array(data["Wc"]).reshape(shape)
+        PR_table  = jnp.array(data["PR"]).reshape(shape)
+        eff_table = jnp.array(data["eff"]).reshape(shape)
+        
+        
+        return cls(
+            alpha_grid=alpha_grid,
+            Nc_grid=Nc_grid,
+            Rline_grid=Rline_grid,
+            Wc_table=Wc_table,
+            PR_table=PR_table,
+            eff_table=eff_table,
+            Nc_des = data["Nc_des"],
+            alpha_des = data['alpha_des'],
+            Rline_des=data["Rline_des"],
+            Rline_stall=data["Rline_stall"],
+        )
 
 
 class TurbineMap(eqx.Module):
+    
+    tag: str = init_field("Turbine Map", static=True)
+    
     # 1D Grid Axes
-    Nc_grid: jnp.ndarray
-    PR_grid: jnp.ndarray
+    alpha_grid: jnp.ndarray = empty_array() # Turbine Nozzle Ratio
+    Np_grid: jnp.ndarray = empty_array()
+    PR_grid: jnp.ndarray = empty_array()
 
     # 2D Data Tables (Shape: [len(Nc_grid), len(PR_grid)])
-    Wc_table: jnp.ndarray
-    eff_table: jnp.ndarray
+    Wp_table: jnp.ndarray = empty_array()
+    eff_table: jnp.ndarray = empty_array()
 
     # Map scaling Values
-    s_Wc: float = 1.0
+    s_Wp: float = 1.0
     s_PR: float = 1.0
     s_eff: float = 1.0
-    s_Nc: float = 1.0
+    s_Np: float = 1.0
 
-    def evaluate(self, Nc, PR):
+    alpha_des: float = 0.0
+    Np_des: float = 1.0
+
+    def evaluate(self, alpha, Np, PR):
         # Un-scale the inputs to read the base map
-        Nc_map = Nc / self.s_Nc
+        Np_map = Np / self.s_Np
         PR_map = (PR - 1.0) / self.s_PR + 1.0
 
         # Get fractional grid coordinates
-        idx_Nc = get_fractional_coords(self.Nc_grid, Nc_map)
+        idx_alpha = get_fractional_coords(self.alpha_grid, alpha)
+        idx_Nc = get_fractional_coords(self.Np_grid, Np_map)
         idx_PR = get_fractional_coords(self.PR_grid, PR_map)
-        coords = jnp.stack([idx_Nc, idx_PR])
+        coords = jnp.stack([idx_alpha, idx_Nc, idx_PR])
 
         # Interpolate values
-        Wc_map = map_coordinates(self.Wc_table, coords, order=1)
+        Wp_map = map_coordinates(self.Wp_table, coords, order=1)
         eff_map = map_coordinates(self.eff_table, coords, order=1)
 
         # Apply output scalars
-        Wc = Wc_map * self.s_Wc
+        Wp = Wp_map * self.s_Wp
         eff = eff_map * self.s_eff
 
-        return Wc, eff
+        return Wp, eff
+    
+    @classmethod
+    def from_json(cls, filepath: str|Path):
+        """Loads a JSON compressor map and initializes the Equinox module."""
+        
+        # Read raw JSON data
+        with open(filepath, "r") as f:
+            data = json.load(f)
+        
+        # Extract 1D grids
+        alpha_grid = jnp.array(data["alpha"])
+        Np_grid    = jnp.array(data["Np"])
+        PR_grid = jnp.array(data["PR"])
+        
+        # Define expected 3D shape
+        shape = (len(alpha_grid), len(Np_grid), len(PR_grid))
+        
+        # Extract and reshape 3D tables
+        Wp_table  = jnp.array(data["Wp"]).reshape(shape)
+        eff_table  = jnp.array(data["eff"]).reshape(shape)
+        
+        return cls(
+            alpha_grid=alpha_grid,
+            Np_grid=Np_grid,
+            PR_grid=PR_grid,
+            Wp_table=Wp_table,
+            eff_table=eff_table
+        )
 
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-# Axial Compressors------------------------------------------------------------
-
-
-def AXI3_2():
-    return CompressorMap(
-        tag="AXI-3_2",
-        Nc_grid=jnp.array([0.400, 0.500, 0.600, 0.700, 0.800, 0.900, 0.950, 1.000, 1.050, 1.100]) * rev / mins,
-        Rline_grid=jnp.array([1.000, 1.200, 1.400, 1.600, 1.800, 2.000, 2.200, 2.400, 2.600]),
-        Wc_table=jnp.array(
-            [
-                [
-                    [4.8430, 5.1909, 5.5289, 5.8564, 6.1729, 6.4780, 6.7714, 7.0525, 7.3212],
-                    [6.8115, 7.1360, 7.4477, 7.7462, 8.03130, 8.3026, 8.5600, 8.8033, 9.0323],
-                    [8.9765, 9.2855, 9.5780, 9.8535, 10.1121, 10.3536, 10.5781, 10.7855, 10.9760],
-                    [11.0367, 11.4245, 11.7795, 12.1017, 12.3913, 12.6485, 12.8738, 13.0679, 13.2314],
-                    [14.5914, 15.1491, 15.6401, 16.0650, 16.4249, 16.7213, 16.9563, 17.1322, 17.2515],
-                    [20.0347, 21.0987, 21.9935, 22.7217, 23.2879, 23.6987, 23.9625, 24.0887, 24.1034],
-                    [23.2785, 24.4288, 25.3829, 26.1447, 26.7207, 27.1196, 27.3519, 27.4292, 27.4293],
-                    [28.6553, 29.0317, 29.3528, 29.6202, 29.8354, 30.0000, 30.1159, 30.1849, 30.2090],
-                    [30.5418, 30.7022, 30.8417, 30.9606, 31.0595, 31.1387, 31.1988, 31.2402, 31.2635],
-                    [31.4065, 31.4886, 31.5601, 31.6213, 31.6723, 31.7133, 31.7445, 31.7661, 31.7782],
-                ],
-                [
-                    [8.3219, 8.8244, 9.2916, 9.7228, 10.1172, 10.4747, 10.7951, 11.0786, 11.3257],
-                    [12.7911, 13.2400, 13.6433, 14.0011, 14.3141, 14.5828, 14.8084, 14.9921, 15.1352],
-                    [15.5913, 15.9958, 16.3567, 16.6745, 16.9499, 17.1837, 17.3772, 17.5315, 17.6479],
-                    [17.6696, 18.2008, 18.6663, 19.0672, 19.4047, 19.6806, 19.8968, 20.0558, 20.1599],
-                    [20.4281, 21.1455, 21.7595, 22.2721, 22.6860, 23.0045, 23.2319, 23.3726, 23.4316],
-                    [23.2298, 24.3738, 25.3232, 26.0816, 26.6557, 27.0539, 27.2866, 27.3654, 27.3655],
-                    [24.7860, 25.9617, 26.9293, 27.6936, 28.2621, 28.6444, 28.8521, 28.9012, 28.9012],
-                    [28.6553, 29.0317, 29.3528, 29.6202, 29.8354, 30.0000, 30.1159, 30.1849, 30.2090],
-                    [30.5418, 30.7022, 30.8417, 30.9606, 31.0595, 31.1387, 31.1988, 31.2402, 31.2635],
-                    [31.4065, 31.4886, 31.5601, 31.6213, 31.6723, 31.7133, 31.7445, 31.7661, 31.7782],
-                ],
-            ]
-        )
-        * lbm
-        / s,
-        eff_table=jnp.array(
-            [
-                [
-                    [0.6673, 0.6982, 0.7210, 0.7340, 0.7349, 0.7208, 0.6849, 0.6177, 0.5090],
-                    [0.7098, 0.7315, 0.7471, 0.7553, 0.7550, 0.7445, 0.7199, 0.6759, 0.6082],
-                    [0.7399, 0.7577, 0.7704, 0.7771, 0.7770, 0.7690, 0.7502, 0.7172, 0.6673],
-                    [0.7425, 0.7677, 0.7867, 0.7985, 0.8019, 0.7954, 0.7752, 0.7366, 0.6757],
-                    [0.7489, 0.7833, 0.8103, 0.8287, 0.8372, 0.8338, 0.8141, 0.7722, 0.7033],
-                    [0.7138, 0.7681, 0.8120, 0.8440, 0.8617, 0.8624, 0.8390, 0.7825, 0.6847],
-                    [0.7111, 0.7667, 0.8116, 0.8443, 0.8626, 0.8638, 0.8408, 0.7849, 0.6883],
-                    [0.8151, 0.8306, 0.8424, 0.8500, 0.8530, 0.8510, 0.8427, 0.8264, 0.8013],
-                    [0.8267, 0.8319, 0.8353, 0.8370, 0.8368, 0.8346, 0.8299, 0.8222, 0.8113],
-                    [0.8180, 0.8199, 0.8209, 0.8208, 0.8197, 0.8176, 0.8141, 0.8091, 0.8024],
-                ],
-                [
-                    [0.6837, 0.7226, 0.7527, 0.7724, 0.7792, 0.7704, 0.7386, 0.6742, 0.5669],
-                    [0.7499, 0.7786, 0.8006, 0.8151, 0.8206, 0.8157, 0.7963, 0.7574, 0.6949],
-                    [0.7858, 0.8079, 0.8249, 0.8358, 0.8401, 0.8366, 0.8228, 0.7956, 0.7528],
-                    [0.7808, 0.8089, 0.8308, 0.8457, 0.8525, 0.8502, 0.8355, 0.8044, 0.7541],
-                    [0.7666, 0.8027, 0.8312, 0.8513, 0.8616, 0.8606, 0.8441, 0.8070, 0.7456],
-                    [0.7119, 0.7672, 0.8119, 0.8445, 0.8626, 0.8638, 0.8409, 0.7852, 0.6891],
-                    [0.7053, 0.7608, 0.8056, 0.8381, 0.8561, 0.8570, 0.8339, 0.7781, 0.6822],
-                    [0.8151, 0.8306, 0.8424, 0.8500, 0.8530, 0.8510, 0.8427, 0.8264, 0.8013],
-                    [0.8267, 0.8319, 0.8353, 0.8370, 0.8368, 0.8346, 0.8299, 0.8222, 0.8113],
-                    [0.8180, 0.8199, 0.8209, 0.8208, 0.8197, 0.8176, 0.8141, 0.8091, 0.8024],
-                ],
-            ]
-        ),
-        PR_table=jnp.array(
-            [
-                [
-                    [1.2763, 1.2720, 1.2629, 1.2490, 1.2306, 1.2076, 1.1796, 1.1460, 1.1072],
-                    [1.4620, 1.4520, 1.4364, 1.4152, 1.3888, 1.3573, 1.3201, 1.2766, 1.2274],
-                    [1.7279, 1.7111, 1.6871, 1.6561, 1.6185, 1.5747, 1.5237, 1.4651, 1.3995],
-                    [2.1250, 2.1062, 2.0723, 2.0239, 1.9616, 1.8865, 1.7973, 1.6934, 1.5771],
-                    [2.8737, 2.8679, 2.8280, 2.7549, 2.6505, 2.5175, 2.3541, 2.1604, 1.9432],
-                    [4.1211, 4.2350, 4.2502, 4.1658, 3.9861, 3.7202, 3.3667, 2.9333, 2.4492],
-                    [4.8577, 5.0260, 5.0648, 4.9720, 4.7525, 4.4188, 3.9702, 3.4187, 2.8058],
-                    [5.9603, 5.8925, 5.7804, 5.6258, 5.4313, 5.2000, 4.9289, 4.6166, 4.2701],
-                    [6.2935, 6.1874, 6.0632, 5.9218, 5.7642, 5.5914, 5.4014, 5.1930, 4.9678],
-                    [6.4390, 6.3324, 6.2162, 6.0908, 5.9568, 5.8145, 5.6627, 5.5004, 5.3284],
-                ],
-                [
-                    [1.7567, 1.7543, 1.7358, 1.7016, 1.6524, 1.5890, 1.5103, 1.4157, 1.3078],
-                    [2.4783, 2.4610, 2.4214, 2.3602, 2.2787, 2.1784, 2.0579, 1.9167, 1.7585],
-                    [2.9457, 2.9160, 2.8640, 2.7907, 2.6972, 2.5851, 2.4528, 2.2995, 2.1288],
-                    [3.4221, 3.4045, 3.3514, 3.2639, 3.1441, 2.9945, 2.8132, 2.5998, 2.3609],
-                    [4.0790, 4.0961, 4.0527, 3.9500, 3.7915, 3.5820, 3.3193, 3.0047, 2.6517],
-                    [4.8443, 5.0097, 5.0468, 4.9535, 4.7350, 4.4035, 3.9581, 3.4109, 2.8024],
-                    [5.2659, 5.4656, 5.5180, 5.4201, 5.1776, 4.8046, 4.3011, 3.6821, 2.9960],
-                    [5.9603, 5.8925, 5.7804, 5.6258, 5.4313, 5.2000, 4.9289, 4.6166, 4.2701],
-                    [6.2935, 6.1874, 6.0632, 5.9218, 5.7642, 5.5914, 5.4014, 5.1930, 4.9678],
-                    [6.4390, 6.3324, 6.2162, 6.0908, 5.9568, 5.8145, 5.6627, 5.5004, 5.3284],
-                ],
-            ]
-        ),
-    )
+MapData = Path(path.join(path.dirname(__file__), "Map_Data"))
 
 import os
+import json
 import pycycle.api as pyc
 
-def harvest_pycycle_maps(output_dir="RCAIDE/Library/Maps/Components/Energy/TurboMaps/"):
-    """Extracts legacy NEPP maps from PyCycle and saves them as JSON."""
+def harvest_pycycle_maps(output_dir=MapData):
+    """Extracts legacy NEPP maps and their design anchors from PyCycle."""
     
-    # Ensure the target directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    # Define the PyCycle maps you want to extract
+    # Now a dictionary mapping the name to a tuple: (PyCycle Map Object, Map Type)
     maps_to_harvest = {
-        "AXI3_2": pyc.AXI3_2,
-        "AXI5": pyc.AXI5,
-        "Fan": pyc.FanMap,
-        "HPC": pyc.HPCMap,
-        "HPT": pyc.HPTMap,
-        "HPT1269": pyc.HPT1269,
-        "LPC": pyc.LPCMap,
-        "LPT": pyc.LPTMap,
-        "LPT2269": pyc.LPT2269,
-        "NCPO1": pyc.NCP01
+        "AXI3_2": (pyc.AXI3_2, "compressor"),
+        "AXI5": (pyc.AXI5, "compressor"),
+        "Fan": (pyc.FanMap, "compressor"),
+        "HPC": (pyc.HPCMap, "compressor"),
+        "LPC": (pyc.LPCMap, "compressor"),
+        "NCPO1": (pyc.NCP01, "compressor"),
+        "HPT": (pyc.HPTMap, "turbine"),
+        "HPT1269": (pyc.HPT1269, "turbine"),
+        "LPT": (pyc.LPTMap, "turbine"),
+        "LPT2269": (pyc.LPT2269, "turbine"),
     }
 
-    # The exact attributes we want to look for in PyCycle's map objects
-    # and what we want to rename them to in our JSON files
-    attribute_mapping = {
+    # The 1D/2D/3D array data
+    array_mapping = {
         "alphaMap": "alpha",
+        "NpMap": "Np",
         "NcMap": "Nc",
-        "RlineMap": "Rline",  # Compressors only
+        "RlineMap": "Rline",
         "PRmap": "PR",        
         "WcMap": "Wc",
-        "effMap": "eff"
+        "effMap": "eff",
+        "RlineStall": "Rline_stall"
     }
 
-    for map_name, map_obj in maps_to_harvest.items():
-        json_data = {}
+    # The scalar design/anchor points PyCycle uses to center the map
+    scalar_mapping = {
+        "alphaMap": "alpha_des",
+        "NcMap": "Nc_des",
+        "NpMap": "Np_des",
+        "PR": "PR_des",
+        "RlineMap": "Rline_des"
+    }
+
+    for map_name, (map_obj, map_type) in maps_to_harvest.items():
+        # Initialize JSON dict with the explicit component type
+        json_data = {"type": map_type}
         
-        for pyc_attr, json_key in attribute_mapping.items():
+        # 1. Harvest Arrays
+        for pyc_attr, json_key in array_mapping.items():
             if hasattr(map_obj, pyc_attr):
                 val = getattr(map_obj, pyc_attr)
-                
-                # PyCycle often stores these as nested lists or numpy arrays.
-                # We force them to native Python lists so json.dump doesn't crash.
+                val_units = map_obj.units.get(pyc_attr, None)
+                if val_units is not None:
+                    if val_units == 'rpm':
+                        val = val * Units.rev / Units.mins
+                    else:
+                        val = val * Units.parse(val_units)
                 if hasattr(val, "tolist"):
                     json_data[json_key] = val.tolist()
                 else:
                     json_data[json_key] = val
                     
-        # Write the sanitized dictionary to disk
+        # 2. Harvest Scalar Design Parameters
+        for pyc_attr, json_key in scalar_mapping.items():
+            val = map_obj.defaults.get(pyc_attr, None)
+            val_units = map_obj.units.get(pyc_attr, None)
+            if val_units is not None:
+                if val_units == 'rpm':
+                    val = val * Units.rev / Units.mins
+                else:
+                    val = val * Units.parse(val_units)
+            if val is not None:
+                json_data[json_key] = val
+                
+        # Write to disk
         file_path = os.path.join(output_dir, f"{map_name}.json")
         with open(file_path, "w") as f:
-            # indent=4 makes the JSON file nicely formatted and readable!
             json.dump(json_data, f, indent=4)
             
-        print(f"Successfully harvested {map_name} to {file_path}")
+        print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
 
 if __name__ == "__main__":
     harvest_pycycle_maps()

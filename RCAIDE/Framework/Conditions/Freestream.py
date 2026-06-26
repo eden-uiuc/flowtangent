@@ -16,14 +16,14 @@ from RCAIDE.utils import empty_array, init_field
 from RCAIDE.Library.Atmospheres import Atmosphere, USStandard1976
 from RCAIDE.Library.Planets import Earth, Planet
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FreestreamConditions(Conditions):
+class FreestreamConditions(StateCondition):
     """
     Represents the freestream conditions in a flight environment.
 

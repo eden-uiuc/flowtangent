@@ -19,9 +19,9 @@ import RCAIDE.Framework as rcf
 
 
 def update_mass_and_weight(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
     """
     Updates the current mass of the system

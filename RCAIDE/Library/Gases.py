@@ -21,7 +21,7 @@ from RCAIDE.utils import empty_array, init_field
 
 class IdealGas(eqx.Module):
     tag: str = init_field("Gas", static=True)
-    molecular_mass: float = init_field(0.0, static=True)
+    molecular_mass: float = init_field(1.0, static=True)
     R: float = init_field(8.314462, static=True)  # ideal gas constant (J/(mol·K))
 
     @property
@@ -36,7 +36,7 @@ class IdealGas(eqx.Module):
     thermal_coefficients: tuple = init_field(tuple)
 
     def __post_init__(self):
-        self.molar_mass = self.R / self.R_specific
+        self.molecular_mass = self.R / self.R_specific
 
     def compute_density(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.0):
         return P / (self.R_specific * T)
@@ -214,8 +214,7 @@ def Argon() -> IdealGas:
 #  Mixed Gases
 # ----------------------------------------------------------------------------------------------------------------------
 
-element_mapping: dict = init_field(
-    lambda: {
+element_mapping: dict = {
         "o2": O2,
         "oxygen": O2,
         "n2": N2,
@@ -226,9 +225,7 @@ element_mapping: dict = init_field(
         "carbon dioxide": CO2,
         "ar": Argon,
         "argon": Argon,
-    },
-    static=True,
-)
+    }
 
 
 class GasComposition(eqx.Module):
@@ -242,14 +239,14 @@ class GasComposition(eqx.Module):
 
         for elem in self.elements:
             if isinstance(elem, str) and elem.lower() in element_mapping:
-                new_elements += (element_mapping[elem](),)
+                new_elements += (element_mapping[elem.lower()](),)
             elif isinstance(elem, IdealGas):
                 new_elements += (elem,)
             else:
                 raise ValueError(f"Unrecognized element {elem} supplied in gas composition. Discarding...")
         object.__setattr__(self, "elements", new_elements)
 
-        if not self.mole_fractions:
+        if not self.mole_fractions.any():
             mm_mix = (
                 1
                 / jnp.sum(

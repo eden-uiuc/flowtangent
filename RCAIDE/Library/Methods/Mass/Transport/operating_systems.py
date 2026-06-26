@@ -62,9 +62,9 @@ def func_operating_systems(
 
 
 def operating_systems(
-    state: "rcf.State",
+    state: "rcf.state",
     system: "rcf.Aircraft",
-    settings: "rcf.Settings",
+    settings: "rcf.settings",
 ):
 
     fixed_masses = []

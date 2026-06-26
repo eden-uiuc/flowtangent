@@ -27,7 +27,6 @@ def func_fan_compressor_performance(
     PR,
     n_p,
 ):
-    # 1. Total state thermodynamics ONLY
     gamma_in = gas.compute_gamma(T_t)
     T_t_out = T_t * (PR ** ((gamma_in - 1.0) / (gamma_in * n_p)))
 
@@ -36,14 +35,13 @@ def func_fan_compressor_performance(
     work = h_t_out - h_t
     P_t_out = P_t * PR
 
-    # Look at how clean that is!
     return work, P_t_out, T_t_out, h_t_out
 
 
 def fan_performance(
-    state: "rcf.State",
+    state: "rcf.state",
     system: "rcf.Aircraft",
-    settings: "rcf.Settings",
+    settings: "rcf.settings",
 ) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
     # Get inputs
@@ -83,9 +81,9 @@ def fan_performance(
 
 
 def compressor_performance(
-    state: "rcf.State",
+    state: "rcf.state",
     system: "rcf.Aircraft",
-    settings: "rcf.Settings",
+    settings: "rcf.settings",
 ) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
     # Get inputs

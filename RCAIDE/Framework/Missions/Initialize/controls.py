@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from RCAIDE.Library import Component
 
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import System
+    from RCAIDE.Framework.settings import Settings
+    from RCAIDE.Framework.state import State
+    from RCAIDE.Framework.systems import System
 
 import equinox as eqx
 

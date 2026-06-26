@@ -18,7 +18,7 @@ from RCAIDE.Library.Components import ComponentAreas
 from RCAIDE.Library.Components.Airfoils import Airfoil
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 
-from RCAIDE.Framework.Systems import Aircraft
+from RCAIDE.Framework.systems import Aircraft
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AVL Interface Functions

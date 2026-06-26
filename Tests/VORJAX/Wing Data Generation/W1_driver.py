@@ -19,7 +19,7 @@ from RCAIDE.Library import Units
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Aircraft, Settings, GradientMap
-from RCAIDE.Framework.Settings import AnalysisSettings
+from RCAIDE.Framework.settings import AnalysisSettings
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 

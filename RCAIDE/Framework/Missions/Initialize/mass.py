@@ -17,9 +17,9 @@ import RCAIDE.Framework as rcf
 
 
 def initialize_mass(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     m_initial = state.initials.mass.total[-1, 0]

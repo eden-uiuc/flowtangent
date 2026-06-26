@@ -14,14 +14,14 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Stability
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class StaticCoefficients(Conditions):
+class StaticCoefficients(StateCondition):
     """
     Static stability coefficients for an aircraft.
 
@@ -74,7 +74,7 @@ class StaticCoefficients(Conditions):
     e: jnp.ndarray = empty_array(0)
 
 
-class StaticForces(Conditions):
+class StaticForces(StateCondition):
     """
     Static forces acting on an aircraft.
 
@@ -113,7 +113,7 @@ class StaticForces(Conditions):
     Z: jnp.ndarray = empty_array(0)
 
 
-class StaticMoments(Conditions):
+class StaticMoments(StateCondition):
     """
     Represents the static moments acting on an aircraft.
 
@@ -145,7 +145,7 @@ class StaticMoments(Conditions):
     N: jnp.ndarray = empty_array(0)
 
 
-class CoefficientDerivatives(Conditions):
+class CoefficientDerivatives(StateCondition):
     """
     Represents the coefficient derivatives for static stability analysis of an aircraft.
 
@@ -221,7 +221,7 @@ class CoefficientDerivatives(Conditions):
     r: jnp.ndarray = empty_array(0)
 
 
-class StaticDerivatives(Conditions):
+class StaticDerivatives(StateCondition):
     """
     Represents the static stability coefficient derivatives for an aircraft.
 
@@ -286,7 +286,7 @@ class StaticDerivatives(Conditions):
     )
 
 
-class StaticStability(Conditions):
+class StaticStability(StateCondition):
     tag: str = init_field("Static Stability", static=True)
 
     forces: StaticForces = init_field(StaticForces)
@@ -304,15 +304,15 @@ class StaticStability(Conditions):
     yaw_rate: jnp.ndarray = empty_array(0)
 
 
-class DynamicStability(Conditions):
+class DynamicStability(StateCondition):
     # Attribute      Type        Default Value
     tag: str = init_field("Dynamic Stability", static=True)
 
-    LongModes: Conditions = init_field(lambda: Conditions(tag="Longitudinal Modes"))
-    LatModes: Conditions = init_field(lambda: Conditions(tag="Lateral Modes"))
+    LongModes: StateCondition = init_field(lambda: StateCondition(tag="Longitudinal Modes"))
+    LatModes: StateCondition = init_field(lambda: StateCondition(tag="Lateral Modes"))
 
 
-class StabilityConditions(Conditions):
+class StabilityConditions(StateCondition):
     # Attribute     Type                Default Value
     tag: str = init_field("Stability", static=True)
 

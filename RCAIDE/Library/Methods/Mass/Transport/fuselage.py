@@ -117,7 +117,7 @@ def func_fuselage(
 # -------------------------------------------------------------------------------
 
 
-def fuselage(state: "rcf.State", system: "rcf.Systems", settings: "rcf.Settings"):
+def fuselage(state: "rcf.state", system: "rcf.systems", settings: "rcf.settings"):
     """
     Framework version of fuselage
 

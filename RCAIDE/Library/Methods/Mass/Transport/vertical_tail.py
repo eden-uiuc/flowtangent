@@ -83,9 +83,9 @@ def func_vertical_tail(
 
 
 def vertical_tail(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     v_tail = system.wings.vertical_tail

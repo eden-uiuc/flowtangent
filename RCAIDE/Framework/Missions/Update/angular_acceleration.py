@@ -20,9 +20,9 @@ import RCAIDE.Framework as rcf
 
 
 def update_angular_acceleration(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     w = state.frames.inertial.angular_velocity_vector

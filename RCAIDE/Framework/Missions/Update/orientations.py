@@ -42,9 +42,9 @@ vmap_euler_to_dcm = vmap(euler_zyx_to_dcm)
 
 
 def update_orientations(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     v_inertial = state.frames.inertial.velocity_vector

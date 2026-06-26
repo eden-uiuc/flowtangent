@@ -12,9 +12,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework.Settings import Settings
+    from RCAIDE.Framework.settings import Settings
     from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import System
+    from RCAIDE.Framework.systems import System
 
 import logging
 import os

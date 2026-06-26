@@ -15,7 +15,7 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Numerics
@@ -69,7 +69,7 @@ def chebyshev_matrices(
     return jnp.atleast_2d(x).T, D, I
 
 
-class NumericalTime(Conditions):
+class NumericalTime(StateCondition):
     # Attribute     Type                Default Value
     control_points: jnp.ndarray = empty_array(0)
     differentiate: jnp.ndarray = empty_array(0)
@@ -79,7 +79,7 @@ class NumericalTime(Conditions):
         return ""
 
 
-class Numerics(Conditions):
+class Numerics(StateCondition):
     # Attribute                 Type                Default Value
     tag: str = init_field("Numerics", static=True)
 

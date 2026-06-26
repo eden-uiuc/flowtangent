@@ -16,7 +16,7 @@ from tqdm import tqdm
 from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Aircraft, State, Settings
-from RCAIDE.Framework.Settings import AnalysisSettings
+from RCAIDE.Framework.settings import AnalysisSettings
 from RCAIDE.Framework.Plotting import plot_vlm_panels
 
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices

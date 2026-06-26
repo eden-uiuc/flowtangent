@@ -18,9 +18,9 @@ import RCAIDE.Framework as rcf
 
 
 def initialize_planetary_position(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     state = eqx.tree_at(

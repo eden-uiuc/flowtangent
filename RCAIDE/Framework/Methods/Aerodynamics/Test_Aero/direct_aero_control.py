@@ -13,9 +13,9 @@ import equinox as eqx
 # RCAIDE Imports
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import System
+    from RCAIDE.Framework.settings import Settings
+    from RCAIDE.Framework.state import State
+    from RCAIDE.Framework.systems import System
 
 
 # -------------------------------------------------------------------------------

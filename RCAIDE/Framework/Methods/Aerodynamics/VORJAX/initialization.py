@@ -16,9 +16,9 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     from RCAIDE.Library.Components.Wings import Wing
 
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import Aircraft
+    from RCAIDE.Framework.settings import Settings
+    from RCAIDE.Framework.state import State
+    from RCAIDE.Framework.systems import Aircraft
 
 from RCAIDE.utils import inputs, outputs
 

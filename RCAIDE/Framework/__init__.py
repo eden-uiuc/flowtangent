@@ -7,10 +7,12 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Analyses, Conditions, Core, Interfaces, Methods, Missions, Plotting
+
 from .Processes import GradientMap, OptimizerInterface, Process, ProcessStep
-from .Settings import Settings
-from .State import State
-from .Systems import Aircraft, System
+from .settings import Settings
+from .state import State
+from .systems import Aircraft, System
+
+from . import Analyses, Conditions, Core, Interfaces, Methods, Missions, Plotting
 # from . import External_Interfaces
 # from . import Optimization

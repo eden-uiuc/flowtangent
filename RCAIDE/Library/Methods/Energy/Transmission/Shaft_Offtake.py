@@ -33,9 +33,9 @@ def func_shaft_offtake(power, T_ref, P_ref, T_t_ref, P_t_ref, mdhc):
 
 
 def shaft_offtake(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ) -> ("rcf.State", "rcf.Aircraft", "rcf.Settings"):
 
     # Get Inputs

@@ -14,14 +14,14 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Frames
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Frame(Conditions):
+class Frame(StateCondition):
     # Attribute             Type        Default Value
     tag: str = init_field("Frame", static=True)
 
@@ -82,7 +82,7 @@ class PlanetFrame(Frame):
     true_course: jnp.ndarray = empty_array(0)
 
 
-class FrameConditions(Conditions):
+class FrameConditions(StateCondition):
     # Attribute     Type            Default Value
     tag: str = init_field("Dynamic Frames", static=True)
 

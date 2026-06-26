@@ -84,7 +84,7 @@ def func_horizontal_tail(
 # -----------------------------------------------------------------------
 
 
-def horizontal_tail(state: "rcf.State", system: "rcf.Systems", settings: "rcf.Settings"):
+def horizontal_tail(state: "rcf.state", system: "rcf.systems", settings: "rcf.settings"):
 
     h_tail = system.wings.horizontal_tail
 

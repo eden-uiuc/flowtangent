@@ -17,9 +17,9 @@ import RCAIDE.Framework as rcf
 
 
 def initialize_inertial_position(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     # Extract current arrays

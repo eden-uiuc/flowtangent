@@ -22,7 +22,7 @@ from RCAIDE.utils import init_field
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class Conditions(eqx.Module):
+class StateCondition(eqx.Module):
     tag: str = init_field("Conditions", static=True)
 
     subconditions: tuple = init_field(tuple)
@@ -31,7 +31,7 @@ class Conditions(eqx.Module):
         subcons = tuple(
             getattr(self, f.name)
             for f in fields(self)
-            if f.name != "subconditions" and isinstance(getattr(self, f.name), Conditions)
+            if f.name != "subconditions" and isinstance(getattr(self, f.name), StateCondition)
         )
 
         object.__setattr__(self, "subconditions", subcons)
@@ -79,19 +79,19 @@ class Conditions(eqx.Module):
 
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
 
-    def add_subcondition(self, subcondition: "Conditions"):
+    def add_subcondition(self, subcondition: "StateCondition"):
 
         new_subconditions = self.subconditions + (subcondition,)
         new_self = eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
         return new_self
 
-    def insert_subcondition(self, subcondition: "Conditions", index: int):
+    def insert_subcondition(self, subcondition: "StateCondition", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index:]
 
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
-    def replace_subcondition(self, subcondition: "Conditions", index: int):
+    def replace_subcondition(self, subcondition: "StateCondition", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1 :]
 
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)

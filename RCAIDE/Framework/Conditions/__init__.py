@@ -1,3 +1,5 @@
+from .Conditions import StateCondition
+
 from .Aerodynamics import (
     AerodynamicAngles,
     AerodynamicCoefficients,
@@ -7,7 +9,7 @@ from .Aerodynamics import (
     InducedDrag,
     LiftCoefficients,
 )
-from .Conditions import Conditions
+
 from .Controls import (
     ControlsConditions,
     ControlVariable,

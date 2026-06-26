@@ -13,21 +13,21 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Interfaces
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MechanicalOutputs(Conditions):
+class MechanicalOutputs(StateCondition):
     tag = "Mechanical Outputs"
 
     work: jnp.ndarray = empty_array(0)
     power: jnp.ndarray = empty_array(0)
 
 
-class ElectricalOutputs(Conditions):
+class ElectricalOutputs(StateCondition):
     tag = "Electrical Outputs"
 
     power: jnp.ndarray = empty_array(0)
@@ -35,7 +35,7 @@ class ElectricalOutputs(Conditions):
     current: jnp.ndarray = empty_array(0)
 
 
-class FuelOutputs(Conditions):
+class FuelOutputs(StateCondition):
     tag = "Fuel Outputs"
 
     fuel_air_ratio: jnp.ndarray = empty_array(0)
@@ -43,7 +43,7 @@ class FuelOutputs(Conditions):
     flow_rate: jnp.ndarray = empty_array(0)
 
 
-class FlowOutputs(Conditions):
+class FlowOutputs(StateCondition):
     tag = "Flow Outputs"
 
     speed: jnp.ndarray = empty_array(0)
@@ -72,7 +72,7 @@ class FlowOutputs(Conditions):
     R: jnp.ndarray = empty_array(0)
 
 
-class ForceOutputs(Conditions):
+class ForceOutputs(StateCondition):
     tag = "Force Interface Conditions"
 
     thrust: jnp.ndarray = empty_array(0)
@@ -80,7 +80,7 @@ class ForceOutputs(Conditions):
     specific_impulse: jnp.ndarray = empty_array(0)
 
 
-class OutputConditions(Conditions):
+class OutputConditions(StateCondition):
     tag = "Energy Interface Conditons"
 
     mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
@@ -90,7 +90,7 @@ class OutputConditions(Conditions):
     force: ForceOutputs = init_field(ForceOutputs)
 
 
-class EnergyNodeConditions(Conditions):
+class EnergyNodeConditions(StateCondition):
     # Attribute         Type                Default Value
     tag: str = init_field("Energy Node Conditions", static=True)
 
@@ -146,15 +146,22 @@ class FuelTankConditions(EnergyStoreConditions):
 
     mass: jnp.ndarray = empty_array(0)
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Energy Lines
+# ----------------------------------------------------------------------------------------------------------------------
 
-class EnergyLineConditions(Conditions):
-    converters: Conditions = init_field(lambda: Conditions(tag="Energy Line Converters"))
-    propulsors: Conditions = init_field(lambda: Conditions(tag="Energy Line Converters"))
-    stores: Conditions = init_field(lambda: Conditions(tag="Energy Line Stores"))
+class EnergyLineConditions(StateCondition):
+    converters: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Converters"))
+    propulsors: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Converters"))
+    stores: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Stores"))
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Energy Networks
+# ----------------------------------------------------------------------------------------------------------------------
 
 
-class EnergyNetworkConditions(Conditions):
-    # Attribute             Type        Default Value
+class EnergyNetworkConditions(StateCondition):
+
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)
@@ -167,3 +174,11 @@ class EnergyNetworkConditions(Conditions):
 
     total_force_vector: jnp.ndarray = empty_array((0, 3))
     total_moment_vector: jnp.ndarray = empty_array((0, 3))
+
+class TurbojetNetworkConditions(EnergyNetworkConditions):
+
+    tag: str = init_field("Turbojet Network", static=True)
+
+    rotation_speed: jnp.ndarray = empty_array(0)
+    Rline: jnp.ndarray = empty_array(0)
+    turbine_PR: jnp.ndarray = empty_array(0)

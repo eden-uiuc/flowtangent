@@ -21,9 +21,9 @@ import jax.numpy as jnp
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import Aircraft
+    from RCAIDE.Framework.settings import Settings
+    from RCAIDE.Framework.state import State
+    from RCAIDE.Framework.systems import Aircraft
 
 # package imports
 from RCAIDE.utils import inputs, outputs

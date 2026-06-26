@@ -127,9 +127,9 @@ def func_expansion_nozzle_performance(
 
 
 def _expansion_nozzle_performance(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
     input_converter_state,
     output_converter_state,
     PR,
@@ -189,7 +189,7 @@ def _expansion_nozzle_performance(
     return state, system, settings
 
 
-def fan_nozzle_performance(state: "rcf.State", system: "rcf.Aircraft", settings: "rcf.Settings"):
+def fan_nozzle_performance(state: "rcf.state", system: "rcf.Aircraft", settings: "rcf.settings"):
     # Get Inputs
 
     for l_idx, line in enumerate(system.energy.lines):
@@ -205,7 +205,7 @@ def fan_nozzle_performance(state: "rcf.State", system: "rcf.Aircraft", settings:
     return state, system, settings
 
 
-def core_nozzle_performance(state: "rcf.State", system: "rcf.Aircraft", settings: "rcf.Settings"):
+def core_nozzle_performance(state: "rcf.state", system: "rcf.Aircraft", settings: "rcf.settings"):
     # Get Inputs
 
     for l_idx, line in enumerate(system.energy.lines):

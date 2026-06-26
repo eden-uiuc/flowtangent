@@ -18,7 +18,7 @@ import RCAIDE.Framework as rcf
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def initialize_time(state: "rcf.State", system: "rcf.Systems", settings: "rcf.Settings"):
+def initialize_time(state: "rcf.state", system: "rcf.systems", settings: "rcf.settings"):
 
     t_initial = state.initials.frames.inertial.time
     if t_initial is None:

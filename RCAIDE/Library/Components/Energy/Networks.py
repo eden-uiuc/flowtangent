@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual
+    from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, DynamicResidual
 
 from dataclasses import replace
 from graphlib import CycleError, TopologicalSorter
@@ -22,8 +22,9 @@ import equinox as eqx
 import jax
 
 # RCAIDE imports
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, DataPath
 
+from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
 from RCAIDE.Library.Components.Energy.Nodes import EnergyDomain, EnergyInput, EnergyNode, EnergySplitter, EnergyStore
 from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
 
@@ -193,3 +194,53 @@ class EnergyNetwork(EnergyNode):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbojet Energy Network
 # ----------------------------------------------------------------------------------------------------------------------
+
+def _TurboNetworkSetup():
+
+    line = TurbojetEnergyLine()
+
+def _TurbojetControls():
+
+    Rline = DirectControlVariable(
+        tag="Rline",
+        path=DataPath(("state", "energy", "Rline")),
+        active=True
+    )
+
+    R = DirectControlVariable(
+        tag="Turbine Pressure Ratio",
+        path=DataPath(("state", "energy", "turbine_PR")),
+        active=True
+    )
+
+    N = DirectControlVariable(
+        tag="Rotation Speed",
+        path=DataPath(("state", "energy", "rotation_speed")),
+        active=True
+    )
+
+    return Rline, R, N
+
+def _TurbojetResiduals():
+
+    W = DynamicResidual(
+        tag="Engine Mass Flow",
+        active=True,
+    )
+
+    work = DynamicResidual(
+        tag="Engine Work Balance",
+        active=True,
+    )
+
+    thrust = DynamicResidual(
+        tag="Engine Thrust Balance",
+        active=True
+    )
+
+    return W, work, thrust
+
+class TurbojetEnergyNetwork(EnergyNetwork):
+
+    controls: tuple[ControlVariable, ...] = init_field(_TurbojetControls)
+    residuals: tuple[DynamicResidual, ...] = init_field(_TurbojetResiduals)

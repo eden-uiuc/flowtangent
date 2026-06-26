@@ -19,9 +19,9 @@ import RCAIDE.Framework as rcf
 
 
 def update_time_differentials(
-    state: "rcf.State",
-    system: "rcf.Systems",
-    settings: "rcf.Settings",
+    state: "rcf.state",
+    system: "rcf.systems",
+    settings: "rcf.settings",
 ):
 
     x = state.numerics.dimensionless.control_points

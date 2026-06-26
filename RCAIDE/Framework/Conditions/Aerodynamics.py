@@ -13,7 +13,7 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Framework.Conditions import Conditions
+from RCAIDE.Framework.Conditions import StateCondition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Aerodynamics
@@ -26,7 +26,7 @@ from RCAIDE.Framework.Conditions import Conditions
 # Component-Level Bookkeeping ------------------------------
 
 
-class ComponentCoefficients(Conditions):
+class ComponentCoefficients(StateCondition):
     tag: str = init_field("Component Coefficients", static=True)
 
     total: jnp.ndarray = empty_array(0)
@@ -40,7 +40,7 @@ class ComponentCoefficients(Conditions):
 # Lift Coefficients ----------------------------------------
 
 
-class LiftCoefficients(Conditions):
+class LiftCoefficients(StateCondition):
     # Attribute     Type            Default Value
     tag: str = init_field("Lift Coefficients", static=True)
 
@@ -53,7 +53,7 @@ class LiftCoefficients(Conditions):
 # Drag Coefficients ----------------------------------------
 
 
-class InducedDrag(Conditions):
+class InducedDrag(StateCondition):
     # Attribute   Type            Default Value
     tag: str = init_field("Induced Drag", static=True)
 
@@ -65,7 +65,7 @@ class InducedDrag(Conditions):
     far_field: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Far-Field Induced Drag"))
 
 
-class DragCoefficients(Conditions):
+class DragCoefficients(StateCondition):
     # Attribute     Type            Default Value
     tag: str = init_field("Drag Coefficients", static=True)
 
@@ -82,7 +82,7 @@ class DragCoefficients(Conditions):
 # Moment Coefficients --------------------------------------
 
 
-class MomentCoefficients(Conditions):
+class MomentCoefficients(StateCondition):
     # Attribute         Type            Default Value
     tag: str = init_field("Moment Coefficients", static=True)
 
@@ -94,7 +94,7 @@ class MomentCoefficients(Conditions):
 # All Coefficients -----------------------------------------
 
 
-class AerodynamicCoefficients(Conditions):
+class AerodynamicCoefficients(StateCondition):
     # Attribute         Type                Default Value
     tag: str = init_field("Aerodynamic Coefficients", static=True)
 
@@ -113,7 +113,7 @@ class AerodynamicCoefficients(Conditions):
 # ----------------------------------------------------------
 
 
-class AerodynamicAngles(Conditions):
+class AerodynamicAngles(StateCondition):
     # Attribute         Type        Default Value
     tag: str = init_field("Aerodynamic Angles", static=True)
 
@@ -127,7 +127,7 @@ class AerodynamicAngles(Conditions):
 # ----------------------------------------------------------
 
 
-class AerodynamicsConditions(Conditions):
+class AerodynamicsConditions(StateCondition):
     # Attribute     Type                    Default Value
     tag: str = init_field("Aerodynamics", static=True)
 

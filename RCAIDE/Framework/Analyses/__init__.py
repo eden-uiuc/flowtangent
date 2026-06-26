@@ -7,5 +7,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Aerodynamics, Energy, Mass
 from .Batched import BatchAnalysis, ShardedDatasetGenerator
+from . import Aerodynamics, Energy, Mass
