@@ -7,8 +7,9 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import Atmospheres, Attributes, Components, Gases, Methods, Planets, Propellants, Units
-from .Component import (
+from . import Methods
+
+from .component import (
     Component,
     ComponentAreas,
     ComponentDimensions,
@@ -16,3 +17,5 @@ from .Component import (
     MassProperties,
     MaterialProperties,
 )
+
+from . import Atmospheres, Attributes, Components, Gases, Planets, Propellants, Units

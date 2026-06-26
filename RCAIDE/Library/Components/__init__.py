@@ -10,7 +10,7 @@
 from os import path
 from pathlib import Path
 
-from RCAIDE.Library.Component import *
+from RCAIDE.Library.component import *
 
 # Component Types
 from . import Airfoils, Energy, Fuselages, Landing_Gear, Nacelles, Wings

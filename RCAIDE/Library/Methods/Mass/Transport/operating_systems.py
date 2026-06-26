@@ -97,29 +97,29 @@ def operating_systems(
     hp_mass = results[2] * adjustment
 
     if not hasattr(system, "operating_systems"):
-        system.add_subcomponent(rcl.Component(tag="operating_systems"))
+        system.add_subcomponent(rcl.component(tag="operating_systems"))
 
     output = system.operating_systems.mass_properties
     output.total = total_opsys_mass
 
     if not hasattr(output, "flight_controls"):
-        output.add_subcomponent(rcl.Component(tag="flight_controls"))
+        output.add_subcomponent(rcl.component(tag="flight_controls"))
 
     output.flight_controls.mass_properties.total = fc_mass
 
     if not hasattr(output, "hydraulics"):
-        output.add_subcomponent(rcl.Component(tag="hydraulics"))
+        output.add_subcomponent(rcl.component(tag="hydraulics"))
 
     output.hydraulics.mass_properties.total = hp_mass
 
     for i in range(len(fixed_mass_names)):
         if not hasattr(output, fixed_mass_names[i]):
-            output.add_subcomponent(rcl.Component(tag=fixed_mass_names[i]))
+            output.add_subcomponent(rcl.component(tag=fixed_mass_names[i]))
         output.__dict__[fixed_mass_names[i]].mass_properties.total = fixed_masses[i] * adjustment
 
     for i in range(len(per_seat_mass_names)):
         if not hasattr(output, per_seat_mass_names[i]):
-            output.add_subcomponent(rcl.Component(tag=per_seat_mass_names[i]))
+            output.add_subcomponent(rcl.component(tag=per_seat_mass_names[i]))
         output.__dict__[per_seat_mass_names[i]].mass_properties.total = (
             per_seat_masses[i] * system.number_of_passengers * adjustment
         )

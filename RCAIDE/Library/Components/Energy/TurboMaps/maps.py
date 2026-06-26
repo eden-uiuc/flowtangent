@@ -1,3 +1,5 @@
+import json
+
 import equinox as eqx
 import jax.numpy as jnp
 from jax.scipy.ndimage import map_coordinates
@@ -20,6 +22,34 @@ def get_fractional_coords(grid_1d, value):
     idx = jnp.interp(value, grid_1d, jnp.arange(len(grid_1d)))
     return idx
 
+def load_compressor_map(filepath: str) -> CompressorMap:
+    """Loads a JSON compressor map and initializes the Equinox module."""
+    
+    # Read raw JSON data
+    with open(filepath, "r") as f:
+        data = json.load(f)
+    
+    # Extract 1D grids
+    alpha_grid = jnp.array(data["alpha"])
+    Nc_grid    = jnp.array(data["Nc"])
+    Rline_grid = jnp.array(data["Rline"])
+    
+    # Define expected 3D shape
+    shape = (len(alpha_grid), len(Nc_grid), len(Rline_grid))
+    
+    # Extract and reshape 3D tables
+    Wc_table  = jnp.array(data["Wc"]).reshape(shape)
+    PR_table  = jnp.array(data["PR"]).reshape(shape)
+    eff_table = jnp.array(data["eff"]).reshape(shape)
+    
+    return CompressorMap3D(
+        alpha_grid=alpha_grid,
+        Nc_grid=Nc_grid,
+        Rline_grid=Rline_grid,
+        Wc_table=Wc_table,
+        PR_table=PR_table,
+        eff_table=eff_table
+    )
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Classes
@@ -209,3 +239,62 @@ def AXI3_2():
             ]
         ),
     )
+
+import os
+import pycycle.api as pyc
+
+def harvest_pycycle_maps(output_dir="RCAIDE/Library/Maps/Components/Energy/TurboMaps/"):
+    """Extracts legacy NEPP maps from PyCycle and saves them as JSON."""
+    
+    # Ensure the target directory exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Define the PyCycle maps you want to extract
+    maps_to_harvest = {
+        "AXI3_2": pyc.AXI3_2,
+        "AXI5": pyc.AXI5,
+        "Fan": pyc.FanMap,
+        "HPC": pyc.HPCMap,
+        "HPT": pyc.HPTMap,
+        "HPT1269": pyc.HPT1269,
+        "LPC": pyc.LPCMap,
+        "LPT": pyc.LPTMap,
+        "LPT2269": pyc.LPT2269,
+        "NCPO1": pyc.NCP01
+    }
+
+    # The exact attributes we want to look for in PyCycle's map objects
+    # and what we want to rename them to in our JSON files
+    attribute_mapping = {
+        "alphaMap": "alpha",
+        "NcMap": "Nc",
+        "RlineMap": "Rline",  # Compressors only
+        "PRmap": "PR",        
+        "WcMap": "Wc",
+        "effMap": "eff"
+    }
+
+    for map_name, map_obj in maps_to_harvest.items():
+        json_data = {}
+        
+        for pyc_attr, json_key in attribute_mapping.items():
+            if hasattr(map_obj, pyc_attr):
+                val = getattr(map_obj, pyc_attr)
+                
+                # PyCycle often stores these as nested lists or numpy arrays.
+                # We force them to native Python lists so json.dump doesn't crash.
+                if hasattr(val, "tolist"):
+                    json_data[json_key] = val.tolist()
+                else:
+                    json_data[json_key] = val
+                    
+        # Write the sanitized dictionary to disk
+        file_path = os.path.join(output_dir, f"{map_name}.json")
+        with open(file_path, "w") as f:
+            # indent=4 makes the JSON file nicely formatted and readable!
+            json.dump(json_data, f, indent=4)
+            
+        print(f"Successfully harvested {map_name} to {file_path}")
+
+if __name__ == "__main__":
+    harvest_pycycle_maps()

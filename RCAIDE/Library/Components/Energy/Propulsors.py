@@ -178,7 +178,7 @@ class Compressor(FlowNode):
 class TurbojetCombustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
-    inputs = init_field((EnergyInput("flow", "HPC"),), static=True)
+    inputs: tuple = init_field((EnergyInput("flow", "HPC"),), static=True)
 
     @ru.inputs(
         "state.freestream.Cp",
@@ -227,7 +227,7 @@ class TurbojetCombustor(FlowNode):
 class Turbine(FlowNode):
     tag: str = init_field("Turbine", static=True)
 
-    inputs = init_field(
+    inputs: tuple = init_field(
         (
             EnergyInput("mechanical", "Offtake Shaft"),
             EnergyInput("fuel", "Combustor"),

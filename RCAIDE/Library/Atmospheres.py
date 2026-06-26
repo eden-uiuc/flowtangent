@@ -16,7 +16,8 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-import RCAIDE.Library as rcl
+from RCAIDE.Library.Gases import IdealGas, Air
+from RCAIDE.Library.Planets import Planet, Earth
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Atmospheres
@@ -33,9 +34,9 @@ class AtmosphericBreakpoints(eqx.Module):
 class Atmosphere(eqx.Module):
     tag: str = init_field("Atmosphere", static=True)
 
-    fluid: rcl.Gases.IdealGas = init_field(rcl.Gases.Air)
+    fluid: IdealGas = init_field(Air)
 
-    planet: rcl.Planets.Planet = init_field(rcl.Planets.Earth)
+    planet: Planet = init_field(Earth)
 
     breaks: AtmosphericBreakpoints = init_field(AtmosphericBreakpoints)
 
