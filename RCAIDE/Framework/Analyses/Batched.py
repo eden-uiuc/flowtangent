@@ -16,10 +16,8 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.State import State
     from RCAIDE.Framework.Systems import System
 
-import gc
 import logging
 import os
-import re
 import shutil
 import tempfile
 import time

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import Aircraft, Settings, State, System
+    from RCAIDE.Framework import Aircraft, Settings, State
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

@@ -10,7 +10,6 @@
 from typing import TYPE_CHECKING
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---

@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from RCAIDE.Framework import Settings, State, System

@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.Systems import System
 
 import equinox as eqx
-import jax
-import jax.numpy as jnp
 
 from RCAIDE.Library.Components import Wing
 

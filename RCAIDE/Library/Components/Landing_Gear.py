@@ -8,7 +8,6 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-import equinox as eqx
 
 # RCAIDE imports
 from RCAIDE.utils import init_field

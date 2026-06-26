@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from RCAIDE.Framework import Aircraft, Settings, State
 
 
-import warnings
 
 import equinox as eqx
 

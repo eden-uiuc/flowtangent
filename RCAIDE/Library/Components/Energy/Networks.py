@@ -8,10 +8,9 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import Settings, State, System
     from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual
 
 from dataclasses import replace

@@ -12,7 +12,7 @@ import jax.numpy as jnp
 
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Library import Component, ComponentAreas, ComponentDimensions
+from RCAIDE.Library import Component, ComponentDimensions
 from RCAIDE.Library.Components.Airfoils import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------

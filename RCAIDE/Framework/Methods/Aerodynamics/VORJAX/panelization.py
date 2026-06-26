@@ -10,7 +10,7 @@
 
 import dataclasses
 import warnings
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import equinox as eqx
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 # package imports
 from RCAIDE.utils import inputs, outputs
 
-from RCAIDE.Library.Components.Wings import Wing, WingDimensions, WingSegment, WingSweeps
+from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps
 
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 

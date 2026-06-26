@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 import equinox as eqx
 
 # RCAIDE Imports
-import RCAIDE.Framework as rcf
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

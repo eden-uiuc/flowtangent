@@ -12,7 +12,6 @@ from os import path
 from pathlib import Path
 
 # package imports
-import equinox as eqx
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 

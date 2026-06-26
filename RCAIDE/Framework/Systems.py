@@ -9,12 +9,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
 
 import equinox as eqx
 
 # package imports
-import jax
 import jax.numpy as jnp
 
 # RCAIDE imports

@@ -10,7 +10,6 @@
 from typing import Callable
 
 # package imports
-import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports

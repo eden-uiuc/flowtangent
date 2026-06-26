@@ -9,15 +9,12 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from RCAIDE.Framework.Settings import Settings
-    from RCAIDE.Framework.State import State
-    from RCAIDE.Framework.Systems import System
+    pass
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Transonic Spline

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 # package imports
 import equinox as eqx
-import jax.numpy as np
 
 # RCAIDE Imports
 

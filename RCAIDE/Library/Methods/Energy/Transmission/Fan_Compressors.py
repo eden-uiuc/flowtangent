@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import jax.numpy as jnp
 
 # RCAIDE imports
 if TYPE_CHECKING:

@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework import Settings, State, System
+    pass
 
 import warnings
 from pathlib import Path
@@ -31,7 +31,6 @@ from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline, pe
 
 from RCAIDE.Framework import Process, ProcessStep
 from RCAIDE.Framework.Analyses import BatchAnalysis
-from RCAIDE.Framework.Methods.Aerodynamics import compute_parasite_drag, compute_viscous_induced_drag
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import (
     apply_aerodynamic_forces,
     check_freestream,
