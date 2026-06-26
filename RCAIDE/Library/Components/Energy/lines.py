@@ -1,56 +1,57 @@
-# RCAIDE/Library/Components/Energy/Networks/Jets.py
-# (c) Copyright 2025 Aerospace Research Community LLC
-#
-# Created: Apr 2025, RCAIDE Team
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  IMPORT
-# ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from RCAIDE.Framework import Settings, State, System
+    from RCAIDE.Framework import State, System, Settings
 
-# package import
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE imports
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Library.Components.Energy.Networks import EnergyLine
-from RCAIDE.Library.Components.Energy.Nodes import FuelTank, OfftakeShaft
-from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine
+from .Nodes import EnergyNode, EnergySplitter, EnergyStore, FuelTank, EnergyInput
+from .Propulsors import Propulsor, TurbojetEngine
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Energy Line
+# ----------------------------------------------------------------------------------------------------------------------
+
+class EnergyLine(EnergyNode):
+    _bookkeeping: dict = init_field(
+        lambda: {
+            "propulsors": Propulsor,
+            "splitters": EnergySplitter,
+            "stores": EnergyStore,
+        },
+        static=True,
+    )
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
 def _TurbojetLineSetup():
     E1 = TurbojetEngine(tag="Engine 1")
-    S1 = OfftakeShaft(tag="Shaft 1")
 
     E2 = TurbojetEngine(tag="Engine 2")
-    S2 = OfftakeShaft(tag="Shaft 2")
 
     tank = FuelTank()
 
-    return (E1, E2, S1, S2, tank)
+    return (E1, E2, tank)
 
 
 class TurbojetEnergyLine(EnergyLine):
     tag: str = init_field("Turbojet Energy Line", static=True)
 
-    fuel_inputs: tuple[str, ...] = init_field(("self.engine_1", "self.engine_2"), static=True)
+    fuel_inputs: tuple[str, ...] = init_field((
+        EnergyInput("fuel", "self.engine_1"),
+        EnergyInput("fuel", "self.engine_2")),
+    static=True)
 
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
 
     subcomponents: tuple = init_field(_TurbojetLineSetup())
 
     _bookkeeping: dict = init_field(
-        lambda: {"engines": TurbojetEngine, "stores": FuelTank, "fuel_tanks": FuelTank, "offtakes": OfftakeShaft},
+        lambda: {"engines": TurbojetEngine, "stores": FuelTank, "fuel_tanks": FuelTank},
         static=True,
     )
 
@@ -101,19 +102,19 @@ class TurbojetEnergyLine(EnergyLine):
             lambda s: s.mass.rate_of_change, updated_state, updated_state.mass.rate_of_change - total_fuel_burn
         )
 
-        # Manage Electrical Power --------------------------------------------------------------------------------------
+        # # Manage Electrical Power --------------------------------------------------------------------------------------
 
-        for idx, offtake in enumerate(self.offtakes):  # type: ignore
-            offtake: OfftakeShaft
-            engine_ID = self.engines[idx].network_ID  # type: ignore
+        # for idx, offtake in enumerate(self.offtakes):  # type: ignore
+        #     offtake: OfftakeShaft
+        #     engine_ID = self.engines[idx].network_ID  # type: ignore
 
-            updated_state = eqx.tree_at(
-                lambda s: (
-                    s.energy.nodes[offtake.network_ID].outputs.electical.power,
-                    s.energy.nodes[offtake.network_ID].outputs.mechanical.work,
-                ),
-                updated_state,
-                (offtake.power_draw, offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate),
-            )
+        #     updated_state = eqx.tree_at(
+        #         lambda s: (
+        #             s.energy.nodes[offtake.network_ID].outputs.electical.power,
+        #             s.energy.nodes[offtake.network_ID].outputs.mechanical.work,
+        #         ),
+        #         updated_state,
+        #         (offtake.power_draw, offtake.power_draw / state.energy.nodes[engine_ID].outputs.flow.mass_flow_rate),
+        #     )
 
         return updated_state, system, settings

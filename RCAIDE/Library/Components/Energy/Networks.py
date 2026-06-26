@@ -24,24 +24,12 @@ import jax
 # RCAIDE imports
 from RCAIDE.utils import init_field, DataPath
 
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
-from RCAIDE.Library.Components.Energy.Nodes import EnergyDomain, EnergyInput, EnergyNode, EnergySplitter, EnergyStore
-from RCAIDE.Library.Components.Energy.Propulsors import Propulsor
+from .lines import TurbojetEnergyLine, EnergyLine
+from RCAIDE.Library.Components.Energy.Nodes import EnergyDomain, EnergyInput, EnergyNode
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Lines
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class EnergyLine(EnergyNode):
-    _bookkeeping: dict = init_field(
-        lambda: {
-            "propulsors": Propulsor,
-            "splitters": EnergySplitter,
-            "stores": EnergyStore,
-        },
-        static=True,
-    )
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -180,7 +168,7 @@ class EnergyNetwork(EnergyNode):
 
         balanced_network = self._rebalance_flow_splitters()
         updated_network = balanced_network._get_all_nodes()
-        dependency_graph = {ID: set(node.inputs) for ID, node in updated_network.nodes.items()}
+        dependency_graph = {ID: set([i.network_ID for i in node.inputs]) for ID, node in updated_network.nodes.items()}
 
         try:
             sorter = TopologicalSorter(dependency_graph)
@@ -195,52 +183,54 @@ class EnergyNetwork(EnergyNode):
 #  Turbojet Energy Network
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _TurboNetworkSetup():
+# def _TurboNetworkSetup():
 
-    line = TurbojetEnergyLine()
+#     line = TurbojetEnergyLine()
 
-def _TurbojetControls():
+# def _TurbojetControls():
 
-    Rline = DirectControlVariable(
-        tag="Rline",
-        path=DataPath(("state", "energy", "Rline")),
-        active=True
-    )
+#     Rline = DirectControlVariable(
+#         tag="Rline",
+#         path=DataPath(("state", "energy", "Rline")),
+#         active=True
+#     )
 
-    R = DirectControlVariable(
-        tag="Turbine Pressure Ratio",
-        path=DataPath(("state", "energy", "turbine_PR")),
-        active=True
-    )
+#     R = DirectControlVariable(
+#         tag="Turbine Pressure Ratio",
+#         path=DataPath(("state", "energy", "turbine_PR")),
+#         active=True
+#     )
 
-    N = DirectControlVariable(
-        tag="Rotation Speed",
-        path=DataPath(("state", "energy", "rotation_speed")),
-        active=True
-    )
+#     N = DirectControlVariable(
+#         tag="Rotation Speed",
+#         path=DataPath(("state", "energy", "rotation_speed")),
+#         active=True
+#     )
 
-    return Rline, R, N
+#     return Rline, R, N
 
-def _TurbojetResiduals():
+# def _TurbojetResiduals():
 
-    W = DynamicResidual(
-        tag="Engine Mass Flow",
-        active=True,
-    )
+#     W = DynamicResidual(
+#         tag="Engine Mass Flow",
+#         active=True,
+#     )
 
-    work = DynamicResidual(
-        tag="Engine Work Balance",
-        active=True,
-    )
+#     work = DynamicResidual(
+#         tag="Engine Work Balance",
+#         active=True,
+#     )
 
-    thrust = DynamicResidual(
-        tag="Engine Thrust Balance",
-        active=True
-    )
+#     thrust = DynamicResidual(
+#         tag="Engine Thrust Balance",
+#         active=True
+#     )
 
-    return W, work, thrust
+#     return W, work, thrust
 
 class TurbojetEnergyNetwork(EnergyNetwork):
 
-    controls: tuple[ControlVariable, ...] = init_field(_TurbojetControls)
-    residuals: tuple[DynamicResidual, ...] = init_field(_TurbojetResiduals)
+    tag: str = init_field("Turbojet Network", static=True)
+
+    # controls: tuple[ControlVariable, ...] = init_field(_TurbojetControls)
+    # residuals: tuple[DynamicResidual, ...] = init_field(_TurbojetResiduals)

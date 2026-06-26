@@ -175,6 +175,11 @@ class EnergyNetworkConditions(StateCondition):
     total_force_vector: jnp.ndarray = empty_array((0, 3))
     total_moment_vector: jnp.ndarray = empty_array((0, 3))
 
+    rotation_speed: jnp.ndarray = empty_array(0)
+    Rline: jnp.ndarray = empty_array(0)
+    turbine_PR: jnp.ndarray = empty_array(0)
+    target_thrust: jnp.ndarray = empty_array(0)
+
 class TurbojetNetworkConditions(EnergyNetworkConditions):
 
     tag: str = init_field("Turbojet Network", static=True)
@@ -182,3 +187,4 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     rotation_speed: jnp.ndarray = empty_array(0)
     Rline: jnp.ndarray = empty_array(0)
     turbine_PR: jnp.ndarray = empty_array(0)
+    target_thrust: jnp.ndarray = empty_array(0)

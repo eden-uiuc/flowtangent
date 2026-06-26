@@ -194,27 +194,19 @@ class EnergyControlVariable(ControlVariable):
 
 
 def _default_bank_angle():
-    return DirectControlVariable(
-        tag="Bank Angle", path=("frames", "body", "inertial_rotations"), path_indices=(slice(None), 0)
-    )
+    return DirectControlVariable(tag="Bank Angle", path=DataPath(("frames", "body", "inertial_rotations")))
 
 
 def _default_body_angle():
-    return DirectControlVariable(
-        tag="Body Angle", path=("frames", "body", "inertial_rotations"), path_indices=(slice(None), 1)
-    )
+    return DirectControlVariable(tag="Body Angle", path=DataPath(("frames", "body", "inertial_rotations")))
 
 
 def _default_velocity():
-    return DirectControlVariable(
-        tag="Velocity", path=("frames", "inertial", "velocity_vector"), path_indices=(slice(None), 0)
-    )
+    return DirectControlVariable(tag="Velocity", path=DataPath(("frames", "inertial", "velocity_vector")))
 
 
 def _default_altitude():
-    return DirectControlVariable(
-        tag="Altitude", path=("frames", "inertial", "position_vector"), path_indices=(slice(None), 2)
-    )
+    return DirectControlVariable(tag="Altitude", path=DataPath(("frames", "inertial", "position_vector", slice(None, 2))))
 
 
 class ControlsConditions(StateCondition):

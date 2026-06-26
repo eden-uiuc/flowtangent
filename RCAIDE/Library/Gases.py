@@ -21,7 +21,7 @@ from RCAIDE.utils import empty_array, init_field
 
 class IdealGas(eqx.Module):
     tag: str = init_field("Gas", static=True)
-    molecular_mass: float = init_field(1.0, static=True)
+    molecular_mass: float = 1.0
     R: float = init_field(8.314462, static=True)  # ideal gas constant (J/(mol·K))
 
     @property
@@ -111,7 +111,7 @@ class IdealGas(eqx.Module):
         return jnp.sqrt(g * self.R_specific * T)
 
     def compute_absolute_viscosity(self, T: float | jnp.ndarray = 298.0):
-        raise NotImplementedError(f"Compute absolute viscosity not implemented for this {self.tag}")
+        return 1.8e-5
 
     def compute_prandtl_number(self, T: float | jnp.ndarray = 298.0):
         return self.compute_absolute_viscosity(T) * self.compute_Cp(T) / self.compute_thermal_conductivity(T)
@@ -261,10 +261,20 @@ class GasComposition(eqx.Module):
             )
 
 
+
 class MixedGas(IdealGas):
     tag: str = "Mixed Gas"
 
     composition: GasComposition = init_field(GasComposition)
+
+    @property
+    def R_specific(self):
+        R_arr = jnp.stack([elem.R_specific for elem in self.composition.elements], axis=-1)
+        frac_arr = jnp.stack(self.composition.mass_fractions, axis=-1)
+        
+        mixed_R = jnp.sum(frac_arr * R_arr, axis=-1)
+
+        return mixed_R
 
     def compute_Cp(self, T: float | jnp.ndarray = 298.15):
         Cp_arr = jnp.stack([elem.compute_Cp(T) for elem in self.composition.elements], axis=-1)

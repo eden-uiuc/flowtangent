@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework import Aircraft, Settings, State
 
 # package imports
-import jax.numpy as np
+import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Library.Gases import CO2, O2, IdealGas, Steam
@@ -56,7 +56,7 @@ def func_combustor_performance(
     # 6. Final output mixture enthalpy
     h_t_out = (h_gas_out + FAR * dh_react) / (1.0 + FAR)
 
-    return P_t_out, h_t_out, FAR
+    return P_t_out, h_t_out, jnp.atleast_2d(FAR)
 
 
 def jet_combustor_transmission(state: State, system: Aircraft, settings: Settings):
@@ -117,18 +117,18 @@ def func_rayleigh_line_flow(
 ):
 
     # Isentropic deceleration through divergent nozzle
-    M1 = np.atleast_2d(fM(AR, M0[:, 0], g[:, 0])).T
+    M1 = jnp.atleast_2d(fM(AR, M0[:, 0], g[:, 0])).T
 
     # Max stagnation temperature to thermally choke flow
     Tt_out_Rayleigh = Tt_in * (1.0 + g * M1**2) ** 2.0 / ((2.0 * (1.0 + g) * M1**2) * (1.0 + (g - 1.0) / 2.0 * M1**2))
 
     # Limit Tt_out
-    Tt_out = np.ones_like(Tt_out_Rayleigh) * Tt_4
-    Tt_out = np.minimum(Tt_out, Tt_out_Rayleigh)
+    Tt_out = jnp.ones_like(Tt_out_Rayleigh) * Tt_4
+    Tt_out = jnp.minimum(Tt_out, Tt_out_Rayleigh)
 
     # Rayleigh calculations
-    M_out = np.zeros_like(Pt_in)
-    Pt_R = np.zeros_like(Pt_in)
+    M_out = jnp.zeros_like(Pt_in)
+    Pt_R = jnp.zeros_like(Pt_in)
     M_out[:, 0], Pt_R[:, 0] = Rayleigh(g[:, 0], M1[:, 0], Tt_out[:, 0] / Tt_in[:, 0])
     Pt_out = Pt_R * Pt_in
 

@@ -36,7 +36,6 @@ def func_thrust_and_power(
     P_core_nozzle,
     fuel_air_ratio,
     BPR,
-    throttle,
 ):
 
     f_fan = BPR / (1.0 + BPR)
@@ -60,9 +59,9 @@ def func_thrust_and_power(
     TSFC = fuel_air_ratio / specific_thrust_core * (1.0 - delta_SFC) * 3600.0
 
     # 4. Engine Sizing and Throttle State
-    mdot_core = (F_ref * f_core) / (F_sp_nondim * a0 * throttle)
+    mdot_core = (F_ref * f_core) / (F_sp_nondim * a0)
 
-    F = specific_thrust_core * mdot_core * throttle
+    F = specific_thrust_core * mdot_core
     p = F * u0
 
     # 5. Fuel Flow Rate (Using JAX maximum)

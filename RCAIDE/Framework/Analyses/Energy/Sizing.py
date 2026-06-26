@@ -21,7 +21,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 from RCAIDE.Library.Atmospheres import USStandard1976
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
+from RCAIDE.Library.Components.Energy.lines import TurbojetEnergyLine
 from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
 
 from RCAIDE.Framework import Aircraft, Settings, State
@@ -104,3 +104,5 @@ def update_design_parameters(turbojet: TurbojetEngine):
     updated_turbojet = eqx.tree_at(lambda s: s.design_parameters, turbojet, updated_params)
 
     return updated_turbojet
+
+# def 

@@ -148,7 +148,7 @@ class TurbineMap(eqx.Module):
         PR_map = (PR - 1.0) / self.s_PR + 1.0
 
         # Get fractional grid coordinates
-        idx_alpha = get_fractional_coords(self.alpha_grid, alpha)
+        idx_alpha = jnp.atleast_2d(get_fractional_coords(self.alpha_grid, alpha))
         idx_Nc = get_fractional_coords(self.Np_grid, Np_map)
         idx_PR = get_fractional_coords(self.PR_grid, PR_map)
         coords = jnp.stack([idx_alpha, idx_Nc, idx_PR])
@@ -229,6 +229,7 @@ def harvest_pycycle_maps(output_dir=MapData):
         "RlineMap": "Rline",
         "PRmap": "PR",        
         "WcMap": "Wc",
+        "WpMap": "Wp",
         "effMap": "eff",
         "RlineStall": "Rline_stall"
     }

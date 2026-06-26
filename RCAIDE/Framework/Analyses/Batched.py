@@ -45,7 +45,7 @@ from RCAIDE.Framework import Process, State
 class BatchAnalysis:
     def __init__(
         self,
-        tag: str = "BatchProcess",
+        tag: str = "Batched Analysis",
         initialize: Process = Process(),
         compute: Process = Process(),
         inputs: dict = {},

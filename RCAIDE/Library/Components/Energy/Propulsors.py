@@ -196,7 +196,7 @@ class Compressor(FlowNode):
 class TurbojetCombustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
-    inputs: tuple = init_field((EnergyInput("flow", "HPC"),), static=True)
+    inputs: tuple = init_field((EnergyInput("flow", "Compressor"),), static=True)
 
     @ru.inputs(
         "state.freestream.Cp",
@@ -252,7 +252,6 @@ class Turbine(FlowNode):
     inputs: tuple = init_field(
         (
             EnergyInput("fuel", "Combustor"),
-            EnergyInput("mechanical", "Compressor")
         ),
         static=True,
     )
@@ -378,36 +377,27 @@ class ExpansionNozzle(FlowNode):
 def _TurbojetSetup():
 
     inlet = InletNozzle()
-    LPC = Compressor(tag="LPC", inputs=(EnergyInput("flow", "Inlet Nozzle"),))
-    HPC = Compressor(tag="HPC", inputs=(EnergyInput("flow", "LPC"),))
-
+    comp = Compressor(
+        tag="Compressor", inputs=(EnergyInput("flow", "Inlet Nozzle"),))
     comb = TurbojetCombustor()
 
-    HPT = Turbine(
-        tag="HPT",
+    turb = Turbine(
+        tag="Turbine",
         inputs=(
-            EnergyInput(
-                "mechanical",
-                "HPC",
-            ),
             EnergyInput("flow", "Combustor"),
             EnergyInput("fuel", "Combustor"),
         ),
-    )
-    LPT = Turbine(
-        tag="LPT",
-        inputs=(EnergyInput("mechanical", "LPC"), EnergyInput("flow", "HPT"), EnergyInput("fuel", "Combustor")),
     )
 
     nozz = ExpansionNozzle(
         tag="Core Nozzle",
         inputs=(
-            EnergyInput("flow", "LPT"),
+            EnergyInput("flow", "Turbine"),
             EnergyInput("fuel", "Combustor"),
         ),
     )
 
-    return (inlet, LPC, HPC, comb, HPT, LPT, nozz)
+    return (inlet, comp, comb, turb, nozz)
 
 
 class TurbojetEngine(Propulsor):
@@ -453,6 +443,7 @@ class TurbojetEngine(Propulsor):
 
         cn_out = state.energy.nodes[self.network_ID + ".core_nozzle"].outputs.flow
         comb_out = state.energy.nodes[self.network_ID + ".combustor"].outputs.fuel
+        # comp_MFR = state.energy.nodes[self.network_ID + ".compressor"].outputs.flow.mass_flow_rate
 
         fs = state.freestream
 
@@ -473,23 +464,23 @@ class TurbojetEngine(Propulsor):
             P_core_nozzle=cn_out.pressure,
             fuel_air_ratio=comb_out.fuel_air_ratio,
             BPR=0.0,
-            throttle=state.energy.nodes[self.network_ID].throttle,
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs
 
         outputs = eqx.tree_at(lambda o: o.force.thrust, outputs, F)
-        outputs = eqx.tree_at(lambda o: o.force.non_dimensional_thrust, outputs, F_sp)
+        outputs = eqx.tree_at(lambda o: o.force.nondimensional_thrust, outputs, F_sp)
         outputs = eqx.tree_at(lambda o: o.force.specific_impulse, outputs, I_sp)
 
         outputs = eqx.tree_at(lambda o: o.fuel.TSFC, outputs, TSFC)
-        outputs = eqx.tree_at(lambda o: o.fuel.fuel_flow_rate, outputs, ff)
+        outputs = eqx.tree_at(lambda o: o.fuel.flow_rate, outputs, ff)
 
         outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, mdot_c)
 
         outputs = eqx.tree_at(lambda o: o.mechanical.power, outputs, p)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
+        # updated_state = eqx.tree_at(lambda s: s.dynamics.engine_mass_flow, updated_state, mdot_c - comp_MFR)
 
         return updated_state, system, settings
 

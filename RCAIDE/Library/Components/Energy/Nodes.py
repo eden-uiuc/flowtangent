@@ -58,17 +58,17 @@ class EnergyNode(Component):
     def _get_inputs_by_domain(self, domain: EnergyDomain):
         return tuple(i for i in self.inputs if i.domain == domain)
 
-    def __getattr__(self, name):
-        if name.endswith("_inputs"):
-            domain = name.replace("_inputs", "")
+    def __getattr__(self, item: str):
+        if item.endswith("_inputs"):
+            domain = item.replace("_inputs", "")
             return tuple(i.network_ID for i in self._get_inputs_by_domain(domain))
         else:
-            return super().__getattribute__(name)
+            return super(EnergyNode, self).__getattr__(item)
 
     @eqx.filter_jit
     def _get_all_inputs(self, state, input_type: EnergyDomain, input_field: str):
         output_conditions = [
-            getattr(state.energy.nodes[i].outputs, input_type) for i in self._get_inputs_by_domain(input_type)
+            getattr(state.energy.nodes[i.network_ID].outputs, input_type) for i in self._get_inputs_by_domain(input_type)
         ]
         return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
 

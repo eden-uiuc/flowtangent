@@ -42,8 +42,8 @@ def update_freestream(
     T = atmo.compute_temperature(alt)
     a = atmo.compute_speed_of_sound(alt)
     m = atmo.compute_dynamic_viscosity(alt)
-    g = atmo.compute_gamma(alt)
     Cp = atmo.compute_Cp(alt)
+    gamma = atmo.compute_gamma(alt)
 
     updated_fs = eqx.tree_at(
         lambda f: (f.density, f.pressure, f.temperature, f.speed_of_sound, f.dynamic_viscosity, f.gamma, f.Cp),
@@ -54,7 +54,7 @@ def update_freestream(
             T,
             a,
             m,
-            g,
+            gamma,
             Cp,
         ),
     )
@@ -72,8 +72,8 @@ def update_freestream(
     M = v_mag / a
 
     # Stagnation
-    P_t = P * (1 + (g - 1) / 2 * M**2) ** (g / (g - 1))  # Stagnation Pressure
-    T_t = T * (1 + (g - 1) / 2 * M**2)  # Stagnation Temperature
+    P_t = P * (1 + (gamma - 1) / 2 * M**2) ** (gamma / (gamma - 1))  # Stagnation Pressure
+    T_t = T * (1 + (gamma - 1) / 2 * M**2)  # Stagnation Temperature
 
     # Reynolds Number (per meter)
     Re = r * v_mag / m
