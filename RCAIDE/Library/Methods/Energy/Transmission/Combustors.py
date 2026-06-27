@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Library.gases import CO2, O2, IdealGas, Steam
+from RCAIDE.Library.gases import CO2, O2, IdealGas, H2O
 from RCAIDE.Library.Methods.Energy.Transmission import Rayleigh, fM
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -41,9 +41,9 @@ def func_combustor_performance(
 
     # Enthalpy of gases at exit temp
     h_gas_out = gas.compute_enthalpy(T_t_out)
-    h_O2 = O2().compute_enthalpy(T_t_out)
-    h_CO2 = CO2().compute_enthalpy(T_t_out)
-    h_H2O = Steam().compute_enthalpy(T_t_out)
+    h_O2 = O2.compute_enthalpy(T_t_out)
+    h_CO2 = CO2.compute_enthalpy(T_t_out)
+    h_H2O = H2O.compute_enthalpy(T_t_out)
 
     # Jet-A Reaction Enthalpy
     dh_react = (3.155 * h_CO2) + (1.242 * h_H2O) - (3.396 * h_O2)

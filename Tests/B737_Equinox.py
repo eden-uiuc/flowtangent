@@ -34,7 +34,7 @@ from RCAIDE.Library.Components.nacelles import Nacelle, NacelleDiameters
 from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
 from RCAIDE.Library.Components.Energy.propulsors import TurbofanEngine, DesignParameters
 from RCAIDE.Library.Components.Energy.nodes import FuelTank
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
+from RCAIDE.Library.Components.Energy.lines import TurbojetEnergyLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
@@ -353,7 +353,7 @@ def vehicle_setup():
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
         design_parameters=DesignParameters(
-            total_thrust=24000.,
+            thrust=24000.,
             altitude=10668.,
             mach_number=0.78,
             turbine_intake_temperature=1450.

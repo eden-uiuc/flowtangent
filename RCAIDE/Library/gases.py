@@ -17,7 +17,7 @@ import jax.numpy as jnp
 
 # RCAIDE imports
 from RCAIDE.Library import units
-from RCAIDE.utils import empty_array, init_field
+from RCAIDE.utils import empty_array, init_field, get_RCAIDE_root
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Ideal Gases
@@ -263,7 +263,7 @@ class GasComposition(eqx.Module):
         for elem in self.elements:
             if isinstance(elem, str):
                 try:
-                    new_elements += (_get_gas(elem.upper()))
+                    new_elements += (_get_gas(elem.upper()),)
                 except AttributeError:
                     raise ValueError(f"Unrecognized element '{elem}' not found in database.")
             
@@ -357,6 +357,8 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
     Assumes complete lean combustion.
     """
 
+    FAR_arr = jnp.atleast_2d(FAR)
+
     # Base air masses (kg) per 1 kg of inlet air
     m_O2_air = 0.2314
     m_N2_air = 0.7552
@@ -370,9 +372,9 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
 
     # Calculate new absolute masses
     # Using jnp.maximum prevents negative mass during aggressive solver iterations
-    m_O2 = jnp.maximum(m_O2_air - (O2_consumed * FAR), 0.0)
-    m_CO2 = m_CO2_air + (CO2_produced * FAR)
-    m_H2O = H2O_produced * FAR
+    m_O2 = jnp.maximum(m_O2_air - (O2_consumed * FAR_arr), 0.0)
+    m_CO2 = m_CO2_air + (CO2_produced * FAR_arr)
+    m_H2O = H2O_produced * FAR_arr
     m_N2 = m_N2_air  # Inert
     m_Ar = m_Ar_air  # Inert
 
@@ -381,7 +383,7 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
     # Return the dynamically mixed composition
     return GasComposition(
         elements=("O2", "AR", "CO2", "N2", "H2O"),
-        mass_fractions=jnp.asarray([m_O2 / m_total, m_Ar / m_total, m_CO2 / m_total, m_N2 / m_total, m_H2O / m_total]),
+        mass_fractions=jnp.concatenate([m_O2 / m_total, m_Ar / m_total, m_CO2 / m_total, m_N2 / m_total, m_H2O / m_total], axis=-1),
     )
 
 
@@ -393,7 +395,7 @@ def BurnedJetA(FAR: float | jnp.ndarray) -> MixedGas:
 # ----------------------------------------------------------------------------------------------------------------------
 
 # Standard atomic weights in g/mol
-ATOMIC_WEIGHTS = {
+ATOMIC_MASSES = {
     "H": 1.008,
     "C": 12.011,
     "N": 14.007,
@@ -433,10 +435,10 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
                     
             # Calculate Molecular Weight
             try:
-                molecular_weight = sum(ATOMIC_WEIGHTS[elem] * count for elem, count in composition.items())
+                molecular_mass = sum(ATOMIC_MASSES[elem] * count for elem, count in composition.items())
             except KeyError as e:
                 print(f"Warning: Missing atomic weight for element {e} in species {species_name}. Defaulting to 0.0")
-                molecular_weight = 0.0
+                molecular_mass = 0.0
                     
             phase = line[44].strip()
             
@@ -466,7 +468,7 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
             database[species_name] = {
                 "phase": phase,
                 "composition": composition,
-                "molecular_weight": molecular_weight,
+                "molecular_mass": molecular_mass,
                 "T_low": t_low,
                 "T_high": t_high,
                 "T_mid": t_mid,
@@ -487,7 +489,7 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
 #  Thermo Database
 # ----------------------------------------------------------------------------------------------------------------------
 
-_DB_PATH = Path(os.path.dirname(__file__)) / "thermo_database.json"
+_DB_PATH = get_RCAIDE_root() / "Library/Data/thermo_database.json"
 
 @lru_cache(maxsize=1)
 def _load_database():
@@ -510,7 +512,7 @@ def _get_gas(name: str):
     # Construct and return your Equinox IdealGas module
     return IdealGas(
         tag=name,
-        molecular_mass=data["molecular_mass"],
+        molecular_mass=data["molecular_mass"] * units.gram,
         nasa_low_coeffs=tuple(data["nasa_low_coeffs"]),
         nasa_high_coeffs=tuple(data["nasa_high_coeffs"]),
     )

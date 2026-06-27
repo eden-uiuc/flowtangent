@@ -36,7 +36,7 @@ from .GraphNetwork import build_analysis_from_network
 
 
 def update_design_parameters(turbojet: TurbojetEngine):
-    design_thrust = turbojet.design_parameters.total_thrust
+    design_thrust = turbojet.design_parameters.thrust
 
     if design_thrust == 0.0:
         warnings.warn(

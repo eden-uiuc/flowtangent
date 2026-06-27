@@ -45,7 +45,7 @@ from RCAIDE.Library.Components.Energy.maps import CompressorMap, TurbineMap
 
 
 class DesignParameters(eqx.Module):
-    total_thrust: float = 0.0
+    thrust: float = 0.0
     delta_SFC: float = 0.0
 
     altitude: float = 0.0
@@ -457,7 +457,7 @@ class TurbojetEngine(Propulsor):
             M0=fs.mach_number,
             P0=fs.pressure,
             g=fs.gravity,
-            F_ref=self.design_parameters.total_thrust,
+            F_ref=self.design_parameters.thrust,
             delta_SFC=self.design_parameters.delta_SFC,
             v_fan_nozzle=0.0,
             AR_fan_nozzle=0.0,
