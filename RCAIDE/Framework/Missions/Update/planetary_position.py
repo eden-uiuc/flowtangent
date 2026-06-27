@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from RCAIDE.Framework.state import State
     from RCAIDE.Framework.systems import System
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Planetary Position
@@ -45,10 +45,10 @@ def update_planetary_position(state: "State", system: "System", settings: "Setti
 
     # Find local velocities and integrate position
     lamdadot = (v / R) * jnp.cos(gamma) * jnp.cos(psi)
-    lamda = jnp.dot(I, lamdadot) / Units.deg  # Latitude
+    lamda = jnp.dot(I, lamdadot) / units.deg  # Latitude
 
     mudot = (v / R) * jnp.cos(gamma) * jnp.sin(psi) / jnp.cos(lamda)
-    mu = jnp.dot(I, mudot) / Units.deg  # Longitude
+    mu = jnp.dot(I, mudot) / units.deg  # Longitude
 
     lat_0 = state.frames.planet.latitude[0, 0]
     lon_0 = state.frames.planet.longitude[0, 0]

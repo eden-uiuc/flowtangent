@@ -8,8 +8,8 @@ import jax.numpy as jnp
 
 from RCAIDE.utils import init_field, inputs, outputs
 
-from .Nodes import EnergyNode, EnergySplitter, EnergyStore, FuelTank, EnergyInput
-from .Propulsors import Propulsor, TurbojetEngine
+from .nodes import EnergyNode, EnergySplitter, EnergyStore, FuelTank, EnergyInput
+from .propulsors import Propulsor, TurbojetEngine
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Line

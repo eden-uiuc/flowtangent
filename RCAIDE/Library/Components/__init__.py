@@ -13,11 +13,11 @@ from pathlib import Path
 from RCAIDE.Library.component import *
 
 # Component Types
-from . import Airfoils, Energy, Fuselages, Landing_Gear, Nacelles, Wings
+from . import Energy, airfoils, fuselages, landing_gear, nacelles, wings
 
 # Top-Level Components for Direct Import
-from .Airfoils import Airfoil, AirfoilData
-from .Fuselages import Fuselage
-from .Landing_Gear import LandingGear
-from .Nacelles import Nacelle
-from .Wings import Wing
+from .airfoils import Airfoil, _AF_DIR
+from .fuselages import Fuselage
+from .landing_gear import LandingGear
+from .nacelles import Nacelle
+from .wings import Wing

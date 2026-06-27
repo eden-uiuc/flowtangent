@@ -7,4 +7,4 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from . import TurboMaps, Networks, Nodes, Propulsors
+from . import maps, networks, nodes, propulsors

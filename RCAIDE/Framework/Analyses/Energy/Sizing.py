@@ -13,16 +13,16 @@ from typing import TYPE_CHECKING
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from RCAIDE.Library.Components.Energy.Propulsors import TurbojetEngine
+    from RCAIDE.Library.Components.Energy.propulsors import TurbojetEngine
 
 import warnings
 
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Library.Atmospheres import USStandard1976
+from RCAIDE.Library.atmospheres import USStandard1976
 from RCAIDE.Library.Components.Energy.lines import TurbojetEnergyLine
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
 
 from RCAIDE.Framework import Aircraft, Settings, State
 from RCAIDE.Framework.Missions.Initialize import initialize_energy

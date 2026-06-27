@@ -10,7 +10,7 @@
 
 import jax.numpy as np
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 # -----------------------------------------------------------------------
 # Functional/Library Version
@@ -39,11 +39,11 @@ def func_segmented_main_wing(
 
     area_fraction = wing_reference_area / vehicle_reference_area
 
-    strength_ratio = material_density * 9.81 * Units["m/(s**2)"] / material_yield_tensile_strength
+    strength_ratio = material_density * 9.81 * units["m/(s**2)"] / material_yield_tensile_strength
 
-    mass_geometric_mean = np.sqrt(vehicle_maximum_takeoff_weight * vehicle_zero_fuel_weight) / Units["kg"]
+    mass_geometric_mean = np.sqrt(vehicle_maximum_takeoff_weight * vehicle_zero_fuel_weight) / units["kg"]
 
-    maximum_load = (vehicle_ultimate_load_factor * mass_geometric_mean * 9.81 * Units["m/(s**2)"]) / Units["N"]
+    maximum_load = (vehicle_ultimate_load_factor * mass_geometric_mean * 9.81 * units["m/(s**2)"]) / units["N"]
 
     root_aerodynamic_load = area_fraction * 2 * maximum_load / (wingspan * np.pi)
 
@@ -202,9 +202,9 @@ def func_segmented_main_wing(
 
     segment_sum = similar_segment_sum + dissimilar_segment_sum
 
-    stress_mass = (strength_ratio * wingspan**2 * root_aerodynamic_load * segment_sum / 2) / Units.lbm
+    stress_mass = (strength_ratio * wingspan**2 * root_aerodynamic_load * segment_sum / 2) / units.lbm
 
-    mass = 4.22 * wing_reference_area / Units["ft**2"] + stress_mass
+    mass = 4.22 * wing_reference_area / units["ft**2"] + stress_mass
 
     return mass
 

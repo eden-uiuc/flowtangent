@@ -25,7 +25,7 @@ import jax
 from RCAIDE.utils import init_field, DataPath
 
 from .lines import TurbojetEnergyLine, EnergyLine
-from RCAIDE.Library.Components.Energy.Nodes import EnergyDomain, EnergyInput, EnergyNode
+from RCAIDE.Library.Components.Energy.nodes import EnergyDomain, EnergyInput, EnergyNode
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Lines

@@ -13,7 +13,7 @@ from dask import compute as dc
 
 from tqdm import tqdm
 
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
+from RCAIDE.Library.Components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Aircraft, State, Settings
 from RCAIDE.Framework.settings import AnalysisSettings

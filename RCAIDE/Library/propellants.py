@@ -13,7 +13,7 @@ import equinox as eqx
 from RCAIDE.utils import init_field
 
 # RCAIDE imports
-from RCAIDE.Library.Gases import O2, IdealGas
+from RCAIDE.Library.gases import O2, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants

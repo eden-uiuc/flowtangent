@@ -10,7 +10,7 @@
 
 import jax.numpy as np
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 import RCAIDE.Framework as rcf
 
@@ -61,11 +61,11 @@ def func_horizontal_tail(
 
     # Unit Conversion
 
-    b = wingspan / Units.ft
-    S = reference_area / Units.ft**2
-    MTOW = vehicle_max_takeoff_weight / Units.lbm
-    MAC = main_wing_mean_aerodynamic_chord / Units.ft
-    L = moment_arm_length / Units.ft
+    b = wingspan / units.ft
+    S = reference_area / units.ft**2
+    MTOW = vehicle_max_takeoff_weight / units.lbm
+    MAC = main_wing_mean_aerodynamic_chord / units.ft
+    L = moment_arm_length / units.ft
 
     # Shorthand Aliases
     exr = np.sqrt(exposed_area * S / wetted_area)
@@ -74,7 +74,7 @@ def func_horizontal_tail(
 
     mass = (
         5.25 * S + 8e-7 * vehicle_ultimate_load * b**3 * MTOW * MAC * exr / (tc * np.cos(qc) ** 2 * L * S**1.5)
-    ) * Units.lbs
+    ) * units.lbs
 
     return mass
 

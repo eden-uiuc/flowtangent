@@ -15,8 +15,8 @@ from scipy.stats import qmc, beta
 
 from RCAIDE.utils import DataPath
 
-from RCAIDE.Library import Units
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
+from RCAIDE.Library import units
+from RCAIDE.Library.Components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Aircraft, Settings, GradientMap
 from RCAIDE.Framework.settings import AnalysisSettings
@@ -30,9 +30,9 @@ from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vorti
 def generate_flow_state_grid(
         
 ):
-    alphas = np.linspace(-5.0, 15.0, 81) * Units.deg
+    alphas = np.linspace(-5.0, 15.0, 81) * units.deg
     machs = np.linspace(0.1, 2.0, 20)
-    betas = np.linspace(0.0, 10.0, 11) * Units.deg
+    betas = np.linspace(0.0, 10.0, 11) * units.deg
 
     total_states = len(alphas) * len(machs) * len(betas)
     
@@ -64,9 +64,9 @@ def generate_weighted_sobol(
     return pd.DataFrame({
         "aspect_ratio": ar_samples,
         "taper_ratio": taper_samples,
-        "sweep": sweep_samples * Units.deg,
-        "twist": twist_samples * Units.deg,
-        "dihedral": dihedral_samples * Units.deg
+        "sweep": sweep_samples * units.deg,
+        "twist": twist_samples * units.deg,
+        "dihedral": dihedral_samples * units.deg
     })
 
 def plot_sampling_validation(df_geometry, dist_kwargs):

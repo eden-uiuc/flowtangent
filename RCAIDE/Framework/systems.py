@@ -19,11 +19,11 @@ from RCAIDE.utils import empty_array, init_field
 
 from RCAIDE.Library import Component, MassProperties
 from RCAIDE.Library.Attributes import AircraftClass, MediumRange
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
-from RCAIDE.Library.Components.Fuselages import Fuselage
-from RCAIDE.Library.Components.Landing_Gear import LandingGear
-from RCAIDE.Library.Components.Nacelles import Nacelle
-from RCAIDE.Library.Components.Wings import Wing
+from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
+from RCAIDE.Library.Components.fuselages import Fuselage
+from RCAIDE.Library.Components.landing_gear import LandingGear
+from RCAIDE.Library.Components.nacelles import Nacelle
+from RCAIDE.Library.Components.wings import Wing
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components

@@ -18,7 +18,7 @@ import networkx as nx
 
 from RCAIDE.utils import init_field, inputs, outputs
 
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
 
 from RCAIDE.Framework import Process, ProcessStep
 

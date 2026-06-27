@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
+from RCAIDE.Library.Components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
 from RCAIDE.Framework import Aircraft, Settings, State
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices

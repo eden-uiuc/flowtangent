@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 
 import RCAIDE.Library as rcl
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 import RCAIDE.Framework as rcf
 
@@ -45,13 +45,13 @@ def func_operating_systems(
         + 1.8 * full_powered_controls
     )  # 3.5 if Fully Powered
 
-    tail_area_imp = tail_area / Units.ft**2
+    tail_area_imp = tail_area / units.ft**2
 
-    fc_mass = (fc_scaler * tail_area_imp) * Units.lbm
+    fc_mass = (fc_scaler * tail_area_imp) * units.lbm
 
     # Hydraulics & Pneumatics System Mass
 
-    hp_mass = (0.65 * reference_area) * Units.lbm
+    hp_mass = (0.65 * reference_area) * units.lbm
 
     return total_opsys_mass, fc_mass, hp_mass
 

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # package imports
 import equinox as eqx
 
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
+from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
 
 # RCAIDE Imports
 from RCAIDE.Framework.Conditions.Energy import EnergyNodeConditions, FuelTankConditions, TurbojetNetworkConditions

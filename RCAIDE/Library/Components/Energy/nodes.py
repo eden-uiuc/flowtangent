@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library import Component, Units
-from RCAIDE.Library.Gases import Air, IdealGas
+from RCAIDE.Library import Component, units
+from RCAIDE.Library.gases import Air, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -144,10 +144,10 @@ class FlowNode(EnergyNode):
 class OfftakeShaft(EnergyNode):
     tag: str = init_field("Offtake Shaft", static=True)
 
-    power_draw: float = 1.0 * Units.W
+    power_draw: float = 1.0 * units.W
 
-    reference_temperature: float = 288.15 * Units.K
-    reference_pressure: float = 101325.0 * Units.Pa
+    reference_temperature: float = 288.15 * units.K
+    reference_pressure: float = 101325.0 * units.Pa
 
     def transmit(self, state: State, system: System, settings: Settings):
         return state, system, settings

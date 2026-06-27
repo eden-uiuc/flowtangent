@@ -46,7 +46,15 @@ def update_freestream(
     gamma = atmo.compute_gamma(alt)
 
     updated_fs = eqx.tree_at(
-        lambda f: (f.density, f.pressure, f.temperature, f.speed_of_sound, f.dynamic_viscosity, f.gamma, f.Cp),
+        lambda f: (
+            f.density,
+            f.pressure,
+            f.temperature,
+            f.speed_of_sound,
+            f.dynamic_viscosity,
+            f.gamma,
+            f.Cp
+            ),
         state.freestream,
         (
             r,

@@ -19,10 +19,10 @@ from plotly.subplots import make_subplots
 
 import RCAIDE.utils as ru
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from RCAIDE.Library.Components.Airfoils import Airfoil
+from RCAIDE.Library.Components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from RCAIDE.Library.Components.airfoils import Airfoil
 
 from RCAIDE.Framework import Process, State, Settings, GradientMap
 from RCAIDE.Framework.systems import Aircraft
@@ -316,14 +316,14 @@ def VORJAX_ONERA_M6():
     AR = 3.8
     taper = 0.56
     
-    sweep_qc = 26.7 * Units.deg
-    sweep_le = 30.0 * Units.deg
-    sweep_te = 15.8 * Units.deg
+    sweep_qc = 26.7 * units.deg
+    sweep_le = 30.0 * units.deg
+    sweep_te = 15.8 * units.deg
 
-    c_root = 805.9 * Units.mm
-    semispan = 1196.3 * Units.mm
+    c_root = 805.9 * units.mm
+    semispan = 1196.3 * units.mm
 
-    mac = 0.64607 * Units.m
+    mac = 0.64607 * units.m
 
     segments = (
         WingSegment(
@@ -911,7 +911,7 @@ if __name__ == "__main__":
         for n_seg in trange(1, max_segments+1, desc="Running Elliptical Test Cases"):
             vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=n_seg)
 
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(vehicle, alpha=2.0 * units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
             f_st, f_sys, f_setts, jac = results
 
             CL.append(ru.get_target(f_st, lift_path).item(0))
@@ -928,11 +928,11 @@ if __name__ == "__main__":
             h = step_sizes[i]
 
             # Forward Step
-            res_fwd = VORJAX_test_run(vehicle, alpha=(2.0 * Units.deg) + h, Mach=0.00, debug_mode=DEBUG)
+            res_fwd = VORJAX_test_run(vehicle, alpha=(2.0 * units.deg) + h, Mach=0.00, debug_mode=DEBUG)
             CL_fwd = ru.get_target(res_fwd[0], lift_path).item(0)
             
             # Backward Step
-            res_bwd = VORJAX_test_run(vehicle, alpha=(2.0 * Units.deg) - h, Mach=0.00, debug_mode=DEBUG)
+            res_bwd = VORJAX_test_run(vehicle, alpha=(2.0 * units.deg) - h, Mach=0.00, debug_mode=DEBUG)
             CL_bwd = ru.get_target(res_bwd[0], lift_path).item(0)
             
             # Central Difference
@@ -968,7 +968,7 @@ if __name__ == "__main__":
             n_cw = n_cws[i]
 
             # Forward Step
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg, Mach=0.00, n_sw=n_sw, n_cw=n_cw, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(vehicle, alpha=2.0 * units.deg, Mach=0.00, n_sw=n_sw, n_cw=n_cw, grad_map=grad_map, debug_mode=DEBUG)
             f_st, f_sys, f_setts, jac = results
 
             jac.block_until_ready()
@@ -992,7 +992,7 @@ if __name__ == "__main__":
             vehicle = VORJAX_delta_wing(AR=ARs[i])
             grad_truth = grad_jones[i]
 
-            results = VORJAX_test_run(vehicle, alpha=2.0 * Units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
+            results = VORJAX_test_run(vehicle, alpha=2.0 * units.deg , Mach=0.00, grad_map=grad_map, debug_mode=DEBUG)
             f_st, f_sys, f_setts, jac = results
 
             CL.append(ru.get_target(f_st, lift_path).item(0))
@@ -1010,7 +1010,7 @@ if __name__ == "__main__":
     # ONERA M6 Mach Sweep ----------------------------------------------------------------------------------------------
     if TEST_ONERA:
         
-        alpha = [3.06 * Units.deg] * 21
+        alpha = [3.06 * units.deg] * 21
         Mach =  [0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
 
         alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))

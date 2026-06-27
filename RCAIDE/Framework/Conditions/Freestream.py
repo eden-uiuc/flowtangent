@@ -13,8 +13,8 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import empty_array, init_field
 
-from RCAIDE.Library.Atmospheres import Atmosphere, USStandard1976
-from RCAIDE.Library.Planets import Earth, Planet
+from RCAIDE.Library.atmospheres import Atmosphere, USStandard1976
+from RCAIDE.Library.planets import Earth, Planet
 
 from RCAIDE.Framework.Conditions import StateCondition
 

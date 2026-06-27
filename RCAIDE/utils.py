@@ -64,7 +64,7 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
 
 
 def get_RCAIDE_root():
-    return Path(os.path.dirname(os.path.abspath(__file__))).parents[0].resolve()
+    return Path(os.path.dirname(os.path.abspath(__file__))).resolve()
 
 
 # ---------------------------------------------------------

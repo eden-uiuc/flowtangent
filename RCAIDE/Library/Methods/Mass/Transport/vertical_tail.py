@@ -10,7 +10,7 @@
 
 import jax.numpy as np
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 import RCAIDE.Framework as rcf
 
@@ -59,10 +59,10 @@ def func_vertical_tail(
         N/A
     """
 
-    b = wingspan / Units.ft
-    S = reference_area / Units.ft**2
-    MTOW = vehicle_maximum_takeoff_weight / Units.lbm
-    Sref = vehicle_reference_area / Units.ft**2
+    b = wingspan / units.ft
+    S = reference_area / units.ft**2
+    MTOW = vehicle_maximum_takeoff_weight / units.lbm
+    Sref = vehicle_reference_area / units.ft**2
 
     # Shorthand Aliases
     tc = thickness_to_chord
@@ -70,7 +70,7 @@ def func_vertical_tail(
 
     v_tail_mass = (
         2.62 * S * 1.5e-5 * vehicle_ultimate_load * b**3 * (8.0 + 0.44 * MTOW / Sref) / (tc * np.cos(qc) ** 2)
-    ) * Units.lbs
+    ) * units.lbs
 
     v_tail_mass += rudder_fraction * 1.6
 

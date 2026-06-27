@@ -16,7 +16,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 # -------------------------------------------------------------------------------
 # Aircraft Classes
@@ -58,22 +58,22 @@ class AircraftClass(eqx.Module):
 
 def _BizJetFixed():
     return FixedMasses(
-        flight_crew_mass=480.0 * Units.lbm,
-        flight_attendants_mass=210.0 * Units.lbm,
-        instruments_mass=100.0 * Units.lbm,
-        avionics_mass=300.0 * Units.lbm,
-        apu_mass=154.0 * Units.lbm,
-        flight_control_mass=0.0 * Units.lbm,
-        hyd_pnu_mass=0.0 * Units.lbm,
+        flight_crew_mass=480.0 * units.lbm,
+        flight_attendants_mass=210.0 * units.lbm,
+        instruments_mass=100.0 * units.lbm,
+        avionics_mass=300.0 * units.lbm,
+        apu_mass=154.0 * units.lbm,
+        flight_control_mass=0.0 * units.lbm,
+        hyd_pnu_mass=0.0 * units.lbm,
     )
 
 
 def _BizJetPer():
     return PerSeatMasses(
-        operating_items_mass=28.0 * Units.lbm,
-        electrical_equipment_mass=13.0 * Units.lbm,
-        environmental_mass=15.0 * Units.lbm,
-        furnishings_mass=89.663 * Units.lbm,
+        operating_items_mass=28.0 * units.lbm,
+        electrical_equipment_mass=13.0 * units.lbm,
+        environmental_mass=15.0 * units.lbm,
+        furnishings_mass=89.663 * units.lbm,
     )
 
 
@@ -91,22 +91,22 @@ class BusinessJet(AircraftClass):
 
 def _MRFixed():
     return FixedMasses(
-        flight_crew_mass=720.0 * Units.lbm,
-        flight_attendants_mass=1050.0 * Units.lbm,
-        instruments_mass=800.0 * Units.lbm,
-        avionics_mass=900.0 * Units.lbm,
-        apu_mass=154.0 * Units.lbm,
-        flight_control_mass=0.0 * Units.lbm,
-        hyd_pnu_mass=0.0 * Units.lbm,
+        flight_crew_mass=720.0 * units.lbm,
+        flight_attendants_mass=1050.0 * units.lbm,
+        instruments_mass=800.0 * units.lbm,
+        avionics_mass=900.0 * units.lbm,
+        apu_mass=154.0 * units.lbm,
+        flight_control_mass=0.0 * units.lbm,
+        hyd_pnu_mass=0.0 * units.lbm,
     )
 
 
 def _MRPer():
     return PerSeatMasses(
-        operating_items_mass=28.0 * Units.lbm,
-        electrical_equipment_mass=13.0 * Units.lbm,
-        environmental_mass=15.0 * Units.lbm,
-        furnishings_mass=89.663 * Units.lbm,
+        operating_items_mass=28.0 * units.lbm,
+        electrical_equipment_mass=13.0 * units.lbm,
+        environmental_mass=15.0 * units.lbm,
+        furnishings_mass=89.663 * units.lbm,
     )
 
 

@@ -26,7 +26,7 @@ import sklearn
 # RCAIDE imports
 from RCAIDE.utils import DataPath, init_field
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline, peaked_CL_spline
 
 from RCAIDE.Framework import Process, ProcessStep
@@ -108,23 +108,23 @@ class Surrogate(eqx.Module):
 
     blend_transonic: bool = True
 
-    angle_of_attack: jnp.ndarray = init_field(lambda: jnp.linspace(-5.0, 15.0, 40) * Units.deg)
-    sideslip_angle: jnp.ndarray = init_field(lambda: jnp.linspace(0.0, 15.0, 30) * Units.deg)
+    angle_of_attack: jnp.ndarray = init_field(lambda: jnp.linspace(-5.0, 15.0, 40) * units.deg)
+    sideslip_angle: jnp.ndarray = init_field(lambda: jnp.linspace(0.0, 15.0, 30) * units.deg)
     mach: jnp.ndarray = init_field(lambda: jnp.linspace(0.0, 0.85, 20))
 
-    aileron_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * Units.deg)
-    elevator_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * Units.deg)
-    rudder_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * Units.deg)
-    flap_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * Units.deg)
-    slat_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * Units.deg)
+    aileron_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    elevator_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    rudder_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    flap_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    slat_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
 
     u: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
     v: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
     w: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
 
-    pitch_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * Units.rad / Units.s)
-    roll_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * Units.rad / Units.s)
-    yaw_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * Units.rad / Units.s)
+    pitch_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
+    roll_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
+    yaw_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
 
     def fit(self, *args, **kwargs):
         return self.surrogate.fit(*args, **kwargs)

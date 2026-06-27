@@ -9,7 +9,7 @@
 import jax.numpy as np
 
 import RCAIDE.Library as rcl
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 import RCAIDE.Framework as rcf
 
@@ -90,12 +90,12 @@ def func_fuselage(
 
     # Unit Conversion
 
-    dp = fuselage_differential_pressure / (Units.lbf / Units.ft**2)
-    w = fuselage_width / Units.ft
-    h = fuselage_maximum_height / Units.ft
-    l = (fuselage_total_length - vehicle_main_wing_root_chord / 2.0) / Units.ft
-    m = (vehicle_max_zero_fuel_mass - vehicle_main_wing_mass - vehicle_propulsion_mass) / Units.lbm
-    S = fuselage_wetted_area / Units.ft**2
+    dp = fuselage_differential_pressure / (units.lbf / units.ft**2)
+    w = fuselage_width / units.ft
+    h = fuselage_maximum_height / units.ft
+    l = (fuselage_total_length - vehicle_main_wing_root_chord / 2.0) / units.ft
+    m = (vehicle_max_zero_fuel_mass - vehicle_main_wing_mass - vehicle_propulsion_mass) / units.lbm
+    S = fuselage_wetted_area / units.ft**2
 
     # Limiting Factor Determination
 
@@ -107,7 +107,7 @@ def func_fuselage(
     else:
         limit_idx = (pressure_idx**2 + geometry_idx**2) / (2 * geometry_idx)
 
-    fuselage_mass = ((1.051 + 0.102 * limit_idx) * S) * Units.lbm
+    fuselage_mass = ((1.051 + 0.102 * limit_idx) * S) * units.lbm
 
     return fuselage_mass
 

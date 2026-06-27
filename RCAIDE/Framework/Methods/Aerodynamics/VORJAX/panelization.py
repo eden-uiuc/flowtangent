@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 # package imports
 from RCAIDE.utils import inputs, outputs
 
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingSweeps
+from RCAIDE.Library.Components.wings import Wing, WingSegment, WingSweeps
 
 # from RCAIDE.Library.Components.Wings import All_Moving_Surface
 

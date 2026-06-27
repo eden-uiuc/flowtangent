@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
+from RCAIDE.Library.Components.Energy import maps
+
 if TYPE_CHECKING:
     from RCAIDE.Framework import Settings, State, System
     from RCAIDE.Framework.Conditions.Energy import TurbojetNetworkConditions
@@ -24,8 +26,8 @@ import RCAIDE.utils as ru
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library.Components.Energy.Nodes import EnergyInput, EnergySplitter, FlowNode
-from RCAIDE.Library.Gases import Air, BurnedJetA, IdealGas
+from RCAIDE.Library.Components.Energy.nodes import EnergyInput, FlowNode
+from RCAIDE.Library.gases import Air, BurnedJetA, IdealGas
 from RCAIDE.Library.Methods.Energy.Transmission.Combustors import func_combustor_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Fan_Compressors import func_fan_compressor_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import (
@@ -34,8 +36,9 @@ from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import (
 )
 from RCAIDE.Library.Methods.Energy.Transmission.Turbines import func_turbine_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import func_thrust_and_power
-from RCAIDE.Library.Propellants import JetA, Propellant
-from RCAIDE.Library.Components.Energy.TurboMaps import CompressorMap, TurbineMap, MapData
+from RCAIDE.Library.propellants import JetA, Propellant
+from RCAIDE.Library.Components.Energy import maps
+from RCAIDE.Library.Components.Energy.maps import CompressorMap, TurbineMap
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors
 # ----------------------------------------------------------------------------------------------------------------------
@@ -137,7 +140,7 @@ def _comp_alpha_schedule(Nc, Nc_design):
 class Compressor(FlowNode):
     tag: str = init_field("Compressor", static=True)
     
-    map: CompressorMap = init_field(CompressorMap.from_json(MapData/"AXI5.json"))
+    map: CompressorMap = init_field(maps.AXI5)
     
     alpha_schedule: Callable = init_field(_comp_alpha_schedule, as_value=True, static=True)
 
@@ -245,7 +248,7 @@ class TurbojetCombustor(FlowNode):
 class Turbine(FlowNode):
     tag: str = init_field("Turbine", static=True)
 
-    map: TurbineMap = init_field(TurbineMap.from_json(MapData/"LPT2269.json"))
+    map: TurbineMap = init_field(maps.LPT2269)
 
     alpha_schedule: Callable = init_field(lambda Np, Np_des: 1.0, as_value=True, static=True)
 
@@ -494,7 +497,7 @@ class Fan(FlowNode):
     tag: str = init_field("Fan", static=True)
     inputs: tuple = init_field((EnergyInput("flow", "Inlet Nozzle"),), static=True)
 
-    map: CompressorMap = init_field(CompressorMap.from_json(MapData/"Fan.json"))
+    map: CompressorMap = init_field(maps.Fan)
 
     @ru.inputs(
         "state.freestream.Cp",

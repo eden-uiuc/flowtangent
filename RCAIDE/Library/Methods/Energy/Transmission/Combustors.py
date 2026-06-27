@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.Library.Gases import CO2, O2, IdealGas, Steam
+from RCAIDE.Library.gases import CO2, O2, IdealGas, Steam
 from RCAIDE.Library.Methods.Energy.Transmission import Rayleigh, fM
 
 # ----------------------------------------------------------------------------------------------------------------------

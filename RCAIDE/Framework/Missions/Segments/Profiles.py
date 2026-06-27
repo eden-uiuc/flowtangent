@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 from RCAIDE.Framework import ProcessStep
 
@@ -32,7 +32,7 @@ from RCAIDE.Framework import ProcessStep
 class ConstantCourse(ProcessStep):
     tag: str = init_field("Set Constant Course", static=True)
 
-    true_course: float = 0.0 * Units.deg
+    true_course: float = 0.0 * units.deg
 
     def __call__(self, state, system, settings):
         course_arr = jnp.full_like(state.freestream.altitude, self.true_course)
@@ -48,7 +48,7 @@ CourseProfile = ConstantCourse
 
 class ConstantAltitude(ProcessStep):
     tag: str = init_field("Set Constant Altitude", static=True)
-    altitude: float = 1.0 * Units.km
+    altitude: float = 1.0 * units.km
 
     def __call__(self, state, system, settings):
         # Z points down, so position vector gets negative altitude
@@ -66,8 +66,8 @@ class ConstantAltitude(ProcessStep):
 
 class AltitudeChange(ProcessStep):
     tag: str = init_field("Set Altitude Change", static=True)
-    initial_altitude: float = 1.0 * Units.km
-    final_altitude: float = 10.0 * Units.km
+    initial_altitude: float = 1.0 * units.km
+    final_altitude: float = 10.0 * units.km
 
     def __call__(self, state, system, settings):
         t_nondim = state.numerics.dimensionless.control_points
@@ -92,7 +92,7 @@ PositionProfile = ConstantAltitude | AltitudeChange
 
 class ConstantSpeed(ProcessStep):
     tag: str = init_field("Set Constant Speed", static=True)
-    speed: float = 1.0 * Units.m / Units.s
+    speed: float = 1.0 * units.m / units.s
 
     def __call__(self, state, system, settings):
         new_speed = jnp.full_like(state.freestream.speed, self.speed)
@@ -134,7 +134,7 @@ SpeedProfile = ConstantSpeed | ConstantMach
 class ConstantAltitudeChangeRate(ProcessStep):
     tag: str = init_field("Set Constant Alt. Change Rate", static=True)
 
-    change_rate: float = 0.0 * Units.m / Units.s
+    change_rate: float = 0.0 * units.m / units.s
 
     def __call__(self, state, system, settings):
         v_mag = state.freestream.speed
@@ -155,7 +155,7 @@ VelocityProfile = ConstantAltitudeChangeRate
 
 class FixedDistance(ProcessStep):
     tag: str = init_field("Set Fixed Distance Duration", static=True)
-    distance: float = 1.0 * Units.km
+    distance: float = 1.0 * units.km
 
     def __call__(self, state, system, settings):
         v_avg = jnp.linalg.norm(jnp.average(state.frames.inertial.velocity_vector, axis=0))
@@ -173,7 +173,7 @@ class FixedDistance(ProcessStep):
 
 class FixedTime(ProcessStep):
     tag: str = init_field("Set Fixed Time Duration", static=True)
-    time: float = 1.0 * Units.s
+    time: float = 1.0 * units.s
 
     def __call__(self, state, system, settings):
         t_0 = state.frames.inertial.time[0, 0]

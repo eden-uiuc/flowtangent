@@ -12,7 +12,7 @@ import equinox as eqx
 
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Planets
@@ -30,7 +30,7 @@ class Planet(eqx.Module):
 
 
 class Earth(Planet):
-    mass: float = init_field(5.972e24 * Units.kg, static=True)
-    mean_radius: float = init_field(6371e3 * Units.m, static=True)
-    sea_level_gravity: float = init_field(9.80665 * Units.parse("m / s**2"), static=True)
+    mass: float = init_field(5.972e24 * units.kg, static=True)
+    mean_radius: float = init_field(6371e3 * units.m, static=True)
+    sea_level_gravity: float = init_field(9.80665 * units.parse("m / s**2"), static=True)
     HitchHikersGuide: str = init_field("MostlyHarmless", static=True)

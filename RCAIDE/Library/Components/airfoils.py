@@ -7,29 +7,23 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import os
 from decimal import Decimal
-from os import path
 from pathlib import Path
+from functools import lru_cache
 
 # package imports
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
-from RCAIDE.utils import empty_array, init_field
+from RCAIDE.utils import empty_array, init_field, get_RCAIDE_root
 
 from RCAIDE.Library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Airfoil Data Locator
-# ----------------------------------------------------------------------------------------------------------------------
-
-AirfoilData = Path(path.join(path.dirname(__file__), "Airfoil_Data"))
-
-# ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
-
 
 class Airfoil(Component):
     tag: str = init_field("Airfoil", static=True)
@@ -264,3 +258,30 @@ class Airfoil(Component):
             y_upper_surface=jnp.array(y_up_interp),
             y_lower_surface=jnp.array(y_lo_interp),
         )
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Airfoil Directory
+# ----------------------------------------------------------------------------------------------------------------------
+
+_AF_DIR = get_RCAIDE_root()/ "/Library/Data/Airfoil_Files"
+
+@lru_cache(maxsize=None)
+def _load_map_from_disk(name: str):
+    """Hidden helper that does the disk I/O, safely cached, and routes by type."""
+    file_path = _AF_DIR / f"{name}.txt"
+    if not file_path.exists():
+        raise AttributeError(f"Map '{name}' not found in RCAIDE library ({_AF_DIR}).")
+    
+    return Airfoil.from_file(file_path)
+
+def __getattr__(name: str):
+    """Intercepts module-level attribute access."""
+    if name.startswith("_"):
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    return _load_map_from_disk(name)
+
+def __dir__():
+    """Allows IDEs and the `dir()` command to see the available maps."""
+    if _AF_DIR.exists():
+        return [f.stem for f in _AF_DIR.glob("*.json")]
+    return []

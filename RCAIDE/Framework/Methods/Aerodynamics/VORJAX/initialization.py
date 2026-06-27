@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from RCAIDE.Library.Components.Wings import Wing
+    from RCAIDE.Library.Components.wings import Wing
 
     from RCAIDE.Framework.settings import Settings
     from RCAIDE.Framework.state import State

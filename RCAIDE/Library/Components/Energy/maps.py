@@ -1,13 +1,15 @@
+import os
 import json
-from os import path
 from pathlib import Path
+from functools import lru_cache
 
 import equinox as eqx
 import jax.numpy as jnp
+import pycycle.api as pyc
 from jax.scipy.ndimage import map_coordinates
 
-from RCAIDE.utils import empty_array, init_field
-from RCAIDE.Library import Units
+from RCAIDE.utils import empty_array, init_field, get_RCAIDE_root
+from RCAIDE.Library import units
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions
@@ -22,7 +24,6 @@ def get_fractional_coords(grid_1d, value):
 
     idx = jnp.interp(value, grid_1d, jnp.arange(len(grid_1d)))
     return idx
-
 
 
 # -----------------------------------------------------------------------------------------------------------------------
@@ -104,9 +105,9 @@ class CompressorMap(eqx.Module):
         Wc_table  = jnp.array(data["Wc"]).reshape(shape)
         PR_table  = jnp.array(data["PR"]).reshape(shape)
         eff_table = jnp.array(data["eff"]).reshape(shape)
-        
-        
+
         return cls(
+            tag=Path(filepath).stem,
             alpha_grid=alpha_grid,
             Nc_grid=Nc_grid,
             Rline_grid=Rline_grid,
@@ -184,6 +185,7 @@ class TurbineMap(eqx.Module):
         eff_table  = jnp.array(data["eff"]).reshape(shape)
         
         return cls(
+            tag=Path(filepath).stem,
             alpha_grid=alpha_grid,
             Np_grid=Np_grid,
             PR_grid=PR_grid,
@@ -196,13 +198,47 @@ class TurbineMap(eqx.Module):
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-MapData = Path(path.join(path.dirname(__file__), "Map_Data"))
+_MAP_DIR = get_RCAIDE_root()/"Library/Data/Turbo_Maps"
 
-import os
-import json
-import pycycle.api as pyc
+@lru_cache(maxsize=None)
+def _load_map_from_disk(name: str):
+    """Hidden helper that does the disk I/O, safely cached, and routes by type."""
+    file_path = _MAP_DIR / f"{name}.json"
+    if not file_path.exists():
+        raise AttributeError(f"Map '{name}' not found in RCAIDE library ({_MAP_DIR}).")
+    
+    # 1. Peek inside the JSON to grab the metadata
+    with open(file_path, "r") as f:
+        data = json.load(f)
+        
+    # 2. Extract the type (defaulting to compressor for legacy safety)
+    map_type = data.get("type", "compressor").lower()
+    
+    # 3. Dispatch to the correct class
+    # (Assuming your classes have a classmethod like .from_dict() or .from_json())
+    if map_type == "compressor":
+        return CompressorMap.from_json(file_path)
+    elif map_type == "turbine":
+        return TurbineMap.from_json(file_path)
+    else:
+        raise ValueError(f"Unrecognized map type '{map_type}' in {name}.json")
 
-def harvest_pycycle_maps(output_dir=MapData):
+def __getattr__(name: str):
+    """Intercepts module-level attribute access."""
+    # Ignore private attributes to prevent messing with Python internals
+    if name.startswith("_"):
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+    
+    return _load_map_from_disk(name)
+
+def __dir__():
+    """Allows IDEs and the `dir()` command to see the available maps."""
+    # List all .json files in the directory without their extensions
+    if _MAP_DIR.exists():
+        return [f.stem for f in _MAP_DIR.glob("*.json")]
+    return []
+
+def harvest_pycycle_maps(output_dir=_MAP_DIR):
     """Extracts legacy NEPP maps and their design anchors from PyCycle."""
     
     os.makedirs(output_dir, exist_ok=True)
@@ -254,9 +290,9 @@ def harvest_pycycle_maps(output_dir=MapData):
                 val_units = map_obj.units.get(pyc_attr, None)
                 if val_units is not None:
                     if val_units == 'rpm':
-                        val = val * Units.rev / Units.mins
+                        val = val * units.rev / units.mins
                     else:
-                        val = val * Units.parse(val_units)
+                        val = val * units.parse(val_units)
                 if hasattr(val, "tolist"):
                     json_data[json_key] = val.tolist()
                 else:
@@ -268,9 +304,9 @@ def harvest_pycycle_maps(output_dir=MapData):
             val_units = map_obj.units.get(pyc_attr, None)
             if val_units is not None:
                 if val_units == 'rpm':
-                    val = val * Units.rev / Units.mins
+                    val = val * units.rev / units.mins
                 else:
-                    val = val * Units.parse(val_units)
+                    val = val * units.parse(val_units)
             if val is not None:
                 json_data[json_key] = val
                 

@@ -13,10 +13,10 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.Library import Units
+from RCAIDE.Library import units
 from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.Airfoils import Airfoil
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
+from RCAIDE.Library.Components.airfoils import Airfoil
+from RCAIDE.Library.Components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 
 from RCAIDE.Framework.systems import Aircraft
 
@@ -54,8 +54,8 @@ def parse_avl_file(filepath: str | Path) -> dict:
         "filepath": str(Path(filepath).absolute()),
         "mach": float(cleaned_lines[1].split()[0]),
         "symmetry": [float(x) for x in cleaned_lines[2].split()[:3]],
-        "reference_area": [float(x) * Units.ft**2 for x in cleaned_lines[3].split()[:3]],
-        "reference_point": [float(x) * Units.ft for x in cleaned_lines[4].split()[:3]],
+        "reference_area": [float(x) * units.ft**2 for x in cleaned_lines[3].split()[:3]],
+        "reference_point": [float(x) * units.ft for x in cleaned_lines[4].split()[:3]],
         "surfaces": [],
     }
 
@@ -89,7 +89,7 @@ def parse_avl_file(filepath: str | Path) -> dict:
 
         elif token == "TRANSLATE":
             i += 1
-            current_surface["translate"] = [float(x) * Units.ft for x in cleaned_lines[i].split()]
+            current_surface["translate"] = [float(x) * units.ft for x in cleaned_lines[i].split()]
 
         elif token == "SCALE":
             i += 1
@@ -101,11 +101,11 @@ def parse_avl_file(filepath: str | Path) -> dict:
 
             current_surface["sections"].append(
                 {
-                    "x_le": section_data[0] * current_surface["scale"][0] * Units.ft,
-                    "y_le": section_data[1] * current_surface["scale"][1] * Units.ft,
-                    "z_le": section_data[2] * current_surface["scale"][2] * Units.ft,
-                    "chord": section_data[3] * Units.ft,
-                    "twist": section_data[4] * Units.deg,
+                    "x_le": section_data[0] * current_surface["scale"][0] * units.ft,
+                    "y_le": section_data[1] * current_surface["scale"][1] * units.ft,
+                    "z_le": section_data[2] * current_surface["scale"][2] * units.ft,
+                    "chord": section_data[3] * units.ft,
+                    "twist": section_data[4] * units.deg,
                     "airfoil_naca": None,
                     "airfoil_file": None,
                 }

@@ -229,7 +229,7 @@ def generate_vortex_distribution(geometry,settings):
     # Deflect Control Surfaces
     # ---------------------------------------------------------------------------------------      
     for wing in VD.VLM_wings:
-        wing_is_all_moving = (not wing.is_a_control_surface) and issubclass(wing.wing_type, RCAIDE.Library.Components.Wings.All_Moving_Surface)        
+        wing_is_all_moving = (not wing.is_a_control_surface) and issubclass(wing.wing_type, RCAIDE.Library.Components.wings.All_Moving_Surface)        
         if wing.is_a_control_surface or wing_is_all_moving:
             # Deflect the control surface
             VD, wing = Legacy.trunk.S.Methods.Aerodynamics.Common.Fidelity_Zero.Lift.deflect_control_surface(VD, wing)
