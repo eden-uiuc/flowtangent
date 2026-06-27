@@ -1,14 +1,16 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from RCAIDE.Framework import State, System, Settings
+    from RCAIDE.Framework import Settings, State, System
 
 import equinox as eqx
 import jax.numpy as jnp
 
 from RCAIDE.utils import init_field, inputs, outputs
 
-from .nodes import EnergyNode, EnergySplitter, EnergyStore, FuelTank, EnergyInput
+from .nodes import EnergyInput, EnergyNode, EnergySplitter, EnergyStore, FuelTank
 from .propulsors import Propulsor, TurbojetEngine
 
 # ----------------------------------------------------------------------------------------------------------------------

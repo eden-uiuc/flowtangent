@@ -6,18 +6,17 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-import os
 import json
-from pathlib import Path
 from functools import lru_cache
 
 # package imports
 import equinox as eqx
 import jax.numpy as jnp
 
+from RCAIDE.utils import empty_array, get_RCAIDE_root, init_field
+
 # RCAIDE imports
 from RCAIDE.Library import units
-from RCAIDE.utils import empty_array, init_field, get_RCAIDE_root
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Ideal Gases
@@ -266,7 +265,7 @@ class GasComposition(eqx.Module):
                     new_elements += (_get_gas(elem.upper()),)
                 except AttributeError:
                     raise ValueError(f"Unrecognized element '{elem}' not found in database.")
-            
+
             elif isinstance(elem, IdealGas):
                 new_elements += (elem,)
             else:
@@ -333,7 +332,7 @@ def _build_air():
     return MixedGas(
         tag="Air",
         composition=GasComposition(
-            elements=("O2", "AR", "CO2", "N2"), 
+            elements=("O2", "AR", "CO2", "N2"),
             mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552])
         ),
     )
@@ -406,25 +405,25 @@ ATOMIC_MASSES = {
 
 def parse_chemkin_thermo(filepath: str, output_path: str):
     database = {}
-    
+
     with open(filepath, 'r') as f:
         lines = f.readlines()
-        
+
     i = 0
     while i < len(lines):
         line = lines[i].replace('\n', '')
-        
+
         # Skip header lines, blank lines, or comments (usually start with !)
         if not line or line.startswith('!') or line.startswith('THERMO'):
             i += 1
             continue
-            
+
         # The line ending in '1' (at column 79) is the species header
         if len(line) >= 80 and line[79] == '1':
-            
+
             # 1. Parse the Header Line (Strict Column Slicing)
             species_name = line[0:18].strip()
-            
+
             # Extract Atomic Composition (Four 5-character blocks)
             composition = {}
             for col in range(24, 44, 5):
@@ -432,38 +431,38 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
                 count_str = line[col+2:col+5].strip()
                 if element and count_str:
                     composition[element] = int(count_str)
-                    
+
             # Calculate Molecular Weight
             try:
                 molecular_mass = sum(ATOMIC_MASSES[elem] * count for elem, count in composition.items())
             except KeyError as e:
                 print(f"Warning: Missing atomic weight for element {e} in species {species_name}. Defaulting to 0.0")
                 molecular_mass = 0.0
-                    
+
             phase = line[44].strip()
-            
+
             # Temperature bounds
             t_low = float(line[45:55].strip())
             t_high = float(line[55:65].strip())
             t_mid = float(line[65:75].strip())
-            
+
             # 2. Parse the Coefficients (Next 3 lines)
             line2 = lines[i+1]
             line3 = lines[i+2]
             line4 = lines[i+3]
-            
+
             def extract(l, start):
                 return float(l[start:start+15].strip())
 
             # Line 2: First 5 High-Temp Coeffs
             h1, h2, h3, h4, h5 = [extract(line2, j) for j in range(0, 75, 15)]
-            
+
             # Line 3: Last 2 High-Temp Coeffs, First 3 Low-Temp Coeffs
             h6, h7, l1, l2, l3 = [extract(line3, j) for j in range(0, 75, 15)]
-            
+
             # Line 4: Last 4 Low-Temp Coeffs
             l4, l5, l6, l7 = [extract(line4, j) for j in range(0, 60, 15)]
-            
+
             # 3. Store in Dictionary
             database[species_name] = {
                 "phase": phase,
@@ -475,14 +474,14 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
                 "nasa_high_coeffs": [h1, h2, h3, h4, h5, h6, h7],
                 "nasa_low_coeffs": [l1, l2, l3, l4, l5, l6, l7]
             }
-            
+
             i += 4 # Skip past the 4 lines we just parsed
         else:
             i += 1
-            
+
     with open(output_path, 'w') as f:
         json.dump(database, f, indent=4)
-        
+
     print(f"Successfully harvested {len(database)} species into {output_path}")
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -503,12 +502,12 @@ def _load_database():
 def _get_gas(name: str):
     """Fetches the gas from the cached database and builds the Equinox module."""
     db = _load_database()
-    
+
     if name not in db:
         raise AttributeError(f"Species '{name}' not found in the thermo database.")
-    
+
     data = db[name]
-    
+
     # Construct and return your Equinox IdealGas module
     return IdealGas(
         tag=name,
@@ -521,11 +520,11 @@ def __getattr__(name: str):
     """Intercepts module-level attribute access."""
     if name.startswith("_"):
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-    
+
     # First, check if the user is asking for a custom mixture
     if name in _CUSTOM_MIXTURES:
         return _CUSTOM_MIXTURES[name]()
-        
+
     # If not, fall back to the thermodynamic database
     return _get_gas(name)
 
@@ -534,6 +533,6 @@ def __dir__():
     available_species = []
     if _DB_PATH.exists():
         available_species.extend(_load_database().keys())
-        
+
     available_species.extend(_CUSTOM_MIXTURES.keys())
     return available_species

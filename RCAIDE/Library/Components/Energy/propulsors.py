@@ -26,6 +26,7 @@ import RCAIDE.utils as ru
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
+from RCAIDE.Library.Components.Energy.maps import CompressorMap, TurbineMap
 from RCAIDE.Library.Components.Energy.nodes import EnergyInput, FlowNode
 from RCAIDE.Library.gases import Air, BurnedJetA, IdealGas
 from RCAIDE.Library.Methods.Energy.Transmission.Combustors import func_combustor_performance
@@ -37,8 +38,7 @@ from RCAIDE.Library.Methods.Energy.Transmission.Nozzles import (
 from RCAIDE.Library.Methods.Energy.Transmission.Turbines import func_turbine_performance
 from RCAIDE.Library.Methods.Energy.Transmission.Turbofans import func_thrust_and_power
 from RCAIDE.Library.propellants import JetA, Propellant
-from RCAIDE.Library.Components.Energy import maps
-from RCAIDE.Library.Components.Energy.maps import CompressorMap, TurbineMap
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Propulsors
 # ----------------------------------------------------------------------------------------------------------------------
@@ -139,9 +139,9 @@ def _comp_alpha_schedule(Nc, Nc_design):
 
 class Compressor(FlowNode):
     tag: str = init_field("Compressor", static=True)
-    
+
     map: CompressorMap = init_field(maps.AXI5)
-    
+
     alpha_schedule: Callable = init_field(_comp_alpha_schedule, as_value=True, static=True)
 
     @ru.inputs(
@@ -281,7 +281,7 @@ class Turbine(FlowNode):
         network_state: TurbojetNetworkConditions = state.energy
         Np = network_state.rotation_speed
         PR = network_state.turbine_PR
-        
+
         Np_des = self.map.Np_des
         alpha = self.alpha_schedule(Np, Np_des)
 

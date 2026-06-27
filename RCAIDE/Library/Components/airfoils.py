@@ -7,17 +7,16 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import os
 from decimal import Decimal
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 
 # package imports
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # RCAIDE imports
-from RCAIDE.utils import empty_array, init_field, get_RCAIDE_root
+from RCAIDE.utils import empty_array, get_RCAIDE_root, init_field
 
 from RCAIDE.Library import Component
 
@@ -271,7 +270,7 @@ def _load_map_from_disk(name: str):
     file_path = _AF_DIR / f"{name}.txt"
     if not file_path.exists():
         raise AttributeError(f"Map '{name}' not found in RCAIDE library ({_AF_DIR}).")
-    
+
     return Airfoil.from_file(file_path)
 
 def __getattr__(name: str):

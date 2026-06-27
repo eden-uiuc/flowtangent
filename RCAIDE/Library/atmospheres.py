@@ -16,8 +16,8 @@ import jax.numpy as jnp
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
-from RCAIDE.Library.gases import IdealGas, Air
-from RCAIDE.Library.planets import Planet, Earth
+from RCAIDE.Library.gases import Air, IdealGas
+from RCAIDE.Library.planets import Earth, Planet
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Atmospheres

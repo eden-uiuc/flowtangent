@@ -105,4 +105,4 @@ def update_design_parameters(turbojet: TurbojetEngine):
 
     return updated_turbojet
 
-# def 
+# def

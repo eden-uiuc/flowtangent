@@ -18,7 +18,6 @@ from RCAIDE.utils import empty_array, init_field
 
 from RCAIDE.Framework.Conditions import (
     AerodynamicsConditions,
-    StateCondition,
     ControlsConditions,
     DynamicsConditions,
     EnergyNetworkConditions,
@@ -27,6 +26,7 @@ from RCAIDE.Framework.Conditions import (
     MassConditions,
     Numerics,
     StabilityConditions,
+    StateCondition,
 )
 
 # ----------------------------------------------------------------------------------------------------------------------

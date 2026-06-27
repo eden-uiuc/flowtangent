@@ -65,4 +65,4 @@ section-order = [
 [tool.ruff.lint.per-file-ignores]
 # __init__.py files are designed to re-export modules. 
 # Ignore unused imports (F401) in all of them globally.
-"__init__.py" = ["F401"]
+"__init__.py" = ["F401", "I"]

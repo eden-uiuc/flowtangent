@@ -68,7 +68,7 @@ def func_turbine_performance(
 ):
     # Target exit pressure based on the given PR
     P_t_out = P_t / PR
-    
+
     # Newton-Raphson to find the real-gas T_t_out that satisfies the polytropic relation
     # Initial guess using a rough ideal-gas approximation
     gamma_guess = gas.compute_gamma(T_t)
@@ -78,14 +78,14 @@ def func_turbine_performance(
         # Average gamma across the expansion
         gamma_out = gas.compute_gamma(T_t_out)
         gamma_avg = 0.5 * (gamma_guess + gamma_out)
-        
+
         # Calculate the PR that this T_t_out would yield
         exponent = gamma_avg / ((gamma_avg - 1.0) * n_flow)
         PR_calc = (T_t / T_t_out) ** exponent
-        
+
         # Analytical 1D Jacobian: d(PR_calc) / d(T_out)
         dPR_dT = -exponent * (PR_calc / T_t_out)
-        
+
         # True Newton-Raphson Step: T_new = T_old - f(x) / f'(x)
         error = PR_calc - PR
         T_t_out = T_t_out - (error / dPR_dT)
@@ -93,9 +93,9 @@ def func_turbine_performance(
     # 3. Calculate actual work extracted per kg of core air
     h_t_in = gas.compute_enthalpy(T_t)
     h_t_out = gas.compute_enthalpy(T_t_out)
-    
+
     # Turbine mass flow is higher than compressor due to added fuel
-    extracted_work = (1.0 + FAR) * (h_t_in - h_t_out) 
+    extracted_work = (1.0 + FAR) * (h_t_in - h_t_out)
 
     return T_t_out, P_t_out, h_t_out, extracted_work
 

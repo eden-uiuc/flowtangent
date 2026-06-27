@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from RCAIDE.Framework.Conditions.Controls import ControlVariable, DirectControlVariable, DynamicResidual
+    from RCAIDE.Framework.Conditions.Controls import ControlVariable, DynamicResidual
 
 from dataclasses import replace
 from graphlib import CycleError, TopologicalSorter
@@ -22,10 +22,11 @@ import equinox as eqx
 import jax
 
 # RCAIDE imports
-from RCAIDE.utils import init_field, DataPath
+from RCAIDE.utils import init_field
 
-from .lines import TurbojetEnergyLine, EnergyLine
 from RCAIDE.Library.Components.Energy.nodes import EnergyDomain, EnergyInput, EnergyNode
+
+from .lines import EnergyLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Lines
