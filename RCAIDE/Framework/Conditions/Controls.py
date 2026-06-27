@@ -61,6 +61,7 @@ NamedResidual = Literal[
     "moment_z",
 ]
 
+
 class DynamicsConditions(StateCondition):
     """
     Represents the dynamics variables for a simulation.
@@ -206,7 +207,9 @@ def _default_velocity():
 
 
 def _default_altitude():
-    return DirectControlVariable(tag="Altitude", path=DataPath(("frames", "inertial", "position_vector", slice(None, 2))))
+    return DirectControlVariable(
+        tag="Altitude", path=DataPath(("frames", "inertial", "position_vector", slice(None, 2)))
+    )
 
 
 class ControlsConditions(StateCondition):

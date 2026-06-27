@@ -229,8 +229,8 @@ class EnergyNetwork(EnergyNode):
 
 #     return W, work, thrust
 
-class TurbojetEnergyNetwork(EnergyNetwork):
 
+class TurbojetEnergyNetwork(EnergyNetwork):
     tag: str = init_field("Turbojet Network", static=True)
 
     # controls: tuple[ControlVariable, ...] = init_field(_TurbojetControls)

@@ -58,11 +58,12 @@ if TYPE_CHECKING:
 
 #     return T_t_out, P_t_out, h_t_out
 
+
 def func_turbine_performance(
-    gas,          # The BurnedGas mixture
-    FAR,          # Fuel-to-air ratio from the combustor
-    PR,           # Pressure Ratio (guessed by global solver or map)
-    n_flow,       # Polytropic efficiency (from the TurbineMap)
+    gas,  # The BurnedGas mixture
+    FAR,  # Fuel-to-air ratio from the combustor
+    PR,  # Pressure Ratio (guessed by global solver or map)
+    n_flow,  # Polytropic efficiency (from the TurbineMap)
     T_t,
     P_t,
 ):
@@ -98,6 +99,7 @@ def func_turbine_performance(
     extracted_work = (1.0 + FAR) * (h_t_in - h_t_out)
 
     return T_t_out, P_t_out, h_t_out, extracted_work
+
 
 def turbine_performance(
     state: "rcf.state",

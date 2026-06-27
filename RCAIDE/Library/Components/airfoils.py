@@ -24,6 +24,7 @@ from RCAIDE.Library import Component
 #  Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class Airfoil(Component):
     tag: str = init_field("Airfoil", static=True)
 
@@ -258,11 +259,13 @@ class Airfoil(Component):
             y_lower_surface=jnp.array(y_lo_interp),
         )
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil Directory
 # ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = get_RCAIDE_root()/ "/Library/Data/Airfoil_Files"
+_AF_DIR = get_RCAIDE_root() / "/Library/Data/Airfoil_Files"
+
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):
@@ -273,11 +276,13 @@ def _load_map_from_disk(name: str):
 
     return Airfoil.from_file(file_path)
 
+
 def __getattr__(name: str):
     """Intercepts module-level attribute access."""
     if name.startswith("_"):
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
     return _load_map_from_disk(name)
+
 
 def __dir__():
     """Allows IDEs and the `dir()` command to see the available maps."""

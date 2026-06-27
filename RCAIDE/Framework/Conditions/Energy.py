@@ -146,14 +146,17 @@ class FuelTankConditions(EnergyStoreConditions):
 
     mass: jnp.ndarray = empty_array(0)
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Lines
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 class EnergyLineConditions(StateCondition):
     converters: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Converters"))
     propulsors: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Converters"))
     stores: StateCondition = init_field(lambda: StateCondition(tag="Energy Line Stores"))
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks
@@ -161,7 +164,6 @@ class EnergyLineConditions(StateCondition):
 
 
 class EnergyNetworkConditions(StateCondition):
-
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)
@@ -180,8 +182,8 @@ class EnergyNetworkConditions(StateCondition):
     turbine_PR: jnp.ndarray = empty_array(0)
     target_thrust: jnp.ndarray = empty_array(0)
 
-class TurbojetNetworkConditions(EnergyNetworkConditions):
 
+class TurbojetNetworkConditions(EnergyNetworkConditions):
     tag: str = init_field("Turbojet Network", static=True)
 
     rotation_speed: jnp.ndarray = empty_array(0)

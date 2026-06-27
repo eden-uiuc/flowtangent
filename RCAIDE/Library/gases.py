@@ -250,6 +250,7 @@ class IdealGas(eqx.Module):
 #  Mixed Gases
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class GasComposition(eqx.Module):
     elements: tuple[str | IdealGas, ...] = init_field(tuple)
     mass_fractions: jnp.ndarray = empty_array()
@@ -326,26 +327,29 @@ class MixedGas(IdealGas):
         S_mixed = jnp.sum(S_arr * self.composition.mass_fractions, axis=-1)
         return S_mixed
 
+
 @lru_cache(maxsize=1)
 def _build_air():
     """Private builder for standard air."""
     return MixedGas(
         tag="Air",
         composition=GasComposition(
-            elements=("O2", "AR", "CO2", "N2"),
-            mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552])
+            elements=("O2", "AR", "CO2", "N2"), mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552])
         ),
     )
+
 
 _CUSTOM_MIXTURES = {
     "Air": _build_air,
 }
 
+
 def Air():
     return MixedGas(
         tag="Air",
         composition=GasComposition(
-            elements=("O2", "Ar", "CO2", "N2"), mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552])
+            elements=("O2", "Ar", "CO2", "N2"),
+            mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552]),
         ),
     )
 
@@ -382,53 +386,56 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
     # Return the dynamically mixed composition
     return GasComposition(
         elements=("O2", "AR", "CO2", "N2", "H2O"),
-        mass_fractions=jnp.concatenate([m_O2 / m_total, m_Ar / m_total, m_CO2 / m_total, m_N2 / m_total, m_H2O / m_total], axis=-1),
+        mass_fractions=jnp.concatenate(
+            [
+                m_O2 / m_total,
+                m_Ar / m_total,
+                m_CO2 / m_total,
+                m_N2 / m_total,
+                m_H2O / m_total,
+            ],
+            axis=-1,
+        ),
     )
 
 
 def BurnedJetA(FAR: float | jnp.ndarray) -> MixedGas:
     return MixedGas(tag="Burned Jet-A", composition=burned_JetA_composition(FAR))
 
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  CHEMKIN Harvester
 # ----------------------------------------------------------------------------------------------------------------------
 
 # Standard atomic weights in g/mol
-ATOMIC_MASSES = {
-    "H": 1.008,
-    "C": 12.011,
-    "N": 14.007,
-    "O": 15.999,
-    "AR": 39.948,
-    "S": 32.065
-}
+ATOMIC_MASSES = {"H": 1.008, "C": 12.011, "N": 14.007, "O": 15.999, "AR": 39.948, "S": 32.065}
+
 
 def parse_chemkin_thermo(filepath: str, output_path: str):
     database = {}
 
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         lines = f.readlines()
 
     i = 0
     while i < len(lines):
-        line = lines[i].replace('\n', '')
+        line = lines[i].replace("\n", "")
 
         # Skip header lines, blank lines, or comments (usually start with !)
-        if not line or line.startswith('!') or line.startswith('THERMO'):
+        if not line or line.startswith("!") or line.startswith("THERMO"):
             i += 1
             continue
 
         # The line ending in '1' (at column 79) is the species header
-        if len(line) >= 80 and line[79] == '1':
-
+        if len(line) >= 80 and line[79] == "1":
             # 1. Parse the Header Line (Strict Column Slicing)
             species_name = line[0:18].strip()
 
             # Extract Atomic Composition (Four 5-character blocks)
             composition = {}
             for col in range(24, 44, 5):
-                element = line[col:col+2].strip().upper() # .upper() for safety
-                count_str = line[col+2:col+5].strip()
+                element = line[col : col + 2].strip().upper()  # .upper() for safety
+                count_str = line[col + 2 : col + 5].strip()
                 if element and count_str:
                     composition[element] = int(count_str)
 
@@ -447,12 +454,12 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
             t_mid = float(line[65:75].strip())
 
             # 2. Parse the Coefficients (Next 3 lines)
-            line2 = lines[i+1]
-            line3 = lines[i+2]
-            line4 = lines[i+3]
+            line2 = lines[i + 1]
+            line3 = lines[i + 2]
+            line4 = lines[i + 3]
 
             def extract(l, start):
-                return float(l[start:start+15].strip())
+                return float(l[start : start + 15].strip())
 
             # Line 2: First 5 High-Temp Coeffs
             h1, h2, h3, h4, h5 = [extract(line2, j) for j in range(0, 75, 15)]
@@ -472,23 +479,25 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
                 "T_high": t_high,
                 "T_mid": t_mid,
                 "nasa_high_coeffs": [h1, h2, h3, h4, h5, h6, h7],
-                "nasa_low_coeffs": [l1, l2, l3, l4, l5, l6, l7]
+                "nasa_low_coeffs": [l1, l2, l3, l4, l5, l6, l7],
             }
 
-            i += 4 # Skip past the 4 lines we just parsed
+            i += 4  # Skip past the 4 lines we just parsed
         else:
             i += 1
 
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(database, f, indent=4)
 
     print(f"Successfully harvested {len(database)} species into {output_path}")
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Thermo Database
 # ----------------------------------------------------------------------------------------------------------------------
 
 _DB_PATH = get_RCAIDE_root() / "Library/Data/thermo_database.json"
+
 
 @lru_cache(maxsize=1)
 def _load_database():
@@ -497,6 +506,7 @@ def _load_database():
         raise FileNotFoundError(f"Database not found at {_DB_PATH}")
     with open(_DB_PATH, "r") as f:
         return json.load(f)
+
 
 @lru_cache(maxsize=None)
 def _get_gas(name: str):
@@ -516,6 +526,7 @@ def _get_gas(name: str):
         nasa_high_coeffs=tuple(data["nasa_high_coeffs"]),
     )
 
+
 def __getattr__(name: str):
     """Intercepts module-level attribute access."""
     if name.startswith("_"):
@@ -527,6 +538,7 @@ def __getattr__(name: str):
 
     # If not, fall back to the thermodynamic database
     return _get_gas(name)
+
 
 def __dir__():
     """Allows IDEs to see both JSON species and custom mixtures."""

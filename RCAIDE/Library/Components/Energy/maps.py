@@ -96,15 +96,15 @@ class CompressorMap(eqx.Module):
 
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
-        Nc_grid    = jnp.array(data["Nc"])
+        Nc_grid = jnp.array(data["Nc"])
         Rline_grid = jnp.array(data["Rline"])
 
         # Define expected 3D shape
         shape = (len(alpha_grid), len(Nc_grid), len(Rline_grid))
 
         # Extract and reshape 3D tables
-        Wc_table  = jnp.array(data["Wc"]).reshape(shape)
-        PR_table  = jnp.array(data["PR"]).reshape(shape)
+        Wc_table = jnp.array(data["Wc"]).reshape(shape)
+        PR_table = jnp.array(data["PR"]).reshape(shape)
         eff_table = jnp.array(data["eff"]).reshape(shape)
 
         return cls(
@@ -115,19 +115,18 @@ class CompressorMap(eqx.Module):
             Wc_table=Wc_table,
             PR_table=PR_table,
             eff_table=eff_table,
-            Nc_des = data["Nc_des"],
-            alpha_des = data['alpha_des'],
+            Nc_des=data["Nc_des"],
+            alpha_des=data["alpha_des"],
             Rline_des=data["Rline_des"],
             Rline_stall=data["Rline_stall"],
         )
 
 
 class TurbineMap(eqx.Module):
-
     tag: str = init_field("Turbine Map", static=True)
 
     # 1D Grid Axes
-    alpha_grid: jnp.ndarray = empty_array() # Turbine Nozzle Ratio
+    alpha_grid: jnp.ndarray = empty_array()  # Turbine Nozzle Ratio
     Np_grid: jnp.ndarray = empty_array()
     PR_grid: jnp.ndarray = empty_array()
 
@@ -166,7 +165,7 @@ class TurbineMap(eqx.Module):
         return Wp, eff
 
     @classmethod
-    def from_json(cls, filepath: str|Path):
+    def from_json(cls, filepath: str | Path):
         """Loads a JSON compressor map and initializes the Equinox module."""
 
         # Read raw JSON data
@@ -175,15 +174,15 @@ class TurbineMap(eqx.Module):
 
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
-        Np_grid    = jnp.array(data["Np"])
+        Np_grid = jnp.array(data["Np"])
         PR_grid = jnp.array(data["PR"])
 
         # Define expected 3D shape
         shape = (len(alpha_grid), len(Np_grid), len(PR_grid))
 
         # Extract and reshape 3D tables
-        Wp_table  = jnp.array(data["Wp"]).reshape(shape)
-        eff_table  = jnp.array(data["eff"]).reshape(shape)
+        Wp_table = jnp.array(data["Wp"]).reshape(shape)
+        eff_table = jnp.array(data["eff"]).reshape(shape)
 
         return cls(
             tag=Path(filepath).stem,
@@ -191,7 +190,7 @@ class TurbineMap(eqx.Module):
             Np_grid=Np_grid,
             PR_grid=PR_grid,
             Wp_table=Wp_table,
-            eff_table=eff_table
+            eff_table=eff_table,
         )
 
 
@@ -199,7 +198,8 @@ class TurbineMap(eqx.Module):
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-_MAP_DIR = get_RCAIDE_root()/"Library/Data/Turbo_Maps"
+_MAP_DIR = get_RCAIDE_root() / "Library/Data/Turbo_Maps"
+
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):
@@ -224,6 +224,7 @@ def _load_map_from_disk(name: str):
     else:
         raise ValueError(f"Unrecognized map type '{map_type}' in {name}.json")
 
+
 def __getattr__(name: str):
     """Intercepts module-level attribute access."""
     # Ignore private attributes to prevent messing with Python internals
@@ -232,12 +233,14 @@ def __getattr__(name: str):
 
     return _load_map_from_disk(name)
 
+
 def __dir__():
     """Allows IDEs and the `dir()` command to see the available maps."""
     # List all .json files in the directory without their extensions
     if _MAP_DIR.exists():
         return [f.stem for f in _MAP_DIR.glob("*.json")]
     return []
+
 
 def harvest_pycycle_maps(output_dir=_MAP_DIR):
     """Extracts legacy NEPP maps and their design anchors from PyCycle."""
@@ -268,7 +271,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
         "WcMap": "Wc",
         "WpMap": "Wp",
         "effMap": "eff",
-        "RlineStall": "Rline_stall"
+        "RlineStall": "Rline_stall",
     }
 
     # The scalar design/anchor points PyCycle uses to center the map
@@ -277,7 +280,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
         "NcMap": "Nc_des",
         "NpMap": "Np_des",
         "PR": "PR_des",
-        "RlineMap": "Rline_des"
+        "RlineMap": "Rline_des",
     }
 
     for map_name, (map_obj, map_type) in maps_to_harvest.items():
@@ -290,7 +293,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
                 val = getattr(map_obj, pyc_attr)
                 val_units = map_obj.units.get(pyc_attr, None)
                 if val_units is not None:
-                    if val_units == 'rpm':
+                    if val_units == "rpm":
                         val = val * units.rev / units.mins
                     else:
                         val = val * units.parse(val_units)
@@ -304,7 +307,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             val = map_obj.defaults.get(pyc_attr, None)
             val_units = map_obj.units.get(pyc_attr, None)
             if val_units is not None:
-                if val_units == 'rpm':
+                if val_units == "rpm":
                     val = val * units.rev / units.mins
                 else:
                     val = val * units.parse(val_units)
@@ -317,6 +320,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             json.dump(json_data, f, indent=4)
 
         print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
+
 
 if __name__ == "__main__":
     harvest_pycycle_maps()

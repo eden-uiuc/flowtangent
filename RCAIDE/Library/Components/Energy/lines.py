@@ -17,6 +17,7 @@ from .propulsors import Propulsor, TurbojetEngine
 #  Energy Line
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class EnergyLine(EnergyNode):
     _bookkeeping: dict = init_field(
         lambda: {
@@ -26,6 +27,7 @@ class EnergyLine(EnergyNode):
         },
         static=True,
     )
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
@@ -43,10 +45,13 @@ def _TurbojetLineSetup():
 class TurbojetEnergyLine(EnergyLine):
     tag: str = init_field("Turbojet Energy Line", static=True)
 
-    fuel_inputs: tuple[str, ...] = init_field((
-        EnergyInput("fuel", "self.engine_1"),
-        EnergyInput("fuel", "self.engine_2")),
-    static=True)
+    fuel_inputs: tuple[str, ...] = init_field(
+        (
+            EnergyInput("fuel", "self.engine_1"),
+            EnergyInput("fuel", "self.engine_2"),
+        ),
+        static=True,
+    )
 
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
 

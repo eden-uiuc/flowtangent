@@ -53,8 +53,8 @@ def update_freestream(
             f.speed_of_sound,
             f.dynamic_viscosity,
             f.gamma,
-            f.Cp
-            ),
+            f.Cp,
+        ),
         state.freestream,
         (
             r,

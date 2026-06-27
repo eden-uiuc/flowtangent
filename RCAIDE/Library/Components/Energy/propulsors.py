@@ -169,10 +169,10 @@ class Compressor(FlowNode):
 
         PR, Wc, eff = self.map.evaluate(alpha, Nc, Rline)
 
-        T_t=self.average_inputs(state, "flow", "stagnation_temperature")
-        P_t=self.average_inputs(state, "flow", "stagnation_pressure")
+        T_t = self.average_inputs(state, "flow", "stagnation_temperature")
+        P_t = self.average_inputs(state, "flow", "stagnation_pressure")
 
-        W = Wc * (P_t/101325.)/(jnp.sqrt(T_t/288.15))
+        W = Wc * (P_t / 101325.0) / (jnp.sqrt(T_t / 288.15))
 
         work, P_t_out, T_t_out, h_t_out = func_fan_compressor_performance(
             gas=self.working_fluid,
@@ -253,9 +253,7 @@ class Turbine(FlowNode):
     alpha_schedule: Callable = init_field(lambda Np, Np_des: 1.0, as_value=True, static=True)
 
     inputs: tuple = init_field(
-        (
-            EnergyInput("fuel", "Combustor"),
-        ),
+        (EnergyInput("fuel", "Combustor"),),
         static=True,
     )
 
@@ -285,11 +283,11 @@ class Turbine(FlowNode):
         Np_des = self.map.Np_des
         alpha = self.alpha_schedule(Np, Np_des)
 
-        T_t=self.average_inputs(state, "flow", "stagnation_temperature")
-        P_t=self.average_inputs(state, "flow", "stagnation_pressure")
+        T_t = self.average_inputs(state, "flow", "stagnation_temperature")
+        P_t = self.average_inputs(state, "flow", "stagnation_pressure")
 
         Wp, n_p = self.map.evaluate(alpha, Np, PR)
-        W = Wp * (P_t/101325.)/(jnp.sqrt(T_t/288.15))
+        W = Wp * (P_t / 101325.0) / (jnp.sqrt(T_t / 288.15))
 
         T_t_out, P_t_out, h_t_out, work = func_turbine_performance(
             gas=BurnedJetA(FAR),
@@ -380,8 +378,7 @@ class ExpansionNozzle(FlowNode):
 def _TurbojetSetup():
 
     inlet = InletNozzle()
-    comp = Compressor(
-        tag="Compressor", inputs=(EnergyInput("flow", "Inlet Nozzle"),))
+    comp = Compressor(tag="Compressor", inputs=(EnergyInput("flow", "Inlet Nozzle"),))
     comb = TurbojetCombustor()
 
     turb = Turbine(
@@ -412,7 +409,13 @@ class TurbojetEngine(Propulsor):
     fuel: Propellant = init_field(JetA)
     working_fluid: IdealGas = init_field(Air)
 
-    inputs: tuple = init_field((EnergyInput("flow", "self.core_nozzle"), EnergyInput("fuel", "self.combustor")), static=True)
+    inputs: tuple = init_field(
+        (
+            EnergyInput("flow", "self.core_nozzle"),
+            EnergyInput("fuel", "self.combustor"),
+        ),
+        static=True,
+    )
 
     installation_geometry: JetInstallationGeometry = init_field(JetInstallationGeometry)
 
