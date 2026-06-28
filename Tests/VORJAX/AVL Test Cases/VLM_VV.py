@@ -19,19 +19,19 @@ from plotly.subplots import make_subplots
 
 import RCAIDE.utils as ru
 
-from RCAIDE.Library import units
-from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from RCAIDE.Library.Components.airfoils import Airfoil
+from RCAIDE.library import units
+from RCAIDE.library.components import ComponentAreas
+from RCAIDE.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from RCAIDE.library.components.airfoils import Airfoil
 
-from RCAIDE.Framework import Process, State, Settings, GradientMap
-from RCAIDE.Framework.systems import Aircraft
-from RCAIDE.Framework.Conditions import Numerics
+from RCAIDE.framework import Process, State, Settings, GradientMap
+from RCAIDE.framework.systems import Aircraft
+from RCAIDE.framework.conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
+from RCAIDE.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
-from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 

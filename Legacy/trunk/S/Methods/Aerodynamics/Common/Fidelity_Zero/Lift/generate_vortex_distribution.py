@@ -229,7 +229,7 @@ def generate_vortex_distribution(geometry,settings):
     # Deflect Control Surfaces
     # ---------------------------------------------------------------------------------------      
     for wing in VD.VLM_wings:
-        wing_is_all_moving = (not wing.is_a_control_surface) and issubclass(wing.wing_type, RCAIDE.Library.Components.wings.All_Moving_Surface)        
+        wing_is_all_moving = (not wing.is_a_control_surface) and issubclass(wing.wing_type, RCAIDE.library.Components.wings.All_Moving_Surface)        
         if wing.is_a_control_surface or wing_is_all_moving:
             # Deflect the control surface
             VD, wing = Legacy.trunk.S.Methods.Aerodynamics.Common.Fidelity_Zero.Lift.deflect_control_surface(VD, wing)
@@ -352,7 +352,7 @@ def generate_wing_vortex_distribution(VD,wing,n_cw,n_sw,spc,precision):
         # Get airfoil section VD  
         if span_breaks[i_break].Airfoil: 
             airfoil_tag      = list(span_breaks[i_break].Airfoil.keys())[0] 
-            airfoil_geo_data = RCAIDE.Library.Methods.Geometry.Airfoil.import_airfoil_geometry(span_breaks[i_break].Airfoil[airfoil_tag].coordinate_file) 
+            airfoil_geo_data = RCAIDE.library.Methods.Geometry.Airfoil.import_airfoil_geometry(span_breaks[i_break].Airfoil[airfoil_tag].coordinate_file) 
             break_camber_zs.append(airfoil_geo_data.camber_coordinates)
             break_camber_xs.append(airfoil_geo_data.x_lower_surface) 
         else:

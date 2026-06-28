@@ -30,22 +30,22 @@ from plotly.subplots import make_subplots
 
 import RCAIDE.utils as ru
 
-from RCAIDE.Library import units
-from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from RCAIDE.Library.Components.airfoils import Airfoil, Airfoil_Data
+from RCAIDE.library import units
+from RCAIDE.library.components import ComponentAreas
+from RCAIDE.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from RCAIDE.library.components.airfoils import Airfoil, Airfoil_Data
 
-from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
+from RCAIDE.library.methods.Aerodynamics.Transonic import ensemble_CL_spline
 
-from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, System
-from RCAIDE.Framework.settings import AnalysisSettings
-from RCAIDE.Framework.Conditions import Numerics
+from RCAIDE.framework import Process, State, Aircraft, Settings, GradientMap, System
+from RCAIDE.framework.settings import AnalysisSettings
+from RCAIDE.framework.conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
-from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
+from RCAIDE.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from RCAIDE.framework.analyses.batched import ShardedDatasetGenerator
 
-from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 

@@ -15,13 +15,13 @@ from scipy.stats import qmc, beta
 
 from RCAIDE.utils import DataPath
 
-from RCAIDE.Library import units
-from RCAIDE.Library.Components.wings import Wing, WingChords, WingDimensions, WingSweeps
+from RCAIDE.library import units
+from RCAIDE.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from RCAIDE.Framework import Aircraft, Settings, GradientMap
-from RCAIDE.Framework.settings import AnalysisSettings
-from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
+from RCAIDE.framework import Aircraft, Settings, GradientMap
+from RCAIDE.framework.settings import AnalysisSettings
+from RCAIDE.framework.analyses.batched import ShardedDatasetGenerator
+from RCAIDE.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data

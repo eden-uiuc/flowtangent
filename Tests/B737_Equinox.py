@@ -11,30 +11,30 @@ import jax.numpy as jnp
 # RCAIDE Imports
 import RCAIDE.utils as ru
 
-from RCAIDE.Framework import Process, State, Settings
-from RCAIDE.Framework.Conditions import Numerics
-from RCAIDE.Framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from RCAIDE.framework import Process, State, Settings
+from RCAIDE.framework.conditions import Numerics
+from RCAIDE.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
+from RCAIDE.framework.Missions.Segments import Segment
+from RCAIDE.framework.Missions.Segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from RCAIDE.Framework.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
-from RCAIDE.Framework.Analyses.Energy.Sizing import update_design_parameters
-from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework.conditions.Controls import Control
+from RCAIDE.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from RCAIDE.framework.analyses.energy.sizing import update_design_parameters
+from RCAIDE.framework.analyses.energy import build_analysis_from_network
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
-from RCAIDE.Library import units
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
-from RCAIDE.Library.Components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
-from RCAIDE.Library.Components.fuselages import *
-from RCAIDE.Library.Components.landing_gear import LandingGear
-from RCAIDE.Library.Components.nacelles import Nacelle, NacelleDiameters
-from RCAIDE.Library.Components.Energy.networks import EnergyNetwork
-from RCAIDE.Library.Components.Energy.propulsors import TurbofanEngine, DesignParameters
-from RCAIDE.Library.Components.Energy.nodes import FuelTank
-from RCAIDE.Library.Components.Energy.lines import TurbojetEnergyLine
+from RCAIDE.library import units
+from RCAIDE.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
+from RCAIDE.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
+from RCAIDE.library.components.fuselages import *
+from RCAIDE.library.components.landing_gear import LandingGear
+from RCAIDE.library.components.nacelles import Nacelle, NacelleDiameters
+from RCAIDE.library.components.energy.networks import EnergyNetwork
+from RCAIDE.library.components.energy.propulsors import TurbofanEngine, JetDesign
+from RCAIDE.library.components.energy.nodes import FuelTank
+from RCAIDE.library.components.energy.lines import TurbojetEnergyLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
@@ -352,7 +352,7 @@ def vehicle_setup():
         bypass_ratio=5.4,
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
-        design_parameters=DesignParameters(
+        design_parameters=JetDesign(
             thrust=24000.,
             altitude=10668.,
             mach_number=0.78,
@@ -463,7 +463,7 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
     controls = (
         "body_angle",
         # DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True),
-        DirectControlVariable(tag='Throttle', path=("energy", "throttle"), active=True)
+        Control(tag='Throttle', state_path=("energy", "throttle"), _active=True)
     )
 
     residuals = ("force_x", "force_z")

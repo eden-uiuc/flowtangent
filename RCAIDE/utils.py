@@ -11,7 +11,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Self
+from typing import TYPE_CHECKING, Any, Callable, Self, Sequence
 
 import equinox as eqx
 import jax
@@ -169,11 +169,11 @@ def get_target(obj, path_tuple: DataPath):
     return parent
 
 
-def get_all_parents(s, input_map):
+def get_all_parents(s, input_map: Sequence[DataPath]):
     return tuple(get_parent_target(s, path) for path in input_map)
 
 
-def get_all_targets(s, input_map):
+def get_all_targets(s, input_map: Sequence[DataPath]):
     return tuple(get_target(s, path) for path in input_map)
 
 
