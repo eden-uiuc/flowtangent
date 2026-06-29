@@ -31,10 +31,10 @@ from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 from RCAIDE.utils import init_field, scan_for_invalid_JAX_types
 
 from RCAIDE.framework import Process, ProcessStep
-from RCAIDE.framework.conditions.Controls import Control, Residual
+from RCAIDE.framework.conditions.controls import Control, Residual
 from RCAIDE.framework.missions.initialize import *
 from RCAIDE.framework.missions.update import *
-from RCAIDE.framework.Processes import null_step
+from RCAIDE.framework.processes import null_step
 
 # RCAIDE imports
 from .profiles import *

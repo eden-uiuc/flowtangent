@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 from RCAIDE.utils import init_field
 
 from RCAIDE.framework import ProcessStep
-from RCAIDE.framework.conditions.Controls import Control, Control, NamedResidual
+from RCAIDE.framework.conditions.controls import Control, Control, NamedResidual
 from RCAIDE.framework.missions.Segments import Segment
 
 from .profiles import *

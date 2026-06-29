@@ -55,8 +55,7 @@ class EnergyNode(Component):
 
     inputs: tuple[EnergyInput, ...] = init_field(tuple, static=True)
 
-    def _get_inputs_by_domain(self, domain: EnergyDomain):
-        return tuple(i for i in self.inputs if i.domain == domain)
+    
 
     def __getattr__(self, item: str):
         if item.endswith("_inputs"):
@@ -64,9 +63,17 @@ class EnergyNode(Component):
             return tuple(i.network_ID for i in self._get_inputs_by_domain(domain))
         else:
             return super(EnergyNode, self).__getattr__(item)
+    
+    @eqx.filter_jit
+    def get_input(self, state, input: EnergyInput, input_field: str):
+        return getattr(getattr(state.energy.nodes[input.network_ID].outputs, input.domain), input_field)
 
     @eqx.filter_jit
-    def _get_all_inputs(self, state, input_type: EnergyDomain, input_field: str):
+    def _get_inputs_by_domain(self, domain: EnergyDomain):
+        return tuple(i for i in self.inputs if i.domain == domain)
+
+    @eqx.filter_jit
+    def get_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
         output_conditions = [
             getattr(state.energy.nodes[i.network_ID].outputs, input_type)
             for i in self._get_inputs_by_domain(input_type)
@@ -74,19 +81,19 @@ class EnergyNode(Component):
         return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
 
     @eqx.filter_jit
-    def sum_inputs(self, state, input_type: EnergyDomain, input_field: str):
-        all_inputs = self._get_all_inputs(state, input_type, input_field)
+    def sum_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
+        all_inputs = self.get_domain_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1)).T
         
 
     @eqx.filter_jit
-    def diff_inputs(self, state, input_type: EnergyDomain, input_field:str):
-        all_inputs = self._get_all_inputs(state, input_type, input_field)
+    def diff_domain_inputs(self, state, input_type: EnergyDomain, input_field:str):
+        all_inputs = self.get_domain_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.diff(all_inputs, axis=-1)).T
     
     @eqx.filter_jit
-    def average_inputs(self, state, input_type: EnergyDomain, input_field: str):
-        all_inputs = self._get_all_inputs(state, input_type, input_field)
+    def average_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
+        all_inputs = self.get_domain_inputs(state, input_type, input_field)
         return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1)).T
 
     def transmit(self, state: State, system: System, settings: Settings):
@@ -137,6 +144,9 @@ class FlowDesign(eqx.Module):
     output_temperature: float = 298.15
     
     area_ratio: float = 1.0
+    area_inlet: float = 1.0
+    area_throat: float = 1.0
+    area_exit: float = 1.0
     
     rotation_speed: float = 0.0
     noise_speed: float = 0.0

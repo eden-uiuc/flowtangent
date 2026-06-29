@@ -9,6 +9,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import os
+import time
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Self, Sequence
@@ -256,6 +258,76 @@ def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
     if not found_invalid:
         print(f"{name} is a valid PyTree.\n")
 
+# ---------------------------------------------------------
+# JAX Caching
+# ---------------------------------------------------------
+
+def initialize_jax_cache(
+    cache_dir="~/.rcaide/jax_cache", 
+    max_size_gb=2.0, 
+    max_age_days=30
+):
+    """
+    Initializes the JAX persistent compilation cache and prunes old entries.
+    Safe to call every time RCAIDE is imported.
+    """
+    # 1. Resolve the absolute path and ensure it exists
+    cache_path = os.path.expanduser(cache_dir)
+    os.makedirs(cache_path, exist_ok=True)
+    
+    # 2. Tell JAX to route all compiled XLA binaries here
+    jax.config.update("jax_compilation_cache_dir", cache_path)
+    
+    # 3. Silently prune the cache so we don't blow up the user's hard drive
+    try:
+        _prune_cache(cache_path, max_size_gb, max_age_days)
+    except Exception as e:
+        # Never let a cache cleanup error crash the main physics library
+        print(f"RCAIDE Warning: Failed to prune JAX compilation cache - {e}")
+
+def _prune_cache(cache_path, max_size_gb, max_age_days):
+    """
+    Implements an LRU (Least Recently Used) eviction policy.
+    """
+    max_size_bytes = max_size_gb * (1024 ** 3)
+    max_age_seconds = max_age_days * 24 * 3600
+    now = time.time()
+    
+    files = []
+    total_size = 0
+    
+    # Scan the directory
+    for filename in os.listdir(cache_path):
+        filepath = os.path.join(cache_path, filename)
+        if os.path.isfile(filepath):
+            stat = os.stat(filepath)
+            # Use st_atime (Last Accessed Time) for LRU, fallback to modified time
+            last_accessed = stat.st_atime
+            age = now - last_accessed
+            size = stat.st_size
+            
+            files.append((filepath, age, size))
+            total_size += size
+            
+    # Phase 1: Age-based Eviction (Delete anything older than max_age_days)
+    files_to_keep = []
+    for filepath, age, size in files:
+        if age > max_age_seconds:
+            os.remove(filepath)
+            total_size -= size
+        else:
+            files_to_keep.append((filepath, age, size))
+            
+    # Phase 2: Size-based LRU Eviction (If still too big, delete oldest accessed first)
+    if total_size > max_size_bytes:
+        # Sort descending by age (oldest accessed at the front of the list)
+        files_to_keep.sort(key=lambda x: x[1], reverse=True)
+        
+        for filepath, age, size in files_to_keep:
+            if total_size <= max_size_bytes:
+                break # We are back under the size limit
+            os.remove(filepath)
+            total_size -= size
 
 # ---------------------------------------------------------
 # General Mathematical Utilities

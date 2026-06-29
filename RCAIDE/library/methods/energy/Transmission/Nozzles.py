@@ -8,15 +8,15 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from RCAIDE.library.gases import IdealGas
 
 # package imports
 import jax.numpy as jnp
 
 # RCAIDE imports
-if TYPE_CHECKING:
-    import RCAIDE.framework as rcf
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compression Nozzle Functional Methods
@@ -24,12 +24,12 @@ if TYPE_CHECKING:
 
 
 def func_isentropic_nozzle_performance(
-    T_t,
-    P_t,
-    P0,
-    gamma,
-    PR,
-    n_r,
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    P0: jnp.ndarray,
+    gamma: jnp.ndarray,
+    PR: jnp.ndarray | float,
+    n_r: jnp.ndarray | float,
 ):
 
     # Isentropic Outputs
@@ -43,13 +43,13 @@ def func_isentropic_nozzle_performance(
 
 
 def func_compression_nozzle_performance(
-    gas,  # Replaces Cp, gamma
-    T_t,
-    P_t,
-    P0,
-    M0,
-    PR,
-    n_r,
+    gas: IdealGas,
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    P0: jnp.ndarray,
+    M0: jnp.ndarray,
+    PR: jnp.ndarray | float,
+    n_r: jnp.ndarray | float,
 ):
     # Dynamically evaluate gamma for the isentropic and shock relations
     gamma = gas.compute_gamma(T_t)
@@ -79,7 +79,7 @@ def func_compression_nozzle_performance(
     return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
 
 
-def func_expansion_nozzle_performance(
+def func_expansion_nozzle_design(
     gas,  # Local working fluid (e.g., BurnedGas)
     T_t,
     T_t0,
@@ -125,97 +125,109 @@ def func_expansion_nozzle_performance(
 
     return AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
-
-def _expansion_nozzle_performance(
-    state: "rcf.state",
-    system: "rcf.systems",
-    settings: "rcf.settings",
-    input_converter_state,
-    output_converter_state,
-    PR,
-    n_p,
+def func_expansion_nozzle_design(
+        gas: IdealGas,  # Local working fluid (e.g., BurnedGas)
+        T_t: jnp.ndarray,
+        T_t0: jnp.ndarray,
+        P_t: jnp.ndarray,
+        P_t0: jnp.ndarray,
+        mdot: jnp.ndarray,
+        P0: jnp.ndarray,
+        M0: jnp.ndarray,
+        gamma_0: jnp.ndarray,
+        PR: jnp.ndarray | float,
 ):
+    # Dynamic gas properties for the exhaust flow
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
 
-    # Get Inputs
-    T_t = input_converter_state.outputs.stagnation_temperature
-    P_t = input_converter_state.stagnation_pressure
+    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1.0)
 
-    fs = state.freestream
-    P0 = fs.pressure
-    M0 = fs.mach_number
-    Cp = fs.Cp
-    gamma = fs.gamma
-    R = fs.R
-    P_t0 = fs.stagnation_pressure
-    T_t0 = fs.stagnation_temperature
-    # Call function
+    # Supersonic Expansion / Choking Logic
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    is_choked = (P_t / P0) >= critical_PR
 
-    (AR, M, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out) = func_expansion_nozzle_performance(
-        T_t, T_t0, P_t, P_t0, P0, M0, Cp, gamma, R, PR, n_p
-    )
+    M_out = jnp.maximum(M_isn, 0.001)
 
-    # Set Input State
-    inputs = input_converter_state
+    # Recalculate static conditions
+    P_out = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    P_out = jnp.where(is_choked, P_out, P0)
 
-    inputs.stagnation_temperature = T_t
-    inputs.stagnation_pressure = P_t
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
 
-    inputs.freestream_stagnation_temperature = T_t0
-    inputs.freestream_stagnation_pressure = P_t0
-    inputs.freestream_pressure = P0
-    inputs.freestream_mach_number = M0
-    inputs.freestream_Cp = Cp
-    inputs.freestream_gamma = gamma
-    inputs.freestream_R = R
+    # Enthalpy and velocity
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
 
-    # Set Output State
-    outputs = output_converter_state
+    # Exit area
+    rho_out = P_out / (R * T_out)
+    A_exit = mdot / (rho_out * u_out)
 
-    outputs.area_ratio = AR
-    outputs.mach_number = M
+    # Throat area
+    T_star = T_t / (1.0 + (gamma - 1.0) / 2.0)
+    P_star = P_t / critical_PR
+    rho_star = P_star / (R * T_star)
+    u_star = jnp.sqrt(gamma * R * T_star)
 
-    outputs.density = r_out
-    outputs.velocity = u_out
+    A_throat_choked = mdot / (rho_star * u_star)
+    A_throat = jnp.where(is_choked, A_throat_choked, A_exit)
 
-    outputs.pressure = P_out
-    outputs.stagnation_pressure = P_t_out
+    return A_throat, A_exit, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
-    outputs.temperature = T_out
-    outputs.stagnation_temperature = T_t_out
+def func_expansion_nozzle_performance(
+        gas: IdealGas,
+        T_t: jnp.ndarray,
+        P_t: jnp.ndarray,
+        P0: jnp.ndarray,
+        A_throat: float,
+        A_exit: float,
+    ):
 
-    outputs.enthalpy = h_out
-    outputs.stagnation_enthalpy = h_t_out
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+    AR = A_exit / A_throat
 
-    return state, system, settings
+    # Check for choked flow
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    actual_PR = P_t / P0
+    choked = actual_PR >= critical_PR
 
+    # Find exit Mach number
+    M_exit_sup = 2.0
+    for _ in range(5):
+        term = (2.0 / (gamma + 1.0)) * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2)
+        power = (gamma + 1.0) / (2.0 * (gamma - 1.0))
+        AR_calc = (1.0 / M_exit_sup) * (term ** power)
+        
+        # Analytical derivative: d(A/A*) / dM
+        dAR_dM = AR_calc * (M_exit_sup**2 - 1.0) / (M_exit_sup * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2))
+        
+        # Newton step
+        M_exit_sup = M_exit_sup - (AR_calc - AR) / dAR_dM
+    
+    M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((P_t / P0)**((gamma - 1.0) / gamma) - 1.0))
+    M_exit      = jnp.where(choked, M_exit_sup, M_exit_sub)
+    M_throat    = jnp.where(choked, 1.0, M_exit)
 
-def fan_nozzle_performance(state: "rcf.state", system: "rcf.Aircraft", settings: "rcf.settings"):
-    # Get Inputs
+    # Nozzle Mass Flow
+    m_1 = (P_t * A_throat) / jnp.sqrt(R * T_t)
+    m_2 = jnp.sqrt(gamma) * M_throat
+    m_3 = (1.0 + (gamma - 1.0) / 2.0 * M_throat**2) ** (- (gamma + 1.0) / (2.0 * (gamma - 1.0)))
 
-    for l_idx, line in enumerate(system.energy.lines):
-        for p_idx, prop in enumerate(line.propulsors):
-            nozzle = prop.converters.fan_nozzle
-            PR = nozzle.pressure_ratio
-            n_p = nozzle.efficiencies.flow
+    mdot_out = m_1 * m_2 * m_3
 
-            state, system, settings = _expansion_nozzle_performance(
-                state, system, settings, prop.converters.fan, prop.converters.fan_nozzle, PR, n_p
-            )
+    P_out_choked = P_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    P_out = jnp.where(choked, P_out_choked, P0)
+    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    
+    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
+    T_t_out = T_t
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
 
-    return state, system, settings
+    rho_out = P_out / (R * T_out)
 
-
-def core_nozzle_performance(state: "rcf.state", system: "rcf.Aircraft", settings: "rcf.settings"):
-    # Get Inputs
-
-    for l_idx, line in enumerate(system.energy.lines):
-        for p_idx, prop in enumerate(line.propulsors):
-            nozzle = prop.converters.core_nozzle
-            PR = nozzle.pressure_ratio
-            n_p = nozzle.efficiencies.flow
-
-            state, system, settings = _expansion_nozzle_performance(
-                state, system, settings, prop.converters.turbines[-1], prop.converters.core_nozzle, PR, n_p
-            )
-
-    return state, system, settings
+    return mdot_out, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out

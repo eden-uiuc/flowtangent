@@ -10,7 +10,7 @@ from .Aerodynamics import (
     LiftCoefficients,
 )
 
-from .Controls import (
+from .controls import (
     ControlsConditions,
     Control,
     Residual,
@@ -28,7 +28,7 @@ from .Energy import (
 from .Frames import BodyFrame, Frame, FrameConditions, InertialFrame, PlanetFrame, WindFrame
 from .Freestream import FreestreamConditions
 from .Mass import MassConditions
-from .Numerics import NumericalTime, Numerics
+from .numerics import NumericalTime, Numerics
 from .Stability import (
     CoefficientDerivatives,
     DynamicStability,

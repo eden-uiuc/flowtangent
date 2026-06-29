@@ -19,7 +19,7 @@ from RCAIDE.framework.missions.Segments.profiles import (ConstantAltitude, Altit
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from RCAIDE.framework.conditions.Controls import Control
+from RCAIDE.framework.conditions.controls import Control
 from RCAIDE.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from RCAIDE.framework.analyses.energy.sizing import update_design_parameters
 from RCAIDE.framework.analyses.energy import build_analysis_from_network

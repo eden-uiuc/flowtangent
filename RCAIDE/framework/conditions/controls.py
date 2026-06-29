@@ -10,7 +10,6 @@
 from typing import Optional, Callable
 
 # package imports
-import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
@@ -47,7 +46,7 @@ class Residual(Condition):
     
     get_value: Callable = init_field(lambda state: jnp.empty(0), as_value=True, static=True)
 
-    _active: bool = False
+    _active: bool = init_field(False, static=True)
 
 class DynamicsConditions(Condition):
 
@@ -83,9 +82,11 @@ class Control(Condition):
     tag: str = init_field("Control", static=True)
 
     state_path: DataPath = init_field(DataPath, static=True)
-    initial_value: float | jnp.ndarray = 1.0
+    
+    # Inital values aren't actually optional, but an unset one will be flagged in State.initialize_controls
+    initial_value: Optional[float | jnp.ndarray] = None
 
-    _active: bool = False
+    _active: bool = init_field(False, static=True)
 
     def get_field_name(self):
         return self.tag.replace(" ", "_").lower()

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from RCAIDE.framework import State, System, Settings
-    from RCAIDE.framework.conditions.Controls import Control, Residual
+    from RCAIDE.framework.conditions.controls import Control, Residual
     from RCAIDE.library.atmospheres import Atmosphere
 
 from dataclasses import replace
@@ -207,7 +207,7 @@ class TurbojetEnergyNetwork(EnergyNetwork):
 
         # Total Thrust----------------------------------------------------------
 
-        total_thrust = jnp.atleast_2d(self.sum_inputs(state, "force", "thrust"))
+        total_thrust = jnp.atleast_2d(self.sum_domain_inputs(state, "force", "thrust"))
 
         total_force_vector = jnp.hstack(
             (total_thrust, jnp.zeros((total_thrust.shape[0], 2)))
@@ -220,14 +220,14 @@ class TurbojetEnergyNetwork(EnergyNetwork):
             ),
             updated_state,(
                 total_force_vector,
-                total_thrust - self.design_parameters.thrust,
+                (total_thrust - self.design_parameters.thrust)/self.design_parameters.thrust,
             )
         )
 
         # Mass & Work Imbalance -------------------------------------------------------
 
-        total_d_work = self.sum_inputs(updated_state, "residual", "work")
-        total_d_mass = self.sum_inputs(updated_state, "residual", "mass_flow_rate")
+        total_d_work = self.sum_domain_inputs(updated_state, "residual", "work")
+        total_d_mass = self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate")
 
         updated_state = eqx.tree_at(
             lambda s: (

@@ -23,7 +23,7 @@ import equinox as eqx
 
 from RCAIDE.library.components import Wing
 
-from RCAIDE.framework.conditions.Controls import Control, SurfaceControl
+from RCAIDE.framework.conditions.controls import Control, SurfaceControl
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize

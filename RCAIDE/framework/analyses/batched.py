@@ -233,7 +233,7 @@ class JAXCompileFilter(logging.Filter):
 
         # 2. If it IS a compile log, apply our strict whitelist & formatting
         if is_compile_log:
-            # Block it if it's not the main VLM solve
+            # Block it if it's not the main solve
             if "jit(run)" not in msg:
                 return False
 

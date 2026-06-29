@@ -19,6 +19,7 @@ from dataclasses import replace
 
 import jax.numpy as jnp
 import equinox as eqx
+from jaxopt import Broyden
 
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
@@ -30,7 +31,7 @@ from RCAIDE.library import units
 from RCAIDE.framework import State, Settings
 from RCAIDE.framework.settings import EnergyAnalysisSettings
 from RCAIDE.framework.analyses.residual import ResidualAnalysis
-from RCAIDE.framework.conditions.Controls import Control, Residual
+from RCAIDE.framework.conditions.controls import Control, Residual
 
 from RCAIDE.framework.missions.initialize import initialize_energy
 from RCAIDE.framework.missions.update import update_freestream
@@ -39,7 +40,7 @@ from RCAIDE.framework.missions.update import update_freestream
 #  Design Point Turbojet Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def design_turbojet(system: System):
+def design_turbojet(system: System, settings: Settings):
 
     # Setup test state according to design parameters
 
@@ -67,7 +68,7 @@ def design_turbojet(system: System):
     )
 
     des_e_settings = EnergyAnalysisSettings(design_mode=True)
-    des_settings = eqx.tree_at(lambda s: s.analysis.energy, Settings(DEBUG_MODE=True), des_e_settings)
+    des_settings = eqx.tree_at(lambda s: s.analysis.energy, settings, des_e_settings)
     des_state, des_system, des_settings = initialize_energy(des_state, system, des_settings)
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
 
@@ -88,12 +89,12 @@ def design_turbojet(system: System):
     )
 
     thrust_res = Residual(
-        tag="Design Thrust Residual",
+        tag="Design Thrust",
         get_value=lambda s: s.energy.outputs.residual.thrust
     )
 
     work_res = Residual(
-        tag="Work Residual",
+        tag="Work",
         get_value=lambda s: s.energy.outputs.residual.work
     )
 
@@ -101,12 +102,13 @@ def design_turbojet(system: System):
         tag="Turbojet Design",
         analyze=base_analysis,
         controls=(mass_ctrl, turb_ctrl),
-        residuals=(thrust_res, work_res)
+        residuals=(thrust_res, work_res),
+        solver=Broyden
     )
 
     des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
     
-    return des_state, des_system
+    return des_state, des_system, settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Off-Design Turbojet Analysis

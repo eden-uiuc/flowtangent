@@ -120,132 +120,6 @@ class IdealGas(eqx.Module):
     def compute_prandtl_number(self, T: float | jnp.ndarray = 298.0):
         return self.compute_absolute_viscosity(T) * self.compute_Cp(T) / self.compute_thermal_conductivity(T)
 
-
-# def Steam() -> IdealGas:
-#     return IdealGas(
-#         tag="Steam",
-#         molecular_mass=18.0 * Units.gram,
-#         nasa_low_coeffs=(
-#             4.19864056,
-#             -2.0364341e-03,
-#             6.52040211e-06,
-#             -5.48797062e-09,
-#             1.77197817e-12,
-#             -30293.7267,
-#             -0.849032208,
-#         ),
-#         nasa_high_coeffs=(
-#             3.03399249,
-#             2.17691804e-03,
-#             -1.64072518e-07,
-#             -9.7041987e-11,
-#             1.68200992e-14,
-#             -30004.2971,
-#             4.9667701,
-#         ),
-#     )
-
-
-# def CO2() -> IdealGas:
-#     return IdealGas(
-#         tag="Carbon Dioxide",
-#         molecular_mass=44.01 * Units.gram,
-#         nasa_low_coeffs=(
-#             2.34433112,
-#             7.98052075e-03,
-#             -1.9478151e-05,
-#             2.01572094e-08,
-#             -7.37611761e-12,
-#             -917.935173,
-#             0.683010238,
-#         ),
-#         nasa_high_coeffs=(
-#             3.3372792,
-#             -4.94024731e-05,
-#             4.99456778e-07,
-#             -1.79566394e-10,
-#             2.00255376e-14,
-#             -950.158922,
-#             -3.20502331,
-#         ),
-#     )
-
-
-# def O2() -> IdealGas:
-#     return IdealGas(
-#         tag="Oxygen",
-#         molecular_mass=32.00 * Units.gram,
-#         nasa_low_coeffs=(
-#             3.78245636,
-#             -2.99673416e-03,
-#             9.84730201e-06,
-#             -9.68129509e-09,
-#             3.24372837e-12,
-#             -1063.94356,
-#             3.65767573,
-#         ),
-#         nasa_high_coeffs=(
-#             3.28253784,
-#             1.48308754e-03,
-#             -7.57966669e-07,
-#             2.09470555e-10,
-#             -2.16717794e-14,
-#             -1088.45772,
-#             5.45323129,
-#         ),
-#     )
-
-
-# def N2() -> IdealGas:
-#     return IdealGas(
-#         tag="Nitrogen",
-#         molecular_mass=28.01 * Units.gram,
-#         nasa_low_coeffs=(
-#             3.298677,
-#             1.4082404e-03,
-#             -3.963222e-06,
-#             5.641515e-09,
-#             -2.444854e-12,
-#             -1020.8999,
-#             3.950372,
-#         ),
-#         nasa_high_coeffs=(
-#             2.926640,
-#             1.4879768e-03,
-#             -5.684760e-07,
-#             1.0097038e-10,
-#             -6.753351e-15,
-#             -922.7977,
-#             5.980528,
-#         ),
-#     )
-
-
-# def Argon() -> IdealGas:
-#     return IdealGas(
-#         tag="Argon",
-#         molecular_mass=39.948 * Units.gram,
-#         nasa_low_coeffs=(
-#             2.5,
-#             0.0,
-#             0.0,
-#             0.0,
-#             0.0,
-#             -745.375,
-#             4.36600118,
-#         ),
-#         nasa_high_coeffs=(
-#             2.5,
-#             0.0,
-#             0.0,
-#             0.0,
-#             0.0,
-#             -745.375,
-#             4.36600118,
-#         ),
-#     )
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mixed Gases
 # ----------------------------------------------------------------------------------------------------------------------
@@ -273,7 +147,8 @@ class GasComposition(eqx.Module):
                 raise ValueError(f"Invalid element type {type(elem)} supplied. Discarding...")
         object.__setattr__(self, "elements", new_elements)
 
-        if not self.mole_fractions.any():
+        @property
+        def mole_fractions(self):
             mm_mix = (
                 1
                 / jnp.sum(
@@ -281,11 +156,8 @@ class GasComposition(eqx.Module):
                 ).item()
             )
 
-            object.__setattr__(
-                self,
-                "mole_fractions",
-                tuple(self.mass_fractions[i] * mm_mix / e.molecular_mass for i, e in enumerate(self.elements)),
-            )
+            return tuple(self.mass_fractions[i] * mm_mix / e.molecular_mass for i, e in enumerate(self.elements)),
+            
 
 
 class MixedGas(IdealGas):

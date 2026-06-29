@@ -63,7 +63,6 @@ class CompressorMap(eqx.Module):
         alpha,
         Nc,
         Rline,
-        design: bool = False
     ):
 
         # Speed scaling

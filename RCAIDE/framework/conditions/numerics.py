@@ -89,7 +89,7 @@ class Numerics(Condition):
     discretization_method: Callable | None = init_field(None, static=True)
 
     solver_jacobian: str | None = init_field(None, static=True)
-    solution_tolerance: float = init_field(1e-8, static=True)
+    solution_tolerance: float = init_field(1e-6, static=True)
     max_evaluations: int = init_field(500, static=True)
     step_size: float | None = init_field(None, static=True)
 

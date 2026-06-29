@@ -71,7 +71,7 @@ class TurbojetEnergyLine(EnergyLine):
     def transmit(self, state: State, system: System, settings: Settings):
 
         # Fuel Burn --------------------------------------------------------------------------------------------------
-        total_fuel_burn = self.sum_inputs(state, "fuel", "flow_rate")
+        total_fuel_burn = self.sum_domain_inputs(state, "fuel", "flow_rate")
 
         #  Compute fuel fraction
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
@@ -112,7 +112,7 @@ class TurbojetEnergyLine(EnergyLine):
         updated_state = eqx.tree_at(
             lambda s: s.energy.nodes[self.network_ID].outputs.force.thrust,
             updated_state,
-            self.sum_inputs(updated_state, "force", "thrust")
+            self.sum_domain_inputs(updated_state, "force", "thrust")
         )
 
         # Mass & Work Imbalance ----------------------------------------------------------------------------------------
@@ -123,8 +123,8 @@ class TurbojetEnergyLine(EnergyLine):
                 s.energy.nodes[self.network_ID].outputs.residual.work,
             ),
             updated_state, (
-                self.sum_inputs(updated_state, "residual", "mass_flow_rate"),
-                self.sum_inputs(updated_state, "residual", "work"),
+                self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate"),
+                self.sum_domain_inputs(updated_state, "residual", "work"),
             )
         )
 

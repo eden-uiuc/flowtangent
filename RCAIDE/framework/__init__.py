@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .Processes import GradientMap, OptimizerInterface, Process, ProcessStep
+from .processes import GradientMap, OptimizerInterface, Process, ProcessStep
 from .settings import Settings
 from .state import State
 from .systems import Aircraft, System
