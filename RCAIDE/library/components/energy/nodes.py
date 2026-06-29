@@ -44,8 +44,8 @@ EnergyDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "res
 
 
 class EnergyInput(eqx.Module):
-    domain: EnergyDomain
-    network_ID: str
+    domain: EnergyDomain = init_field("flow", static=True)
+    network_ID: str = init_field("network", static=True)
 
 
 class EnergyNode(Component):
@@ -129,35 +129,22 @@ class EnergySplitter(EnergyNode):
 #  Flow Nodes
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-class FlowNode(EnergyNode):
+class FlowDesign(eqx.Module):
     pressure_ratio: float = 1.0
     pressure_recovery: float = 1.0
+    
+    intake_temperature: float = 298.15
+    output_temperature: float = 298.15
+    
     area_ratio: float = 1.0
-
-    design_intake_temperature: float = 298.15  # Kelvin
-
+    
     rotation_speed: float = 0.0
     noise_speed: float = 0.0
 
+class FlowNode(EnergyNode):
+    
+    design_parameters: FlowDesign = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  Mechanical Nodes
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class OfftakeShaft(EnergyNode):
-    tag: str = init_field("Offtake Shaft", static=True)
-
-    power_draw: float = 1.0 * units.W
-
-    reference_temperature: float = 288.15 * units.K
-    reference_pressure: float = 101325.0 * units.Pa
-
-    def transmit(self, state: State, system: System, settings: Settings):
-        return state, system, settings
 
 
 # ----------------------------------------------------------------------------------------------------------------------

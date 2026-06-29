@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from RCAIDE.framework import State, System, Settings
     from RCAIDE.framework.conditions.Controls import Control, Residual
-    from RCAIDE.library.components.energy.propulsors import TurbojetEngine
     from RCAIDE.library.atmospheres import Atmosphere
 
 from dataclasses import replace
@@ -27,6 +26,7 @@ import equinox as eqx
 # RCAIDE imports
 from RCAIDE.utils import init_field
 
+from RCAIDE.library import units
 from RCAIDE.library.components.energy.nodes import EnergyDomain, EnergyInput, EnergyNode
 from RCAIDE.library.atmospheres import USStandard1976
 
@@ -40,6 +40,7 @@ class NetworkDesign(eqx.Module):
 
     altitude: float = 0.0
     mach_number: float = 0.01
+    thrust: float = 1.0 * units.N
     atmosphere_model: Atmosphere = init_field(USStandard1976)
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -181,11 +182,17 @@ class EnergyNetwork(EnergyNode):
 def _TurbojetNetworkSetup():
     return (TurbojetEnergyLine(tag="Line"),)
 
+class TurbojetDesign(NetworkDesign):
+
+    initial_MFR: float = 100.0 * units.lbm / units.s
+    initial_turb_PR: float = 5.0
+
 class TurbojetEnergyNetwork(EnergyNetwork):
     tag: str = init_field("Network", static=True)
-    network_ID: str = "network"
+    network_ID: str = init_field("network", static=True)
 
     subcomponents: tuple = init_field(_TurbojetNetworkSetup)
+    design_parameters: TurbojetDesign = init_field(TurbojetDesign)
 
     inputs: tuple = init_field(
         (
@@ -203,33 +210,18 @@ class TurbojetEnergyNetwork(EnergyNetwork):
         total_thrust = jnp.atleast_2d(self.sum_inputs(state, "force", "thrust"))
 
         total_force_vector = jnp.hstack(
-            (
-                total_thrust,
-                jnp.zeros((total_thrust.shape[0], 2))
+            (total_thrust, jnp.zeros((total_thrust.shape[0], 2)))
+        )
+
+        updated_state = eqx.tree_at(
+            lambda s: (
+                s.energy.total_force_vector,
+                s.energy.outputs.residual.thrust,
+            ),
+            updated_state,(
+                total_force_vector,
+                total_thrust - self.design_parameters.thrust,
             )
-        )
-
-        updated_state = eqx.tree_at(
-            lambda s: s.energy.total_force_vector,
-            updated_state,
-            total_force_vector
-        )
-
-        # Design Thrust --------------------------------------------------------
-        total_design_thrust = 0.
-        
-        for line in self.lines:
-            for engine in line.engines:
-                engine: TurbojetEngine
-                total_design_thrust += engine.design_parameters.thrust
-            
-        
-        design_thrust_vector = total_force_vector.at[:, 0].set(total_design_thrust)
-
-        updated_state = eqx.tree_at(
-            lambda s: s.energy.design_thrust_vector,
-            updated_state,
-            design_thrust_vector
         )
 
         # Mass & Work Imbalance -------------------------------------------------------
@@ -239,8 +231,8 @@ class TurbojetEnergyNetwork(EnergyNetwork):
 
         updated_state = eqx.tree_at(
             lambda s: (
-                s.energy.work_imbalance,
-                s.energy.mass_flow_imbalance
+                s.energy.outputs.residual.work,
+                s.energy.outputs.residual.mass_flow_rate
             ),
             updated_state,(
                 total_d_work,

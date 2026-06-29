@@ -289,7 +289,7 @@ class GasComposition(eqx.Module):
 
 
 class MixedGas(IdealGas):
-    tag: str = "Mixed Gas"
+    tag: str = init_field("Mixed Gas", static=True)
 
     composition: GasComposition = init_field(GasComposition)
 

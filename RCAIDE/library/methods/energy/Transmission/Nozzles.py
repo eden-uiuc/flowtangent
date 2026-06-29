@@ -94,7 +94,7 @@ def func_expansion_nozzle_performance(
     gamma = gas.compute_gamma(T_t)
     R = gas.R_specific
 
-    (P_t_out, T_t_out, T_out_isn, M_isn) = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1.0)
+    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1.0)
 
     # Supersonic Expansion / Choking Logic
     sup = M_isn > 1.0

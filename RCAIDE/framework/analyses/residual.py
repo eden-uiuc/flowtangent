@@ -10,6 +10,7 @@
 from typing import TYPE_CHECKING, Optional, Callable
 
 import equinox as eqx
+import jax.numpy as jnp
 from jaxopt import GaussNewton
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
@@ -17,9 +18,9 @@ if TYPE_CHECKING:
     from RCAIDE.framework import State, System, Settings
     from RCAIDE.framework.conditions import ControlsConditions
 
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, scan_for_invalid_JAX_types
 from RCAIDE.framework import Process, Settings, State, System
-from RCAIDE.framework.conditions.Controls import Control, Residual, ControlsConditions
+from RCAIDE.framework.conditions.Controls import Control, Residual, ControlsConditions, DynamicsConditions
 # ----------------------------------------------------------------------------------------------------------------------
 #  Residual Minimization Analysis
 # ----------------------------------------------------------------------------------------------------------------------
@@ -61,16 +62,16 @@ class ResidualAnalysis(Process):
 
     def _activate_controls_and_dynamics(self, state: State, settings:Settings):
         
-        analysis_controls = ControlsConditions()
-        analysis_dynamics = ControlsConditions()
+        analysis_controls = ControlsConditions(tag="Analysis Controls")
+        analysis_dynamics = DynamicsConditions(tag="Analysis Dynamics")
         
         for ctrl in self.controls:
             active_ctrl = eqx.tree_at(lambda c: c._active, ctrl, True)
-            analysis_controls.add_subcondition(active_ctrl)
+            analysis_controls = analysis_controls.add_subcondition(active_ctrl)
         
         for res in self.residuals:
             active_res = eqx.tree_at(lambda c: c._active, res, True)
-            analysis_dynamics.add_subcondition(active_res)
+            analysis_dynamics = analysis_dynamics.add_subcondition(active_res)
 
         
         analysis_state = eqx.tree_at(lambda s: (
@@ -108,7 +109,7 @@ class ResidualAnalysis(Process):
     ):
         if self.solver_kwargs is None:  # Assume GaussNetwon Solver
             solver_kwargs = {
-                "residual_fun": self.get_residuals,
+                "residual_fun": self._get_residuals,
                 "tol": state.numerics.solution_tolerance,
                 "maxiter": state.numerics.max_evaluations
             }
@@ -124,9 +125,13 @@ class ResidualAnalysis(Process):
         # Set controls for current analysis
         analysis_state = self._activate_controls_and_dynamics(state, settings)
 
+        if settings.DEBUG_MODE:
+            scan_for_invalid_JAX_types(analysis_state,  "Analysis State")
+            scan_for_invalid_JAX_types(system,  "Analysis System")
+
         # Get analysis control values 
         initial_control_values = analysis_state.get_control_array()
-        final_control_values, opt_state = self._run_solver(initial_control_values, state, system, settings)
+        final_control_values, opt_state = self._run_solver(initial_control_values, analysis_state, system, settings)
 
         analysis_state = analysis_state.update_controls(final_control_values)
         

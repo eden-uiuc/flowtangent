@@ -42,7 +42,7 @@ from RCAIDE.framework.Methods.Aerodynamics.VORJAX import (
     discretize_surfaces,
     initialize_VORJAX_data,
 )
-from RCAIDE.framework.Missions.Initialize import initialize_aerodynamics
+from RCAIDE.framework.missions.initialize import initialize_aerodynamics
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings

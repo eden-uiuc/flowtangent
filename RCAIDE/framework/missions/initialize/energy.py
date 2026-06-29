@@ -18,7 +18,7 @@ import equinox as eqx
 from RCAIDE.library.components.energy.networks import EnergyNetwork
 
 # RCAIDE Imports
-from RCAIDE.framework.conditions.Energy import EnergyNodeConditions, FuelTankConditions, TurbojetNetworkConditions
+from RCAIDE.framework.conditions.Energy import EnergyNodeConditions, TurbojetNetworkConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
@@ -29,7 +29,6 @@ def initialize_energy(state: State, system: System, settings: Settings):
 
     flat_state_nodes = {}
     conditions_map = {
-        "FuelTank": FuelTankConditions,
         "TurbojetEnergyNetwork": TurbojetNetworkConditions,
     }
 

@@ -14,8 +14,8 @@ import RCAIDE.utils as ru
 from RCAIDE.framework import Process, State, Settings
 from RCAIDE.framework.conditions import Numerics
 from RCAIDE.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from RCAIDE.framework.Missions.Segments import Segment
-from RCAIDE.framework.Missions.Segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from RCAIDE.framework.missions.Segments import Segment
+from RCAIDE.framework.missions.Segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles

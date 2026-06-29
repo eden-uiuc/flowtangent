@@ -19,7 +19,6 @@ from RCAIDE.framework.conditions import Condition
 #  Energy Interfaces
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class MechanicalOutputs(Condition):
     tag = "Mechanical Outputs"
 
@@ -81,6 +80,8 @@ class ResidualOutputs(Condition):
     work: jnp.ndarray = empty_array(0)
     power: jnp.ndarray = empty_array(0)
 
+    thrust: jnp.ndarray = empty_array(0)
+
 class ForceOutputs(Condition):
     tag = "Force Outputs"
 
@@ -90,7 +91,7 @@ class ForceOutputs(Condition):
 
 
 class OutputConditions(Condition):
-    tag = "Energy Interface Conditons"
+    tag = "Node Outputs"
 
     mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
     electrical: ElectricalOutputs = init_field(ElectricalOutputs)
@@ -105,23 +106,12 @@ class EnergyNodeConditions(Condition):
     tag: str = init_field("Energy Node Conditions", static=True)
 
     outputs: OutputConditions = init_field(OutputConditions)
-    throttle: jnp.ndarray = empty_array(0)
-
-
-
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Battery Stores
+#  Energy Stores
 # ----------------------------------------------------------------------------------------------------------------------
-class EnergyStoreConditions(EnergyNodeConditions):
-    # Attribute             Type        Default Value
-    tag: str = init_field("Energy Store", static=True)
 
-    total_energy: jnp.ndarray = empty_array(0)
-    total_change_rate: jnp.ndarray = empty_array(0)
-
-
-class BatteryCellConditions(EnergyStoreConditions):
+class BatteryCellConditions(EnergyNodeConditions):
     # Attribute                 Type        Default Value
     tag: str = init_field("Battery Cell", static=True)
 
@@ -135,7 +125,7 @@ class BatteryCellConditions(EnergyStoreConditions):
     state_of_charge: jnp.ndarray = empty_array(0)
 
 
-class BatteryPackConditions(EnergyStoreConditions):
+class BatteryPackConditions(EnergyNodeConditions):
     # Attribute             Type                    Default Value
     tag: str = init_field("Battery Pack", static=True)
 
@@ -148,34 +138,11 @@ class BatteryPackConditions(EnergyStoreConditions):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Fuel Stores
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class FuelTankConditions(EnergyStoreConditions):
-    # Attribute         Type        Default Value
-    tag: str = init_field("Fuel", static=True)
-
-    mass: jnp.ndarray = empty_array(0)
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  Energy Lines
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class EnergyLineConditions(Condition):
-    converters: Condition = init_field(lambda: Condition(tag="Energy Line Converters"))
-    propulsors: Condition = init_field(lambda: Condition(tag="Energy Line Converters"))
-    stores: Condition = init_field(lambda: Condition(tag="Energy Line Stores"))
-
-
-# ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class EnergyNetworkConditions(Condition):
+class EnergyNetworkConditions(EnergyNodeConditions):
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)
@@ -194,10 +161,11 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     
     tag: str = init_field("Turbojet Network", static=True)
 
+    # Control hooks for design/sizing analysis
+    design_mass_flow_rate: jnp.ndarray = empty_array(0)
+    design_turbine_PR: jnp.ndarray = empty_array(0)
+
+    # Off-design control hooks
     rotation_speed: jnp.ndarray = empty_array(0)
     Rline: jnp.ndarray = empty_array(0)
     turbine_PR: jnp.ndarray = empty_array(0)
-
-    design_thrust_vector: jnp.ndarray = empty_array(0)
-    work_imbalance: jnp.ndarray = empty_array(0)
-    mass_flow_imbalance: jnp.ndarray = empty_array(0)

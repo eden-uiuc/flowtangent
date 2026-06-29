@@ -7,14 +7,14 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Literal, Optional, Callable
+from typing import Optional, Callable
 
 # package imports
 import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.utils import DataPath, empty_array, init_field, get_target
+from RCAIDE.utils import DataPath, init_field
 
 from RCAIDE.library import Component
 
@@ -35,20 +35,19 @@ def get_active(cond: Condition) -> tuple[Condition, ...]:
 
     for c in cond.subconditions:
         if hasattr(c, "_active") and c._active:
-            actives += c
+            actives.append(c)
         elif hasattr(c, "subconditions") and len(c.subconditions) > 0:
-            actives += get_active(c)
+            actives.append(get_active(c))
 
     return tuple(actives)
 
 
 class Residual(Condition):
     tag: str = init_field("Dynamic Residual", static=True)
-    type: str | None = init_field(None, static=True)
     
     get_value: Callable = init_field(lambda state: jnp.empty(0), as_value=True, static=True)
 
-    _active: bool = init_field(False, static=True)
+    _active: bool = False
 
 class DynamicsConditions(Condition):
 
@@ -84,7 +83,7 @@ class Control(Condition):
     tag: str = init_field("Control", static=True)
 
     state_path: DataPath = init_field(DataPath, static=True)
-    initial_value: Optional[float | jnp.ndarray] = None
+    initial_value: float | jnp.ndarray = 1.0
 
     _active: bool = False
 

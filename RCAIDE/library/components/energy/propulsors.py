@@ -76,8 +76,8 @@ class InletNozzle(FlowNode):
             P_t=fs.stagnation_pressure,
             P0=fs.pressure,
             M0=fs.mach_number,
-            PR=self.pressure_ratio,
-            n_r=self.pressure_recovery,
+            PR=self.design_parameters.pressure_ratio,
+            n_r=self.design_parameters.pressure_recovery,
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
@@ -128,19 +128,17 @@ class Compressor(FlowNode):
         network_state: TurbojetNetworkConditions = state.energy
         
         Nc_des    = jnp.atleast_2d(self.map.Nc_des)
-        Rline_des = jnp.atleast_2d(self.map.Rline_des)
-        alpha_des = jnp.atleast_2d(self.map.alpha_des)
         
         if design_mode:
-            Nc      = Nc_des
-            Rline   = Rline_des
-            alpha   = alpha_des
+            PR  = self.design_parameters.pressure_ratio
+            eff = self.efficiencies.flow
+            Wc  = network_state.design_mass_flow_rate
         else:
             Nc      = network_state.rotation_speed
             Rline   = network_state.Rline
             alpha   = self.alpha_schedule(Nc, Nc_des)
 
-        PR, Wc, eff = self.map.evaluate(alpha, Nc, Rline)
+            PR, Wc, eff = self.map.evaluate(alpha, Nc, Rline)
 
         T_t = self.average_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_inputs(state, "flow", "stagnation_pressure")
@@ -191,9 +189,9 @@ class TurbojetCombustor(FlowNode):
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
-        jet_tag = ".".join(self.network_ID.split(".")[:-1])
-        jet = system.energy_networks[0].nodes[jet_tag]
-        T_t_ref = jnp.atleast_2d(jet.design_parameters.turbine_intake_temperature)
+        jet_ID = ".".join(self.network_ID.split(".")[:-1])
+        jet = system.energy_networks[0].nodes[jet_ID]
+        T_t_ref = jnp.atleast_2d(self.design_parameters.output_temperature)
 
         P_t_out, h_t_out, f = func_combustor_performance(
             gas=self.working_fluid,
@@ -201,7 +199,7 @@ class TurbojetCombustor(FlowNode):
             P_t=self.average_inputs(state, "flow", "stagnation_pressure"),
             T_t_out=T_t_ref,
             h_t_f=jet.fuel.specific_energy,
-            PR=self.pressure_ratio,
+            PR=self.design_parameters.pressure_ratio,
             n_b=self.efficiencies.flow,
         )
 
@@ -253,18 +251,17 @@ class Turbine(FlowNode):
         network_state: TurbojetNetworkConditions = state.energy
         
         Np_des    = jnp.atleast_2d(self.map.Np_des)
-        alpha_des = jnp.atleast_2d(self.map.alpha_des)
         
         if design_mode:
-            Np    = Np_des
-            alpha = alpha_des
+            Wp = network_state.design_mass_flow_rate
+            PR = network_state.design_turbine_PR
+            n_p = self.efficiencies.flow
         else:
-            Np    = network_state.rotation_speed
+            Np = network_state.rotation_speed
+            PR = network_state.turbine_PR
             alpha = self.alpha_schedule(Np, Np_des)
-            
-        PR = network_state.turbine_PR
 
-        Wp, n_p = self.map.evaluate(alpha, Np, PR)
+            Wp, n_p = self.map.evaluate(alpha, Np, PR)
 
         T_t = self.average_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_inputs(state, "flow", "stagnation_pressure")
@@ -338,7 +335,7 @@ class ExpansionNozzle(FlowNode):
             P0=fs.pressure,
             M0=fs.mach_number,
             gamma_0=fs.gamma,
-            PR=self.pressure_ratio,
+            PR=self.design_parameters.pressure_ratio,
         )
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow

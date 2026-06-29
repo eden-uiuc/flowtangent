@@ -20,7 +20,7 @@ from RCAIDE.utils import init_field
 
 from RCAIDE.framework import ProcessStep
 from RCAIDE.framework.conditions.Controls import Control, Control, NamedResidual
-from RCAIDE.framework.Missions.Segments import Segment
+from RCAIDE.framework.missions.Segments import Segment
 
 from .profiles import *
 

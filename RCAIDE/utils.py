@@ -219,7 +219,7 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
 # ---------------------------------------------------------
 
 
-def scan_for_invalid_JAX_types(pytree, name="PyTree"):
+def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
     print(f"--- Scanning {name} for invalid dynamic leaves ---")
     found_invalid = False
 

@@ -25,8 +25,8 @@ from RCAIDE.library.components.energy.lines import TurbojetEnergyLine
 from RCAIDE.library.components.energy.networks import EnergyNetwork
 
 from RCAIDE.framework import Aircraft, Settings, State
-from RCAIDE.framework.Missions.Initialize import initialize_energy
-from RCAIDE.framework.Missions.Update import update_freestream
+from RCAIDE.framework.missions.initialize import initialize_energy
+from RCAIDE.framework.missions.update import update_freestream
 
 from .graph_network import build_analysis_from_network
 

@@ -83,7 +83,7 @@ class Numerics(Condition):
     # Attribute                 Type                Default Value
     tag: str = init_field("Numerics", static=True)
 
-    number_of_control_points: int = init_field(16, static=True)
+    number_of_control_points: int = init_field(1, static=True)
     control_point_spacing: str = init_field("cosine", static=True)
     calculate_integration: bool = init_field(True, static=True)
     discretization_method: Callable | None = init_field(None, static=True)

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from RCAIDE.framework import System
     from RCAIDE.framework.conditions.Energy import TurbojetNetworkConditions
-    from RCAIDE.library.components.energy.networks import TurbojetEnergyNetwork
+    from RCAIDE.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
 
 from dataclasses import replace
 
@@ -29,18 +29,22 @@ from RCAIDE.library import units
 
 from RCAIDE.framework import State, Settings
 from RCAIDE.framework.settings import EnergyAnalysisSettings
+from RCAIDE.framework.analyses.residual import ResidualAnalysis
 from RCAIDE.framework.conditions.Controls import Control, Residual
-from RCAIDE.framework.Missions.Initialize import initialize_energy
-from RCAIDE.framework.Missions.Update import update_freestream
+
+from RCAIDE.framework.missions.initialize import initialize_energy
+from RCAIDE.framework.missions.update import update_freestream
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Point Turbojet Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def design_turbojet(state:State, system: System, settings: Settings):
+def design_turbojet(system: System):
+
+    # Setup test state according to design parameters
 
     network: TurbojetEnergyNetwork = system.energy_networks[0]
-    des = network.design_parameters
+    des: TurbojetDesign = network.design_parameters
 
     alt = des.altitude
     M0 = des.mach_number
@@ -63,18 +67,46 @@ def design_turbojet(state:State, system: System, settings: Settings):
     )
 
     des_e_settings = EnergyAnalysisSettings(design_mode=True)
-    des_settings = eqx.tree_at(lambda s: s.analysis.energy, settings, des_e_settings)
+    des_settings = eqx.tree_at(lambda s: s.analysis.energy, Settings(DEBUG_MODE=True), des_e_settings)
     des_state, des_system, des_settings = initialize_energy(des_state, system, des_settings)
-    des_state = eqx.tree_at(lambda s: s.energy.turbine_PR, des_state, jnp.atleast_2d(8070. * units.rev/units.mins))
-    
-    
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
 
-    design_analysis = build_analysis_from_network(des_system.energy_networks[0])
+    # Build design analysis
+
+    base_analysis = build_analysis_from_network(des_system.energy_networks[0])
+
+    mass_ctrl = Control(
+        tag="Mass Flow Rate",
+        state_path=DataPath(("energy", "design_mass_flow_rate")),
+        initial_value=des.initial_MFR,
+    )
+
+    turb_ctrl = Control(
+        tag="Turbine Pressure Ratio",
+        state_path=DataPath(("energy", "design_turbine_PR")),
+        initial_value=des.initial_turb_PR,
+    )
+
+    thrust_res = Residual(
+        tag="Design Thrust Residual",
+        get_value=lambda s: s.energy.outputs.residual.thrust
+    )
+
+    work_res = Residual(
+        tag="Work Residual",
+        get_value=lambda s: s.energy.outputs.residual.work
+    )
+
+    design_analysis = ResidualAnalysis(
+        tag="Turbojet Design",
+        analyze=base_analysis,
+        controls=(mass_ctrl, turb_ctrl),
+        residuals=(thrust_res, work_res)
+    )
 
     des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
     
-    return state, des_system, settings
+    return des_state, des_system
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Off-Design Turbojet Analysis
