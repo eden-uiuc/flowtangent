@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 import equinox as eqx
 import jax.numpy as jnp
 
-from RCAIDE.utils import init_field, outputs
+from RCAIDE.utils import init_field, outputs, register
 from RCAIDE.utils import inputs as func_inputs
 
 from .nodes import EnergyInput, EnergyNode, EnergySplitter, EnergyStore, FuelTank
@@ -18,7 +18,7 @@ from .propulsors import TurbojetEngine
 #  Energy Line
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class EnergyLine(EnergyNode):
     _bookkeeping: dict = init_field(
         lambda: {
@@ -39,6 +39,7 @@ def _TurbojetLineSetup():
     return E1, tank
 
 
+@register
 class TurbojetEnergyLine(EnergyLine):
     tag: str = init_field("Turbojet Energy Line", static=True)
 

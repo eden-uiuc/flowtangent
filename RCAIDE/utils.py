@@ -9,7 +9,10 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 import os
+import gzip
+import json
 import time
+import warnings
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -183,6 +186,32 @@ def get_all_targets(s, input_map: Sequence[DataPath]):
 # PyTree Deltas
 # ---------------------------------------------------------
 
+def is_equivalent(a, b):
+    """Safely checks deep equality between any two PyTrees, arrays, or scalars."""
+    if type(a) != type(b):
+        return False
+    
+    try:
+        a_leaves, a_treedef = jax.tree_util.tree_flatten(a)
+        b_leaves, b_treedef = jax.tree_util.tree_flatten(b)
+    except Exception:
+        return False
+        
+    if a_treedef != b_treedef:
+        return False
+        
+    for la, lb in zip(a_leaves, b_leaves):
+        if isinstance(la, (jnp.ndarray, np.ndarray)):
+            if la.shape != lb.shape: 
+                return False
+            # array_equal safely handles NaNs and identical array contents
+            if not jnp.array_equal(la, lb, equal_nan=True): 
+                return False
+        else:
+            if la != lb: 
+                return False
+                
+    return True
 
 def compute_tree_delta(old_tree, new_tree):
     """Find changes between two identically structured PyTrees."""
@@ -215,6 +244,146 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
 
+#----------------------------------------------------------
+# Saving and Loading
+#----------------------------------------------------------
+
+RCAIDE_REGISTRY = {}
+
+def register(cls):
+    """Decorator to safely register any RCAIDE class for standalone serialization."""
+    if cls.__name__ in RCAIDE_REGISTRY:
+        raise ValueError(f"RCAIDE class '{cls.__name__}' is already registered.")
+    RCAIDE_REGISTRY[cls.__name__] = cls
+    return cls
+
+def serialize_rcaide_node(obj):
+    """Recursively walks data, skipping attributes that match class defaults."""
+    
+    # 1. JAX or Numpy Array
+    if isinstance(obj, (jnp.ndarray, np.ndarray)):
+        return {"__type__": "ndarray", "data": obj.tolist()}
+        
+    # 2. Registered RCAIDE Class
+    elif type(obj).__name__ in RCAIDE_REGISTRY:
+        cls = type(obj)
+        state = {}
+        
+        # Attempt to conjure a default instance to compare against
+        try:
+            default_obj = cls()
+            has_default = True
+        except TypeError:
+            # Class requires mandatory init arguments; we must save everything
+            default_obj = None
+            has_default = False
+            
+        for k, v in obj.__dict__.items():
+            if k.startswith("__"): 
+                continue
+                
+            # If we have a default instance, check if the current value matches it
+            if has_default:
+                default_v = getattr(default_obj, k, None)
+                if is_equivalent(v, default_v):
+                    continue  # SKIP SAVING! Massive file size reduction.
+                    
+            state[k] = serialize_rcaide_node(v)
+            
+        return {"__class__": cls.__name__, "state": state}
+        
+    # 3. Standard Python Containers
+    elif isinstance(obj, list):
+        return {"__type__": "list", "data": [serialize_rcaide_node(i) for i in obj]}
+    elif isinstance(obj, tuple):
+        return {"__type__": "tuple", "data": [serialize_rcaide_node(i) for i in obj]}
+    elif isinstance(obj, dict):
+        return {"__type__": "dict", "data": {k: serialize_rcaide_node(v) for k, v in obj.items()}}
+        
+    # 4. Standard Scalars
+    elif isinstance(obj, (int, float, str, bool, type(None))):
+        return obj
+        
+    else:
+        if hasattr(obj, "tag") and obj.tag:
+            warnings.warn(
+                f"Attempted to save '{obj.tag}' wing unregisterd class {type(obj).__name__}. "
+                "RCAIDE will be unable to load this data until the class is registered.", UserWarning)
+        else:
+            warnings.warn(
+                f"Attempted to save unregisterd class {type(obj).__name__}. "
+                "RCAIDE will be unable to load this data until the class is registered.", UserWarning)
+        return {"__type__": "unknown", "data": str(obj)}
+        
+
+
+def deserialize_rcaide_node(data):
+    """Unpacks JSON, relying on default initializers to fill in missing attributes."""
+    if not isinstance(data, dict):
+        return data
+        
+    # 1. Reconstruct RCAIDE Classes
+    if "__class__" in data:
+        cls_name = data["__class__"]
+        
+        if cls_name not in RCAIDE_REGISTRY:
+            raise ValueError(f"Class '{cls_name}' is not a registered RCAIDE class and cannot be loaded.")
+            
+        cls = RCAIDE_REGISTRY[cls_name]
+        
+        # Conjure the instance
+        try:
+            # Try normal instantiation to get all default attributes (like 'Air')
+            instance = cls()
+        except TypeError:
+            # If it required args, we know it didn't have a default state to skip,
+            # so the JSON contains 100% of the attributes. Use __new__.
+            instance = object.__new__(cls)
+        
+        # Overwrite defaults with any saved differences
+        for k, v in data["state"].items():
+            object.__setattr__(instance, k, deserialize_rcaide_node(v))
+            
+        return instance
+        
+    # 2. Reconstruct Arrays
+    elif data.get("__type__") == "ndarray":
+        return jnp.array(data["data"])
+        
+    # 3. Reconstruct Containers
+    elif data.get("__type__") == "list":
+        return [deserialize_rcaide_node(i) for i in data["data"]]
+    elif data.get("__type__") == "tuple":
+        return tuple(deserialize_rcaide_node(i) for i in data["data"])
+    elif data.get("__type__") == "dict":
+        return {k: deserialize_rcaide_node(v) for k, v in data["data"].items()}
+        
+    return data
+
+def save_data(obj, filename:str | Path):
+    """
+    Serializes any registered RCAIDE data structure and compresses it to a file.
+    """
+    payload = serialize_rcaide_node(obj)
+    
+    with gzip.open(filename, 'wt', encoding='utf-8') as f:
+        json.dump(payload, f)
+        
+    print(f"Successfully saved {type(obj).__name__} data to {filename}")
+
+
+def load_data(filename: str | Path):
+    """
+    Loads any RCAIDE data structure from a file.
+    No setup scripts or templates are required.
+    """
+    with gzip.open(filename, 'rt', encoding='utf-8') as f:
+        payload = json.load(f)
+        
+    obj = deserialize_rcaide_node(payload)
+    print(f"Successfully loaded {type(obj).__name__} from {filename}")
+    
+    return obj
 
 # ---------------------------------------------------------
 # Debugging Tools

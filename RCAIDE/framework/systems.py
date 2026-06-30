@@ -15,7 +15,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # RCAIDE imports
-from RCAIDE.utils import empty_array, init_field
+from RCAIDE.utils import empty_array, init_field, register
 
 from RCAIDE.library import Component, MassProperties
 from RCAIDE.library.attributes import AircraftClass, MediumRange
@@ -67,6 +67,7 @@ class AircraftMassProperties(MassProperties):
     cargo: float = 0.0
 
 
+@register
 class Aircraft(System):
     tag: str = init_field("Aircraft", static=True)
 

@@ -26,6 +26,8 @@ from .graph_network import build_analysis_from_network
 
 from RCAIDE.utils import DataPath
 
+from RCAIDE.library import units
+
 from RCAIDE.framework import State, Aircraft, Settings
 from RCAIDE.framework.settings import EnergyAnalysisSettings
 from RCAIDE.framework.analyses.residual import ResidualAnalysis
@@ -112,31 +114,42 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
 #  Off-Design Turbojet Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _TurbojetControls():
+def _TurbojetControls(
+    initial_Rline: float | jnp.ndarray = 2.0,
+    initial_turb_PR: float | jnp.ndarray = 5.0,
+    initial_RPM: float | jnp.ndarray = 10_000 * units.rev / units.mins,
+    initial_MFR: float | jnp.ndarray = 100 * units.kg / units.s,
+    initial_FAR: float | jnp.ndarray = 1e-2,
+):
 
     Rline = Control(
         tag="Rline",
         state_path=DataPath(("energy", "Rline")),
+        initial_value=initial_Rline,
     )
 
     turb_PR = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
+        initial_value=initial_turb_PR,
     )
 
     N = Control(
         tag="Rotation Speed",
         state_path=DataPath(("energy", "rotation_speed")),
+        initial_value=initial_RPM,
     )
 
     W = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
+        initial_value=initial_MFR,
     )
 
     FAR = Control(
         tag="Fuel Air Ratio",
-        state_path=DataPath(("energy", "fuel_air_ratio"))
+        state_path=DataPath(("energy", "fuel_air_ratio")),
+        initial_value=initial_FAR
     )
 
 
@@ -174,12 +187,25 @@ def _TurbojetResiduals():
     return d_Wc, d_Wp, d_mdot, d_work, d_thrust
 
 
-def TurbojetPerformance(network: TurbojetEnergyNetwork):
+def TurbojetPerformance(
+        network: TurbojetEnergyNetwork,
+        initial_Rline: float | jnp.ndarray = 2.0,
+        initial_turb_PR: float | jnp.ndarray = 5.0,
+        initial_RPM: float | jnp.ndarray = 10_000 * units.rev / units.mins,
+        initial_MFR: float | jnp.ndarray = 100 * units.kg / units.s,
+        initial_FAR: float | jnp.ndarray = 1e-2,
+    ):
 
     return ResidualAnalysis(
         tag="Turbojet Performance",
         analyze=build_analysis_from_network(network),
-        controls=_TurbojetControls(),
+        controls=_TurbojetControls(
+            initial_Rline,
+            initial_turb_PR,
+            initial_RPM,
+            initial_MFR,
+            initial_FAR,
+        ),
         residuals=_TurbojetResiduals()
     )
 

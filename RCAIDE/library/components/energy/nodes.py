@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from RCAIDE.framework.state import State
     from RCAIDE.framework.systems import System
 
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, register
 
 from RCAIDE.library import Component, units
 from RCAIDE.library.gases import Air, IdealGas
@@ -29,7 +29,7 @@ from RCAIDE.library.gases import Air, IdealGas
 #  Energy Nodes
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class EnergyEfficiencies(eqx.Module):
     total: float = 1.0
 
@@ -42,12 +42,12 @@ class EnergyEfficiencies(eqx.Module):
 
 EnergyDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "residual"]
 
-
+@register
 class EnergyInput(eqx.Module):
     domain: EnergyDomain = init_field("flow", static=True)
     network_ID: str = init_field("network", static=True)
 
-
+@register
 class EnergyNode(Component):
     network_ID: str = init_field("energy_node", static=True)
 
@@ -102,7 +102,7 @@ class EnergyNode(Component):
             "Subclasses of EnergyNode must implement their individual transmission methods."
         )
 
-
+@register
 class EnergySplitter(EnergyNode):
     extraction_fraction: float = 1.0
 
@@ -135,7 +135,7 @@ class EnergySplitter(EnergyNode):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Flow Nodes
 # ----------------------------------------------------------------------------------------------------------------------
-
+@register
 class FlowDesign(eqx.Module):
     pressure_ratio: float = 1.0
     pressure_recovery: float = 1.0
@@ -153,6 +153,7 @@ class FlowDesign(eqx.Module):
     rotation_speed: float = 0.0
     noise_speed: float = 0.0
 
+@register
 class FlowNode(EnergyNode):
     
     design_parameters: FlowDesign = init_field(FlowDesign)
@@ -163,7 +164,7 @@ class FlowNode(EnergyNode):
 # Energy Store
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class EnergyStore(EnergyNode):
     tag: str = init_field("Energy Store", static=True)
 
@@ -177,7 +178,7 @@ class EnergyStore(EnergyNode):
 # Fuel Tank
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class FuelTank(EnergyStore):
     tag: str = init_field("Fuel Tank", static=True)
 
@@ -197,14 +198,14 @@ class FuelTank(EnergyStore):
 # Battery
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class BatteryRagoneParameters(eqx.Module):
     const_1: float = 0.0
     const_2: float = 0.0
     lower_bound: float = 0.0
     i: float = 0.0
 
-
+@register
 class Battery(EnergyStore):
     tag: str = init_field("Battery", static=True)
 

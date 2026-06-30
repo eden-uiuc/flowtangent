@@ -24,7 +24,7 @@ import equinox as eqx
 
 
 # RCAIDE imports
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, register
 
 from RCAIDE.library import units
 from RCAIDE.library.components.energy.nodes import EnergyDomain, EnergyInput, EnergyNode
@@ -36,6 +36,7 @@ from .lines import EnergyLine, TurbojetEnergyLine
 #  Design Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
+@register
 class NetworkDesign(eqx.Module):
 
     altitude: float = 0.0
@@ -79,6 +80,7 @@ def _resolve_namespaces(node, parent_prefix=""):
     return node
 
 
+@register
 class EnergyNetwork(EnergyNode):
     
     tag: str = init_field("Energy Network", static=True)
@@ -182,11 +184,13 @@ class EnergyNetwork(EnergyNode):
 def _TurbojetNetworkSetup():
     return (TurbojetEnergyLine(tag="Line"),)
 
+@register
 class TurbojetDesign(NetworkDesign):
 
     initial_MFR: float = 100.0 * units.lbm / units.s
     initial_turb_PR: float = 5.0
 
+@register
 class TurbojetEnergyNetwork(EnergyNetwork):
     tag: str = init_field("Network", static=True)
     network_ID: str = init_field("network", static=True)

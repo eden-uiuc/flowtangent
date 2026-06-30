@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import RCAIDE.utils as ru
 
 # RCAIDE imports
-from RCAIDE.utils import init_field
+from RCAIDE.utils import init_field, register
 
 from RCAIDE.library.components.energy import maps
 from RCAIDE.library.components.energy.maps import CompressorMap, TurbineMap
@@ -47,7 +47,7 @@ from RCAIDE.library.propellants import JetA, Propellant
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbojet Components
 # ----------------------------------------------------------------------------------------------------------------------
-
+@register
 class InletNozzle(FlowNode):
     tag: str = init_field("Inlet Nozzle", static=True)
 
@@ -84,7 +84,7 @@ class InletNozzle(FlowNode):
                 T_t=fs.stagnation_temperature,
                 P_t=fs.stagnation_pressure,
                 M0=fs.mach_number,
-                mdot=network_state.mass_flow_rate,
+                mdot=jnp.atleast_2d(network_state.mass_flow_rate),
                 PR=self.design_parameters.pressure_ratio,
                 n_r=self.design_parameters.pressure_recovery,
                 M_design=self.design_parameters.exit_mach_number,
@@ -109,7 +109,7 @@ class InletNozzle(FlowNode):
                 M0=fs.mach_number,
                 PR=self.design_parameters.pressure_ratio,
                 n_r=self.design_parameters.pressure_recovery,
-                mdot=network_state.mass_flow_rate,
+                mdot=jnp.atleast_2d(network_state.mass_flow_rate),
                 A_exit=self.design_parameters.A_exit,
             )
 
@@ -130,9 +130,9 @@ class InletNozzle(FlowNode):
 
 
 def _comp_alpha_schedule(Nc, Nc_design):
-    return jnp.where(Nc_design > 0.0, jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), 0.0)
+    return jnp.where(Nc_design > 0.0, jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), jnp.zeros_like(Nc))
 
-
+@register
 class Compressor(FlowNode):
     tag: str = init_field("Compressor", static=True)
 
@@ -168,11 +168,11 @@ class Compressor(FlowNode):
         
         if design_mode:
             PR  = self.design_parameters.pressure_ratio
-            W   = network_state.mass_flow_rate
+            W   = jnp.atleast_2d(network_state.mass_flow_rate)
             n_isn = self.efficiencies.flow
         else:
-            Nc      = network_state.rotation_speed
-            Rline   = network_state.Rline
+            Nc      = jnp.atleast_2d(network_state.rotation_speed)
+            Rline   = jnp.atleast_2d(network_state.Rline)
             alpha   = self.alpha_schedule(Nc, Nc_des)
 
             PR, Wc, n_isn = self.map.evaluate(alpha, Nc, Rline)
@@ -206,7 +206,7 @@ class Compressor(FlowNode):
 
         return updated_state, system, settings
 
-
+@register
 class TurbojetCombustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
@@ -281,13 +281,13 @@ class TurbojetCombustor(FlowNode):
 
         return updated_state, system, settings
 
-
+@register
 class Turbine(FlowNode):
     tag: str = init_field("Turbine", static=True)
 
     map: TurbineMap = init_field(maps.LPT2269)
 
-    alpha_schedule: Callable = init_field(lambda Np, Np_des: 1.0, as_value=True, static=True)
+    alpha_schedule: Callable = init_field(lambda Np, Np_des: jnp.full_like(Np, 1.0), as_value=True, static=True)
 
     inputs: tuple = init_field(
         (
@@ -325,11 +325,11 @@ class Turbine(FlowNode):
 
         if design_mode:
             W = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
-            PR = network_state.turbine_PR
+            PR = jnp.atleast_2d(network_state.turbine_PR)
             n_isn = self.efficiencies.flow
         else:
-            Np = network_state.rotation_speed
-            PR = network_state.turbine_PR
+            Np = jnp.atleast_2d(network_state.rotation_speed)
+            PR = jnp.atleast_2d(network_state.turbine_PR)
             alpha = self.alpha_schedule(Np, Np_des)
 
             Wp, n_isn = self.map.evaluate(alpha, Np, PR)
@@ -366,7 +366,7 @@ class Turbine(FlowNode):
 
         return updated_state, system, settings
 
-
+@register
 class ExpansionNozzle(FlowNode):
     tag: str = init_field("Nozzle", static=True)
 
@@ -475,6 +475,7 @@ class ExpansionNozzle(FlowNode):
 
         return updated_state, updated_system, settings
 
+@register
 class Turboshaft(EnergyNode):
     tag: str = init_field("Turboshaft", static=True)
 
@@ -507,8 +508,6 @@ class Turboshaft(EnergyNode):
 
         return updated_state, system, settings
 
-    
-
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbojet Engine
 # ----------------------------------------------------------------------------------------------------------------------
@@ -531,11 +530,13 @@ def _TurbojetSetup():
 
     return (inlet, comp, comb, turb, bal, nozz)
 
+@register
 class JetGeometry(eqx.Module):
     xe: float = 1.0
     ye: float = 1.0
     Ce: float = 2.0
 
+@register
 class JetDesign(eqx.Module):
     thrust: float = 0.0
     delta_SFC: float = 0.0
@@ -555,7 +556,7 @@ class JetDesign(eqx.Module):
 
     turbine_intake_temperature: float = 0.0
 
-
+@register
 class TurbojetEngine(FlowNode):
     tag: str = init_field("Turbojet", static=True)
     subcomponents: tuple = init_field(_TurbojetSetup)
