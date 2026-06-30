@@ -25,14 +25,25 @@ def func_fan_compressor_performance(
     T_t,
     P_t,
     PR,
-    n_p,
+    n_isn,
 ):
-    gamma_in = gas.compute_gamma(T_t)
-    T_t_out = T_t * (PR ** ((gamma_in - 1.0) / (gamma_in * n_p)))
+    # 1. Find ideal exit temperature with average gamma
+    gamma_guess = gas.compute_gamma(T_t)
+    T_t_out_ideal = T_t * (PR ** ((gamma_guess - 1.0) / gamma_guess))
+    
+    for _ in range(3):
+        gamma_out = gas.compute_gamma(T_t_out_ideal)
+        gamma_avg = 0.5 * (gamma_guess + gamma_out)
+        T_t_out_ideal = T_t * (PR ** ((gamma_avg - 1.0) / gamma_avg))
 
+    # 2. Apply isentropic efficiency
+    T_t_out = T_t + (T_t_out_ideal - T_t) / n_isn
+
+    # 3. Calculate work using absolute enthalpies
     h_t = gas.compute_enthalpy(T_t)
     h_t_out = gas.compute_enthalpy(T_t_out)
     d_work = h_t_out - h_t
+    
     P_t_out = P_t * PR
 
     return d_work, P_t_out, T_t_out, h_t_out

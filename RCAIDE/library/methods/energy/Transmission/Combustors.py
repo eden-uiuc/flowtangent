@@ -28,35 +28,33 @@ from RCAIDE.library.methods.energy.Transmission import Rayleigh, fM
 
 def func_combustor_performance(
     gas: IdealGas,
-    T_t,
-    P_t,
-    T_t_out,
-    h_t_f,
-    PR,
-    n_b,
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    T_t_out: jnp.ndarray, # Target design exit temperature
+    mdot_in: jnp.ndarray,
+    LHV: jnp.ndarray | float, # e.g., 42798400.0 J/kg
+    h_t_f: jnp.ndarray | float, # Sensible enthalpy of liquid fuel (often 0 or a small constant)
+    PR: jnp.ndarray | float,
+    n_b: jnp.ndarray | float,
 ):
-
-    h_t = gas.compute_enthalpy(T_t)
+    
+    h_t_in = gas.compute_enthalpy(T_t)
     P_t_out = P_t * PR
 
-    # Enthalpy of gases at exit temp
-    h_gas_out = gas.compute_enthalpy(T_t_out)
-    h_O2 = O2.compute_enthalpy(T_t_out)
-    h_CO2 = CO2.compute_enthalpy(T_t_out)
-    h_H2O = H2O.compute_enthalpy(T_t_out)
+    # Target exit enthalpy based on the commanded exit temperature
+    h_t_out = gas.compute_enthalpy(T_t_out)
 
-    # Jet-A Reaction Enthalpy
-    dh_react = (3.155 * h_CO2) + (1.242 * h_H2O) - (3.396 * h_O2)
-
-    numerator = h_gas_out - h_t
-    denominator = (n_b * h_t_f) - dh_react - h_gas_out
-
+    # Simple First-Law FAR calculation using LHV
+    numerator = h_t_out - h_t_in
+    denominator = (LHV * n_b) + h_t_f - h_t_out
+    
     FAR = numerator / denominator
+    
+    # Calculate explicit mass flow additions
+    mdot_fuel = mdot_in * FAR
+    mdot_out = mdot_in + mdot_fuel
 
-    # 6. Final output mixture enthalpy
-    h_t_out = (h_gas_out + FAR * dh_react) / (1.0 + FAR)
-
-    return P_t_out, h_t_out, jnp.atleast_2d(FAR)
+    return P_t_out, h_t_out, jnp.atleast_2d(FAR), mdot_out
 
 
 def jet_combustor_transmission(state: State, system: Aircraft, settings: Settings):

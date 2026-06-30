@@ -62,40 +62,35 @@ if TYPE_CHECKING:
 def func_turbine_performance(
     gas,  # The BurnedGas mixture
     FAR,  # Fuel-to-air ratio from the combustor
-    PR,  # Pressure Ratio (guessed by global solver or map)
-    n_flow,  # Polytropic efficiency (from the TurbineMap)
+    PR,   # Pressure Ratio (guessed by global solver or map)
+    n_isn,  # Isentropic efficiency (from the TurbineMap or PyCycle)
     T_t,
     P_t,
 ):
     # Target exit pressure based on the given PR
     P_t_out = P_t / PR
 
-    # Newton-Raphson to find the real-gas T_t_out that satisfies the polytropic relation
-    # Initial guess using a rough ideal-gas approximation
+    # 1. Find the IDEAL exit temperature (100% isentropic expansion)
+    # We use a quick 3-step fixed-point iteration to get a highly accurate average gamma 
+    # across the massive temperature drop of the turbine.
     gamma_guess = gas.compute_gamma(T_t)
-    T_t_out = T_t * (1.0 / PR) ** (n_flow * (gamma_guess - 1.0) / gamma_guess)
-
-    for _ in range(5):
-        # Average gamma across the expansion
-        gamma_out = gas.compute_gamma(T_t_out)
+    T_t_out_ideal = T_t * (1.0 / PR) ** ((gamma_guess - 1.0) / gamma_guess)
+    
+    for _ in range(3):
+        gamma_out = gas.compute_gamma(T_t_out_ideal)
         gamma_avg = 0.5 * (gamma_guess + gamma_out)
+        T_t_out_ideal = T_t * (1.0 / PR) ** ((gamma_avg - 1.0) / gamma_avg)
 
-        # Calculate the PR that this T_t_out would yield
-        exponent = gamma_avg / ((gamma_avg - 1.0) * n_flow)
-        PR_calc = (T_t / T_t_out) ** exponent
-
-        # Analytical 1D Jacobian: d(PR_calc) / d(T_out)
-        dPR_dT = -exponent * (PR_calc / T_t_out)
-
-        # True Newton-Raphson Step: T_new = T_old - f(x) / f'(x)
-        error = PR_calc - PR
-        T_t_out = T_t_out - (error / dPR_dT)
+    # 2. Apply ISENTROPIC efficiency to find the ACTUAL exit temperature
+    # A real turbine extracts less energy, so the temperature drop is smaller than ideal.
+    T_t_out = T_t - (T_t - T_t_out_ideal) * n_isn
 
     # 3. Calculate actual work extracted per kg of core air
     h_t_in = gas.compute_enthalpy(T_t)
     h_t_out = gas.compute_enthalpy(T_t_out)
 
     # Turbine mass flow is higher than compressor due to added fuel
+    # Work will be a negative value (energy leaving the fluid)
     d_work = (1.0 + FAR) * (h_t_out - h_t_in)
 
     return T_t_out, P_t_out, h_t_out, d_work

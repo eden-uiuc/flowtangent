@@ -26,7 +26,6 @@ def get_fractional_coords(grid_1d, value):
     idx = jnp.interp(value, grid_1d, jnp.arange(len(grid_1d)))
     return idx
 
-
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Classes
 # -----------------------------------------------------------------------------------------------------------------------
@@ -43,7 +42,7 @@ class CompressorMap(eqx.Module):
     # 3D Data Tables (Shape: [len(alpha_grid), len(Nc_grid), len(PR_grid)])
     Wc_table: jnp.ndarray = empty_array()  # Mass flow rate
     PR_table: jnp.ndarray = empty_array()  # Pressure Ratio
-    eff_table: jnp.ndarray = empty_array()  # Polytropic Efficiency
+    eff_table: jnp.ndarray = empty_array()  # Isentropic Efficiency
 
     # Map scaling values
     Rline_stall: float = 1.0

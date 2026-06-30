@@ -143,10 +143,12 @@ class FlowDesign(eqx.Module):
     intake_temperature: float = 298.15
     output_temperature: float = 298.15
     
-    area_ratio: float = 1.0
-    area_inlet: float = 1.0
-    area_throat: float = 1.0
-    area_exit: float = 1.0
+    A_ratio: float = 1.0
+    A_intake: float = 1.0
+    A_throat: float = 1.0
+    A_exit: float = 1.0
+
+    exit_mach_number: float = 0.5
     
     rotation_speed: float = 0.0
     noise_speed: float = 0.0

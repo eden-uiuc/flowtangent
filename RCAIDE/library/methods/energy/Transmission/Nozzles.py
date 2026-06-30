@@ -23,7 +23,7 @@ import jax.numpy as jnp
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def func_isentropic_nozzle_performance(
+def func_isentropic_expansion(
     T_t: jnp.ndarray,
     P_t: jnp.ndarray,
     P0: jnp.ndarray,
@@ -41,6 +41,73 @@ def func_isentropic_nozzle_performance(
 
     return P_t_out, T_t_out, T_out, M_out
 
+def func_inlet_stagnation(gas, T_t, P_t, M0, PR, n_r):
+    gamma = gas.compute_gamma(T_t)
+    
+    # Base isentropic recovery
+    P_t_out_sub = P_t * PR * n_r
+    
+    # Normal Shock Recovery
+    ns_P_t = (
+        PR * P_t
+        * ((((gamma + 1.0) * (M0**2.0)) / ((gamma - 1.0) * M0**2.0 + 2.0)) ** (gamma / (gamma - 1.0)))
+        * ((gamma + 1.0) / (2.0 * gamma * M0**2.0 - (gamma - 1.0))) ** (1.0 / (gamma - 1.0))
+    )
+    
+    P_t_out = jnp.where(M0 > 1.0, ns_P_t, P_t_out_sub)
+    T_t_out = T_t # Adiabatic
+    
+    return P_t_out, T_t_out, gamma
+
+def func_inlet_design(gas, T_t, P_t, M0, PR, n_r, mdot, M_design):
+    P_t_out, T_t_out, gamma = func_inlet_stagnation(gas, T_t, P_t, M0, PR, n_r)
+    R = gas.R_specific
+    
+    M_out = M_design
+    
+    # Calculate static properties from the prescribed Mach
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
+    P_out = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+    
+    # Size the physical compressor face area
+    rho_out = P_out / (R * T_out)
+    A_face = mdot / (rho_out * u_out)
+    
+    return A_face, M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out
+
+def func_inlet_performance(gas, T_t, P_t, M0, PR, n_r, mdot, A_exit):
+    P_t_out, T_t_out, gamma = func_inlet_stagnation(gas, T_t, P_t, M0, PR, n_r)
+    R = gas.R_specific
+    
+    # The non-dimensional mass flow parameter we need to match
+    Q = (mdot * jnp.sqrt(R * T_t_out)) / (P_t_out * A_exit * jnp.sqrt(gamma))
+    
+    # Newton loop to find subsonic Mach number
+    M_out = 0.5 # Subsonic initial guess
+    for _ in range(5):
+        term = 1.0 + (gamma - 1.0) / 2.0 * M_out**2
+        power = - (gamma + 1.0) / (2.0 * (gamma - 1.0))
+        
+        f = M_out * (term ** power) - Q
+        
+        # Derivative df/dM
+        df_dM = (term ** power) + M_out * power * (term ** (power - 1.0)) * (gamma - 1.0) * M_out
+        
+        M_out = M_out - f / df_dM
+        
+    # Calculate static properties using the solved Mach
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
+    P_out = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+    
+    return M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out
 
 def func_compression_nozzle_performance(
     gas: IdealGas,
@@ -54,7 +121,7 @@ def func_compression_nozzle_performance(
     # Dynamically evaluate gamma for the isentropic and shock relations
     gamma = gas.compute_gamma(T_t)
 
-    (P_t_out, T_t_out, T_out, M_out) = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, n_r)
+    (P_t_out, T_t_out, T_out, M_out) = func_isentropic_expansion(T_t, P_t, P0, gamma, PR, n_r)
 
     # Normal Shock Outputs (Evaluated dynamically)
     ns_M = jnp.sqrt((1.0 + (gamma - 1.0) / 2.0 * M0**2.0) / (gamma * M0**2 - (gamma - 1.0) / 2.0))
@@ -78,70 +145,19 @@ def func_compression_nozzle_performance(
 
     return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
 
-
-def func_expansion_nozzle_design(
-    gas,  # Local working fluid (e.g., BurnedGas)
-    T_t,
-    T_t0,
-    P_t,
-    P_t0,
-    P0,
-    M0,
-    gamma_0,  # Explicit freestream gamma
-    PR,
-):
-    # Dynamic gas properties for the exhaust flow
-    gamma = gas.compute_gamma(T_t)
-    R = gas.R_specific
-
-    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1.0)
-
-    # Supersonic Expansion / Choking Logic
-    sup = M_isn > 1.0
-    M_out = jnp.maximum(jnp.minimum(M_isn, 1.0), 0.001)  # Bound Mach number to [0.001, 1]
-
-    # Recalculate static conditions based on the bounded Mach number
-    P = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
-    P_out = jnp.where(sup, P, P0)
-
-    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
-
-    # High-fidelity absolute enthalpy and velocity
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out = gas.compute_enthalpy(T_out)
-    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
-
-    # Gas density based on the specific gas constant
-    r_out = P_out / (R * T_out)
-
-    def fm(M, g):
-        m0 = (g + 1.0) / (2.0 * (g - 1.0))
-        m1 = ((g + 1.0) / 2.0) ** m0
-        m2 = (1.0 + (g - 1.0) / 2.0 * M * M) ** m0
-        return m1 * M / m2
-
-    # Area Ratio calculation rigorously separates freestream and exhaust gammas
-    AR = fm(M0, gamma_0) / fm(M_out, gamma) * (1.0 / (P_t_out / P_t0)) * (jnp.sqrt(T_t_out / T_t0))
-
-    return AR, M_out, r_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
-
-def func_expansion_nozzle_design(
-        gas: IdealGas,  # Local working fluid (e.g., BurnedGas)
+def func_nozzle_design(
+        gas: IdealGas,
         T_t: jnp.ndarray,
-        T_t0: jnp.ndarray,
         P_t: jnp.ndarray,
-        P_t0: jnp.ndarray,
         mdot: jnp.ndarray,
         P0: jnp.ndarray,
-        M0: jnp.ndarray,
-        gamma_0: jnp.ndarray,
         PR: jnp.ndarray | float,
 ):
     # Dynamic gas properties for the exhaust flow
     gamma = gas.compute_gamma(T_t)
     R = gas.R_specific
 
-    P_t_out, T_t_out, T_out, M_isn = func_isentropic_nozzle_performance(T_t, P_t, P0, gamma, PR, 1.0)
+    P_t_out, T_t_out, T_out, M_isn = func_isentropic_expansion(T_t, P_t, P0, gamma, PR, 1.0)
 
     # Supersonic Expansion / Choking Logic
     critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
@@ -175,7 +191,7 @@ def func_expansion_nozzle_design(
 
     return A_throat, A_exit, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
-def func_expansion_nozzle_performance(
+def func_nozzle_performance(
         gas: IdealGas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,

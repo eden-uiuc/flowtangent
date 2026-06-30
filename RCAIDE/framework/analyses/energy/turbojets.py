@@ -78,13 +78,13 @@ def design_turbojet(system: System, settings: Settings):
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
-        state_path=DataPath(("energy", "design_mass_flow_rate")),
+        state_path=DataPath(("energy", "mass_flow_rate")),
         initial_value=des.initial_MFR,
     )
 
     turb_ctrl = Control(
         tag="Turbine Pressure Ratio",
-        state_path=DataPath(("energy", "design_turbine_PR")),
+        state_path=DataPath(("energy", "turbine_PR")),
         initial_value=des.initial_turb_PR,
     )
 

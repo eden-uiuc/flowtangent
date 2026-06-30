@@ -180,8 +180,6 @@ class ResidualAnalysis(Process):
                 fun_kwarg: _get_residuals,
                 "tol": tol,
                 "maxiter": maxiter,
-                # "unroll": False,
-                "implicit_diff": False,
             }
         else:
             solver_kwargs = self.solver_kwargs
@@ -204,32 +202,32 @@ class ResidualAnalysis(Process):
         # _ = jac_func(control_values) # Force compile
         # print(f"Jacobian Compile Time: {time.time() - t0:.2f} seconds")
 
-        print(f"\n{'='*60}")
-        print("Starting JAX AOT Compilation Profiler...")
-        print(f"{'-'*60}")
+        # print(f"\n{'='*60}")
+        # print("Starting JAX AOT Compilation Profiler...")
+        # print(f"{'-'*60}")
 
-        # 1. Profile the JAX 'Lowering' Phase
-        t0 = time.time()
-        # We use a lambda to cleanly pass all arguments to the solver's run method
-        run_fn = lambda c, s, sys, set: solver.run(c, s, sys, set)
-        lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
-        t_lower = time.time() - t0
-        print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
+        # # 1. Profile the JAX 'Lowering' Phase
+        # t0 = time.time()
+        # # We use a lambda to cleanly pass all arguments to the solver's run method
+        # run_fn = lambda c, s, sys, set: solver.run(c, s, sys, set)
+        # lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
+        # t_lower = time.time() - t0
+        # print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
 
-        # 2. Measure the Graph Size
-        hlo_text = lowered.as_text()
-        print(f"XLA HLO Graph Size (Lines of Code)     : {len(hlo_text.splitlines())}")
+        # # 2. Measure the Graph Size
+        # hlo_text = lowered.as_text()
+        # print(f"XLA HLO Graph Size (Lines of Code)     : {len(hlo_text.splitlines())}")
 
-        # 3. Profile the XLA 'Compiling' Phase
-        t0 = time.time()
-        compiled = lowered.compile()
-        t_compile = time.time() - t0
-        print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
-        print(f"{'='*60}\n")
+        # # 3. Profile the XLA 'Compiling' Phase
+        # t0 = time.time()
+        # compiled = lowered.compile()
+        # t_compile = time.time() - t0
+        # print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
+        # print(f"{'='*60}\n")
 
-        # Run the actually compiled function to get your result
-        results = compiled(control_values, state, system, settings)
-        # results = solver.run(control_values, state, system, settings)
+        # # Run the actually compiled function to get your result
+        # results = compiled(control_values, state, system, settings)
+        results = solver.run(control_values, state, system, settings)
         
         return results
     
@@ -252,6 +250,9 @@ class ResidualAnalysis(Process):
                 settings,
             )
 
+        analysis_state = analysis_state.update_controls(final_control_values)
+        f_st, f_sys, f_set = self.analyze(analysis_state, system, settings)
+
         if settings.verbose:
             import numpy as np
             
@@ -261,13 +262,13 @@ class ResidualAnalysis(Process):
             
             # Safely extract scalar values for iterations and objective
             iter_num = np.asarray(opt_state.iter_num).item()
-            obj_val = np.asarray(opt_state.value).item()
+            obj_val = np.mean(np.asarray(opt_state.value)).item()
             print(f"  Num. Iterations : {iter_num}")
             print(f"  Final Objective : {obj_val:.6e}")
-            
+                
             # Determine the maximum tag length
-            active_controls = analysis_state.controls.active_controls
-            active_residuals = analysis_state.dynamics.active_residuals
+            active_controls = f_st.controls.active_controls
+            active_residuals = f_st.dynamics.active_residuals
             
             all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
             # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
@@ -283,24 +284,25 @@ class ResidualAnalysis(Process):
 
             print(f"\n  Final Control Values:")
             for ctrl in active_controls:
-                val = get_target(analysis_state, ctrl.state_path)
+                val = get_target(f_st, ctrl.state_path)
                 print(f"    {ctrl.tag:<{pad}}: {format_array(val)}")
+
+            if self.solver is GaussNewton:                
+                print(f"\n  Final Residual Values:")
+                final_residuals = np.asarray(opt_state.residual).flatten() 
+                for i, res in enumerate(f_st.dynamics.active_residuals):
+                    print(f"    {res.tag:<{pad}}: {final_residuals[i]:>12.6e}")
                 
-            print(f"\n  Final Residual Values:")
-            final_residuals = np.asarray(opt_state.residual).flatten() 
-            for i, res in enumerate(analysis_state.dynamics.active_residuals):
-                print(f"    {res.tag:<{pad}}: {final_residuals[i]:>12.6e}")
-                
-            print(f"\n  Final Gradient / Jacobian:")
-            grad_np = np.asarray(opt_state.gradient)
-            grad_str = np.array2string(grad_np, precision=4, separator=', ', prefix="    ")
-            print(f"    {grad_str}")
+                print(f"\n  Final Gradient / Jacobian:")
+                grad_np = np.asarray(opt_state.gradient)
+                grad_str = np.array2string(grad_np, precision=4, separator=', ', prefix="    ")
+                print(f"    {grad_str}")
             
             print(f"{'='*60}\n")
 
-        analysis_state = analysis_state.update_controls(final_control_values)
+        
         
         # Return control back to higher process
-        final_state = eqx.tree_at(lambda s: s.controls, analysis_state, state.controls)
+        final_state = eqx.tree_at(lambda s: s.controls, f_st, state.controls)
 
-        return final_state, system, settings
+        return final_state, f_sys, settings

@@ -161,11 +161,8 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     
     tag: str = init_field("Turbojet Network", static=True)
 
-    # Control hooks for design/sizing analysis
-    design_mass_flow_rate: jnp.ndarray = empty_array(0)
-    design_turbine_PR: jnp.ndarray = empty_array(0)
-
-    # Off-design control hooks
+    # Control hooks
+    mass_flow_rate: jnp.ndarray = empty_array(0)
     rotation_speed: jnp.ndarray = empty_array(0)
     Rline: jnp.ndarray = empty_array(0)
     turbine_PR: jnp.ndarray = empty_array(0)
