@@ -97,7 +97,7 @@ def func_inlet_performance(gas, T_t, P_t, M0, PR, n_r, mdot, A_exit):
         # Derivative df/dM
         df_dM = (term ** power) + M_out * power * (term ** (power - 1.0)) * (gamma - 1.0) * M_out
         
-        M_out = M_out - f / df_dM
+        M_out = jnp.clip(M_out - f / df_dM, 1e-6, 0.99)
         
     # Calculate static properties using the solved Mach
     T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
@@ -220,7 +220,7 @@ def func_nozzle_performance(
         dAR_dM = AR_calc * (M_exit_sup**2 - 1.0) / (M_exit_sup * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2))
         
         # Newton step
-        M_exit_sup = M_exit_sup - (AR_calc - AR) / dAR_dM
+        M_exit_sup = jnp.maximum(M_exit_sup - (AR_calc - AR) / dAR_dM, 1.001)
     
     M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((P_t / P0)**((gamma - 1.0) / gamma) - 1.0))
     M_exit      = jnp.where(choked, M_exit_sup, M_exit_sub)

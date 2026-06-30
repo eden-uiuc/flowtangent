@@ -85,6 +85,7 @@ class Control(Condition):
     
     # Inital values aren't actually optional, but an unset one will be flagged in State.initialize_controls
     initial_value: Optional[float | jnp.ndarray] = None
+    bounds: tuple[float, ...] = tuple((-1e6, 1e6))
 
     _active: bool = init_field(False, static=True)
 

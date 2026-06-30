@@ -93,10 +93,10 @@ class InletNozzle(FlowNode):
             updated_design_paramters = eqx.tree_at(
                 lambda d: d.A_exit,
                 self.design_parameters,
-                A_exit
+                A_exit.squeeze()
             )
             updated_system = eqx.tree_at(
-                lambda s: s.energy_networks[0].nodes[self.network_ID].design_parameters,
+                lambda s: s.energy.nodes[self.network_ID].design_parameters,
                 updated_system,
                 updated_design_paramters
             )
@@ -126,7 +126,7 @@ class InletNozzle(FlowNode):
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs.flow, state, outputs)
 
-        return updated_state, system, settings
+        return updated_state, updated_system, settings
 
 
 def _comp_alpha_schedule(Nc, Nc_design):
@@ -158,6 +158,8 @@ class Compressor(FlowNode):
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
+        updated_system = system
+
         design_mode = settings.analysis.energy.design_mode
         network_state: TurbojetNetworkConditions = state.energy
         
@@ -170,8 +172,29 @@ class Compressor(FlowNode):
             PR  = self.design_parameters.pressure_ratio
             W   = jnp.atleast_2d(network_state.mass_flow_rate)
             n_isn = self.efficiencies.flow
+            
+            PR_map, Wc_map, eff_map = self.map.evaluate(0.0, 1.0, self.map.Rline_des)
+            
+            s_Wc = W / Wc_map
+            s_PR = (PR - 1.0)/(PR_map - 1.0)
+            s_eff = self.efficiencies.flow / eff_map
+
+            updated_map = eqx.tree_at(
+                lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
+                self.map,
+                (s_Wc, s_PR, s_eff, self.design_parameters.rotation_speed)
+            )
+
+            updated_system = eqx.tree_at(
+                lambda s: s.energy.nodes[self.network_ID].map,
+                updated_map,
+                updated_system
+            )
+
         else:
-            Nc      = jnp.atleast_2d(network_state.rotation_speed)
+            N      = jnp.atleast_2d(network_state.rotation_speed)
+            Nc     = N / jnp.sqrt(T_t / 288.15) / self.design_parameters.rotation_speed
+
             Rline   = jnp.atleast_2d(network_state.Rline)
             alpha   = self.alpha_schedule(Nc, Nc_des)
 
@@ -204,7 +227,7 @@ class Compressor(FlowNode):
             (W - state.energy.mass_flow_rate)/state.energy.mass_flow_rate
         )
 
-        return updated_state, system, settings
+        return updated_state, updated_system, settings
 
 @register
 class TurbojetCombustor(FlowNode):
@@ -313,6 +336,8 @@ class Turbine(FlowNode):
     )
     def transmit(self, state: State, system: System, settings: Settings):
         
+        updated_system = system
+
         design_mode = settings.analysis.energy.design_mode
         network_state: TurbojetNetworkConditions = state.energy
         
@@ -327,8 +352,27 @@ class Turbine(FlowNode):
             W = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
             PR = jnp.atleast_2d(network_state.turbine_PR)
             n_isn = self.efficiencies.flow
+
+            Wp_map, eff_map = self.map.evaluate(0.0, 1.0, PR)
+            
+            s_Wp = W / Wp_map
+            s_eff = self.efficiencies.flow / eff_map
+
+            updated_map = eqx.tree_at(
+                lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),
+                self.map,
+                (s_Wp, PR, s_eff, self.design_parameters.rotation_speed)
+            )
+
+            updated_system = eqx.tree_at(
+                lambda s: s.energy.nodes[self.network_ID].map,
+                updated_map,
+                updated_system
+            )
+
         else:
-            Np = jnp.atleast_2d(network_state.rotation_speed)
+            N = jnp.atleast_2d(network_state.rotation_speed)
+            Np = N / jnp.sqrt(T_t / 288.15)
             PR = jnp.atleast_2d(network_state.turbine_PR)
             alpha = self.alpha_schedule(Np, Np_des)
 
@@ -364,7 +408,7 @@ class Turbine(FlowNode):
             (W - state.energy.mass_flow_rate)/state.energy.mass_flow_rate
         )
 
-        return updated_state, system, settings
+        return updated_state, updated_system, settings
 
 @register
 class ExpansionNozzle(FlowNode):
@@ -425,13 +469,13 @@ class ExpansionNozzle(FlowNode):
                     d.A_exit,
                     d.A_ratio
                 ), self.design_parameters,(
-                    A_t,
-                    A_x,
-                    A_t/A_x
+                    A_t.squeeze(),
+                    A_x.squeeze(),
+                    A_t.squeeze()/A_x.squeeze()
                 ),
             )
             updated_system = eqx.tree_at(
-                lambda s: s.energy_networks[0].nodes[self.network_ID].design_parameters,
+                lambda s: s.energy.nodes[self.network_ID].design_parameters,
                 updated_system,
                 updated_design_parameters
             )

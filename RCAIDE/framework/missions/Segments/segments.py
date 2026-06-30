@@ -164,7 +164,7 @@ class InitializeSegment(Process):
         # Set up static routing for active controls
         active_controls = current_state.controls.get_active_controls()
         if settings.analysis.energy.use_network_controls:
-            for network in system.energy_network:
+            for network in system.energy_networks:
                 active_controls += network.controls  # type: ignore
         routing_table = tuple((ctrl.path, ctrl.path_indices) for ctrl in active_controls)
         new_controls = replace(current_state.controls, active_routing_table=routing_table)
@@ -172,7 +172,7 @@ class InitializeSegment(Process):
 
         active_residuals = self.active_residuals
         if settings.analysis.energy.use_network_controls:
-            for network in system.energy_network:
+            for network in system.energy_networks:
                 active_residuals += network.residuals  # type: ignore
         for res in self.active_residuals:
             current_state = _activate_residual(res, current_state)

@@ -94,10 +94,10 @@ def update_design_parameters(turbojet: TurbojetEngine):
         jnp.atleast_2d(1.0),
     )
 
-    sls_analysis = build_analysis_from_network(sls_system.energy_networks[0])
+    sls_analysis = build_analysis_from_network(sls_system.energy)
 
     sls_state, sls_system, sls_settings = sls_analysis(sls_state, sls_system, sls_settings)
-    sls_engine = sls_system.energy_networks[0].nodes["energy_network.turbojet_energy_line.engine_1"]
+    sls_engine = sls_system.energy.nodes["energy_network.turbojet_energy_line.engine_1"]
     sls_thrust = sls_state.energy.nodes["energy_network.turbojet_energy_line.engine_1"].outputs.force.thrust.item(0)
 
     updated_params = eqx.tree_at(lambda d: d.SLS_thrust, sls_engine.design_parameters, sls_thrust)

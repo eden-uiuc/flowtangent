@@ -66,20 +66,24 @@ class AircraftMassProperties(MassProperties):
     max_zero_fuel: float = 0.0
     cargo: float = 0.0
 
+@register
+class AircraftDesign(eqx.Module):
+
+    ac_class: AircraftClass = init_field(MediumRange, static=True)
+    envelope: VehicleEnvelope = init_field(VehicleEnvelope, static=True)
+    
+    passengers: int = init_field(0, static=True)
+
+    mach_number: float = init_field(0.0, static=True)
+    range: float = init_field(0.0, static=True)
+    cruise_alt: float = init_field(0.0, static=True)
 
 @register
 class Aircraft(System):
     tag: str = init_field("Aircraft", static=True)
 
-    ac_class: AircraftClass = init_field(MediumRange, static=True)
-    envelope: VehicleEnvelope = init_field(VehicleEnvelope, static=True)
     mass_properties: AircraftMassProperties = init_field(AircraftMassProperties)  # type: ignore
-
-    passengers: int = init_field(0, static=True)
-
-    design_mach_number: float = init_field(0.0, static=True)
-    design_range: float = init_field(0.0, static=True)
-    design_cruise_alt: float = init_field(0.0, static=True)
+    design_parameters: AircraftDesign = init_field(AircraftDesign)
 
     _bookkeeping: dict = init_field(
         lambda: {
@@ -92,5 +96,14 @@ class Aircraft(System):
         static=True,
     )
 
+    @property
+    def energy(self) -> EnergyNetwork:
+        return self.energy_networks[0]
+
     reference_geometry: AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
     analysis_data: dict = init_field(dict)
+
+    def sort_network_topology(self) -> Aircraft:
+        sorted_network = self.energy.sort_network_topology()
+        return self.replace_subcomponent(sorted_network)
+        

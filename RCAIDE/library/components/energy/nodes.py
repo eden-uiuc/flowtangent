@@ -78,7 +78,8 @@ class EnergyNode(Component):
             getattr(state.energy.nodes[i.network_ID].outputs, input_type)
             for i in self._get_inputs_by_domain(input_type)
         ]
-        return jnp.concatenate([getattr(out, input_field) for out in output_conditions], axis=-1)
+        input_values = [jnp.asarray(getattr(out, input_field)) for out in output_conditions]
+        return jnp.concatenate([jnp.atleast_2d(v) for v in input_values if v.size > 0], axis=-1)
 
     @eqx.filter_jit
     def sum_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):

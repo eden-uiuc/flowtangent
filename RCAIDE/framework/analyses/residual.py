@@ -20,7 +20,7 @@ from dataclasses import replace
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from jaxopt import GaussNewton
+from jaxopt import GaussNewton, LevenbergMarquardt, Broyden
 
 jax.config.update("jax_enable_x64", True)
 
@@ -171,7 +171,7 @@ class ResidualAnalysis(Process):
             else:
                 maxiter=state.numerics.max_evaluations
             
-            if self.solver is GaussNewton:
+            if self.solver is GaussNewton or LevenbergMarquardt:
                 fun_kwarg = "residual_fun"
             else:
                 fun_kwarg = 'fun'
@@ -239,6 +239,7 @@ class ResidualAnalysis(Process):
         if settings.DEBUG_MODE:
             scan_for_invalid_JAX_types(analysis_state,  "Analysis State")
             scan_for_invalid_JAX_types(system,  "Analysis System")
+            print("\n")
 
         # Get analysis control values 
         initial_control_values = analysis_state.get_control_array()
@@ -299,8 +300,6 @@ class ResidualAnalysis(Process):
                 print(f"    {grad_str}")
             
             print(f"{'='*60}\n")
-
-        
         
         # Return control back to higher process
         final_state = eqx.tree_at(lambda s: s.controls, f_st, state.controls)

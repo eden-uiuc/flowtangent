@@ -187,7 +187,11 @@ def get_all_targets(s, input_map: Sequence[DataPath]):
 # ---------------------------------------------------------
 
 def is_equivalent(a, b):
-    """Safely checks deep equality between any two PyTrees, arrays, or scalars."""
+    """
+    Safely checks deep equality between any two PyTrees, arrays, or scalars.
+    Accounts for dimension broadcasting (e.g., float == array([[float]])).
+    """
+    # 1. Check if the top-level classes are the same type
     if type(a) != type(b):
         return False
     
@@ -200,15 +204,29 @@ def is_equivalent(a, b):
     if a_treedef != b_treedef:
         return False
         
+    # 2. Compare the flattened leaves safely
     for la, lb in zip(a_leaves, b_leaves):
-        if isinstance(la, (jnp.ndarray, np.ndarray)):
-            if la.shape != lb.shape: 
+        
+        # Check if both leaves are some form of numeric/boolean data
+        is_num_a = isinstance(la, (jnp.ndarray, np.ndarray, float, int, bool))
+        is_num_b = isinstance(lb, (jnp.ndarray, np.ndarray, float, int, bool))
+        
+        if is_num_a and is_num_b:
+            # Normalize to arrays and strip empty dimensions 
+            # (e.g., 5.0 and [[5.0]] both become dimensionless scalars)
+            arr_a = jnp.squeeze(jnp.asarray(la))
+            arr_b = jnp.squeeze(jnp.asarray(lb))
+            
+            if arr_a.shape != arr_b.shape:
                 return False
-            # array_equal safely handles NaNs and identical array contents
-            if not jnp.array_equal(la, lb, equal_nan=True): 
+                
+            # array_equal safely handles identical contents and NaNs
+            if not jnp.array_equal(arr_a, arr_b, equal_nan=True):
                 return False
+                
         else:
-            if la != lb: 
+            # Fallback for strings, None, or custom object leaves
+            if la != lb:
                 return False
                 
     return True
@@ -369,7 +387,10 @@ def save_data(obj, filename:str | Path):
     with gzip.open(filename, 'wt', encoding='utf-8') as f:
         json.dump(payload, f)
         
-    print(f"Successfully saved {type(obj).__name__} data to {filename}")
+    if hasattr(obj, "tag") and obj.tag:
+        print(f"Successfully saved {type(obj).__name__} '{obj.tag}' to {filename}")
+    else:
+        print(f"Successfully saved {type(obj).__name__} to {filename}")
 
 
 def load_data(filename: str | Path):
@@ -381,7 +402,11 @@ def load_data(filename: str | Path):
         payload = json.load(f)
         
     obj = deserialize_rcaide_node(payload)
-    print(f"Successfully loaded {type(obj).__name__} from {filename}")
+    
+    if hasattr(obj, "tag") and obj.tag:
+        print(f"Successfully loaded {type(obj).__name__} '{obj.tag}' from {filename}")
+    else:
+        print(f"Successfully loaded {type(obj).__name__} from {filename}")
     
     return obj
 

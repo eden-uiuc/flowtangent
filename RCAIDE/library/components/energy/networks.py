@@ -175,6 +175,37 @@ class EnergyNetwork(EnergyNode):
             return replace(updated_network, _execution_order=updated_order)
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
+    
+    def sync_and_clear_nodes(self) -> EnergyNetwork:
+        """
+        Projects the updated nodes from the flat 'nodes' dictionary
+        back onto their original positions in the nested subcomponents tree.
+        Clears nodes dict and execution order.
+        """
+        def _walk_and_sync(component):
+            # If we hit an EnergyNode, replace it with the latest version from the dict
+            if isinstance(component, EnergyNode):
+                # Grab the updated node (fallback to current if not in dict)
+                component = self.nodes.get(component.network_ID, component)
+
+            # Recurse down through any nested wrappers (like EnergyLines or Engine Pods)
+            if hasattr(component, "subcomponents") and component.subcomponents:
+                synced_children = tuple(_walk_and_sync(child) for child in component.subcomponents)
+                # Functionally update the component's subcomponents
+                component = eqx.tree_at(lambda c: c.subcomponents, component, synced_children)
+
+            return component
+
+        # Start the recursive sync from the top-level subcomponents
+        synced_subcomponents = tuple(_walk_and_sync(child) for child in self.subcomponents)
+
+        # Return a new network
+        return replace(
+            self, 
+            subcomponents=synced_subcomponents, 
+            nodes={}, 
+            _execution_order=()
+        )
 
 
 # ----------------------------------------------------------------------------------------------------------------------

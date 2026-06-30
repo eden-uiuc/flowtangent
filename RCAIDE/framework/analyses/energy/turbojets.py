@@ -11,15 +11,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from RCAIDE.framework import System
-    from RCAIDE.framework.conditions.Energy import TurbojetNetworkConditions
     from RCAIDE.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-
-from dataclasses import replace
 
 import jax.numpy as jnp
 import equinox as eqx
-from jaxopt import Broyden
+from jaxopt import Broyden, LevenbergMarquardt
 
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
@@ -44,7 +40,7 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
 
     # Setup test state according to design parameters
 
-    network: TurbojetEnergyNetwork = system.energy_networks[0]
+    network: TurbojetEnergyNetwork = system.energy
     des: TurbojetDesign = network.design_parameters
 
     alt = des.altitude
@@ -74,7 +70,7 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
 
     # Build design analysis
 
-    base_analysis = build_analysis_from_network(des_system.energy_networks[0])
+    base_analysis = build_analysis_from_network(des_system.energy)
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
@@ -107,6 +103,8 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
     )
 
     des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
+    des_net = des_system.energy.sync_and_clear_nodes()
+    des_system = des_system.replace_subcomponent(des_net)
     
     return des_state, des_system, settings
 
@@ -126,32 +124,42 @@ def _TurbojetControls(
         tag="Rline",
         state_path=DataPath(("energy", "Rline")),
         initial_value=initial_Rline,
+        bounds=(1.0, 5.0)
     )
 
     turb_PR = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
         initial_value=initial_turb_PR,
+        bounds=(1.001, 1e2)
     )
 
     N = Control(
         tag="Rotation Speed",
         state_path=DataPath(("energy", "rotation_speed")),
         initial_value=initial_RPM,
+        bounds=(
+            1e2 * units.rev / units.mins,
+            1e5 * units.rev / units.mins,
+        )
     )
 
     W = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
         initial_value=initial_MFR,
+        bounds=(
+            1e-3 * units.kg / units.s,
+            5e3  * units.kg / units.s,
+        )
     )
 
     FAR = Control(
         tag="Fuel Air Ratio",
         state_path=DataPath(("energy", "fuel_air_ratio")),
-        initial_value=initial_FAR
+        initial_value=initial_FAR,
+        bounds=(1e-6, 0.2)
     )
-
 
     return Rline, turb_PR, N, W, FAR
 
@@ -206,6 +214,7 @@ def TurbojetPerformance(
             initial_MFR,
             initial_FAR,
         ),
+        solver=LevenbergMarquardt,
         residuals=_TurbojetResiduals()
     )
 

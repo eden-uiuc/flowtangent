@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 # package imports
 import equinox as eqx
@@ -213,10 +213,19 @@ class Component(eqx.Module):
 
         return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
 
-    def replace_subcomponent(self, subcomponent: "Component", index: int):
-        new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index + 1 :]
+    def replace_subcomponent(self, subcomponent: "Component", index: Optional[int]=None):
+        if index is not None:
+            new_subcomponents = self.subcomponents[:index] + (subcomponent,) + self.subcomponents[index + 1 :]
 
-        return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
+            return eqx.tree_at(lambda c: c.subcomponents, self, new_subcomponents)
+        else:
+            matched_types = [s for s in self.subcomponents if isinstance(s, type(subcomponent))]
+            if len(matched_types) == 1:
+                matched_comp = matched_types[0]
+                matched_idx = self.subcomponents.index(matched_comp)
+                return self.replace_subcomponent(subcomponent, index=matched_idx)
+            else:
+                raise ValueError(f"Unable to find matching subcomponent. Please provide exact index.")
 
     def remove_subcomponent(self, index: int):
         new_subcomponents = self.subcomponents[:index] + self.subcomponents[index + 1 :]

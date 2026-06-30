@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import pycycle.api as pyc
 from jax.scipy.ndimage import map_coordinates
 
-from RCAIDE.utils import empty_array, get_RCAIDE_root, init_field
+from RCAIDE.utils import empty_array, get_RCAIDE_root, init_field, register
 
 from RCAIDE.library import units
 
@@ -31,6 +31,7 @@ def get_fractional_coords(grid_1d, value):
 # -----------------------------------------------------------------------------------------------------------------------
 
 
+@register
 class CompressorMap(eqx.Module):
     tag: str = init_field("Compressor Map", static=True)
 
@@ -47,7 +48,7 @@ class CompressorMap(eqx.Module):
     # Map scaling values
     Rline_stall: float = 1.0
 
-    s_WC: float = 1.0
+    s_Wc: float = 1.0
     s_PR: float = 1.0
     s_eff: float = 1.0
     s_Nc: float = 1.0
@@ -79,7 +80,7 @@ class CompressorMap(eqx.Module):
         eff_map = map_coordinates(self.eff_table, coords, order=1)
 
         # Apply scaling
-        Wc = Wc_map * self.s_WC
+        Wc = Wc_map * self.s_Wc
         PR = (PR_map - 1.0) * self.s_PR + 1.0
         eff = eff_map * self.s_eff
 
@@ -121,6 +122,7 @@ class CompressorMap(eqx.Module):
         )
 
 
+@register
 class TurbineMap(eqx.Module):
     tag: str = init_field("Turbine Map", static=True)
 
