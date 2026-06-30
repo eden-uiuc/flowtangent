@@ -82,6 +82,10 @@ class ResidualOutputs(Condition):
 
     thrust: jnp.ndarray = empty_array(0)
 
+    # Turbofan residual hooks
+    Wc: jnp.ndarray = empty_array(0)
+    Wp: jnp.ndarray = empty_array(0)
+
 class ForceOutputs(Condition):
     tag = "Force Outputs"
 
@@ -162,7 +166,10 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     tag: str = init_field("Turbojet Network", static=True)
 
     # Control hooks
+    fuel_air_ratio: jnp.ndarray = empty_array(0)
     mass_flow_rate: jnp.ndarray = empty_array(0)
     rotation_speed: jnp.ndarray = empty_array(0)
     Rline: jnp.ndarray = empty_array(0)
     turbine_PR: jnp.ndarray = empty_array(0)
+
+    target_thrust: jnp.ndarray = empty_array(0)

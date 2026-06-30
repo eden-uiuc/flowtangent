@@ -24,11 +24,9 @@ from jaxopt import Broyden
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
 
-from RCAIDE.utils import init_field, DataPath
+from RCAIDE.utils import DataPath
 
-from RCAIDE.library import units
-
-from RCAIDE.framework import State, Settings
+from RCAIDE.framework import State, Aircraft, Settings
 from RCAIDE.framework.settings import EnergyAnalysisSettings
 from RCAIDE.framework.analyses.residual import ResidualAnalysis
 from RCAIDE.framework.conditions.controls import Control, Residual
@@ -40,7 +38,7 @@ from RCAIDE.framework.missions.update import update_freestream
 #  Design Point Turbojet Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def design_turbojet(system: System, settings: Settings):
+def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
 
     # Setup test state according to design parameters
 
@@ -131,56 +129,59 @@ def _TurbojetControls():
         state_path=DataPath(("energy", "rotation_speed")),
     )
 
-    return Rline, turb_PR, N
+    W = Control(
+        tag="Mass Flow Rate",
+        state_path=DataPath(("energy", "mass_flow_rate")),
+    )
+
+    FAR = Control(
+        tag="Fuel Air Ratio",
+        state_path=DataPath(("energy", "fuel_air_ratio"))
+    )
+
+
+    return Rline, turb_PR, N, W, FAR
 
 def _TurbojetResiduals():
 
-    # Mass flow residual, mostly dependent on Rline
-    d_mass = d_work = Residual(
-        tag="Mass",
-        get_value=lambda s: s.energy.mass_flow_imbalance
+    d_Wc = Residual(
+        tag="Mass Flow Balance",
+        get_value=lambda s: s.energy.outputs.residual.Wc
+    )
+
+    d_Wp = Residual(
+        tag="Mass Flow Balance",
+        get_value=lambda s: s.energy.outputs.residual.Wp
+    )
+
+    d_mdot = Residual(
+        tag="Mass Flow Rate",
+        get_value=lambda s: s.energy.outputs.residual.mass_flow_rate
     )
     
     # Work residual, mostly depended on turbine PR
     d_work = Residual(
         tag="Work",
-        get_value=lambda s: s.energy.work_imbalance
+        get_value=lambda s: s.energy.outputs.residual.work
     )
-    
-    def target_thrust_balance(state: State):
-        network_state: TurbojetNetworkConditions = state.energy
-        return network_state.total_force_vector - network_state.design_thrust_vector
     
     # Thrust residual, mostly dependent on N
-    thrust = Residual(
+    d_thrust = Residual(
         tag="Thrust",
-        get_value=target_thrust_balance
+        get_value=lambda s: s.energy.outputs.residual.thrust
     )
 
-    return d_mass, d_work, thrust
+    return d_Wc, d_Wp, d_mdot, d_work, d_thrust
 
 
-class TurbojetAnalysis(ResidualAnalysis):
+def TurbojetPerformance(network: TurbojetEnergyNetwork):
 
-    tag: str = init_field("Turbojet Design", static=True)
-
-    controls: tuple[Control, ...] = init_field(_TurbojetControls)
-    residuals: tuple[Residual, ...] = init_field(_TurbojetResiduals)
-
-    def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
-        
-        # Temporarily set design mode on
-        design_settings = eqx.tree_at(lambda s: s.analysis.energy.design_mode, settings, True)
-        
-        # Run residual analysis
-        analysis_state, analysis_system, analysis_settings = super().__call__(state, system, design_settings)
-
-        # Turn design mode off
-        analysis_settings = eqx.tree_at(lambda s: s.analysis.energy.design_mode, analysis_settings, False)
-
-        return analysis_state, analysis_system, analysis_settings
-
-    
+    return ResidualAnalysis(
+        tag="Turbojet Performance",
+        analyze=build_analysis_from_network(network),
+        controls=_TurbojetControls(),
+        residuals=_TurbojetResiduals()
+    )
 
 
     

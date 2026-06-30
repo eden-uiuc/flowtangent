@@ -64,6 +64,7 @@ def func_turbine_performance(
     FAR,  # Fuel-to-air ratio from the combustor
     PR,   # Pressure Ratio (guessed by global solver or map)
     n_isn,  # Isentropic efficiency (from the TurbineMap or PyCycle)
+    n_mech, # Mechanical work transmission efficiency
     T_t,
     P_t,
 ):
@@ -91,9 +92,9 @@ def func_turbine_performance(
 
     # Turbine mass flow is higher than compressor due to added fuel
     # Work will be a negative value (energy leaving the fluid)
-    d_work = (1.0 + FAR) * (h_t_out - h_t_in)
+    work = (1.0 + FAR) * (h_t_out - h_t_in) * n_mech
 
-    return T_t_out, P_t_out, h_t_out, d_work
+    return T_t_out, P_t_out, h_t_out, work
 
 
 def turbine_performance(

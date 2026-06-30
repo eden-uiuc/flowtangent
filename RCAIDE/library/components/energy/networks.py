@@ -212,7 +212,11 @@ class TurbojetEnergyNetwork(EnergyNetwork):
         total_force_vector = jnp.hstack(
             (total_thrust, jnp.zeros((total_thrust.shape[0], 2)))
         )
-
+        if settings.analysis.energy.design_mode:
+            target_thrust = self.design_parameters.thrust
+        else:
+            target_thrust = state.energy.target_thrust
+        
         updated_state = eqx.tree_at(
             lambda s: (
                 s.energy.total_force_vector,
@@ -220,9 +224,10 @@ class TurbojetEnergyNetwork(EnergyNetwork):
             ),
             updated_state,(
                 total_force_vector,
-                (total_thrust - self.design_parameters.thrust)/self.design_parameters.thrust,
+                (total_thrust - target_thrust)/target_thrust,
             )
         )
+
 
         # Mass & Work Imbalance -------------------------------------------------------
 

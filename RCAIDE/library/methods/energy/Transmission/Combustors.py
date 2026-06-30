@@ -26,14 +26,14 @@ from RCAIDE.library.methods.energy.Transmission import Rayleigh, fM
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def func_combustor_performance(
+def func_combustor_design(
     gas: IdealGas,
     T_t: jnp.ndarray,
     P_t: jnp.ndarray,
-    T_t_out: jnp.ndarray, # Target design exit temperature
+    T_t_out: jnp.ndarray,
     mdot_in: jnp.ndarray,
-    LHV: jnp.ndarray | float, # e.g., 42798400.0 J/kg
-    h_t_f: jnp.ndarray | float, # Sensible enthalpy of liquid fuel (often 0 or a small constant)
+    LHV: jnp.ndarray | float,
+    h_t_f: jnp.ndarray | float,
     PR: jnp.ndarray | float,
     n_b: jnp.ndarray | float,
 ):
@@ -56,45 +56,44 @@ def func_combustor_performance(
 
     return P_t_out, h_t_out, jnp.atleast_2d(FAR), mdot_out
 
+def func_combustor_performance(
+    gas: IdealGas,            # IdealGas or BurnedGas model
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    mdot_in: jnp.ndarray,
+    FAR: jnp.ndarray,
+    LHV: jnp.ndarray | float,
+    h_t_f: jnp.ndarray | float,
+    PR: jnp.ndarray | float,
+    n_b: jnp.ndarray | float,
+):
+    # 1. Pressure and Mass Flow additions
+    P_t_out = P_t * PR
+    mdot_fuel = mdot_in * FAR
+    mdot_out = mdot_in + mdot_fuel
 
-def jet_combustor_transmission(state: State, system: Aircraft, settings: Settings):
+    # 2. Forward Energy Balance to find Exit Enthalpy
+    h_t_in = gas.compute_enthalpy(T_t)
+    
+    # Derivation: m_in*h_in + m_fuel*h_fuel + m_fuel*LHV*n_b = m_out*h_out
+    h_t_out = (h_t_in + FAR * (LHV * n_b + h_t_f)) / (1.0 + FAR)
 
-    for l_idx, line in enumerate(system.energy.lines):
-        for p_idx, propulsor in enumerate(line.propulsors):
-            comp_outputs = state.energy.lines[l_idx].propulsors[p_idx].compressors[-1].outputs
-            T_t_in = comp_outputs.stagnation_temperature
-            P_t_in = comp_outputs.stagnation_pressure
+    # 3. Newton-Raphson to invert Enthalpy back to Temperature
+    # Initial guess using inlet Cp to get us in the ballpark
+    Cp_guess = gas.compute_Cp(T_t)
+    T_t_out = T_t + (h_t_out - h_t_in) / Cp_guess
 
-            T_t_out = propulsor.converters.turbines[0].design_intake_temperature
+    # 5 steps is more than enough for NASA polynomials to converge perfectly
+    for _ in range(5):
+        h_current = gas.compute_enthalpy(T_t_out)
+        Cp_current = gas.compute_Cp(T_t_out)
+        
+        error = h_current - h_t_out
+        
+        # True Newton Step: x_new = x_old - f(x)/f'(x)
+        T_t_out = T_t_out - (error / Cp_current)
 
-            Cp = state.freestream.Cp
-
-            combustor = propulsor.converters.combustor
-            PR = combustor.pressure_ratio
-            n_b = combustor.efficiency
-
-            h_t_f = propulsor.fuel.specific_energy
-
-            # Call the function
-            P_t_out, T_t_out, h_t_out, f = func_combustor_performance(T_t_in, P_t_in, T_t_out, Cp, PR, n_b, h_t_f)
-
-            # Set Input State
-            combustor_state = state.energy.lines[l_idx].propulsors[p_idx].combustor
-
-            inputs = combustor_state.inputs
-            inputs.freestream_Cp = Cp
-            inputs.stagnation_temperature = T_t_in
-            inputs.stagnation_pressure = P_t_in
-
-            # Set Output State
-
-            outputs = combustor_state.outputs
-            outputs.stagnation_pressure = P_t_out
-            outputs.stagnation_temperature = T_t_out
-            outputs.stagnation_enthalpy = h_t_out
-            outputs.fuel_air_ratio = f
-
-    return state, system, settings
+    return P_t_out, T_t_out, h_t_out, mdot_out
 
 
 # ----------------------------------------------------------------------------------------------------------------------
