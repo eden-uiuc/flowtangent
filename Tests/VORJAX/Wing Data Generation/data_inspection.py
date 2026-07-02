@@ -17,7 +17,7 @@ from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, Wi
 
 from RCAIDE.Framework import Aircraft, State, Settings
 from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.Framework.plotting import plot_vlm_panels
 
 from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices
 from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces

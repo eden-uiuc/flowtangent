@@ -31,7 +31,7 @@ from RCAIDE.Framework.Conditions import Numerics
 from RCAIDE.Framework.Analyses.Aerodynamics import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.Framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 

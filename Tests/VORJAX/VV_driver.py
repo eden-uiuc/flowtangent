@@ -45,7 +45,7 @@ from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_
 from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
 
 from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.Framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
