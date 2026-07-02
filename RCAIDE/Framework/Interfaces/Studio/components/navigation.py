@@ -26,7 +26,7 @@ def navigation_header(app_state: dict, on_nav: callable):
         
         project_json = json.dumps(export_state, indent=4).encode('utf-8')
         ui.download(project_json, 'rcaide_master.rcaide')
-        ui.notify('Master Project saved!', type='positive', position='top')
+        ui.notify('Project Saved', type='positive', position='top')
 
     async def load_project(e):
         try:
@@ -38,6 +38,8 @@ def navigation_header(app_state: dict, on_nav: callable):
                 app_state['hangar'].update(loaded_state['hangar'])
             if 'simulator' in loaded_state:
                 app_state['simulator'].update(loaded_state['simulator'])
+            if 'engine' in loaded_state:
+                app_state['simulator'].update(loaded_state['engine'])
             
             ui.notify('Project loaded! Refreshing...', type='positive', position='top')
             upload_dialog.close()
@@ -50,7 +52,7 @@ def navigation_header(app_state: dict, on_nav: callable):
 
     # The hidden upload dialog (available on every page this header is injected into)
     with ui.dialog() as upload_dialog, ui.card().classes('w-96'):
-        ui.label('Load Master Project').classes('text-lg font-bold mb-2')
+        ui.label('Load Project').classes('text-lg font-bold mb-2')
         ui.upload(on_upload=load_project, auto_upload=True, max_files=1).classes('w-full')
         with ui.row().classes('w-full justify-end mt-4'):
             ui.button('Cancel', on_click=upload_dialog.close, color='gray')
@@ -75,6 +77,7 @@ def navigation_header(app_state: dict, on_nav: callable):
             def nav_buttons():
                 nav_items = {
                     '/hangar': {'icon': 'send', 'label': 'Hangar'},
+                    '/test_stand': {'icon': 'cyclone', 'label': 'Test Stand'},
                     '/simulator': {'icon': 'flight_takeoff', 'label': 'Simulator'},
                 }
                 

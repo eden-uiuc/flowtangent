@@ -60,6 +60,11 @@ app_state = {
         'is_playing': False,
         'current_alt': 0, 'current_mach': 0.0, 'alpha': 0.0,
         'cl': 0.0, 'cd': 0.0, 'l_d': 0.0, 'throttle': 0.0, 'fuel_burn': 0.0
+    },
+    'engine':{
+        'design': {},
+        'selected_id': '',
+        'stations': {}
     }
 }
 

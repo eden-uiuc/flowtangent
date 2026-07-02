@@ -1,12 +1,16 @@
 import uuid
-import numpy as np
 import tempfile
-from nicegui import app, ui
+
+import numpy as np
+from nicegui import ui, app
+
+from utils.state import app_state
+from components.context_menus import setup_context_menu
 
 # -------------------------------------------------------------------------
-# 1. Procedural STL Generator
+# Mesh Generators
 # -------------------------------------------------------------------------
-def generate_cutaway_shroud_stl(x_start=-0.5, length=1.5, r_start=1.25, r_end=1.25, sweep_deg=180):
+def generate_shroud(x_start=-0.5, length=1.5, r_start=1.25, r_end=1.25, sweep_deg=180):
     """Generates an open-ended, cutaway shell for engine stations."""
     vertices = []
     triangles = []
@@ -53,7 +57,7 @@ def generate_cutaway_shroud_stl(x_start=-0.5, length=1.5, r_start=1.25, r_end=1.
     stl_lines.append("endsolid shroud")
     return "\n".join(stl_lines)
 
-def generate_scimitar_fan_stl(
+def generate_fan(
     x_center=0.0, hub_radius=0.3, tip_radius=1.2, hub_length=0.8, 
     num_blades=24, blade_chord=0.45, blade_thickness=0.02,
     root_stagger=np.radians(35.0), tip_stagger=np.radians(70.0)
@@ -175,7 +179,7 @@ def generate_scimitar_fan_stl(
     stl_lines.append("endsolid fan")
     return "\n".join(stl_lines)
 
-def generate_rotor_stls(
+def generate_rotors(
     x_start=1.0, length=2.0, r_hub=0.4, r_tip=[1.2]*4, 
     num_stages=4, num_blades=36, chord=0.15, thickness=0.02
 ):
@@ -279,136 +283,297 @@ def generate_rotor_stls(
     stator_stl_string = write_stl("compressor_stators", stator_verts, stator_tris)
     
     return rotor_stl_string, stator_stl_string
-    
-# -------------------------------------------------------------------------
-# 2. NiceGUI Implementation
-# -------------------------------------------------------------------------
-@ui.page('/')
-def engine_viewer():
-    ui.label("RCAIDE Studio: Turbofan Cutaway").classes('text-2xl font-bold m-4')
-    
-    # -------------------------------------------------------------------------
-    # 1. Update Internals to Align with New Station Coordinates
-    # -------------------------------------------------------------------------
-    # Fan (Centered in the 1.0 to 1.5 station)
-    fan_data = generate_scimitar_fan_stl(
-        x_center=1.25, hub_radius=0.3, tip_radius=1.05, hub_length=0.8,
-        num_blades=24, blade_chord=0.45, root_stagger=np.radians(35.0), tip_stagger=np.radians(70.0)
-    )
-    temp_fan = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-    temp_fan.write(fan_data.encode('utf-8'))
-    temp_fan.close()
-    fan_url = f'/fan_{uuid.uuid4().hex}.stl'
-    app.add_static_file(local_file=temp_fan.name, url_path=fan_url)
 
-    # Compressor (Spans LPC and HPC: X=1.5 to 4.0)
-    comp_rotor_data, comp_stator_data = generate_rotor_stls(
-        x_start=1.5, length=2.5, r_hub=0.1, r_tip=[0.45, 0.5, 0.55, 0.55, 0.55, 0.55], 
-        num_stages=6, num_blades=36, chord=0.12, thickness=0.015
-    )
-    temp_cr = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-    temp_cr.write(comp_rotor_data.encode('utf-8'))
-    temp_cr.close()
-    comp_rotor_url = f'/comp_r_{uuid.uuid4().hex}.stl'
-    app.add_static_file(local_file=temp_cr.name, url_path=comp_rotor_url)
+def engine_ui():
 
-    temp_cs = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-    temp_cs.write(comp_stator_data.encode('utf-8'))
-    temp_cs.close()
-    comp_stator_url = f'/comp_s_{uuid.uuid4().hex}.stl'
-    app.add_static_file(local_file=temp_cs.name, url_path=comp_stator_url)
-
-    # Turbine (Spans HPT and LPT: X=5.0 to 6.5)
-    turb_rotor_data, turb_stator_data = generate_rotor_stls(
-        x_start=5.0, length=1.5, r_hub=0.1, r_tip=[0.4, 0.35, 0.3], 
-        num_stages=3, num_blades=40, chord=0.15, thickness=0.015
-    )
-    temp_tr = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-    temp_tr.write(turb_rotor_data.encode('utf-8'))
-    temp_tr.close()
-    turb_rotor_url = f'/turb_r_{uuid.uuid4().hex}.stl'
-    app.add_static_file(local_file=temp_tr.name, url_path=turb_rotor_url)
-
-    temp_ts = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-    temp_ts.write(turb_stator_data.encode('utf-8'))
-    temp_ts.close()
-    turb_stator_url = f'/turb_s_{uuid.uuid4().hex}.stl'
-    app.add_static_file(local_file=temp_ts.name, url_path=turb_stator_url)
-
-    # -------------------------------------------------------------------------
-    # 2. Generate the Thermodynamic Station Shrouds
-    # -------------------------------------------------------------------------
     station_params = [
-            {'name': 'Inlet',  'x_start': 0.0, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.4, 'r_in_end': 0.5, 'color': '#3b82f6'}, # Cool blue
-            {'name': 'Fan',    'x_start': 1.0, 'length': 0.5, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.5, 'r_in_end': 0.5, 'color': '#60a5fa'},
-            {'name': 'LPC',    'x_start': 1.5, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 0.9, 'r_in_start': 0.5, 'r_in_end': 0.6, 'color': '#93c5fd'},
-            {'name': 'HPC',    'x_start': 2.5, 'length': 1.5, 'r_out_start': 0.9, 'r_out_end': 0.7, 'r_in_start': 0.6, 'r_in_end': 0.6, 'color': '#f87171'}, # Warming up
-            {'name': 'Burner', 'x_start': 4.0, 'length': 1.0, 'r_out_start': 0.7, 'r_out_end': 0.7, 'r_in_start': 0.6, 'r_in_end': 0.5, 'color': '#dc2626'}, # Hot red
-            {'name': 'HPT',    'x_start': 5.0, 'length': 0.5, 'r_out_start': 0.7, 'r_out_end': 0.8, 'r_in_start': 0.5, 'r_in_end': 0.4, 'color': '#fb923c'}, # Cooling slightly
-            {'name': 'LPT',    'x_start': 5.5, 'length': 1.0, 'r_out_start': 0.8, 'r_out_end': 0.9, 'r_in_start': 0.4, 'r_in_end': 0.3, 'color': '#fbbf24'},
-            {'name': 'Nozzle', 'x_start': 6.5, 'length': 1.5, 'r_out_start': 0.9, 'r_out_end': 0.6, 'r_in_start': 0.3, 'r_in_end': 0.0, 'color': '#fcd34d'}
-        ]
+        {'name': 'Inlet',  'x_start': 0.0, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.4, 'r_in_end': 0.5, 'color': '#3b82f6'}, # Cool blue
+        {'name': 'Fan',    'x_start': 1.0, 'length': 0.5, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.5, 'r_in_end': 0.5, 'color': '#60a5fa'},
+        {'name': 'LPC',    'x_start': 1.5, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 0.9, 'r_in_start': 0.5, 'r_in_end': 0.6, 'color': '#93c5fd'},
+        {'name': 'HPC',    'x_start': 2.5, 'length': 1.5, 'r_out_start': 0.9, 'r_out_end': 0.7, 'r_in_start': 0.6, 'r_in_end': 0.6, 'color': '#f87171'}, # Warming up
+        {'name': 'Burner', 'x_start': 4.0, 'length': 1.0, 'r_out_start': 0.7, 'r_out_end': 0.7, 'r_in_start': 0.6, 'r_in_end': 0.5, 'color': '#dc2626'}, # Hot red
+        {'name': 'HPT',    'x_start': 5.0, 'length': 0.5, 'r_out_start': 0.7, 'r_out_end': 0.8, 'r_in_start': 0.5, 'r_in_end': 0.4, 'color': '#fb923c'}, # Cooling slightly
+        {'name': 'LPT',    'x_start': 5.5, 'length': 1.0, 'r_out_start': 0.8, 'r_out_end': 0.9, 'r_in_start': 0.4, 'r_in_end': 0.3, 'color': '#fbbf24'},
+        {'name': 'Nozzle', 'x_start': 6.5, 'length': 1.5, 'r_out_start': 0.9, 'r_out_end': 0.6, 'r_in_start': 0.3, 'r_in_end': 0.0, 'color': '#fcd34d'}
+    ]
 
-    station_urls = []
-    for stat in station_params:
-        # Generate Outer Flow Boundary
-        outer_data = generate_cutaway_shroud_stl(
-            x_start=stat['x_start'], length=stat['length'], 
-            r_start=stat['r_out_start'], r_end=stat['r_out_end'], sweep_deg=180
+    station_centers = {s['name'].lower(): s['x_start'] + s['length'] / 1.8 for s in station_params}
+    station_centers['c_nozz'] = 7.33
+    station_centers['f_nozz'] = 7.33
+
+    def pan_to_station(target_x, zoom_z=0.):
+        scene.move_camera(
+            x=target_x, y=-1.5, z=zoom_z, 
+            look_at_x=target_x, look_at_y=0, look_at_z=0, 
+            duration=0.8
         )
-        temp_o = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-        temp_o.write(outer_data.encode('utf-8'))
-        temp_o.close()
-        url_o = f"/{stat['name']}_out_{uuid.uuid4().hex}.stl"
-        app.add_static_file(local_file=temp_o.name, url_path=url_o)
 
-        # Generate Inner Flow Boundary
-        inner_data = generate_cutaway_shroud_stl(
-            x_start=stat['x_start'], length=stat['length'], 
-            r_start=stat['r_in_start'], r_end=stat['r_in_end'], sweep_deg=180
-        )
-        temp_i = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
-        temp_i.write(inner_data.encode('utf-8'))
-        temp_i.close()
-        url_i = f"/{stat['name']}_in_{uuid.uuid4().hex}.stl"
-        app.add_static_file(local_file=temp_i.name, url_path=url_i)
+    with ui.column().classes('w-full h-full p-0 gap-0'):
+        # --- 1. STATE DATA ---
+        engine_state = app_state['engine']
+        
+        def get_selected_station():
+            sel_id = engine_state['selected_id']
+            stats = engine_state['stations']
+            if sel_id in stats:
+                return stats[sel_id]
+            return None
+        
+        def select_node(e):
+            if e.value:  
+                engine_state['selected_id'] = e.value
+            if e.value in station_centers:
+                pan_to_station(station_centers[e.value])
 
-        station_urls.append((url_o, url_i, stat['color']))
-
-    # -------------------------------------------------------------------------
-    # 3. Compile the Scene
-    # -------------------------------------------------------------------------
-    with ui.scene(width=1000, height=600, grid=False) as scene:
-        # Shift camera back to fit the new 8-unit-long engine envelope
-        scene.move_camera(x=-8, y=4, z=8, look_at_x=4, look_at_y=0, look_at_z=0)
-        
-        # Mount the Thermodynamic Color Stations (Opacity set to 0.7)
-        for url_o, url_i, color in station_urls:
-            scene.stl(url_o).material(color=color, opacity=0.7)
-            scene.stl(url_i).material(color=color, opacity=0.7)
-        
-        # Mount STATIC Internals
-        scene.stl(comp_stator_url).material(color='#475569') 
-        scene.stl(turb_stator_url).material(color='#475569') 
-        
-        # Mount ROTATING Internals
-        rotor_group = scene.group()
-        with rotor_group:
-            scene.stl(fan_url).material(color='#94a3b8')
-            scene.stl(comp_rotor_url).material(color='#94a3b8')
-            scene.stl(turb_rotor_url).material(color='#94a3b8')
+        # --- 5. DYNAMIC UI COMPONENTS ---
+        @ui.refreshable
+        def engine_tree():
             
-            # Update Central Turboshaft to span the full engine (Center at X=4.0)
-            scene.cylinder(top_radius=0.1, bottom_radius=0.1, height=5.0, radial_segments=16) \
-                 .material(color='#94a3b8') \
-                 .move(x=4, y=0, z=0) \
-                 .rotate(0, 0, np.pi/2)
-        
-        anim_state = {'angle': 0.0}
-        def animate_spin():
-            anim_state['angle'] -= 0.1 
-            rotor_group.rotate(anim_state['angle'], 0, 0)
-            
-        ui.timer(0.016, animate_spin)
+            # Build nested tree data
+            tree_data = [
+                {'id': 'inlet', 'label': 'Inlet Nozzle', 'icon': 'tornado', 'children': []},
+                {'id': 'fan', 'label': 'Fan', 'icon': 'adjust', 'children': []},
+                {'id': 'cat_comp', 'label': 'Compressors', 'icon': 'cyclone', 'children': [
+                    {'id': 'lpc', 'label': 'Low Pressure Stage'},
+                    {'id': 'hpc', 'label': 'High Pressure Stage'},
+                ]},
+                {'id': 'burner', 'label': 'Combustion Chamber', 'icon': 'local_fire_department', 'children': []},
+                {'id': 'cat_turb', 'label': 'Turbines', 'icon': 'settings', 'children': [
+                    {'id': 'hpt', 'label': 'High Pressure Stage'},
+                    {'id': 'lpt', 'label': 'Low Pressure Stage'},
+                ]},
+                {'id': 'cat_exit', 'label': 'Exhaust', 'icon': 'air', 'children': [
+                    {'id': 'c_nozz', 'label': 'Core Flow'},
+                    {'id': 'f_nozz', 'label': 'Fan Bypass'},
+                ]},
+            ]
+                
+            # The tree draws once and handles its own internal visual state
+            ui.tree(tree_data, on_select=select_node, tick_strategy='none').expand()
 
-ui.run()
+        # --- 6. MAIN LAYOUT (SPA COMPLIANT) ---
+        # 1. Evaluate True Colors based on state
+        is_dark = app_state.get('is_dark', False)
+        
+        sidebar_bg = 'bg-neutral-900' if is_dark else 'bg-gray-200'
+        sidebar_border = 'border-neutral-800' if is_dark else 'border-gray-200'
+        
+        canvas_bg = 'bg-black text-gray-200' if is_dark else 'bg-white text-gray-800'
+
+        # Dialogs
+        with ui.dialog() as payload_dialog, ui.card().classes('w-full max-w-2xl'):
+            ui.label('RCAIDE JSON Payload').classes('text-xl font-bold')
+            json_display = ui.code('', language='json').classes('w-full')
+            with ui.row().classes('w-full justify-end mt-4'):
+                ui.button('Close', on_click=payload_dialog.close, color='gray')
+                ui.button('Send to Solver', color='blue') 
+
+        # SPLITTER 1: Left Panel
+        # Added limits=(min, max) to physically prevent the Quasar collapse bug
+        with ui.splitter(value=350, limits=(200, 800)).classes('w-full h-full').props('unit="px"') as outer_split:
+            
+            setup_context_menu()
+
+            with outer_split.before:
+                # LEFT PANEL CONTENT
+                with ui.column().classes(f'w-full h-full p-4 border-r overflow-y-auto {sidebar_bg} {sidebar_border}'):
+                    with ui.row().classes('w-full gap-2 flex-wrap'):
+                        ui.button('Side View', on_click=lambda: scene.move_camera(
+                                    x=4.0, y=-4.0, z=0.0, look_at_x=4.0, look_at_y=0, look_at_z=0, duration=1.0)
+                                ).classes('flex-grow text-xs')
+                        ui.button('Isometric', on_click=lambda: scene.move_camera(
+                                    x=-0.2, y=-2.5, z=2.5, look_at_x=3.0, look_at_y=0, look_at_z=0, duration=1.0)
+                                ).classes('flex-grow text-xs')
+                    ui.label('Vehicle Tree').classes('text-lg font-bold mb-2')
+                    engine_tree()  
+                    ui.separator().classes('my-4 opacity-50')
+                    # attribute_sliders() 
+            
+            with outer_split.after:
+                # SPLITTER 2: Right Panel
+                # reverse=True makes the 'value' and 'limits' apply to the RIGHT panel
+                with ui.splitter(value=450, limits=(300, 800), reverse=True).classes('w-full h-full').props('unit="px"') as inner_split:
+                    
+                    with inner_split.before:
+                        # MAIN 3D CANVAS
+                        with ui.column().classes(f'w-full h-full flex justify-center items-center relative {canvas_bg}'):
+                            # -------------------------------------------------------------------------
+                            # 1. Update Internals to Align with New Station Coordinates
+                            # -------------------------------------------------------------------------
+                            # Fan (Centered in the 1.0 to 1.5 station)
+                            fan_data = generate_fan(
+                                x_center=1.25, hub_radius=0.3, tip_radius=1.05, hub_length=0.8,
+                                num_blades=24, blade_chord=0.45, root_stagger=np.radians(35.0), tip_stagger=np.radians(70.0)
+                            )
+                            temp_fan = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                            temp_fan.write(fan_data.encode('utf-8'))
+                            temp_fan.close()
+                            fan_url = f'/fan_{uuid.uuid4().hex}.stl'
+                            app.add_static_file(local_file=temp_fan.name, url_path=fan_url)
+
+                            # Compressor (Spans LPC and HPC: X=1.5 to 4.0)
+                            comp_rotor_data, comp_stator_data = generate_rotors(
+                                x_start=1.5, length=2.5, r_hub=0.1, r_tip=[0.45, 0.5, 0.55, 0.55, 0.55, 0.55], 
+                                num_stages=6, num_blades=36, chord=0.12, thickness=0.015
+                            )
+                            temp_cr = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                            temp_cr.write(comp_rotor_data.encode('utf-8'))
+                            temp_cr.close()
+                            comp_rotor_url = f'/comp_r_{uuid.uuid4().hex}.stl'
+                            app.add_static_file(local_file=temp_cr.name, url_path=comp_rotor_url)
+
+                            temp_cs = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                            temp_cs.write(comp_stator_data.encode('utf-8'))
+                            temp_cs.close()
+                            comp_stator_url = f'/comp_s_{uuid.uuid4().hex}.stl'
+                            app.add_static_file(local_file=temp_cs.name, url_path=comp_stator_url)
+
+                            # Turbine (Spans HPT and LPT: X=5.0 to 6.5)
+                            turb_rotor_data, turb_stator_data = generate_rotors(
+                                x_start=5.0, length=1.5, r_hub=0.1, r_tip=[0.4, 0.35, 0.3], 
+                                num_stages=3, num_blades=40, chord=0.15, thickness=0.015
+                            )
+                            temp_tr = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                            temp_tr.write(turb_rotor_data.encode('utf-8'))
+                            temp_tr.close()
+                            turb_rotor_url = f'/turb_r_{uuid.uuid4().hex}.stl'
+                            app.add_static_file(local_file=temp_tr.name, url_path=turb_rotor_url)
+
+                            temp_ts = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                            temp_ts.write(turb_stator_data.encode('utf-8'))
+                            temp_ts.close()
+                            turb_stator_url = f'/turb_s_{uuid.uuid4().hex}.stl'
+                            app.add_static_file(local_file=temp_ts.name, url_path=turb_stator_url)
+
+                            # -------------------------------------------------------------------------
+                            # 2. Generate the Thermodynamic Station Shrouds
+                            # -------------------------------------------------------------------------
+
+                            station_urls = []
+                            for stat in station_params:
+                                # Generate Outer Flow Boundary
+                                outer_data = generate_shroud(
+                                    x_start=stat['x_start'], length=stat['length'], 
+                                    r_start=stat['r_out_start'], r_end=stat['r_out_end'], sweep_deg=180
+                                )
+                                temp_o = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                                temp_o.write(outer_data.encode('utf-8'))
+                                temp_o.close()
+                                url_o = f"/{stat['name']}_out_{uuid.uuid4().hex}.stl"
+                                app.add_static_file(local_file=temp_o.name, url_path=url_o)
+
+                                # Generate Inner Flow Boundary
+                                inner_data = generate_shroud(
+                                    x_start=stat['x_start'], length=stat['length'], 
+                                    r_start=stat['r_in_start'], r_end=stat['r_in_end'], sweep_deg=180
+                                )
+                                temp_i = tempfile.NamedTemporaryFile(delete=False, suffix=".stl")
+                                temp_i.write(inner_data.encode('utf-8'))
+                                temp_i.close()
+                                url_i = f"/{stat['name']}_in_{uuid.uuid4().hex}.stl"
+                                app.add_static_file(local_file=temp_i.name, url_path=url_i)
+
+                                station_urls.append((url_o, url_i, stat['color']))
+
+                            # -------------------------------------------------------------------------
+                            # 3. Camera Control Hooks (Flipped to the -Z side for Left-to-Right flow)
+                            # -------------------------------------------------------------------------
+                            # Defaulting to -3.5 for the Z zoom so we view from the other side
+                            def pan_to_station(target_x, zoom_z=0.):
+                                scene.move_camera(
+                                    x=target_x, y=-1.5, z=zoom_z, 
+                                    look_at_x=target_x, look_at_y=0, look_at_z=0, 
+                                    duration=0.8
+                                )
+
+                            # -------------------------------------------------------------------------
+                            # 4. Compile the Scene
+                            # -------------------------------------------------------------------------
+                            scene = ui.scene(grid=False, background_color='transparent').classes('w-full h-full')
+                            
+                            with scene:
+                                # Initial boot-up camera position matches the new Wide Shot (-12.0 Z)
+                                scene.move_camera(x=-0.2, y=-2.5, z=2.5, look_at_x=3.0, look_at_y=0, look_at_z=0)
+
+                                # Mount the Thermodynamic Color Stations
+                                for url_o, url_i, color in station_urls:
+                                    scene.stl(url_o).material(color=color, opacity=0.7)
+                                    scene.stl(url_i).material(color=color, opacity=0.7)
+                                
+                                # Mount STATIC Internals
+                                scene.stl(comp_stator_url).material(color='#475569') 
+                                scene.stl(turb_stator_url).material(color='#475569') 
+                                
+                                # Mount ROTATING Internals
+                                rotor_group = scene.group()
+                                with rotor_group:
+                                    scene.stl(fan_url).material(color='#94a3b8')
+                                    scene.stl(comp_rotor_url).material(color='#94a3b8')
+                                    scene.stl(turb_rotor_url).material(color='#94a3b8')
+                                    
+                                    # Central Turboshaft
+                                    scene.cylinder(top_radius=0.1, bottom_radius=0.1, height=6.0, radial_segments=16) \
+                                        .material(color='#94a3b8') \
+                                        .move(x=4.0, y=0, z=0) \
+                                        .rotate(0, 0, np.pi/2)
+                                
+                                anim_state = {'angle': 0.0}
+                                def animate_spin():
+                                    anim_state['angle'] += 0.05 
+                                    rotor_group.rotate(anim_state['angle'], 0, 0)
+                                    
+                                ui.timer(0.05, animate_spin)
+                            
+                    with inner_split.after:
+                        # RIGHT PANEL CONTENT
+                        with ui.column().classes(f'w-full h-full p-4 border-l overflow-y-auto gap-0 {sidebar_bg} {sidebar_border}'):
+                            ui.label('Flight Regime').classes('text-lg font-bold mb-2')
+                            
+                            # with ui.row().classes('w-full gap-2'):
+                            #     ui.number('Mach', value=engine_state['mach'], step=0.05).bind_value(engine_state, 'mach').props('dense').classes('flex-1')
+                            #     ui.number('AoA (°)', value=engine_state['alpha'], step=0.5).bind_value(engine_state, 'alpha').props('dense').classes('flex-1')
+                            #     ui.number('Beta (°)', value=engine_state['beta'], step=0.5).bind_value(engine_state, 'beta').props('dense').classes('flex-1')
+                            
+                            ui.separator().classes('my-4 opacity-50')
+                            # run_button = ui.button('Run Analysis', on_click=run_analysis, color='blue').classes('w-full')
+
+                            with ui.row().classes('w-full items-center justify-center mt-4 hidden') as loading_indicator:
+                                ui.spinner('orbit', size='md', color='blue')
+                                loading_label = ui.label('Initializing...').classes('ml-2 text-gray-500 font-medium')
+
+                            ui.separator().classes('my-4 opacity-50')
+                            
+                            # Analysis Results
+                            ui.label('Analysis Results').classes('text-lg font-bold mt-2 mb-2')
+                            
+                            notice_bg = 'bg-neutral-900 border-neutral-800' if is_dark else 'bg-gray-50 border-gray-200'
+                            no_results_notice = ui.column().classes(f'w-full border rounded-lg p-4 items-center justify-center {notice_bg}')
+                            with no_results_notice:
+                                ui.icon('science', size='2rem', color='gray')
+                                ui.label('No analysis results available.').classes('text-sm font-bold text-center mt-2')
+
+                            results_container = ui.column().classes('w-full gap-0 hidden')
+                            with results_container:
+                                ui.label('Aerodynamics').classes('text-sm font-bold mt-2 mb-1')
+                                result_columns = [
+                                    {'name': 'coeff', 'label': 'Coeff', 'field': 'coeff', 'align': 'left'},
+                                    {'name': 'base', 'label': 'Base', 'field': 'base', 'align': 'right'},
+                                    {'name': 'd_alpha', 'label': '∂/∂α', 'field': 'd_alpha', 'align': 'right'}
+                                ]
+                                results_table = ui.table(columns=result_columns, rows=[], row_key='coeff').classes('w-full').props('dense flat bordered')
+                                
+                            ui.separator().classes('my-6 opacity-50')
+                            
+                            # RCAIDE Assistant Chat
+                            with ui.row().classes('w-full items-center justify-between mb-2'):
+                                ui.label('RCAIDE Assistant').classes('text-lg font-bold')
+                                ui.icon('psychology', size='sm', color='primary')
+                            
+                            chat_border = 'border-neutral-800' if is_dark else 'border-gray-300'
+                            with ui.column().classes(f'w-full h-64 border rounded-lg flex-nowrap gap-0 overflow-hidden bg-transparent shrink-0 {chat_border}'):
+                                with ui.column().classes('w-full flex-grow p-3 overflow-y-auto gap-2'):
+                                    ui.chat_message('Hello! I am your RCAIDE agent.', name='RCAIDE', stamp='System Ready').props('bg-color=primary text-color=white')
+                                    
+                                with ui.row().classes(f'w-full shrink-0 p-2 border-t items-center flex-nowrap bg-transparent {chat_border}'):
+                                    chat_input = ui.input(placeholder='Ask RCAIDE...').props('dense outlined').classes('flex-grow text-sm')
+                                    ui.button(icon='send', color='primary').props('round flat dense').classes('ml-2')

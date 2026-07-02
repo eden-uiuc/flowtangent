@@ -245,6 +245,7 @@ def hangar_ui():
                 if n['id'] == sel_id: return 'nac', n
                 
             return None, None
+        
         def select_node(e):
             if e.value:  
                 hangar_state['selected_id'] = e.value

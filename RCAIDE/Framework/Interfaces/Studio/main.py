@@ -3,6 +3,7 @@ from nicegui import ui
 
 from pages.hangar import hangar_ui
 from pages.simulator import simulator_ui
+from pages.test_stand import engine_ui
 from components.navigation import navigation_header
 from utils.state import app_state, perform_undo, perform_redo
 
@@ -13,6 +14,8 @@ def router_content():
         hangar_ui()
     elif app_state['route'] == '/simulator':
         simulator_ui()
+    elif app_state['route'] == '/test_stand':
+        engine_ui()
     else:
         ui.label('404 - Tool Not Found').classes('text-red-500 text-xl p-8')
 
