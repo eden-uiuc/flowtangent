@@ -270,7 +270,6 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
         ),
     )
 
-
 def BurnedJetA(FAR: float | jnp.ndarray) -> MixedGas:
     return MixedGas(tag="Burned Jet-A", composition=burned_JetA_composition(FAR))
 

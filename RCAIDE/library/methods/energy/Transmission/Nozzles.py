@@ -109,42 +109,6 @@ def func_inlet_performance(gas, T_t, P_t, M0, PR, n_r, mdot, A_exit):
     
     return M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out
 
-def func_compression_nozzle_performance(
-    gas: IdealGas,
-    T_t: jnp.ndarray,
-    P_t: jnp.ndarray,
-    P0: jnp.ndarray,
-    M0: jnp.ndarray,
-    PR: jnp.ndarray | float,
-    n_r: jnp.ndarray | float,
-):
-    # Dynamically evaluate gamma for the isentropic and shock relations
-    gamma = gas.compute_gamma(T_t)
-
-    (P_t_out, T_t_out, T_out, M_out) = func_isentropic_expansion(T_t, P_t, P0, gamma, PR, n_r)
-
-    # Normal Shock Outputs (Evaluated dynamically)
-    ns_M = jnp.sqrt((1.0 + (gamma - 1.0) / 2.0 * M0**2.0) / (gamma * M0**2 - (gamma - 1.0) / 2.0))
-    ns_T = T_t_out / (1.0 + (gamma - 1.0) / 2 * ns_M**2)
-    ns_P_t = (
-        PR
-        * P_t
-        * ((((gamma + 1.0) * (M0**2.0)) / ((gamma - 1.0) * M0**2.0 + 2.0)) ** (gamma / (gamma - 1.0)))
-        * ((gamma + 1.0) / (2.0 * gamma * M0**2.0 - (gamma - 1.0))) ** (1.0 / (gamma - 1.0))
-    )
-
-    # Combine Outputs
-    P_t_out = jnp.where(M0 > 1.0, ns_P_t, P_t_out)
-    T_out = jnp.where(M0 > 1.0, ns_T, T_out)
-    M_out = jnp.where(M0 > 1.0, ns_M, M_out)
-
-    # Calculate Velocity using Absolute Enthalpy (Strictly enforces First Law)
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out = gas.compute_enthalpy(T_out)
-    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
-
-    return M_out, u_out, P_t_out, T_t_out, T_out, h_t_out, h_out
-
 def func_nozzle_design(
         gas: IdealGas,
         T_t: jnp.ndarray,
@@ -207,6 +171,7 @@ def func_nozzle_performance(
     # Check for choked flow
     critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
     actual_PR = P_t / P0
+    safe_PR = 1.0 + jnp.sqrt((actual_PR - 1.0)**2 + 1e-4)
     choked = actual_PR >= critical_PR
 
     # Find exit Mach number
@@ -222,7 +187,7 @@ def func_nozzle_performance(
         # Newton step
         M_exit_sup = jnp.maximum(M_exit_sup - (AR_calc - AR) / dAR_dM, 1.001)
     
-    M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((P_t / P0)**((gamma - 1.0) / gamma) - 1.0))
+    M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
     M_exit      = jnp.where(choked, M_exit_sup, M_exit_sub)
     M_throat    = jnp.where(choked, 1.0, M_exit)
 

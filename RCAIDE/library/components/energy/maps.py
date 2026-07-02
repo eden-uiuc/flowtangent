@@ -26,6 +26,43 @@ def get_fractional_coords(grid_1d, value):
     idx = jnp.interp(value, grid_1d, jnp.arange(len(grid_1d)))
     return idx
 
+def interp_2d_extrapolate(x, y, x_grid, y_grid, z_table):
+    """
+    Performs 2D bilinear interpolation with linear extrapolation.
+    z_table must have shape (len(x_grid), len(y_grid)).
+    """
+    # 1. Find indices, subtract 1 to get the lower bound of the box
+    idx_x = jnp.searchsorted(x_grid, x, side='right') - 1
+    idx_y = jnp.searchsorted(y_grid, y, side='right') - 1
+    
+    # 2. Clip indices to ensure we always grab a valid 2x2 box at the edges
+    # If x is off the map to the right, this anchors the box at the highest 2 grid points.
+    idx_x = jnp.clip(idx_x, 0, x_grid.shape[0] - 2)
+    idx_y = jnp.clip(idx_y, 0, y_grid.shape[0] - 2)
+    
+    x0 = x_grid[idx_x]
+    x1 = x_grid[idx_x + 1]
+    y0 = y_grid[idx_y]
+    y1 = y_grid[idx_y + 1]
+    
+    # 3. Calculate fractional distances (these will safely go >1 or <0 during extrapolation)
+    tx = (x - x0) / (x1 - x0)
+    ty = (y - y0) / (y1 - y0)
+    
+    # 4. Extract the 4 corners of the box
+    z00 = z_table[idx_x, idx_y]
+    z10 = z_table[idx_x + 1, idx_y]
+    z01 = z_table[idx_x, idx_y + 1]
+    z11 = z_table[idx_x + 1, idx_y + 1]
+    
+    # 5. Bilinear combination (carries the gradients smoothly everywhere)
+    z = (1.0 - tx) * (1.0 - ty) * z00 + \
+        tx * (1.0 - ty) * z10 + \
+        (1.0 - tx) * ty * z01 + \
+        tx * ty * z11
+        
+    return z
+
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Classes
 # -----------------------------------------------------------------------------------------------------------------------
@@ -58,28 +95,34 @@ class CompressorMap(eqx.Module):
     Rline_des: float = 2.0
     Rline_stall: float = 1.0
 
-    def evaluate(
-        self,
-        alpha,
-        Nc,
-        Rline,
-    ):
-
+    def evaluate(self, alpha, Nc, Rline):
         # Speed scaling
         Nc_map = Nc / self.s_Nc
 
-        # Get fractional coordinates
-        idx_alpha = get_fractional_coords(self.alpha_grid, alpha)
-        idx_Nc = get_fractional_coords(self.Nc_grid, Nc_map)
-        idx_Rline = get_fractional_coords(self.Rline_grid, Rline)
-        coords = jnp.stack([idx_alpha, idx_Nc, idx_Rline])
+        # Helper to grab all 3 values from a specific alpha 2D slice
+        def eval_slice(alpha_idx):
+            Wc = interp_2d_extrapolate(Nc_map, Rline, self.Nc_grid, self.Rline_grid, self.Wc_table[alpha_idx])
+            PR = interp_2d_extrapolate(Nc_map, Rline, self.Nc_grid, self.Rline_grid, self.PR_table[alpha_idx])
+            eff = interp_2d_extrapolate(Nc_map, Rline, self.Nc_grid, self.Rline_grid, self.eff_table[alpha_idx])
+            return PR, Wc, eff
 
-        # Interpolate values
-        Wc_map = map_coordinates(self.Wc_table, coords, order=1)
-        PR_map = map_coordinates(self.PR_table, coords, order=1)
-        eff_map = map_coordinates(self.eff_table, coords, order=1)
+        # Find blending weight between the first and last alpha grids
+        a0, a1 = self.alpha_grid[0], self.alpha_grid[-1]
+        
+        # Prevent division by zero if the map only has 1 alpha value
+        denom = jnp.maximum(a1 - a0, 1e-9)
+        w = jnp.clip((alpha - a0) / denom, 0.0, 1.0)
+        
+        # Evaluate the two edge maps
+        PR_0, Wc_0, eff_0 = eval_slice(0)
+        PR_1, Wc_1, eff_1 = eval_slice(-1)
+        
+        # Linearly blend
+        PR_map = PR_0 + w * (PR_1 - PR_0)
+        Wc_map = Wc_0 + w * (Wc_1 - Wc_0)
+        eff_map = eff_0 + w * (eff_1 - eff_0)
 
-        # Apply scaling
+        # Apply output scaling
         Wc = Wc_map * self.s_Wc
         PR = (PR_map - 1.0) * self.s_PR + 1.0
         eff = eff_map * self.s_eff
@@ -146,18 +189,23 @@ class TurbineMap(eqx.Module):
 
     def evaluate(self, alpha, Np, PR):
         # Un-scale the inputs to read the base map
-        Np_map = Np / self.s_Np
-        PR_map = (PR - 1.0) / self.s_PR + 1.0
+        Np_map = Np / self.s_Np * 100.0  
+        PR_map = PR  
 
-        # Get fractional grid coordinates
-        idx_alpha = jnp.atleast_2d(get_fractional_coords(self.alpha_grid, alpha))
-        idx_Nc = get_fractional_coords(self.Np_grid, Np_map)
-        idx_PR = get_fractional_coords(self.PR_grid, PR_map)
-        coords = jnp.stack([idx_alpha, idx_Nc, idx_PR])
+        def eval_slice(alpha_idx):
+            Wp = interp_2d_extrapolate(Np_map, PR_map, self.Np_grid, self.PR_grid, self.Wp_table[alpha_idx])
+            eff = interp_2d_extrapolate(Np_map, PR_map, self.Np_grid, self.PR_grid, self.eff_table[alpha_idx])
+            return Wp, eff
 
-        # Interpolate values
-        Wp_map = map_coordinates(self.Wp_table, coords, order=1)
-        eff_map = map_coordinates(self.eff_table, coords, order=1)
+        a0, a1 = self.alpha_grid[0], self.alpha_grid[-1]
+        denom = jnp.maximum(a1 - a0, 1e-9)
+        w = jnp.clip((alpha - a0) / denom, 0.0, 1.0)
+        
+        Wp_0, eff_0 = eval_slice(0)
+        Wp_1, eff_1 = eval_slice(-1)
+        
+        Wp_map = Wp_0 + w * (Wp_1 - Wp_0)
+        eff_map = eff_0 + w * (eff_1 - eff_0)
 
         # Apply output scalars
         Wp = Wp_map * self.s_Wp
@@ -295,7 +343,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
                 val_units = map_obj.units.get(pyc_attr, None)
                 if val_units is not None:
                     if val_units == "rpm":
-                        val = val * units.rev / units.mins
+                        val = val
                     else:
                         val = val * units.parse(val_units)
                 if hasattr(val, "tolist"):
@@ -309,7 +357,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             val_units = map_obj.units.get(pyc_attr, None)
             if val_units is not None:
                 if val_units == "rpm":
-                    val = val * units.rev / units.mins
+                    val = val
                 else:
                     val = val * units.parse(val_units)
             if val is not None:

@@ -76,7 +76,6 @@ def get_RCAIDE_root():
 # Input/Output Function Decorators
 # ---------------------------------------------------------
 
-
 def inputs(*dependencies: str):
     def decorator(func: Callable):
         func._inputs = set(dependencies)
@@ -91,6 +90,16 @@ def outputs(*outputs: str):
         return func
 
     return decorator
+# ---------------------------------------------------------
+# Formatting
+# ---------------------------------------------------------
+
+def format_array(v, precision=3):
+    v_np = np.asarray(v)
+    if v_np.size == 1:
+        return f"{v_np.item():>12.{precision}e}"
+    # For 1D/2D arrays, use numpy's built-in pretty printer
+    return np.array2string(v_np, precision=precision, separator=', ')
 
 
 MERMAID_STYLES = {
@@ -280,7 +289,10 @@ def serialize_rcaide_node(obj):
     
     # 1. JAX or Numpy Array
     if isinstance(obj, (jnp.ndarray, np.ndarray)):
-        return {"__type__": "ndarray", "data": obj.tolist()}
+        if obj.size == 1:
+            return obj.item()
+        else:
+            return {"__type__": "ndarray", "data": obj.tolist()}
         
     # 2. Registered RCAIDE Class
     elif type(obj).__name__ in RCAIDE_REGISTRY:

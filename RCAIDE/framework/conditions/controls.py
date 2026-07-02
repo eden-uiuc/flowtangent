@@ -7,9 +7,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Optional, Callable
+import warnings
+from typing import Optional, Callable, Literal
 
 # package imports
+import jax
 import jax.numpy as jnp
 
 # RCAIDE imports
@@ -86,11 +88,44 @@ class Control(Condition):
     # Inital values aren't actually optional, but an unset one will be flagged in State.initialize_controls
     initial_value: Optional[float | jnp.ndarray] = None
     bounds: tuple[float, ...] = tuple((-1e6, 1e6))
+    scaling: Literal["linear", "logistic"] = init_field("linear", static=True)
 
     _active: bool = init_field(False, static=True)
 
     def get_field_name(self):
         return self.tag.replace(" ", "_").lower()
+    
+    def scale(self, val):
+        if self.scaling == "logistic":
+            lb = self.bounds[0]
+            ub = self.bounds[1]
+            return lb + (ub - lb) * jax.nn.sigmoid(val)
+        else:
+            return val * self.initial_value
+    
+    def normalize(self, val):
+        if self.scaling == "logistic":
+            lb = self.bounds[0]
+            ub = self.bounds[1]
+            norm = jnp.clip((val - lb) / (ub - lb), 1e-6, 1.0 - 1e-6)
+            return jnp.log(norm / (1.0 - norm))
+        else:
+            return val / self.initial_value
+    
+    def __post_init__(self):
+        if self.bounds[0] > self.bounds[1]:
+            warnings.warn(f"Control '{self.tag}' initialized with out-of-order bounds: {self.bounds}. Reversing...")
+            rev_bnds = (self.bounds[1], self.bounds[0])
+            object.__setattr__(self, "bounds", rev_bnds)
+
+        if self.initial_value is not None:
+            clip_value = jnp.clip(self.initial_value, self.bounds[0] * 1.10, self.bounds[1] * 0.90)
+            if self.initial_value != clip_value:
+                warnings.warn(f"Control '{self.tag}' initialized with out of bounds value {self.initial_value}. Clipping to {clip_value}...")
+                object.__setattr__(self, "initial_value", clip_value)
+
+        
+        return super().__post_init__()
 
 
 class SurfaceControl(Control):

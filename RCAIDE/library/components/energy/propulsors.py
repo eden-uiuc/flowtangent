@@ -163,19 +163,26 @@ class Compressor(FlowNode):
         design_mode = settings.analysis.energy.design_mode
         network_state: TurbojetNetworkConditions = state.energy
         
-        Nc_des    = jnp.atleast_2d(self.map.Nc_des)
-        
         T_t = self.average_domain_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_domain_inputs(state, "flow", "stagnation_pressure")
+
+        theta_c = T_t/288.15
+        delta_c = P_t/101325.0
         
         if design_mode:
             PR  = self.design_parameters.pressure_ratio
-            W   = jnp.atleast_2d(network_state.mass_flow_rate)
             n_isn = self.efficiencies.flow
+
+            W   = jnp.atleast_2d(network_state.mass_flow_rate)
+            Wc_tgt = W * jnp.sqrt(theta_c) / delta_c
             
-            PR_map, Wc_map, eff_map = self.map.evaluate(0.0, 1.0, self.map.Rline_des)
+            PR_map, Wc_map, eff_map = self.map.evaluate(
+                alpha=0.0,
+                Nc=1.0,
+                Rline=self.map.Rline_des
+            )
             
-            s_Wc = W / Wc_map
+            s_Wc =  (Wc_tgt / Wc_map).squeeze()
             s_PR = (PR - 1.0)/(PR_map - 1.0)
             s_eff = self.efficiencies.flow / eff_map
 
@@ -187,19 +194,20 @@ class Compressor(FlowNode):
 
             updated_system = eqx.tree_at(
                 lambda s: s.energy.nodes[self.network_ID].map,
-                updated_map,
-                updated_system
+                updated_system,
+                updated_map
             )
 
         else:
             N      = jnp.atleast_2d(network_state.rotation_speed)
-            Nc     = N / jnp.sqrt(T_t / 288.15) / self.design_parameters.rotation_speed
-
+            Nc_des = self.design_parameters.rotation_speed
+            Nc     = N / jnp.sqrt(T_t / 288.15)
+            
             Rline   = jnp.atleast_2d(network_state.Rline)
             alpha   = self.alpha_schedule(Nc, Nc_des)
 
             PR, Wc, n_isn = self.map.evaluate(alpha, Nc, Rline)
-            W = Wc * (P_t / 101325.0) / (jnp.sqrt(T_t / 288.15))
+            W = Wc * delta_c / jnp.sqrt(theta_c)
 
         d_work, P_t_out, T_t_out, h_t_out = fan_compressor_performance(
             gas=self.working_fluid,
@@ -213,7 +221,7 @@ class Compressor(FlowNode):
 
         outputs = eqx.tree_at(lambda o: o.mechanical.work, outputs, jnp.atleast_2d(d_work))
 
-        outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, W)
+        outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, network_state.mass_flow_rate)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure, outputs, P_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
@@ -224,7 +232,7 @@ class Compressor(FlowNode):
         updated_state = eqx.tree_at(
             lambda s:s.energy.outputs.residual.Wc,
             updated_state,
-            (W - state.energy.mass_flow_rate)/state.energy.mass_flow_rate
+            (W - state.energy.mass_flow_rate)/100.
         )
 
         return updated_state, updated_system, settings
@@ -341,22 +349,28 @@ class Turbine(FlowNode):
         design_mode = settings.analysis.energy.design_mode
         network_state: TurbojetNetworkConditions = state.energy
         
-        Np_des    = jnp.atleast_2d(self.map.Np_des)
-        
         T_t = self.average_domain_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_domain_inputs(state, "flow", "stagnation_pressure")
+
+        theta_t = T_t/288.15
+        delta_t = P_t/101325.0
         
         FAR = self.average_domain_inputs(state, "fuel", "fuel_air_ratio")
 
         if design_mode:
-            W = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
             PR = jnp.atleast_2d(network_state.turbine_PR)
             n_isn = self.efficiencies.flow
 
-            Wp_map, eff_map = self.map.evaluate(0.0, 1.0, PR)
+            W = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
+            Wp_tgt = W * jnp.sqrt(theta_t) / delta_t
+
+            Wp_map, eff_map = self.map.evaluate(
+                alpha=jnp.zeros_like(PR),
+                Np=jnp.ones_like(PR),
+                PR=PR)
             
-            s_Wp = W / Wp_map
-            s_eff = self.efficiencies.flow / eff_map
+            s_Wp = (Wp_tgt / Wp_map).squeeze()
+            s_eff = (self.efficiencies.flow / eff_map).squeeze()
 
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),
@@ -366,18 +380,20 @@ class Turbine(FlowNode):
 
             updated_system = eqx.tree_at(
                 lambda s: s.energy.nodes[self.network_ID].map,
-                updated_map,
-                updated_system
+                updated_system,
+                updated_map
             )
 
         else:
             N = jnp.atleast_2d(network_state.rotation_speed)
             Np = N / jnp.sqrt(T_t / 288.15)
+            Np_des = self.design_parameters.rotation_speed
+
             PR = jnp.atleast_2d(network_state.turbine_PR)
             alpha = self.alpha_schedule(Np, Np_des)
 
             Wp, n_isn = self.map.evaluate(alpha, Np, PR)
-            W = Wp * (P_t / 101325.0) / (jnp.sqrt(T_t / 288.15)) * (1. + FAR)
+            W = Wp * delta_t / jnp.sqrt(theta_t) * (1. + FAR)
 
         T_t_out, P_t_out, h_t_out, work = turbine_performance(
             gas=BurnedJetA(FAR),
@@ -395,7 +411,7 @@ class Turbine(FlowNode):
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_pressure, outputs, P_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
-        outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, W)
+        outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, network_state.mass_flow_rate * (1 + FAR))
 
         outputs = eqx.tree_at(lambda o: o.mechanical.work, outputs, jnp.atleast_2d(work))
 
@@ -405,7 +421,7 @@ class Turbine(FlowNode):
         updated_state = eqx.tree_at(
             lambda s:s.energy.outputs.residual.Wp,
             updated_state,
-            (W - state.energy.mass_flow_rate)/state.energy.mass_flow_rate
+            (W / (1. + FAR) - state.energy.mass_flow_rate)/100.
         )
 
         return updated_state, updated_system, settings
@@ -471,7 +487,7 @@ class ExpansionNozzle(FlowNode):
                 ), self.design_parameters,(
                     A_t.squeeze(),
                     A_x.squeeze(),
-                    A_t.squeeze()/A_x.squeeze()
+                    A_x.squeeze()/A_t.squeeze()
                 ),
             )
             updated_system = eqx.tree_at(
@@ -514,7 +530,7 @@ class ExpansionNozzle(FlowNode):
         updated_state = eqx.tree_at(
             lambda s: s.energy.outputs.residual.mass_flow_rate,
             updated_state,
-            (mdot_out - state.energy.mass_flow_rate)/state.energy.mass_flow_rate
+            (mdot_out / (1. + FAR) - state.energy.mass_flow_rate)/100.
         )
 
         return updated_state, updated_system, settings
@@ -532,10 +548,9 @@ class Turboshaft(EnergyNode):
 
     def transmit(self, state: State, system: System, settings: Settings):
         
-        c_norm = [i for i in self.inputs if "compressor" in i.network_ID and i.domain == "mechanical"][0]
+        # c_norm = [i for i in self.inputs if "compressor" in i.network_ID and i.domain == "mechanical"][0]
 
-        d_work = (self.sum_domain_inputs(state, "mechanical", "work") / 
-                  self.get_input(state, c_norm, "work"))
+        d_work = (self.sum_domain_inputs(state, "mechanical", "work") / 2e7)
         if settings.analysis.energy.design_mode:
             d_mass = jnp.atleast_2d(0.)
         else:
@@ -653,18 +668,15 @@ class TurbojetEngine(FlowNode):
         mdot_core = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
 
         F, F_sp, I_sp, TSFC, p, ff = engine_performance(
-            gamma_0=fs.gamma,
             u0=fs.speed,
-            a0=fs.speed_of_sound,
-            M0=fs.mach_number,
             P0=fs.pressure,
             g=fs.gravity,
             delta_SFC=self.design_parameters.delta_SFC,
             v_fan_nozzle=0.0,
-            AR_fan_nozzle=0.0,
+            A_fan_nozzle=0.0,
             P_fan_nozzle=0.0,
             v_core_nozzle=self.average_domain_inputs(state, "flow", "speed"),
-            AR_core_nozzle=self.average_domain_inputs(state, "flow", "area_ratio"),
+            A_core_nozzle=self.core_nozzle.design_parameters.A_exit,
             P_core_nozzle=self.average_domain_inputs(state, "flow", "pressure"),
             fuel_air_ratio=self.average_domain_inputs(state, "fuel", "fuel_air_ratio"),
             mdot_core=mdot_core,

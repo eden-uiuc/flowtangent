@@ -55,7 +55,7 @@ class State(Condition):
     def __post_init__(self):
         frozen_initials = eqx.tree_at(lambda s: s.initials, self, None, is_leaf=lambda x: x is None)
         object.__setattr__(self, "initials", frozen_initials)
-    
+
     def initialize_controls(self):
         
         control_values = []
@@ -66,7 +66,10 @@ class State(Condition):
             # All control values are normalized by their initial value, so set initial control value to 1.0
             # Values are rescaled in update_controls when actually added to state
             if ctrl.initial_value is not None:
-                    control_values.append(jnp.full((n_cp, 1), 1.0))
+                    control_values.append(jnp.full(
+                        (n_cp, 1),
+                        ctrl.normalize(ctrl.initial_value))
+                    )
             else:
                 raise ValueError(f"Control {ctrl.tag} has no initial value: {ctrl.initial_value}."
                                 "Initial value must be a float or an array of size matching the number of analysis control points.")
@@ -74,9 +77,6 @@ class State(Condition):
         return self.update_controls(jnp.concatenate(control_values, axis=0))
 
     def update_controls(self, control_values: jnp.ndarray):
-        
-        def apply_bounds(val, lb, ub):
-            return lb + (ub - lb) * jax.nn.sigmoid(val)
 
         updated_state = self
         n_points = int(self.numerics.number_of_control_points)
@@ -87,7 +87,7 @@ class State(Condition):
             # The solver's guess is already in dimensionless logit space
             solver_logit = control_values[control_idx : control_idx + n_points]
             
-            new_values = apply_bounds(solver_logit, ctrl.bounds[0], ctrl.bounds[1])
+            new_values = ctrl.scale(solver_logit)
             
             updated_state = eqx.tree_at(lambda s: get_target(s, ctrl.state_path), updated_state, new_values)
             control_idx += n_points
@@ -96,17 +96,12 @@ class State(Condition):
     
     def get_control_array(self) -> jnp.ndarray:
         
-        def invert_bounds(val, lb, ub):
-            # Fixed the 1e6 typo to 1e-6
-            norm = jnp.clip((val - lb) / (ub - lb), 1e-6, 1.0 - 1e-6)
-            return jnp.log(norm / (1.0 - norm))
-        
         control_values = []
         for ctrl in self.controls.active_controls:
             current_physical_val = get_target(self, ctrl.state_path)
             
             # Map the physical value directly to logit space based on its bounds
-            logit_val = invert_bounds(current_physical_val, ctrl.bounds[0], ctrl.bounds[1])
+            logit_val = ctrl.normalize(current_physical_val)
             
             control_values.append(logit_val)
                                 

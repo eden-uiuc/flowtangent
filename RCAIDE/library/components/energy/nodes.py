@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 from RCAIDE.utils import init_field, register
 
-from RCAIDE.library import Component, units
+from RCAIDE.library import Component
 from RCAIDE.library.gases import Air, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
