@@ -390,7 +390,7 @@ def hangar_ui():
                     if sel_type in ['wing', 'fuse']:
                         sel_obj['y_offset'] = 0.0
 
-                    if sel_type is 'nac':
+                    if sel_type == 'nac':
                         with ui.row().classes('w-full items-center gap-2 mb-2'):
                             ui.number('X', value=sel_obj['x_offset'], step=0.5, format='%.1f', 
                                     on_change=update_plot).bind_value(sel_obj, 'x_offset').props('dense').classes('flex-1')

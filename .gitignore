@@ -85,3 +85,4 @@ nosetests.xml
 /docs/_modules/
 /docs/_sources/
 /docs/_static/
+/Tests/PyCycle/PyCycle_Examples/

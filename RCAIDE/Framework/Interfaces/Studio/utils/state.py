@@ -62,9 +62,20 @@ app_state = {
         'cl': 0.0, 'cd': 0.0, 'l_d': 0.0, 'throttle': 0.0, 'fuel_burn': 0.0
     },
     'engine':{
-        'design': {},
+        'design': {'mach': 0.2, 'alt': 5.0, 'thrust': 50.0,},
         'selected_id': '',
-        'stations': {}
+        'stations': {
+            'inlet': {},
+            'fan': {},
+            'lpc': {},
+            'hpc': {},
+            'burner': {},
+            'hpt': {},
+            'lpt': {},
+            'c_nozz': {},
+            'f_nozz': {}
+
+        },
     }
 }
 

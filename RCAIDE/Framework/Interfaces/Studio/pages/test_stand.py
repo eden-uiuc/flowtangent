@@ -286,7 +286,7 @@ def generate_rotors(
 
 def engine_ui():
 
-    station_params = [
+    station_geometry = [
         {'name': 'Inlet',  'x_start': 0.0, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.4, 'r_in_end': 0.5, 'color': '#3b82f6'}, # Cool blue
         {'name': 'Fan',    'x_start': 1.0, 'length': 0.5, 'r_out_start': 1.2, 'r_out_end': 1.2, 'r_in_start': 0.5, 'r_in_end': 0.5, 'color': '#60a5fa'},
         {'name': 'LPC',    'x_start': 1.5, 'length': 1.0, 'r_out_start': 1.2, 'r_out_end': 0.9, 'r_in_start': 0.5, 'r_in_end': 0.6, 'color': '#93c5fd'},
@@ -297,7 +297,7 @@ def engine_ui():
         {'name': 'Nozzle', 'x_start': 6.5, 'length': 1.5, 'r_out_start': 0.9, 'r_out_end': 0.6, 'r_in_start': 0.3, 'r_in_end': 0.0, 'color': '#fcd34d'}
     ]
 
-    station_centers = {s['name'].lower(): s['x_start'] + s['length'] / 1.8 for s in station_params}
+    station_centers = {s['name'].lower(): s['x_start'] + s['length'] / 1.8 for s in station_geometry}
     station_centers['c_nozz'] = 7.33
     station_centers['f_nozz'] = 7.33
 
@@ -382,7 +382,7 @@ def engine_ui():
                                     x=4.0, y=-4.0, z=0.0, look_at_x=4.0, look_at_y=0, look_at_z=0, duration=1.0)
                                 ).classes('flex-grow text-xs')
                         ui.button('Isometric', on_click=lambda: scene.move_camera(
-                                    x=-0.2, y=-2.5, z=2.5, look_at_x=3.0, look_at_y=0, look_at_z=0, duration=1.0)
+                                    x=-0.3, y=-2.0, z=2.2, look_at_x=2.0, look_at_y=0, look_at_z=0, duration=1.0)
                                 ).classes('flex-grow text-xs')
                     ui.label('Vehicle Tree').classes('text-lg font-bold mb-2')
                     engine_tree()  
@@ -450,7 +450,7 @@ def engine_ui():
                             # -------------------------------------------------------------------------
 
                             station_urls = []
-                            for stat in station_params:
+                            for stat in station_geometry:
                                 # Generate Outer Flow Boundary
                                 outer_data = generate_shroud(
                                     x_start=stat['x_start'], length=stat['length'], 
@@ -475,10 +475,7 @@ def engine_ui():
 
                                 station_urls.append((url_o, url_i, stat['color']))
 
-                            # -------------------------------------------------------------------------
-                            # 3. Camera Control Hooks (Flipped to the -Z side for Left-to-Right flow)
-                            # -------------------------------------------------------------------------
-                            # Defaulting to -3.5 for the Z zoom so we view from the other side
+
                             def pan_to_station(target_x, zoom_z=0.):
                                 scene.move_camera(
                                     x=target_x, y=-1.5, z=zoom_z, 
@@ -486,56 +483,99 @@ def engine_ui():
                                     duration=0.8
                                 )
 
-                            # -------------------------------------------------------------------------
-                            # 4. Compile the Scene
-                            # -------------------------------------------------------------------------
-                            scene = ui.scene(grid=False, background_color='transparent').classes('w-full h-full')
-                            
-                            with scene:
-                                # Initial boot-up camera position matches the new Wide Shot (-12.0 Z)
-                                scene.move_camera(x=-0.2, y=-2.5, z=2.5, look_at_x=3.0, look_at_y=0, look_at_z=0)
+                            scene_container = ui.element('div').classes('w-full h-full')
+                            with scene_container:
+                                scene = ui.scene(grid=False, background_color='transparent').classes('w-full h-full')
+                                
+                                with scene:
+                                    # Initial boot-up camera position matches the new Wide Shot (-12.0 Z)
+                                    scene.move_camera(x=-0.2, y=-2.5, z=2.5, look_at_x=3.0, look_at_y=0, look_at_z=0)
 
-                                # Mount the Thermodynamic Color Stations
-                                for url_o, url_i, color in station_urls:
-                                    scene.stl(url_o).material(color=color, opacity=0.7)
-                                    scene.stl(url_i).material(color=color, opacity=0.7)
-                                
-                                # Mount STATIC Internals
-                                scene.stl(comp_stator_url).material(color='#475569') 
-                                scene.stl(turb_stator_url).material(color='#475569') 
-                                
-                                # Mount ROTATING Internals
-                                rotor_group = scene.group()
-                                with rotor_group:
-                                    scene.stl(fan_url).material(color='#94a3b8')
-                                    scene.stl(comp_rotor_url).material(color='#94a3b8')
-                                    scene.stl(turb_rotor_url).material(color='#94a3b8')
+                                    # Mount the Thermodynamic Color Stations
+                                    for url_o, url_i, color in station_urls:
+                                        scene.stl(url_o).material(color=color, opacity=0.7)
+                                        scene.stl(url_i).material(color=color, opacity=0.7)
                                     
-                                    # Central Turboshaft
-                                    scene.cylinder(top_radius=0.1, bottom_radius=0.1, height=6.0, radial_segments=16) \
-                                        .material(color='#94a3b8') \
-                                        .move(x=4.0, y=0, z=0) \
-                                        .rotate(0, 0, np.pi/2)
-                                
-                                anim_state = {'angle': 0.0}
-                                def animate_spin():
-                                    anim_state['angle'] += 0.05 
-                                    rotor_group.rotate(anim_state['angle'], 0, 0)
+                                    # Mount STATIC Internals
+                                    scene.stl(comp_stator_url).material(color='#475569') 
+                                    scene.stl(turb_stator_url).material(color='#475569') 
                                     
-                                ui.timer(0.05, animate_spin)
-                            
+                                    # Mount ROTATING Internals
+                                    rotor_group = scene.group()
+                                    with rotor_group:
+                                        scene.stl(fan_url).material(color='#94a3b8')
+                                        scene.stl(comp_rotor_url).material(color='#94a3b8')
+                                        scene.stl(turb_rotor_url).material(color='#94a3b8')
+                                        
+                                        # Central Turboshaft
+                                        scene.cylinder(top_radius=0.1, bottom_radius=0.1, height=5.0, radial_segments=16) \
+                                            .material(color='#94a3b8') \
+                                            .move(x=4.0, y=0, z=0) \
+                                            .rotate(0, 0, np.pi/2)
+                                    
+                                    anim_state = {'angle': 0.0}
+                                    def animate_spin():
+                                        anim_state['angle'] += 0.05 
+                                        rotor_group.rotate(anim_state['angle'], 0, 0)
+                                        
+                                    ui.timer(0.05, animate_spin)
+                                
+                                with ui.row().classes('absolute top-0 left-0 z-40 bg-slate-900/90 text-white p-4 shadow-2xl backdrop-blur-md border-b border-slate-700 w-full justify-around items-center'):
+                                    def telemetry_block(label, key, stage, formatter=None,):
+                                        with ui.column().classes('items-center gap-1'):
+                                            ui.label(label).classes('text-[10px] text-slate-400 font-bold uppercase tracking-wider')
+                                            ui.label().bind_text_from(app_state['simulator'], key, backward=formatter).classes('font-mono text-lg text-slate-100')
+
+                                    with ui.column().classes('items-center gap-1'):
+                                            ui.label(engine_state['selected_id'].title()).classes('text-[10px] text-slate-400 font-bold uppercase tracking-wider')
+                                            ui.label("Intake").classes('font-bold text-lg text-green-400')
+                                    telemetry_block('Alt (ft)', 'current_alt', lambda a: f"{a:,.0f}")
+                                    telemetry_block('Mach', 'current_mach', lambda m: f"{m:.3f}")
+                                    ui.element('div').classes('w-px h-8 bg-slate-700 mx-2')
+                                    telemetry_block('Alpha', 'alpha', lambda a: f"{a:.1f}°")
+                                    telemetry_block('CL', 'cl', lambda c: f"{c:.3f}")
+                                    telemetry_block('CD', 'cd', lambda c: f"{c:.4f}")
+                                    telemetry_block('L/D', 'l_d', lambda l: f"{l:.1f}")
+                                    ui.element('div').classes('w-px h-8 bg-slate-700 mx-2')
+                                    telemetry_block('Throttle', 'throttle', lambda t: f"{t:.1f}%")
+                                    telemetry_block('Fuel Burn', 'fuel_burn', lambda f: f"{f:,.0f} lb/hr")
+                                
+                                with ui.row().classes('absolute bottom-0 left-0 z-40 bg-slate-900/90 text-white p-4 shadow-2xl backdrop-blur-md border-b border-slate-700 w-full justify-around items-center'):
+
+                                    with ui.column().classes('items-center gap-1'):
+                                            ui.label(engine_state['selected_id'].title()).classes('text-[10px] text-slate-400 font-bold uppercase tracking-wider')
+                                            ui.label("Exit").classes('font-bold text-lg text-green-400')
+                                    telemetry_block('Alt (ft)', 'current_alt', lambda a: f"{a:,.0f}")
+                                    telemetry_block('Mach', 'current_mach', lambda m: f"{m:.3f}")
+                                    ui.element('div').classes('w-px h-8 bg-slate-700 mx-2')
+                                    telemetry_block('Alpha', 'alpha', lambda a: f"{a:.1f}°")
+                                    telemetry_block('CL', 'cl', lambda c: f"{c:.3f}")
+                                    telemetry_block('CD', 'cd', lambda c: f"{c:.4f}")
+                                    telemetry_block('L/D', 'l_d', lambda l: f"{l:.1f}")
+                                    ui.element('div').classes('w-px h-8 bg-slate-700 mx-2')
+                                    telemetry_block('Throttle', 'throttle', lambda t: f"{t:.1f}%")
+                                    telemetry_block('Fuel Burn', 'fuel_burn', lambda f: f"{f:,.0f} lb/hr")
+                            ui.run_javascript(f'''
+                                const target = getElement({scene_container.id});
+                                if (target) {{
+                                    new ResizeObserver(() => {{
+                                        window.dispatchEvent(new Event('resize')); 
+                                    }}).observe(target);
+                                }}
+                            ''')
+
                     with inner_split.after:
                         # RIGHT PANEL CONTENT
                         with ui.column().classes(f'w-full h-full p-4 border-l overflow-y-auto gap-0 {sidebar_bg} {sidebar_border}'):
-                            ui.label('Flight Regime').classes('text-lg font-bold mb-2')
+                            ui.label('Design Flight Regime').classes('text-lg font-bold mb-2')
                             
-                            # with ui.row().classes('w-full gap-2'):
-                            #     ui.number('Mach', value=engine_state['mach'], step=0.05).bind_value(engine_state, 'mach').props('dense').classes('flex-1')
-                            #     ui.number('AoA (°)', value=engine_state['alpha'], step=0.5).bind_value(engine_state, 'alpha').props('dense').classes('flex-1')
-                            #     ui.number('Beta (°)', value=engine_state['beta'], step=0.5).bind_value(engine_state, 'beta').props('dense').classes('flex-1')
+                            with ui.row().classes('w-full gap-2'):
+                                ui.number('Mach', value=engine_state['design']['mach'], step=0.05).bind_value(engine_state, 'mach').props('dense').classes('flex-1')
+                                ui.number('Alt. (km)', value=engine_state['design']['alt'], step=0.5).bind_value(engine_state, 'alpha').props('dense').classes('flex-1')
+                                ui.number('Target Thrust (kN)', value=engine_state['design']['thrust'], step=1.0).bind_value(engine_state, 'beta').props('dense').classes('flex-1')                            
                             
                             ui.separator().classes('my-4 opacity-50')
-                            # run_button = ui.button('Run Analysis', on_click=run_analysis, color='blue').classes('w-full')
+                            run_button = ui.button('Run Design Study', on_click=lambda: None, color='blue').classes('w-full')
 
                             with ui.row().classes('w-full items-center justify-center mt-4 hidden') as loading_indicator:
                                 ui.spinner('orbit', size='md', color='blue')
