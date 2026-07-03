@@ -255,7 +255,7 @@ def copy_large_container(large_container, type_str):
     paths = get_paths(type_str)
     
     for obj in large_container:
-        if type(obj) ==  RCAIDE.Library.Components.Wings.Control_Surfaces.Slat: # DO NOT COPY SLATS
+        if type(obj) ==  RCAIDE.library.Components.wings.Control_Surfaces.Slat: # DO NOT COPY SLATS
             continue
         else:
             #copy from paths

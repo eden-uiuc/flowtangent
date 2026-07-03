@@ -13,14 +13,14 @@ from dask import compute as dc
 
 from tqdm import tqdm
 
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingDimensions, WingSweeps
+from RCAIDE.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from RCAIDE.Framework import Aircraft, State, Settings
-from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework import Aircraft, State, Settings
+from RCAIDE.framework.settings import AnalysisSettings
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices
-from RCAIDE.Framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
+from RCAIDE.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
+from RCAIDE.framework.Methods.Aerodynamics.VORJAX import discretize_surfaces
 
 def get_zarr_root():
     """

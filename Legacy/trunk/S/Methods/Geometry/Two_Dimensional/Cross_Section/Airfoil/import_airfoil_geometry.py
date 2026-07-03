@@ -52,7 +52,7 @@ def import_airfoil_geometry(airfoil_geometry_file, npoints = 201,surface_interpo
         npoints+= 1
         print('Number of points must be odd, changing to ' + str(npoints) + ' points')      
     
-    geometry     = RCAIDE.Framework.Core.Data()
+    geometry     = RCAIDE.framework.Core.Data()
     half_npoints = npoints//2         
  
     # Open file and read column names and data block

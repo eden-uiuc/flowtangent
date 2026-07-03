@@ -30,22 +30,22 @@ from plotly.subplots import make_subplots
 
 import RCAIDE.utils as ru
 
-from RCAIDE.Library import Units
-from RCAIDE.Library.Components import ComponentAreas
-from RCAIDE.Library.Components.Wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from RCAIDE.Library.Components.Airfoils import Airfoil, Airfoil_Data
+from RCAIDE.library import units
+from RCAIDE.library.components import ComponentAreas
+from RCAIDE.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from RCAIDE.library.components.airfoils import Airfoil, Airfoil_Data
 
-from RCAIDE.Library.Methods.Aerodynamics.Transonic import ensemble_CL_spline
+from RCAIDE.library.methods.Aerodynamics.Transonic import ensemble_CL_spline
 
-from RCAIDE.Framework import Process, State, Aircraft, Settings, GradientMap, System
-from RCAIDE.Framework.Settings import AnalysisSettings
-from RCAIDE.Framework.Conditions import Numerics
+from RCAIDE.framework import Process, State, Aircraft, Settings, GradientMap, System
+from RCAIDE.framework.settings import AnalysisSettings
+from RCAIDE.framework.conditions import Numerics
 
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
-from RCAIDE.Framework.Analyses.Batched import ShardedDatasetGenerator
+from RCAIDE.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from RCAIDE.framework.analyses.batched import ShardedDatasetGenerator
 
-from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -382,14 +382,14 @@ def VORJAX_ONERA_M6():
     AR = 3.8
     taper = 0.56
     
-    sweep_qc = 26.7 * Units.deg
-    sweep_le = 30.0 * Units.deg
-    sweep_te = 15.8 * Units.deg
+    sweep_qc = 26.7 * units.deg
+    sweep_le = 30.0 * units.deg
+    sweep_te = 15.8 * units.deg
 
-    c_root = 805.9 * Units.mm
-    semispan = 1196.3 * Units.mm
+    c_root = 805.9 * units.mm
+    semispan = 1196.3 * units.mm
 
-    mac = 0.64607 * Units.m
+    mac = 0.64607 * units.m
 
     segments = (
         WingSegment(
@@ -745,7 +745,7 @@ def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     plt.rcParams['font.size'] = 8 # 11pt maps perfectly to AIAA column widths
 
     AR = 8.0
-    alpha = 2.0 * Units.deg
+    alpha = 2.0 * units.deg
     grad_truth = (2.0  * alpha / (jnp.pi * AR)) * (2.0 * jnp.pi/(jnp.sqrt(1 + (2 / AR)**2) + 2/AR))**2
 
     # Convert error to percentage
@@ -1654,7 +1654,7 @@ if __name__ == "__main__":
 
             vehicle = VORJAX_straight_wing(span=10.0, chord=1.0)
             results = VORJAX_test_run(vehicle,
-                                      alpha=alpha * Units.deg, Mach=jnp.zeros_like(alpha),
+                                      alpha=alpha * units.deg, Mach=jnp.zeros_like(alpha),
                                       n_sw=20, n_cw=12, cos_sw=False,
                                       suction=True, shock=False,
                                       debug_mode=DEBUG)
@@ -1713,7 +1713,7 @@ if __name__ == "__main__":
 
                 results = VORJAX_test_run(
                     vehicle,
-                    alpha=2.0 * Units.deg , Mach=0.00,
+                    alpha=2.0 * units.deg , Mach=0.00,
                     n_sw=max_segments,
                     grad_map=GRAD_MAP,
                     debug_mode=DEBUG
@@ -1763,14 +1763,14 @@ if __name__ == "__main__":
                     # Forward Step
                     res_fwd = VORJAX_test_run(
                         vehicle,
-                        alpha=(2.0 * Units.deg) + h, Mach=0.00,
+                        alpha=(2.0 * units.deg) + h, Mach=0.00,
                         debug_mode=DEBUG)
                     CL_fwd = ru.get_target(res_fwd[0], lift_path).item(0)
                     
                     # Backward Step
                     res_bwd = VORJAX_test_run(
                         vehicle,
-                        alpha=(2.0 * Units.deg) - h,
+                        alpha=(2.0 * units.deg) - h,
                         Mach=0.00,
                         debug_mode=DEBUG)
                     CL_bwd = ru.get_target(res_bwd[0], lift_path).item(0)
@@ -1801,7 +1801,7 @@ if __name__ == "__main__":
         if NEW_DATA:
             max_segments = 20
             AR = 8.0
-            alpha = 2.0 * Units.deg
+            alpha = 2.0 * units.deg
             grad_truth = (2.0  * alpha / (jnp.pi * AR)) * (2.0 * jnp.pi/(jnp.sqrt(1 + (2 / AR)**2) + 2/AR))**2
             
             CDnf = []
@@ -1875,7 +1875,7 @@ if __name__ == "__main__":
                 # Forward Step
                 f_st, f_sys, f_setts, jac = VORJAX_test_run(
                     vehicle,
-                    alpha=2.0 * Units.deg,
+                    alpha=2.0 * units.deg,
                     Mach=0.00,
                     n_sw=n_sw,
                     n_cw=n_cw,
@@ -1917,7 +1917,7 @@ if __name__ == "__main__":
 
                 f_st, f_sys, f_setts, jac = VORJAX_test_run(
                     VORJAX_delta_wing(AR=ARs[i]),
-                    alpha=2.0 * Units.deg,
+                    alpha=2.0 * units.deg,
                     Mach=0.00,
                     grad_map=GRAD_MAP,
                     n_sw=32,
@@ -1950,7 +1950,7 @@ if __name__ == "__main__":
                 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2, 1.3, # Transonic
                 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0  # Supersonic
                 ]
-            alpha = [3.06 * Units.deg] * len(Mach)
+            alpha = [3.06 * units.deg] * len(Mach)
 
             vehicle = VORJAX_ONERA_M6()
 
@@ -1982,7 +1982,7 @@ if __name__ == "__main__":
                 SU2_da = float(SU2_results['dcl_dalpha'])
 
                 VJX_CL = float(CL[i, 0])
-                VJX_da = float(dCL_dMach[i, 0]) * Units.deg
+                VJX_da = float(dCL_dMach[i, 0]) * units.deg
 
                 CL_err = (VJX_CL - SU2_CL)/SU2_CL * 100
                 da_err = (VJX_da - SU2_da)/SU2_da * 100
@@ -2023,7 +2023,7 @@ if __name__ == "__main__":
         db_path = "./Tests/VORJAX/batch_test"
         if NEW_DATA:
             
-            alpha = jnp.linspace(0.0, 5.0, 51) * Units.deg
+            alpha = jnp.linspace(0.0, 5.0, 51) * units.deg
             mach = jnp.linspace(0.0, 0.7, 71)
 
             solver = BatchVORJAX(db_path=db_path)

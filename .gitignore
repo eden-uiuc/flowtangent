@@ -61,6 +61,7 @@ nosetests.xml
 
 *.csv
 *.dat
+*.openmdao_out
 
 # Geometry
 *.geo

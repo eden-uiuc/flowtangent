@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from RCAIDE.Framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
+from RCAIDE.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
 
 if __name__ == "__main__":
 

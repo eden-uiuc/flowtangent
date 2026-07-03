@@ -11,30 +11,30 @@ import jax.numpy as jnp
 # RCAIDE Imports
 import RCAIDE.utils as ru
 
-from RCAIDE.Framework import Process, State, Settings
-from RCAIDE.Framework.Conditions import Numerics
-from RCAIDE.Framework.Systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from RCAIDE.Framework.Missions.Segments import Segment
-from RCAIDE.Framework.Missions.Segments.Profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from RCAIDE.framework import Process, State, Settings
+from RCAIDE.framework.conditions import Numerics
+from RCAIDE.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
+from RCAIDE.framework.missions.Segments import Segment
+from RCAIDE.framework.missions.Segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from RCAIDE.Framework.Conditions.Controls import DirectControlVariable
-from RCAIDE.Framework.Analyses.Aerodynamics.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
-from RCAIDE.Framework.Analyses.Energy.Sizing import update_design_parameters
-from RCAIDE.Framework.Analyses.Energy import build_analysis_from_network
-from RCAIDE.Framework.Plotting import plot_vlm_panels
+from RCAIDE.framework.conditions.controls import Control
+from RCAIDE.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from RCAIDE.framework.analyses.energy.sizing import update_design_parameters
+from RCAIDE.framework.analyses.energy import build_analysis_from_network
+from RCAIDE.framework.Plotting import plot_vlm_panels
 
-from RCAIDE.Library import Units
-from RCAIDE.Library.Components import ComponentAreas, Airfoil, AirfoilData, MassProperties
-from RCAIDE.Library.Components.Wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
-from RCAIDE.Library.Components.Fuselages import *
-from RCAIDE.Library.Components.Landing_Gear import LandingGear
-from RCAIDE.Library.Components.Nacelles import Nacelle, NacelleDiameters
-from RCAIDE.Library.Components.Energy.Networks import EnergyNetwork
-from RCAIDE.Library.Components.Energy.Propulsors import TurbofanEngine, DesignParameters
-from RCAIDE.Library.Components.Energy.Nodes import FuelTank
-from RCAIDE.Library.Components.Energy.Lines.Jets import TurbojetEnergyLine
+from RCAIDE.library import units
+from RCAIDE.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
+from RCAIDE.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
+from RCAIDE.library.components.fuselages import *
+from RCAIDE.library.components.landing_gear import LandingGear
+from RCAIDE.library.components.nacelles import Nacelle, NacelleDiameters
+from RCAIDE.library.components.energy.networks import EnergyNetwork
+from RCAIDE.library.components.energy.propulsors import TurbofanEngine, JetDesign
+from RCAIDE.library.components.energy.nodes import FuelTank
+from RCAIDE.library.components.energy.lines import TurbojetEnergyLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
@@ -48,12 +48,12 @@ def vehicle_setup():
     # ------------------------------------------------------------------------------------------------------------------
 
     mass_props = AircraftMassProperties(
-        total=79015.8 * Units.kg,
-        max_takeoff=79015.8 * Units.kg,
-        takeoff=79015.8 * Units.kg,
-        operating_empty=62746.4 * Units.kg,
-        max_zero_fuel=62732.0 * Units.kg,
-        cargo=10000.0 * Units.kg,
+        total=79015.8 * units.kg,
+        max_takeoff=79015.8 * units.kg,
+        takeoff=79015.8 * units.kg,
+        operating_empty=62746.4 * units.kg,
+        max_zero_fuel=62732.0 * units.kg,
+        cargo=10000.0 * units.kg,
         center_of_gravity=jnp.array([[15.30987849,   0.,             -0.48023939]]),  # Estimated
         moments_of_inertia=jnp.array([[3173074.17,    0.,             28752.77565],
                                       [0.,             3019041.443,    0],
@@ -81,39 +81,39 @@ def vehicle_setup():
     root_segment = WingSegment(
         tag='Main Wing Root Segment',
         percent_span_location   =0.0,
-        twist                   =4. * Units.deg,
+        twist                   =4. * units.deg,
         root_chord_percent      =1.,
         thickness_to_chord      =0.1,
-        dihedral_outboard       =2.5 * Units.deg,
-        sweeps                  =WingSweeps(quarter_chord=28.225 * Units.deg),
-        airfoil                 =Airfoil.from_file(AirfoilData/'B737a.txt'))
+        dihedral_outboard       =2.5 * units.deg,
+        sweeps                  =WingSweeps(quarter_chord=28.225 * units.deg),
+        airfoil                 =Airfoil.from_file(_AF_DIR/'B737a.txt'))
 
     yehudi_segment = WingSegment(
         tag='Main Wing Yehudi Segment',
         percent_span_location=0.324,
-        twist=0.047193 * Units.deg,
+        twist=0.047193 * units.deg,
         root_chord_percent=0.5,
         thickness_to_chord=0.1,
-        dihedral_outboard=5.5 * Units.deg,
-        sweeps=WingSweeps(quarter_chord=25. * Units.deg),
-        airfoil=Airfoil.from_file(AirfoilData/'B737b.txt'))
+        dihedral_outboard=5.5 * units.deg,
+        sweeps=WingSweeps(quarter_chord=25. * units.deg),
+        airfoil=Airfoil.from_file(_AF_DIR/'B737b.txt'))
 
     mid_segment = WingSegment(
         tag='Main Wing Mid Segment',
         percent_span_location=0.963,
-        twist=0.00258 * Units.deg,
+        twist=0.00258 * units.deg,
         root_chord_percent=0.220,
         thickness_to_chord=0.1,
-        dihedral_outboard=5.5 * Units.deg,
-        sweeps=WingSweeps(quarter_chord=56.75 * Units.deg),
-        airfoil=Airfoil.from_file(AirfoilData/'B737c.txt'))
+        dihedral_outboard=5.5 * units.deg,
+        sweeps=WingSweeps(quarter_chord=56.75 * units.deg),
+        airfoil=Airfoil.from_file(_AF_DIR/'B737c.txt'))
 
     tip_segment = WingSegment(
         tag='Main Wing Tip Segment',
         percent_span_location=1.,
         root_chord_percent=0.10077,
         thickness_to_chord=0.1,
-        airfoil=Airfoil.from_file(AirfoilData/'B737d.txt'))
+        airfoil=Airfoil.from_file(_AF_DIR/'B737d.txt'))
 
     # Control Surfaces -------------------------------------------------------------------------------------------------
 
@@ -152,11 +152,11 @@ def vehicle_setup():
         symmetric=True,
         high_lift=True,
         dynamic_pressure_ratio=1.0,
-        sweeps=WingSweeps(quarter_chord=25. * Units.deg),
+        sweeps=WingSweeps(quarter_chord=25. * units.deg),
         spans=WingDimensions(projected=34.32),
         chords=WingChords(root=7.760, tip=0.782, mean_aerodynamic=4.235),
         areas=ComponentAreas(reference=124.862, wetted=225.08),
-        twists=WingDimensions(root=4.0 * Units.deg, tip=0.0 * Units.deg),
+        twists=WingDimensions(root=4.0 * units.deg, tip=0.0 * units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
         subcomponents=(slat, flap, aileron)
     ).update_geometry()
@@ -173,8 +173,8 @@ def vehicle_setup():
         thickness_to_chord=0.1,
         percent_span_location=0.0,
         root_chord_percent=1.0,
-        dihedral_outboard=8.63 * Units.deg,
-        sweeps=WingSweeps(quarter_chord=28.2250 * Units.deg))
+        dihedral_outboard=8.63 * units.deg,
+        sweeps=WingSweeps(quarter_chord=28.2250 * units.deg))
 
     h_tip_segment = WingSegment(
         tag='Horizontal Stabilizer Tip Segment',
@@ -202,11 +202,11 @@ def vehicle_setup():
         aerodynamic_center      =jnp.array([0, 0, 0]),
         vertical                =False,
         symmetric               =True,
-        sweeps                  =WingSweeps(quarter_chord=28.2250 * Units.deg),
+        sweeps                  =WingSweeps(quarter_chord=28.2250 * units.deg),
         spans                   =WingDimensions(projected=14.4),
         chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
         areas                   =ComponentAreas(reference=41.49, exposed=59.354, wetted=71.81),
-        twists                  =WingDimensions(root=3.0 * Units.deg, tip=3.0 * Units.deg),
+        twists                  =WingDimensions(root=3.0 * units.deg, tip=3.0 * units.deg),
         segments                =(h_root_segment, h_tip_segment),
         subcomponents           =(elevator,)).update_geometry()
     
@@ -224,13 +224,13 @@ def vehicle_setup():
         percent_span_location=0.0,
         root_chord_percent=1.,
         thickness_to_chord=.1,
-        sweeps=WingSweeps(quarter_chord=61.485 * Units.deg))
+        sweeps=WingSweeps(quarter_chord=61.485 * units.deg))
 
     mid_segment = WingSegment(
         tag='Vertical Stabilizer Mid Segment',
         percent_span_location=0.2962,
         root_chord_percent=0.45,
-        sweeps=WingSweeps(quarter_chord=31.2 * Units.deg),
+        sweeps=WingSweeps(quarter_chord=31.2 * units.deg),
         thickness_to_chord=.1,)
 
     tip_segment = WingSegment(
@@ -251,7 +251,7 @@ def vehicle_setup():
         symmetric               =False,
         t_tail                  =False,
         dynamic_pressure_ratio  =1.0,
-        sweeps                  =WingSweeps(quarter_chord=32.2 * Units.deg),
+        sweeps                  =WingSweeps(quarter_chord=32.2 * units.deg),
         spans                   =WingDimensions(projected=8.33),
         chords                  =WingChords(root=10.1, tip=1.20, mean_aerodynamic=4.0),
         areas                   =ComponentAreas(reference=34.89, wetted=57.25),
@@ -352,13 +352,12 @@ def vehicle_setup():
         bypass_ratio=5.4,
         plug_diameter=0.1,
         lengths=ComponentDimensions(total=2.71),
-        design_parameters=DesignParameters(
-            total_thrust=24000.,
-            SLS_thrust=24000.,
+        design_parameters=JetDesign(
+            thrust=24000.,
             altitude=10668.,
             mach_number=0.78,
             turbine_intake_temperature=1450.
-            ),
+        ),
     )
 
     # Direct Replacement
@@ -464,7 +463,7 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
     controls = (
         "body_angle",
         # DirectControlVariable(tag='Thrust', path=("frames", "body", "thrust_force_vector",), active=True),
-        DirectControlVariable(tag='Throttle', path=("energy", "throttle"), active=True)
+        Control(tag='Throttle', state_path=("energy", "throttle"), _active=True)
     )
 
     residuals = ("force_x", "force_z")
@@ -478,10 +477,10 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     climb_segment = Segment(
         tag="Climb Segment",
-        position_profile=AltitudeChange(initial_altitude=0.0 * Units.m, final_altitude=10000.0 * Units.m),
-        speed_profile=ConstantSpeed(speed=125 * Units.m/Units.s),
-        velocity_profile=ConstantAltitudeChangeRate(change_rate=6.0 * Units.m/Units.s),
-        duration_profile=FixedTime(time = 10000.0 / 6.0 * Units.s),
+        position_profile=AltitudeChange(initial_altitude=0.0 * units.m, final_altitude=10000.0 * units.m),
+        speed_profile=ConstantSpeed(speed=125 * units.m/units.s),
+        velocity_profile=ConstantAltitudeChangeRate(change_rate=6.0 * units.m/units.s),
+        duration_profile=FixedTime(time = 10000.0 / 6.0 * units.s),
         active_controls=controls,
         active_residuals=residuals,
         controls_initial_guess=(0.03, 0.5),
@@ -489,9 +488,9 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
     
     cruise_segment = Segment(
         tag="Cruise Segment",
-        position_profile=ConstantAltitude(altitude=10000.0 * Units.m),
-        speed_profile=ConstantSpeed(speed=230 * Units.m/Units.s),
-        duration_profile=FixedDistance(distance=5500. * Units.km),
+        position_profile=ConstantAltitude(altitude=10000.0 * units.m),
+        speed_profile=ConstantSpeed(speed=230 * units.m/units.s),
+        duration_profile=FixedDistance(distance=5500. * units.km),
         active_controls=controls,
         active_residuals=residuals,
         controls_initial_guess=(0.03, 0.5),
@@ -499,10 +498,10 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     descent_segment = Segment(
         tag="Descent Segment",
-        position_profile=AltitudeChange(initial_altitude=10000.0 * Units.m, final_altitude=0.0 * Units.m),
-        speed_profile=ConstantSpeed(speed=145 * Units.m/Units.s),
-        velocity_profile=ConstantAltitudeChangeRate(change_rate=5.0 * Units.m/Units.s),
-        duration_profile=FixedTime(time = 10000.0 / 5.0 * Units.s),
+        position_profile=AltitudeChange(initial_altitude=10000.0 * units.m, final_altitude=0.0 * units.m),
+        speed_profile=ConstantSpeed(speed=145 * units.m/units.s),
+        velocity_profile=ConstantAltitudeChangeRate(change_rate=5.0 * units.m/units.s),
+        duration_profile=FixedTime(time = 10000.0 / 5.0 * units.s),
         active_controls=controls,
         active_residuals=residuals,
         controls_initial_guess=(0.03, 0.5),
