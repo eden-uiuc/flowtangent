@@ -43,7 +43,6 @@ nosetests.xml
 *.wpr
 
 # local directories
-/Tests/PyCycle
 /workspace
 .idea
  

@@ -212,3 +212,54 @@ def func_nozzle_performance(
     rho_out = P_out / (R * T_out)
 
     return mdot_out, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
+
+def func_variable_nozzle_performance(
+        gas,
+        T_t: jnp.ndarray,
+        P_t: jnp.ndarray,
+        P0: jnp.ndarray,
+        mdot_in: jnp.ndarray,  # Mass flow is now the driver
+    ):
+
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+
+    # 1. Determine Pressure Ratio and Choking
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    actual_PR = P_t / P0
+    safe_PR = jnp.maximum(actual_PR, 1.00001) # Prevent div by zero or negative root
+    choked = actual_PR >= critical_PR
+
+    # 2. Perfect Expansion Exit Mach
+    # Because we vary the nozzle to perfectly expand to ambient pressure (P_out = P0),
+    # M_exit is explicitly a function of the total-to-ambient pressure ratio.
+    M_exit = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
+    
+    # 3. Throat Mach
+    M_throat = jnp.where(choked, 1.0, M_exit)
+
+    # 4. Explicitly Calculate Required Physical Areas
+    def calc_area_for_mach(M):
+        # Apply a floor to M to prevent NaN gradients in JAX if M approaches 0
+        M_safe = jnp.maximum(M, 1e-5) 
+        m_term = jnp.sqrt(gamma) * M_safe
+        temp_term = (1.0 + (gamma - 1.0) / 2.0 * M_safe**2) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+        return (mdot_in * jnp.sqrt(R * T_t) * temp_term) / (P_t * m_term)
+
+    A_throat = calc_area_for_mach(M_throat)
+    A_exit = calc_area_for_mach(M_exit)
+
+    # 5. Thermodynamics and Kinematics
+    P_out = P0  # Perfect expansion assumption guarantees this
+    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    
+    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
+    T_t_out = T_t
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0))
+
+    rho_out = P_out / (R * T_out)
+
+    return mdot_in, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out, A_throat, A_exit
