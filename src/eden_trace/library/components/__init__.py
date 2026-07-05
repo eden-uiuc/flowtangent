@@ -10,7 +10,7 @@
 from os import path
 from pathlib import Path
 
-from src.eden_trace.library.component import *
+from eden_trace.library.component import *
 
 # Component Types
 # from . import Energy, airfoils, fuselages, landing_gear, nacelles, wings

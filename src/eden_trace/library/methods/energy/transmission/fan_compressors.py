@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 # Trace imports
 if TYPE_CHECKING:
-    import src.eden_trace.framework as rcf
+    import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Compressor

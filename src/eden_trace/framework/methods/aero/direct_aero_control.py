@@ -13,9 +13,9 @@ import equinox as eqx
 # Trace Imports
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework.settings import Settings
-    from src.eden_trace.framework.state import State
-    from src.eden_trace.framework.systems import System
+    from eden_trace.framework.settings import Settings
+    from eden_trace.framework.state import State
+    from eden_trace.framework.systems import System
 
 
 # -------------------------------------------------------------------------------

@@ -8,7 +8,7 @@
 # package imports
 import equinox as eqx
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
 # -------------------------------------------------------------------------------
 # Solid Data Class

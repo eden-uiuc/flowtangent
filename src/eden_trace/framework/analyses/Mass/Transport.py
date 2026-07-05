@@ -1,8 +1,8 @@
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.library.methods.mass import transport as Mass
+from eden_trace.library.methods.mass import transport as Mass
 
-from src.eden_trace.framework import Process, ProcessStep
+from eden_trace.framework import Process, ProcessStep
 
 # from Trace.Framework.Methods.Mass.Energy import tf_mass_from_SLS
 

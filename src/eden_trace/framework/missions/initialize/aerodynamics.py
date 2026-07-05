@@ -15,13 +15,13 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from src.eden_trace.framework.settings import Settings
-    from src.eden_trace.framework.state import State
-    from src.eden_trace.framework.systems import Aircraft
+    from eden_trace.framework.settings import Settings
+    from eden_trace.framework.state import State
+    from eden_trace.framework.systems import Aircraft
 
-from src.eden_trace.utils import inputs, outputs
+from eden_trace.utils import inputs, outputs
 
-from src.eden_trace.framework.conditions.Aerodynamics import ComponentCoefficients
+from eden_trace.framework.conditions.aero import ComponentCoefficients
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Initialize Aerodynamic Conditions

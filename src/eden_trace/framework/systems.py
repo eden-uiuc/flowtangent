@@ -15,15 +15,15 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, init_field, register
 
-from src.eden_trace.library import Component, MassProperties
-from src.eden_trace.library.attributes import AircraftClass, MediumRange
-from src.eden_trace.library.components.energy.networks import EnergyNetwork
-from src.eden_trace.library.components.fuselages import Fuselage
-from src.eden_trace.library.components.landing_gear import LandingGear
-from src.eden_trace.library.components.nacelles import Nacelle
-from src.eden_trace.library.components.wings import Wing
+from eden_trace.library import Component, MassProperties
+from eden_trace.library.attributes import AircraftClass, MediumRange
+from eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.fuselages import Fuselage
+from eden_trace.library.components.landing_gear import LandingGear
+from eden_trace.library.components.nacelles import Nacelle
+from eden_trace.library.components.wings import Wing
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
@@ -79,7 +79,7 @@ class AircraftDesign(eqx.Module):
     cruise_alt: float = init_field(0.0, static=True)
 
 @register
-class Aircraft(System):
+class Aircraft[EnergyType: EnergyNetwork](System):
     tag: str = init_field("Aircraft", static=True)
 
     mass_properties: AircraftMassProperties = init_field(AircraftMassProperties)  # type: ignore
@@ -97,7 +97,7 @@ class Aircraft(System):
     )
 
     @property
-    def energy(self) -> EnergyNetwork:
+    def energy(self) -> EnergyType:
         return self.energy_networks[0]
 
     reference_geometry: AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)

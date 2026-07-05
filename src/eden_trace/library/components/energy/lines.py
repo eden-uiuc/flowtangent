@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
 import equinox as eqx
 import jax.numpy as jnp
 
-from src.eden_trace.utils import init_field, outputs, register
-from src.eden_trace.utils import inputs as func_inputs
+from eden_trace.utils import init_field, outputs, register
+from eden_trace.utils import inputs as func_inputs
 
 from .nodes import EnergyInput, EnergyNode, EnergySplitter, EnergyStore, FuelTank
 from .propulsors import TurbojetEngine

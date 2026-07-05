@@ -11,9 +11,9 @@
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.library import Component, ComponentAreas, ComponentDimensions, ComponentFineness
+from eden_trace.library import Component, ComponentAreas, ComponentDimensions, ComponentFineness
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Fuselage

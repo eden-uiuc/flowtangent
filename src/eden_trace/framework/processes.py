@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Generator, Optional, Self, Tuple
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
 import os
 import re
@@ -25,10 +25,10 @@ import jax.numpy as jnp
 import networkx as nx
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-import src.eden_trace.utils as ru
+import eden_trace.utils as tu
 
 # Trace imports
-from src.eden_trace.utils import MERMAID_STYLES, DataPath, Token, init_field
+from eden_trace.utils import MERMAID_STYLES, DataPath, Token, init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep

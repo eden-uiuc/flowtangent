@@ -13,9 +13,9 @@ import jax
 
 # package imports
 # Trace imports
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.framework import GradientMap
+from eden_trace.framework import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings
@@ -64,10 +64,6 @@ class AnalysisSettings(eqx.Module):
 
 RootFinders = Literal["Broyden", "GaussNewton", "LevenbergMarquardt"]
 
-
-class MissionSettings(eqx.Module):
-    root_finder: RootFinders = init_field("GaussNewton", static=True)
-
 class NumericalSettings(eqx.Module):
     
     root_finder: RootFinders = init_field("GaussNewton", static=True)
@@ -88,7 +84,7 @@ class Settings(eqx.Module):
     tag: str = init_field("Settings", static=True)
 
     analysis: AnalysisSettings = init_field(AnalysisSettings)
-    numerical: MissionSettings = init_field(MissionSettings)
+    numerical: NumericalSettings = init_field(NumericalSettings)
 
     DEBUG_MODE: bool = init_field(False, static=True)
     verbose: bool = init_field(False, static=True)

@@ -11,12 +11,12 @@
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.library.atmospheres import Atmosphere, USStandard1976
-from src.eden_trace.library.planets import Earth, Planet
+from eden_trace.library.atmospheres import Atmosphere, USStandard1976
+from eden_trace.library.planets import Earth, Planet
 
-from src.eden_trace.framework.conditions import Condition
+from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream

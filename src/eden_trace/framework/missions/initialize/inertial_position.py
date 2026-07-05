@@ -13,7 +13,7 @@
 import equinox as eqx
 
 # Trace Imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 
 def initialize_inertial_position(

@@ -15,7 +15,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions

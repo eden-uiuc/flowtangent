@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from src.eden_trace.library.methods.energy import *
+from eden_trace.library.methods.energy import *
 
 # from . import sizing
 from .graph_network import build_analysis_from_network

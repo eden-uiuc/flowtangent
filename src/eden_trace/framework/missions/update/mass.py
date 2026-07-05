@@ -4,7 +4,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from src.eden_trace.framework import State, System, Settings
+    from eden_trace.framework import State, System, Settings
 
 # package imports
 import equinox as eqx

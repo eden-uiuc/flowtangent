@@ -9,8 +9,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from typing import TYPE_CHECKING, Optional, Callable, Literal
 if TYPE_CHECKING:
-    from src.eden_trace.framework import State, System, Settings
-    from src.eden_trace.framework.conditions import ControlsConditions
+    from eden_trace.framework import State, System, Settings
+    from eden_trace.framework.conditions import ControlsConditions
 
 import sys
 import time
@@ -28,9 +28,9 @@ jax.config.update("jax_enable_x64", True)
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 
 
-from src.eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
-from src.eden_trace.framework import Process, Settings, State, System
-from src.eden_trace.framework.conditions.controls import Control, Residual, ControlsConditions, DynamicsConditions
+from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
+from eden_trace.framework import Process, Settings, State, System
+from eden_trace.framework.conditions.controls import Control, Residual, ControlsConditions, DynamicsConditions
 # ----------------------------------------------------------------------------------------------------------------------
 #  Residual Minimization Analysis
 # ----------------------------------------------------------------------------------------------------------------------
@@ -196,11 +196,11 @@ class ResidualAnalysis(Process):
             if self.solution_tolerance is not None:
                 tol = self.solution_tolerance
             else:
-                tol = state.time.solution_tolerance
+                tol = settings.numerical.solution_tolerance
             if self.max_evaluations is not None:
                 maxiter=self.max_evaluations
             else:
-                maxiter=state.time.max_evaluations
+                maxiter=settings.numerical.max_evaluations
             
             if self.solver_type == "min":
                 fun_kwarg = "residual_fun"

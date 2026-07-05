@@ -5,24 +5,24 @@ import equinox as eqx
 import numpy as np
 import pandas as pd
 
-from src.eden_trace.utils import save_data, load_data, format_array
+from eden_trace.utils import save_data, load_data, format_array
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-from src.eden_trace.library.components.energy.propulsors import TurbojetEngine, JetDesign
-from src.eden_trace.library.components.energy.lines import TurbojetEnergyLine
+from eden_trace.library import units
+from eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
+from eden_trace.library.components.energy.propulsors import TurbojetEngine, JetDesign
+from eden_trace.library.components.energy.lines import TurbojetEnergyLine
 
-from src.eden_trace.framework import State, Aircraft, Settings
-from src.eden_trace.framework.analyses.energy.turbojets import design_turbojet, TurbojetPerformance
-from src.eden_trace.framework.missions.initialize import initialize_energy
-from src.eden_trace.framework.missions.update import update_freestream
+from eden_trace.framework import State, Aircraft, Settings
+from eden_trace.framework.analyses.energy.turbojets import design_turbojet, TurbojetPerformance
+from eden_trace.framework.missions.initialize import initialize_energy
+from eden_trace.framework.missions.update import update_freestream
 
-def system_setup():
+def system_setup(variable_nozzle: bool = False):
 
     engine_design = JetDesign(
         thrust=11_800 * units.lbf,
     )
-    engine = TurbojetEngine(tag="Engine", design_parameters=engine_design)
+    engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
     
     inlet_design = eqx.tree_at(lambda c:
         c.design_parameters.exit_mach_number,
@@ -289,11 +289,11 @@ if __name__ == "__main__":
     VERBOSE = True
 
     DESIGN_POINT = True
-    OFF_DESIGN_0 = True
+    OFF_DESIGN_0 = False
     OFF_DESIGN_1 = False
 
     # Build Turbojet------------------------------------------------------------
-    system = system_setup()
+    system = system_setup(variable_nozzle=False)
 
     settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
 

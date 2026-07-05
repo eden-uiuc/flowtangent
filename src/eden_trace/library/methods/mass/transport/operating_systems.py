@@ -12,10 +12,10 @@
 import jax
 import jax.numpy as jnp
 
-import src.eden_trace.library as rcl
-from src.eden_trace.library import units
+import eden_trace.library as rcl
+from eden_trace.library import units
 
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

@@ -12,7 +12,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace Imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Update Moments

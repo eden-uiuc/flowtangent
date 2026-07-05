@@ -17,21 +17,21 @@ import numpy as np
 from tqdm import trange
 from plotly.subplots import make_subplots
 
-import src.eden_trace.utils as ru
+import eden_trace.utils as tu
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components import ComponentAreas
-from src.eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from src.eden_trace.library.components.airfoils import Airfoil
+from eden_trace.library import units
+from eden_trace.library.components import ComponentAreas
+from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.airfoils import Airfoil
 
-from src.eden_trace.framework import Process, State, Settings, GradientMap
-from src.eden_trace.framework.systems import Aircraft
-from src.eden_trace.framework.conditions import Time
+from eden_trace.framework import Process, State, Settings, GradientMap
+from eden_trace.framework.systems import Aircraft
+from eden_trace.framework.conditions import Time
 
-from src.eden_trace.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
+from eden_trace.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
-from src.eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
-from src.eden_trace.framework.plotting import plot_vlm_panels
+from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from eden_trace.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 

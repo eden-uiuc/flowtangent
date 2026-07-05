@@ -24,14 +24,14 @@ import jax.numpy as jnp
 import sklearn
 
 # Trace imports
-from src.eden_trace.utils import DataPath, init_field
+from eden_trace.utils import DataPath, init_field
 
-from src.eden_trace.library import units
-from src.eden_trace.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
+from eden_trace.library import units
+from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
 
-from src.eden_trace.framework import Process, ProcessStep
-from src.eden_trace.framework.analyses import BatchAnalysis
-from src.eden_trace.framework.methods.aero.VORJAX import (
+from eden_trace.framework import Process, ProcessStep
+from eden_trace.framework.analyses import BatchAnalysis
+from eden_trace.framework.methods.aero.VORJAX import (
     apply_aerodynamic_forces,
     check_freestream,
     compute_boundary_conditions,
@@ -42,7 +42,7 @@ from src.eden_trace.framework.methods.aero.VORJAX import (
     discretize_surfaces,
     initialize_VORJAX_data,
 )
-from src.eden_trace.framework.missions.initialize import initialize_aerodynamics
+from eden_trace.framework.missions.initialize import initialize_aerodynamics
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings

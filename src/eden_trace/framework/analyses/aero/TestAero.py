@@ -8,9 +8,9 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.framework import Process, ProcessStep
+from eden_trace.framework import Process, ProcessStep
 from eden_trace.framework.methods.aero.Test_Aero import direct_aero
 
 

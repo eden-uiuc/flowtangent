@@ -20,15 +20,15 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from src.eden_trace.framework.settings import Settings
-    from src.eden_trace.framework.state import State
-    from src.eden_trace.framework.systems import Aircraft
+    from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
+    from eden_trace.framework.settings import Settings
+    from eden_trace.framework.state import State
+    from eden_trace.framework.systems import Aircraft
 
 # package imports
-from src.eden_trace.utils import inputs, outputs
+from eden_trace.utils import inputs, outputs
 
-from src.eden_trace.library.components.wings import Wing, WingSegment, WingSweeps
+from eden_trace.library.components.wings import Wing, WingSegment, WingSweeps
 
 # from Trace.Library.Components.Wings import All_Moving_Surface
 

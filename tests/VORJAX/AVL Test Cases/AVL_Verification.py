@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
 
 if __name__ == "__main__":
 

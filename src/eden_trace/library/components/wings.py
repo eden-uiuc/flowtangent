@@ -10,10 +10,10 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.library import Component, ComponentDimensions
-from src.eden_trace.library.components.airfoils import Airfoil
+from eden_trace.library import Component, ComponentDimensions
+from eden_trace.library.components.airfoils import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing

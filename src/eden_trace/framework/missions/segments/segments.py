@@ -28,19 +28,19 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 
-from src.eden_trace.utils import init_field, scan_for_invalid_JAX_types
+from eden_trace.utils import init_field, scan_for_invalid_JAX_types
 
-from src.eden_trace.framework import Process, ProcessStep
-from src.eden_trace.framework.conditions.controls import Control, Residual
-from src.eden_trace.framework.missions.initialize import *
-from src.eden_trace.framework.missions.update import *
-from src.eden_trace.framework.processes import null_step
+from eden_trace.framework import Process, ProcessStep
+from eden_trace.framework.conditions.controls import Control, Residual
+from eden_trace.framework.missions.initialize import *
+from eden_trace.framework.missions.update import *
+from eden_trace.framework.processes import null_step
 
 # Trace imports
 from .profiles import *
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Mission Spinner

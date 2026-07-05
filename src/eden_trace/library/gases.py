@@ -13,10 +13,10 @@ from functools import lru_cache
 import equinox as eqx
 import jax.numpy as jnp
 
-from src.eden_trace.utils import empty_array, get_Trace_root, init_field
+from eden_trace.utils import empty_array, get_Trace_root, init_field
 
 # Trace imports
-from src.eden_trace.library import units
+from eden_trace.library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Ideal Gases

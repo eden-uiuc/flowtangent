@@ -9,7 +9,7 @@
 # Trace Imports
 import equinox as eqx
 
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Mass

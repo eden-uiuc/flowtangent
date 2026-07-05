@@ -17,9 +17,9 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.library.attributes.materials import Aluminum, Solid
+from eden_trace.library.attributes.materials import Aluminum, Solid
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component
@@ -141,7 +141,7 @@ class Component(eqx.Module):
         else:
             raise TypeError("Indices must be int, slice, or str.")
 
-    def __getattr__(self, item: str):
+    def __getattr__(self, item: str) -> Any:
         if item.startswith("__") and item.endswith("__"):
             raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{item}'")
 

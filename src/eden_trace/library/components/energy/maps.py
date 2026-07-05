@@ -8,9 +8,9 @@ import jax.numpy as jnp
 import pycycle.api as pyc
 from jax.scipy.ndimage import map_coordinates
 
-from src.eden_trace.utils import empty_array, get_Trace_root, init_field, register
+from eden_trace.utils import empty_array, get_Trace_root, init_field, register
 
-from src.eden_trace.library import units
+from eden_trace.library import units
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions

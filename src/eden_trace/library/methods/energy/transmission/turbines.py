@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import src.eden_trace.framework as rcf
+    import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # turbine

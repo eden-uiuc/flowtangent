@@ -14,9 +14,9 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, init_field, register
 
-from src.eden_trace.framework.conditions import Condition
+from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Time Conditions
@@ -37,6 +37,8 @@ class NumericalTime(Condition):
 class Time(Condition):
     tag: str = init_field("Time", static=True)
 
+    n_cp: int = init_field(1, static=True)
+    
     dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
     dimensional: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensional Time"))
 
@@ -98,5 +100,5 @@ class Time(Condition):
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
-        if self.number_of_control_points <= 1:
+        if self.n_cp <= 1:
             return

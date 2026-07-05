@@ -9,32 +9,32 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace Imports
-import src.eden_trace.utils as ru
+import eden_trace.utils as tu
 
-from src.eden_trace.framework import Process, State, Settings
-from src.eden_trace.framework.conditions import Time
-from src.eden_trace.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from src.eden_trace.framework.missions.segments import Segment
-from src.eden_trace.framework.missions.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from eden_trace.framework import Process, State, Settings
+from eden_trace.framework.conditions import Time
+from eden_trace.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
+from eden_trace.framework.missions.segments import Segment
+from eden_trace.framework.missions.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from src.eden_trace.framework.conditions.controls import Control
-from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
+from eden_trace.framework.conditions.controls import Control
+from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from trace.framework.analyses.energy.sizing import update_design_parameters
-from src.eden_trace.framework.analyses.energy import build_analysis_from_network
-from src.eden_trace.framework.plotting import plot_vlm_panels
+from eden_trace.framework.analyses.energy import build_analysis_from_network
+from eden_trace.framework.plotting import plot_vlm_panels
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
-from src.eden_trace.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
-from src.eden_trace.library.components.fuselages import *
-from src.eden_trace.library.components.landing_gear import LandingGear
-from src.eden_trace.library.components.nacelles import Nacelle, NacelleDiameters
-from src.eden_trace.library.components.energy.networks import EnergyNetwork
-from src.eden_trace.library.components.energy.propulsors import TurbofanEngine, JetDesign
-from src.eden_trace.library.components.energy.nodes import FuelTank
-from src.eden_trace.library.components.energy.lines import TurbojetEnergyLine
+from eden_trace.library import units
+from eden_trace.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
+from eden_trace.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
+from eden_trace.library.components.fuselages import *
+from eden_trace.library.components.landing_gear import LandingGear
+from eden_trace.library.components.nacelles import Nacelle, NacelleDiameters
+from eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.propulsors import TurbofanEngine, JetDesign
+from eden_trace.library.components.energy.nodes import FuelTank
+from eden_trace.library.components.energy.lines import TurbojetEnergyLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process

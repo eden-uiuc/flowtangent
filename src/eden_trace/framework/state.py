@@ -14,8 +14,8 @@ import equinox as eqx
 # package imports
 import jax.numpy as jnp
 
-from src.eden_trace.framework.conditions import AerodynamicsConditions, Condition, ControlsConditions, DynamicsConditions, EnergyNetworkConditions, FreestreamConditions, MassConditions, StabilityConditions, Time
-from src.eden_trace.utils import init_field, get_target
+from eden_trace.framework.conditions import AerodynamicsConditions, Condition, ControlsConditions, DynamicsConditions, EnergyNetworkConditions, FreestreamConditions, MassConditions, StabilityConditions, Time
+from eden_trace.utils import init_field, get_target
 
 from eden_trace.framework.conditions import (
     Frames,
@@ -25,7 +25,7 @@ from eden_trace.framework.conditions import (
 #  State
 # ----------------------------------------------------------------------------------------------------------------------
 
-class State(Condition):
+class State[EnergyType: EnergyNetworkConditions](Condition):
 
     tag: str = init_field("State", static=True)
 
@@ -36,7 +36,7 @@ class State(Condition):
     freestream: FreestreamConditions = init_field(FreestreamConditions)
 
     mass: MassConditions = init_field(MassConditions)
-    energy: EnergyNetworkConditions = init_field(EnergyNetworkConditions)
+    energy: EnergyType = init_field(EnergyNetworkConditions)
     aerodynamics: AerodynamicsConditions = init_field(AerodynamicsConditions)
     stability: StabilityConditions = init_field(StabilityConditions)
 
@@ -52,7 +52,7 @@ class State(Condition):
         control_values = []
 
         for ctrl in self.controls.active_controls:
-            n_cp = int(self.time.number_of_control_points)
+            n_cp = int(self.time.n_cp)
 
             # All control values are normalized by their initial value, so set initial control value to 1.0
             # Values are rescaled in update_controls when actually added to state
@@ -70,7 +70,7 @@ class State(Condition):
     def update_controls(self, control_values: jnp.ndarray):
 
         updated_state = self
-        n_points = int(self.time.number_of_control_points)
+        n_points = int(self.time.n_cp)
         control_idx = 0
 
         # Slice and set (Step through by n_cp to accomodate solvers which return 1D arrays)

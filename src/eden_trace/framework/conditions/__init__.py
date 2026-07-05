@@ -1,6 +1,6 @@
-from .Conditions import Condition
+from .conditions import Condition
 
-from .Aerodynamics import (
+from .aero import (
     AerodynamicAngles,
     AerodynamicCoefficients,
     AerodynamicsConditions,
@@ -18,18 +18,18 @@ from .controls import (
     SurfaceControl,
 )
 
-from .Energy import (
+from .energy import (
     BatteryCellConditions,
     BatteryPackConditions,
     EnergyNetworkConditions,
     EnergyNodeConditions,
 )
 
-from .Frames import BodyFrame, Frame, Frames, InertialFrame, PlanetFrame, WindFrame
-from .Freestream import FreestreamConditions
-from .Mass import MassConditions
+from .frames import BodyFrame, Frame, Frames, InertialFrame, PlanetFrame, WindFrame
+from .freestream import FreestreamConditions
+from .mass import MassConditions
 from .numerical_time import NumericalTime, Time
-from .Stability import (
+from .stability import (
     CoefficientDerivatives,
     DynamicStability,
     StabilityConditions,

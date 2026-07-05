@@ -17,7 +17,7 @@ import jax.numpy as jnp
 from jax import vmap
 
 # Trace imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 
 def euler_zyx_to_dcm(angles):

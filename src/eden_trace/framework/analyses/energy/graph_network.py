@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 
 import networkx as nx
 
-from src.eden_trace.utils import init_field, inputs, outputs
+from eden_trace.utils import init_field, inputs, outputs
 
-from src.eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.networks import EnergyNetwork
 
-from src.eden_trace.framework import Process, ProcessStep
+from eden_trace.framework import Process, ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Energy Network Analysis

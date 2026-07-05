@@ -15,14 +15,14 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from src.eden_trace.framework.settings import Settings
-    from src.eden_trace.framework.state import State
-    from src.eden_trace.framework.systems import System
+    from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
+    from eden_trace.framework.settings import Settings
+    from eden_trace.framework.state import State
+    from eden_trace.framework.systems import System
 
-from src.eden_trace.utils import inputs, outputs
+from eden_trace.utils import inputs, outputs
 
-from src.eden_trace.library.methods.aero.Shocks import oblique_shock, theta_beta_mach
+from eden_trace.library.methods.aero.Shocks import oblique_shock, theta_beta_mach
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation

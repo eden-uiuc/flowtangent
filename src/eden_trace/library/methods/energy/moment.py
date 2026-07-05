@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import jax.numpy as np
 
 if TYPE_CHECKING:
-    import src.eden_trace.framework as rcf
+    import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbofan Moment

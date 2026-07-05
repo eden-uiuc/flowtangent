@@ -13,15 +13,15 @@ from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
 
-from src.eden_trace.utils import DataPath
+from eden_trace.utils import DataPath
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
+from eden_trace.library import units
+from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from src.eden_trace.framework import Aircraft, Settings, GradientMap
-from src.eden_trace.framework.settings import AnalysisSettings
-from src.eden_trace.framework.analyses.batched import ShardedDatasetGenerator
-from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
+from eden_trace.framework import Aircraft, Settings, GradientMap
+from eden_trace.framework.settings import AnalysisSettings
+from eden_trace.framework.analyses.batched import ShardedDatasetGenerator
+from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data

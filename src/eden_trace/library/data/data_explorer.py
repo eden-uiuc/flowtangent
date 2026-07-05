@@ -10,13 +10,13 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from src.eden_trace.framework import Aircraft, Settings, State
-from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
-from src.eden_trace.framework.methods.aero.VORJAX import discretize_surfaces
-from src.eden_trace.framework.plotting import plot_vlm_panels
-from src.eden_trace.framework.settings import AnalysisSettings
+from eden_trace.framework import Aircraft, Settings, State
+from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
+from eden_trace.framework.methods.aero.VORJAX import discretize_surfaces
+from eden_trace.framework.plotting import plot_vlm_panels
+from eden_trace.framework.settings import AnalysisSettings
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Filter Functions

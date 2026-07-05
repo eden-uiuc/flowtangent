@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import State, System, Settings
-    from src.eden_trace.framework.conditions.controls import Control, Residual
-    from src.eden_trace.library.atmospheres import Atmosphere
+    from eden_trace.framework import State, System, Settings
+    from eden_trace.framework.conditions.controls import Control, Residual
+    from eden_trace.library.atmospheres import Atmosphere
 
 from dataclasses import replace
 from graphlib import CycleError, TopologicalSorter
@@ -24,11 +24,11 @@ import equinox as eqx
 
 
 # Trace imports
-from src.eden_trace.utils import init_field, register
+from eden_trace.utils import init_field, register
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components.energy.nodes import EnergyDomain, EnergyInput, EnergyNode
-from src.eden_trace.library.atmospheres import USStandard1976
+from eden_trace.library import units
+from eden_trace.library.components.energy.nodes import EnergyDomain, EnergyInput, EnergyNode
+from eden_trace.library.atmospheres import USStandard1976
 
 from .lines import EnergyLine, TurbojetEnergyLine
 
@@ -81,12 +81,12 @@ def _resolve_namespaces(node, parent_prefix=""):
 
 
 @register
-class EnergyNetwork(EnergyNode):
+class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
     
     tag: str = init_field("Energy Network", static=True)
     nodes: dict[str, "EnergyNode"] = init_field(dict)
     domains: tuple[EnergyDomain, ...] = init_field(tuple, static=True)
-    design_parameters: NetworkDesign = init_field(NetworkDesign)
+    design_parameters: DesignType = init_field(NetworkDesign)
 
     _bookkeeping: dict = init_field(lambda: {"lines": EnergyLine}, static=True)
     _execution_order: tuple[str, ...] = init_field(tuple, static=True)
@@ -221,8 +221,13 @@ class TurbojetDesign(NetworkDesign):
     initial_MFR: float = 100.0 * units.lbm / units.s
     initial_turb_PR: float = 5.0
 
+    mass_flow_rate: float = 100 * units.kg / units.s
+    power: float = 2e7 * units.W
+
+
+
 @register
-class TurbojetEnergyNetwork(EnergyNetwork):
+class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
     tag: str = init_field("Network", static=True)
     network_ID: str = init_field("network", static=True)
 

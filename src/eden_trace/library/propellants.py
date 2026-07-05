@@ -10,10 +10,10 @@
 # package imports
 import equinox as eqx
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
 # Trace imports
-from src.eden_trace.library.gases import O2, IdealGas
+from eden_trace.library.gases import O2, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants

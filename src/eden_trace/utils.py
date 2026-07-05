@@ -405,7 +405,7 @@ def save_data(obj, filename:str | Path):
         print(f"Successfully saved {type(obj).__name__} to {filename}")
 
 
-def load_data(filename: str | Path):
+def load_data(filename: str | Path) -> Any:
     """
     Loads any Trace data structure from a file.
     No setup scripts or templates are required.

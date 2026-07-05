@@ -8,7 +8,7 @@
 
 
 # Trace Imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Converge Roots

@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import State, System, Settings
+    from eden_trace.framework import State, System, Settings
 
 import logging
 import os
@@ -32,9 +32,9 @@ import zarr
 from numcodecs import Blosc
 from tqdm import tqdm, trange
 
-import src.eden_trace.utils as ru
+import eden_trace.utils as tu
 
-from src.eden_trace.framework import Process, State
+from eden_trace.framework import Process, State
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -86,7 +86,7 @@ class BatchAnalysis:
             logger.addHandler(ch)
 
         # Set up base state
-        from src.eden_trace.framework.conditions import Time
+        from eden_trace.framework.conditions import Time
 
         state = State(time=Time(number_of_control_points=1, calculate_integration=False))
         initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)

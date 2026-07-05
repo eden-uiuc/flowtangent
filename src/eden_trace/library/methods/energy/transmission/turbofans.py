@@ -12,7 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.library import units
+from eden_trace.library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbofan thrust
@@ -25,10 +25,10 @@ def func_thrust_and_power(
     g, 
     delta_SFC,
     v_fan_nozzle,
-    A_fan_nozzle, # Physical exit area, not Area Ratio!
+    A_fan_nozzle,
     P_fan_nozzle,
     v_core_nozzle,
-    A_core_nozzle, # Physical exit area, not Area Ratio!
+    A_core_nozzle,
     P_core_nozzle,
     fuel_air_ratio,
     mdot_core,
@@ -38,7 +38,6 @@ def func_thrust_and_power(
     # 1. Calculate mass flows
     mdot_fan = mdot_core * BPR
     mdot_in_core = mdot_core / (1.0 + fuel_air_ratio) # Strip fuel for inlet momentum
-    mdot_in_total = mdot_in_core + mdot_fan
     
     # 2. Raw Dimensional Thrust (Gross Thrust - Ram Drag)
     # Core
@@ -64,10 +63,10 @@ def func_thrust_and_power(
     safe_F_actual = jnp.maximum(F_actual, 1e-9)
     
     I_sp = F_actual / (safe_mdot_fuel * g)
-    TSFC = (safe_mdot_fuel / safe_F_actual) * (1.0 - delta_SFC) * 3600.0
+    TSFC = (safe_mdot_fuel / safe_F_actual) * (1.0 - delta_SFC) / units.hr
     
     # Fuel flow in kg/hr
-    ff = mdot_fuel * 3600.0 
+    ff = mdot_fuel * units.parse('kg/hr')
     
     # Back-calculate non-dimensional terms only if downstream code strictly requires it
     # (Though it's highly recommended to purge F_sp_nondim entirely if possible)

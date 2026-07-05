@@ -16,14 +16,14 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from src.eden_trace.framework.settings import Settings
-    from src.eden_trace.framework.state import State
-    from src.eden_trace.framework.systems import System
+    from eden_trace.framework.settings import Settings
+    from eden_trace.framework.state import State
+    from eden_trace.framework.systems import System
 
-from src.eden_trace.utils import init_field, register
+from eden_trace.utils import init_field, register
 
-from src.eden_trace.library import Component
-from src.eden_trace.library.gases import Air, IdealGas
+from eden_trace.library import Component
+from eden_trace.library.gases import Air, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Nodes
@@ -69,7 +69,7 @@ class EnergyNode(Component):
         return getattr(getattr(state.energy.nodes[input.network_ID].outputs, input.domain), input_field)
 
     @eqx.filter_jit
-    def _get_inputs_by_domain(self, domain: EnergyDomain):
+    def _get_inputs_by_domain(self, domain: EnergyDomain | str):
         return tuple(i for i in self.inputs if i.domain == domain)
 
     @eqx.filter_jit
@@ -155,9 +155,9 @@ class FlowDesign(eqx.Module):
     noise_speed: float = 0.0
 
 @register
-class FlowNode(EnergyNode):
+class FlowNode[DesignType: FlowDesign](EnergyNode):
     
-    design_parameters: FlowDesign = init_field(FlowDesign)
+    design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
 
 

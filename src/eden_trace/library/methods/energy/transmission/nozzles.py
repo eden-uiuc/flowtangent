@@ -10,7 +10,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from src.eden_trace.library.gases import IdealGas
+    from eden_trace.library.gases import IdealGas
 
 # package imports
 import jax.numpy as jnp
@@ -233,10 +233,10 @@ def func_variable_nozzle_performance(
     # 2. Perfect Expansion Exit Mach
     # Because we vary the nozzle to perfectly expand to ambient pressure (P_out = P0),
     # M_exit is explicitly a function of the total-to-ambient pressure ratio.
-    M_exit = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
+    M_out = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
     
     # 3. Throat Mach
-    M_throat = jnp.where(choked, 1.0, M_exit)
+    M_throat = jnp.where(choked, 1.0, M_out)
 
     # 4. Explicitly Calculate Required Physical Areas
     def calc_area_for_mach(M):
@@ -247,13 +247,13 @@ def func_variable_nozzle_performance(
         return (mdot_in * jnp.sqrt(R * T_t) * temp_term) / (P_t * m_term)
 
     A_throat = calc_area_for_mach(M_throat)
-    A_exit = calc_area_for_mach(M_exit)
+    A_exit = calc_area_for_mach(M_out)
 
     # 5. Thermodynamics and Kinematics
     P_out = P0  # Perfect expansion assumption guarantees this
-    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
     
-    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
+    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
     T_t_out = T_t
     
     h_t_out = gas.compute_enthalpy(T_t_out)
@@ -262,4 +262,4 @@ def func_variable_nozzle_performance(
 
     rho_out = P_out / (R * T_out)
 
-    return mdot_in, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out, A_throat, A_exit
+    return M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out, A_throat, A_exit

@@ -11,9 +11,9 @@
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.framework.conditions import Condition
+from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Interfaces
@@ -48,24 +48,23 @@ class FlowOutputs(Condition):
 
     speed: jnp.ndarray = empty_array(0)
     speed_of_sound: jnp.ndarray = empty_array(0)
-    area_ratio: jnp.ndarray = empty_array(0)
-
+    mach_number: jnp.ndarray = empty_array(0)
+    reynolds_number: jnp.ndarray = empty_array(0)
+    
     pressure: jnp.ndarray = empty_array(0)
     temperature: jnp.ndarray = empty_array(0)
-    density: jnp.ndarray = empty_array(0)
     enthalpy: jnp.ndarray = empty_array(0)
-
-    mass_flow_rate: jnp.ndarray = empty_array(0)
-
-    dynamic_viscosity: jnp.ndarray = empty_array(0)
-    dynamic_pressure: jnp.ndarray = empty_array(0)
 
     stagnation_pressure: jnp.ndarray = empty_array(0)
     stagnation_temperature: jnp.ndarray = empty_array(0)
     stagnation_enthalpy: jnp.ndarray = empty_array(0)
 
-    mach_number: jnp.ndarray = empty_array(0)
-    reynolds_number: jnp.ndarray = empty_array(0)
+    area: jnp.ndarray = empty_array(0)
+    density: jnp.ndarray = empty_array(0)
+    mass_flow_rate: jnp.ndarray = empty_array(0)
+
+    dynamic_viscosity: jnp.ndarray = empty_array(0)
+    dynamic_pressure: jnp.ndarray = empty_array(0)
 
     gamma: jnp.ndarray = empty_array(0)
     Cp: jnp.ndarray = empty_array(0)
@@ -81,8 +80,9 @@ class ResidualOutputs(Condition):
     power: jnp.ndarray = empty_array(0)
 
     thrust: jnp.ndarray = empty_array(0)
+    area: jnp.ndarray = empty_array(0)
 
-    # Turbofan residual hooks
+    # Fixed Nozzle Turbofan Residuals
     Wc: jnp.ndarray = empty_array(0)
     Wp: jnp.ndarray = empty_array(0)
 

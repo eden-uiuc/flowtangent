@@ -28,24 +28,24 @@ from jax import Array
 from tqdm import trange
 from plotly.subplots import make_subplots
 
-import src.eden_trace.utils as ru
+import eden_trace.utils as tu
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components import ComponentAreas
-from src.eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
-from src.eden_trace.library.components.airfoils import Airfoil, Airfoil_Data
+from eden_trace.library import units
+from eden_trace.library.components import ComponentAreas
+from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.airfoils import Airfoil, Airfoil_Data
 
-from src.eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
+from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
 
-from src.eden_trace.framework import Process, State, Aircraft, Settings, GradientMap, System
-from src.eden_trace.framework.settings import AnalysisSettings
-from src.eden_trace.framework.conditions import Time
+from eden_trace.framework import Process, State, Aircraft, Settings, GradientMap, System
+from eden_trace.framework.settings import AnalysisSettings
+from eden_trace.framework.conditions import Time
 
-from src.eden_trace.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
-from src.eden_trace.framework.analyses.batched import ShardedDatasetGenerator
+from eden_trace.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from eden_trace.framework.analyses.batched import ShardedDatasetGenerator
 
-from src.eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
-from src.eden_trace.framework.plotting import plot_vlm_panels
+from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from eden_trace.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 

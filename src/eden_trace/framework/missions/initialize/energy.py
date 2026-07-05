@@ -10,15 +10,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 
-from src.eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.networks import EnergyNetwork
 
 # Trace Imports
-from src.eden_trace.framework.conditions.Energy import EnergyNodeConditions, TurbojetNetworkConditions
+from eden_trace.framework.conditions.energy import EnergyNodeConditions, TurbojetNetworkConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy

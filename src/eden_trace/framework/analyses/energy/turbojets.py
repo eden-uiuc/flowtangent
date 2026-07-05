@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from src.eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-    from src.eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
+    from eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
+    from eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
 
 import jax.numpy as jnp
 import equinox as eqx
@@ -21,17 +21,18 @@ from jaxopt import LevenbergMarquardt, GaussNewton
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
 
-from src.eden_trace.utils import DataPath
+from eden_trace.utils import DataPath
 
-from src.eden_trace.library import units
+from eden_trace.library import units
+from eden_trace.library.components.energy.propulsors import FixedNozzle, VariableNozzle
 
-from src.eden_trace.framework import State, Aircraft, Settings
-from src.eden_trace.framework.settings import EnergyAnalysisSettings
-from src.eden_trace.framework.analyses.residual import ResidualAnalysis
-from src.eden_trace.framework.conditions.controls import Control, Residual
+from eden_trace.framework import State, Aircraft, Settings
+from eden_trace.framework.settings import EnergyAnalysisSettings
+from eden_trace.framework.analyses.residual import ResidualAnalysis
+from eden_trace.framework.conditions.controls import Control, Residual
 
-from src.eden_trace.framework.missions.initialize import initialize_energy
-from src.eden_trace.framework.missions.update import update_freestream
+from eden_trace.framework.missions.initialize import initialize_energy
+from eden_trace.framework.missions.update import update_freestream
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Point Turbojet Analysis
@@ -251,30 +252,84 @@ def TurbojetPerformance(
     Wp_bnds = (jnp.min(t_map.Wp_table).item(),
                jnp.max(t_map.Wp_table).item(),)
     
-    # Composite Bounds -------------------------------------------------------00
+    # Composite Bounds ---------------------------------------------------------
     
     RPM_bnds = (max(Nc_bnds[0], Np_bnds[0]) * 0.5,
                 min(Nc_bnds[1], Np_bnds[1]) * 1.5)
     
     FAR_bnds = (1e-4, 5e-2)
 
+    # Control Setup -----------------------------------------------------------
+    
+    Rline = Control(
+        tag="Rline",
+        state_path=DataPath(("energy", "Rline")),
+        initial_value=initial_Rline,
+        bounds=R_bnds
+    )
+
+    turb_PR = Control(
+        tag="Turbine Pressure Ratio",
+        state_path=DataPath(("energy", "turbine_PR")),
+        initial_value=initial_turb_PR,
+        bounds=PR_bnds
+    )
+
+    N = Control(
+        tag="Rotation Speed",
+        state_path=DataPath(("energy", "rotation_speed")),
+        initial_value=initial_RPM,
+        bounds=RPM_bnds,
+    )
+
+    W = Control(
+        tag="Mass Flow Rate",
+        state_path=DataPath(("energy", "mass_flow_rate")),
+        initial_value=initial_MFR,
+        bounds=Wc_bnds,
+    )
+
+    FAR = Control(
+        tag="Fuel Air Ratio",
+        state_path=DataPath(("energy", "fuel_air_ratio")),
+        initial_value=initial_FAR,
+        bounds=FAR_bnds
+    )
+    
+    # Residual Setup -----------------------------------------------------------
+
+    d_mdot = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.outputs.residual.mass_flow_rate)
+    
+    d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.outputs.residual.power)
+    
+    d_thrust = Residual(tag="Thrust", get_value=lambda s: s.energy.outputs.residual.thrust)
+
+    d_Wc = Residual(tag="Compressor Mass Flow", get_value=lambda s: s.energy.outputs.residual.Wc)
+
+    d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.outputs.residual.Wp)
+
+    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.outputs.residuals.area)
+
+    # Variable Setup -----------------------------------------------------------
+    
+    base_res = (d_mdot, d_power, d_thrust)
+    base_ctrls = (turb_PR, N, W, FAR)
+    
+    if isinstance(network.core_nozzle, VariableNozzle):
+        ctrls = base_ctrls
+        res = base_res + (d_area,)
+    else:    
+        ctrls = base_ctrls + (Rline,)
+        res = base_res + (d_Wc, d_Wp)
+
+    # Construct Analysis -------------------------------------------------------
+
     return ResidualAnalysis(
         tag="Turbojet Performance",
         analyze=build_analysis_from_network(network),
-        controls=_TurbojetControls(
-            initial_Rline=initial_Rline,
-            R_line_bnds=R_bnds,
-            initial_turb_PR=initial_turb_PR,
-            turb_PR_bnds=PR_bnds,
-            initial_RPM=initial_RPM,
-            RPM_bnds=RPM_bnds,
-            initial_MFR=initial_MFR,
-            MFR_bnds=Wc_bnds,
-            initial_FAR=initial_FAR,
-            FAR_bnds=FAR_bnds,
-        ),
         solver=GaussNewton,
-        residuals=_TurbojetResiduals()
+        controls=ctrls,
+        residuals=res
     )
 
 

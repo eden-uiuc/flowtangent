@@ -14,10 +14,10 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.library.gases import Air, IdealGas
-from src.eden_trace.library.planets import Earth, Planet
+from eden_trace.library.gases import Air, IdealGas
+from eden_trace.library.planets import Earth, Planet
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Atmospheres

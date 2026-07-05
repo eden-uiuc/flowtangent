@@ -13,12 +13,12 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 
-from src.eden_trace.library import units
-from src.eden_trace.library.components import ComponentAreas
-from src.eden_trace.library.components.airfoils import Airfoil
-from src.eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
+from eden_trace.library import units
+from eden_trace.library.components import ComponentAreas
+from eden_trace.library.components.airfoils import Airfoil
+from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 
-from src.eden_trace.framework.systems import Aircraft
+from eden_trace.framework.systems import Aircraft
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AVL Interface Functions

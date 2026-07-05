@@ -14,13 +14,13 @@ import equinox as eqx
 import jax.numpy as jnp
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.framework import ProcessStep
-from src.eden_trace.framework.conditions.controls import Control, Control, NamedResidual
-from src.eden_trace.framework.missions.segments import Segment
+from eden_trace.framework import ProcessStep
+from eden_trace.framework.conditions.controls import Control, Control, NamedResidual
+from eden_trace.framework.missions.segments import Segment
 
 from .profiles import *
 

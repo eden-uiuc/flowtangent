@@ -14,9 +14,9 @@ from typing import Literal
 import equinox as eqx
 
 # Trace imports
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.library import units
+from eden_trace.library import units
 
 # -------------------------------------------------------------------------------
 # Aircraft Classes

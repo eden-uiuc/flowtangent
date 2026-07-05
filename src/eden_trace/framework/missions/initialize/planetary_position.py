@@ -10,7 +10,7 @@
 import equinox as eqx
 
 # Trace Imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Planetary Position

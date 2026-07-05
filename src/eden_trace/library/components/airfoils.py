@@ -16,9 +16,9 @@ import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # Trace imports
-from src.eden_trace.utils import empty_array, get_Trace_root, init_field
+from eden_trace.utils import empty_array, get_Trace_root, init_field
 
-from src.eden_trace.library import Component
+from eden_trace.library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil

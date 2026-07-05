@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Aircraft, Settings, State
+    from eden_trace.framework import Aircraft, Settings, State
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

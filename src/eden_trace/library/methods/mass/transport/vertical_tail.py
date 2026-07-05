@@ -10,9 +10,9 @@
 
 import jax.numpy as np
 
-from src.eden_trace.library import units
+from eden_trace.library import units
 
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

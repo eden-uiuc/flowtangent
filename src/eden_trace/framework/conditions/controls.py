@@ -15,12 +15,12 @@ import jax
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import DataPath, init_field
+from eden_trace.utils import DataPath, init_field
 
-from src.eden_trace.library import Component
+from eden_trace.library import Component
 
-from src.eden_trace.framework.conditions import Condition
-from src.eden_trace.framework.conditions.Stability import StabilityConditions
+from eden_trace.framework.conditions import Condition
+from eden_trace.framework.conditions.stability import StabilityConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Controls

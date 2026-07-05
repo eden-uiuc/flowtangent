@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 # Trace imports
 if TYPE_CHECKING:
-    from src.eden_trace.framework import Settings, State, System
+    from eden_trace.framework import Settings, State, System
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Freestream

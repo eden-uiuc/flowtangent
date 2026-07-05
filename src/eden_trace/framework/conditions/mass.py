@@ -12,9 +12,9 @@
 import jax.numpy as jnp
 
 # Trace imports
-from src.eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field
 
-from src.eden_trace.framework.conditions import Condition
+from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mass

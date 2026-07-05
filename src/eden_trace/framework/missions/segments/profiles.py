@@ -16,11 +16,11 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     pass
 
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.library import units
+from eden_trace.library import units
 
-from src.eden_trace.framework import ProcessStep
+from eden_trace.framework import ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Segment Profiles

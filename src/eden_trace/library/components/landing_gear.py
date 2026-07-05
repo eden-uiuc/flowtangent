@@ -10,9 +10,9 @@
 # package imports
 
 # Trace imports
-from src.eden_trace.utils import init_field
+from eden_trace.utils import init_field
 
-from src.eden_trace.library import Component
+from eden_trace.library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Landing_Gear

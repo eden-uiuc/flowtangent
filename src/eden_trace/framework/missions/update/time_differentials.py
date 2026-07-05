@@ -11,7 +11,7 @@
 import equinox as eqx
 
 # Trace imports
-import src.eden_trace.framework as rcf
+import eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Time Differentials
