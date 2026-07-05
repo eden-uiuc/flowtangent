@@ -1,12 +1,35 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eden-trace"
+version = "0.1.0"
+description = "A differentiable, GPU-accelerated aerospace systems design environment."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "equinox",
+    "jax",
+    "jaxopt",
+    "matplotlib",
+    "networkx",
+    "numcodecs",
+    "nvidia-ml-py",
+    "numpy",
+    "pandas",
+    "plotly",
+    "scikit-learn",
+    "scipy",
+    "tqdm",
+    "zarr"
+]
 
 [tool.ruff]
 # Scientific codebases often need longer lines for complex equations
 line-length = 120 
 
-# Assume Python 3.10 as the minimum (adjust if RCAIDE targets 3.9 or 3.11)
+# Assume Python 3.10 as the minimum
 target-version = "py310"
 
 [tool.ruff.lint]
@@ -44,25 +67,25 @@ indent-style = "space"
 section-order = [
     "future",
     "standard-library",   # Native Python (os, sys, etc.)
-    "third-party",        # Non-RCAIDE packages (jax, equinox, numpy, etc.)
-    "rcaide-utils",       # Custom section 1
-    "rcaide-library",     # Custom section 2
-    "rcaide-framework",   # Custom section 3
-    "first-party",        # Catch-all for any other RCAIDE imports
+    "third-party",        # Non-Trace packages (jax, equinox, numpy, etc.)
+    "trace-utils",        # Custom section 1
+    "trace-library",      # Custom section 2
+    "trace-framework",    # Custom section 3
+    "first-party",        # Catch-all for any other Trace imports
     "local-folder"        # Relative imports (e.g., from . import utils)
 ]
 
 # Custom Import Sections
 [tool.ruff.lint.isort.sections]
-"rcaide-utils" = ["RCAIDE.utils"] 
-"rcaide-library" = ["RCAIDE.Library"]
-"rcaide-framework" = ["RCAIDE.Framework"]
+"trace-utils" = ["eden_trace.utils"] 
+"trace-library" = ["eden_trace.Library"]
+"trace-framework" = ["eden_trace.Framework"]
 
-# Catch numpy tracer errors
+# Catch numpy tracer errors (Brilliant addition, by the way)
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "numpy".msg = "Use jax.numpy as jnp in all computational modules to prevent XLA tracer crashes"
 
 [tool.ruff.lint.per-file-ignores]
 # __init__.py files are designed to re-export modules. 
-# Ignore unused imports (F401) in all of them globally.
+# Ignore unused imports (F401) and import sorting (I) globally.
 "__init__.py" = ["F401", "I"]
