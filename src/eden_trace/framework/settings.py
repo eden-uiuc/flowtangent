@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Settings.py
+# Trace/Framework/Settings.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -12,7 +12,7 @@ import equinox as eqx
 import jax
 
 # package imports
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field
 
 from src.eden_trace.framework import GradientMap

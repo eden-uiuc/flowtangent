@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Methods/Aerodynamics/VLM/pressure_coefficients.py
+# Trace/Framework/Methods/Aerodynamics/VLM/pressure_coefficients.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart

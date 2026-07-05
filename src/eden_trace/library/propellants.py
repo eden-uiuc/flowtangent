@@ -1,7 +1,7 @@
-# RCAIDE/Library/Propellants.py
+# Trace/Library/Propellants.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, RCAIDE Team
+# Created: Apr 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -12,7 +12,7 @@ import equinox as eqx
 
 from src.eden_trace.utils import init_field
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.library.gases import O2, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------

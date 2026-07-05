@@ -44,8 +44,8 @@ from src.eden_trace.framework.conditions import Time
 from src.eden_trace.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from src.eden_trace.framework.analyses.batched import ShardedDatasetGenerator
 
-from src.eden_trace.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from src.eden_trace.framework.Plotting import plot_vlm_panels
+from src.eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from src.eden_trace.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -1594,7 +1594,7 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
 if __name__ == "__main__":
 
-    os.chdir(ru.get_RCAIDE_root())
+    os.chdir(ru.get_Trace_root())
 
     mach_path   = ru.DataPath(("freestream", "mach_number"), tag="M")
     alpha_path  = ru.DataPath(("aerodynamics", "angles", "alpha"), tag="a")

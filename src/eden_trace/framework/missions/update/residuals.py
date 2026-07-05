@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Missions/residuals.py
+# Trace/Framework/Missions/residuals.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  Sep 2025, J. Smart
 # Modified:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # package imports
 import equinox as eqx
 
-# RCAIDE Imports
+# Trace Imports
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

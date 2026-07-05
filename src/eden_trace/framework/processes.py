@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Process.py
+# Trace/Framework/Process.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -27,7 +27,7 @@ import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizer
 
 import src.eden_trace.utils as ru
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import MERMAID_STYLES, DataPath, Token, init_field
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -453,7 +453,7 @@ class Process(ProcessStep):
             return self.steps.index(value)
 
         else:
-            raise ValueError("RCAIDE processes can only be indexed by name, function, or ProcessStep object.")
+            raise ValueError("Trace processes can only be indexed by name, function, or ProcessStep object.")
 
     def insert(self, step: ProcessStep, index: int):
         new_steps = self.steps[:index] + (step,) + self.steps[index:]
@@ -820,7 +820,7 @@ class Process(ProcessStep):
 
 
 class OptimizerInterface:
-    """Interface with legacy optimizers to separate value and gradient function for RCAIDE Processes."""
+    """Interface with legacy optimizers to separate value and gradient function for Trace Processes."""
 
     def __init__(
         self,

@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Conditions/Controls.py
+# Trace/Framework/Missions/Conditions/Controls.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,7 +14,7 @@ from typing import Optional, Callable, Literal
 import jax
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import DataPath, init_field
 
 from src.eden_trace.library import Component

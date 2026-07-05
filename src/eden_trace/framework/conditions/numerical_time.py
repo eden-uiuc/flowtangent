@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Conditions/Numerics.py
+# Trace/Framework/Missions/Conditions/Numerics.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -13,7 +13,7 @@ from typing import Callable
 import jax.numpy as jnp
 import equinox as eqx
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field, register
 
 from src.eden_trace.framework.conditions import Condition

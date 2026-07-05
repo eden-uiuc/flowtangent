@@ -15,7 +15,7 @@ from src.eden_trace.library.components.wings import Wing, WingChords, WingDimens
 from src.eden_trace.framework import Aircraft, Settings, State
 from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
 from src.eden_trace.framework.methods.aero.VORJAX import discretize_surfaces
-from src.eden_trace.framework.Plotting import plot_vlm_panels
+from src.eden_trace.framework.plotting import plot_vlm_panels
 from src.eden_trace.framework.settings import AnalysisSettings
 
 # -----------------------------------------------------------------------------------------------------------------------

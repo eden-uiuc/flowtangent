@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Methods/Aerodynamics/VLM/boundary_conditions.py
+# Trace/Framework/Methods/Aerodynamics/VLM/boundary_conditions.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -75,7 +75,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     v_total = v_fs[:, None, :] + v_rot
     if vlm_settings.model_propeller_wake:
         # TODO: Convert BEMT and add wake calculation to VLM Process
-        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in RCAIDE.")
+        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in Trace.")
         v_total = v_total + system.analysis_data["induced_wake"]  # type: ignore
 
     # Take the Dot Product with the Panel Normals

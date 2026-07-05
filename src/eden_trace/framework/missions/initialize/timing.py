@@ -1,6 +1,6 @@
-# RCAIDE/Framework/Missions/Initialization/time.py
+# Trace/Framework/Missions/Initialization/time.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -10,7 +10,7 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE Imports
+# Trace Imports
 import src.eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------

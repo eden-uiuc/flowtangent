@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import pycycle.api as pyc
 from jax.scipy.ndimage import map_coordinates
 
-from src.eden_trace.utils import empty_array, get_RCAIDE_root, init_field, register
+from src.eden_trace.utils import empty_array, get_Trace_root, init_field, register
 
 from src.eden_trace.library import units
 
@@ -247,7 +247,7 @@ class TurbineMap(eqx.Module):
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-_MAP_DIR = get_RCAIDE_root() / "library/data/turbo_maps"
+_MAP_DIR = get_Trace_root() / "library/data/turbo_maps"
 
 
 @lru_cache(maxsize=None)
@@ -255,7 +255,7 @@ def _load_map_from_disk(name: str):
     """Hidden helper that does the disk I/O, safely cached, and routes by type."""
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in RCAIDE library ({_MAP_DIR}).")
+        raise AttributeError(f"Map '{name}' not found in Trace library ({_MAP_DIR}).")
 
     # 1. Peek inside the JSON to grab the metadata
     with open(file_path, "r") as f:

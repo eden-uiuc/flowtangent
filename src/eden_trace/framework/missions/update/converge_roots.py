@@ -1,13 +1,13 @@
-# RCAIDE/Framework/Missions/Iteration/converge_roots.py
+# Trace/Framework/Missions/Iteration/converge_roots.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# RCAIDE Imports
+# Trace Imports
 import src.eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
-# RCAIDE/Library/Compoments/Component.py
+# Trace/Library/Compoments/Component.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -16,7 +16,7 @@ from typing import Any, Optional
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field
 
 from src.eden_trace.library.attributes.materials import Aluminum, Solid

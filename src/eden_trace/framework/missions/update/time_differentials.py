@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Update/time_differentials.py
+# Trace/Framework/Missions/Update/time_differentials.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 # package imports
 import equinox as eqx
 
-# RCAIDE imports
+# Trace imports
 import src.eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------

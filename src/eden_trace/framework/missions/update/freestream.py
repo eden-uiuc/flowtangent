@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Update/freestream.py
+# Trace/Framework/Missions/Update/freestream.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 if TYPE_CHECKING:
     from src.eden_trace.framework import Settings, State, System
 

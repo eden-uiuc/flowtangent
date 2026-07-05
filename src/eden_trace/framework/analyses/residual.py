@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Analyses/residual.py
+# Trace/Framework/Analyses/residual.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart

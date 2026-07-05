@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Missions/Initialize/controls.py
+# Trace/Framework/Missions/Initialize/controls.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J.

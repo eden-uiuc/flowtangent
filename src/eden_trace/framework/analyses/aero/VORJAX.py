@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Analyses/Aerodynamics/VLM.py
+# Trace/Framework/Analyses/Aerodynamics/VLM.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: May 2025, RCAIDE Team
+# Created: May 2025, Trace Team
 # Modified: Mar 2026, J. Smart
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ import jax.numpy as jnp
 # package imports
 import sklearn
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import DataPath, init_field
 
 from src.eden_trace.library import units

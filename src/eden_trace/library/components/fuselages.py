@@ -1,7 +1,7 @@
-# RCAIDE/Compoments/Fuselages/Fuselage.py
+# Trace/Compoments/Fuselages/Fuselage.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 # package imports
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field
 
 from src.eden_trace.library import Component, ComponentAreas, ComponentDimensions, ComponentFineness

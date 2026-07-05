@@ -156,16 +156,16 @@ def off_design_point(
 
     return od_state, od_system, od_settings
 
-def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Design"):
+def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Design"):
     """
-    Loads PyCycle JSON results and compares them against the RCAIDE state.
+    Loads PyCycle JSON results and compares them against the Trace state.
     """
     
     # 1. Load the JSON
     with open(pycycle_json_path, 'r') as f:
         pycycle_data = json.load(f)
         
-    # 2. Map PyCycle flow stations to RCAIDE network IDs
+    # 2. Map PyCycle flow stations to Trace network IDs
     station_map = {
         # 'fc.Fl_O':     'freestream',
         'inlet.Fl_O':  'network.line.engine.inlet_nozzle',
@@ -175,7 +175,7 @@ def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Desi
         'nozz.Fl_O':   'network.line.engine.core_nozzle'
     }
     
-    # 3. Map PyCycle properties to RCAIDE tags
+    # 3. Map PyCycle properties to Trace tags
     property_map = {
         'W':     ('mass_flow_rate', units.lbm/units.s),
         'Pt':    ('stagnation_pressure', units.psi),
@@ -188,7 +188,7 @@ def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Desi
     }
 
     # User-defined extraction function
-    def get_rcaide_value(state, network_id, prop_tag):
+    def get_Trace_value(state, network_id, prop_tag):
 
         node = state.energy.nodes[network_id]
         value = np.asarray(getattr(node.outputs.flow, prop_tag))
@@ -209,30 +209,30 @@ def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Desi
         
         if pyc_prop in property_map:
             prop_tag, pyc_units = property_map[pyc_prop]
-            value = getattr(rcaide_state.freestream, prop_tag)
-            rcaide_val = np.asarray(value).item()
+            value = getattr(Trace_state.freestream, prop_tag)
+            Trace_val = np.asarray(value).item()
 
             pyc_val *= pyc_units
-            diff = rcaide_val - pyc_val
+            diff = Trace_val - pyc_val
 
             if abs(pyc_val) > 1e-12:
                     rel_error = (diff / pyc_val)
             else:
-                rel_error = np.nan if abs(rcaide_val) > 1e-12 else 0.0
+                rel_error = np.nan if abs(Trace_val) > 1e-12 else 0.0
             
             records.append({
                 'Station': "fc",
                 'Property': pyc_prop,
                 'PyCycle Val': pyc_val,
-                'RCAIDE Val': rcaide_val,
+                'Trace Val': Trace_val,
                 'Diff': diff,
                 'Rel. Error': rel_error
             })
     
     for pyc_station, pyc_props in pycycle_data.get('flow_stations', {}).items():
         
-        rcaide_node_id = station_map.get(pyc_station)
-        if not rcaide_node_id:
+        Trace_node_id = station_map.get(pyc_station)
+        if not Trace_node_id:
             continue
             
         for pyc_prop, pyc_val in pyc_props.items():
@@ -240,29 +240,29 @@ def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Desi
             if pyc_prop == "ht":
                 continue
             
-            rcaide_tag, pyc_units = property_map.get(pyc_prop, (None, None))
-            if not rcaide_tag or pyc_val is None:
+            Trace_tag, pyc_units = property_map.get(pyc_prop, (None, None))
+            if not Trace_tag or pyc_val is None:
                 continue
                 
-            # Grab the RCAIDE value
-            rcaide_val = get_rcaide_value(rcaide_state, rcaide_node_id, rcaide_tag)
-            if rcaide_val is not None:
+            # Grab the Trace value
+            Trace_val = get_Trace_value(Trace_state, Trace_node_id, Trace_tag)
+            if Trace_val is not None:
                 # Calculate metrics
                 pyc_val *= pyc_units
-                diff = rcaide_val - pyc_val
+                diff = Trace_val - pyc_val
                 
                 # Protect against divide-by-zero if PyCycle value is exactly 0.0 (like altitude or Mn=0)
                 if abs(pyc_val) > 1e-12:
                     rel_error = (diff / pyc_val)
                 else:
                     # If PyCycle is 0, use absolute difference as the "error" metric visually, or set to NaN
-                    rel_error = np.nan if abs(rcaide_val) > 1e-12 else 0.0
+                    rel_error = np.nan if abs(Trace_val) > 1e-12 else 0.0
                     
                 records.append({
                     'Station': pyc_station.split('.')[0],
                     'Property': pyc_prop,
                     'PyCycle Val': pyc_val,
-                    'RCAIDE Val': rcaide_val,
+                    'Trace Val': Trace_val,
                     'Diff': diff,
                     'Rel. Error': rel_error
                 })
@@ -275,7 +275,7 @@ def validate_design_point(pycycle_json_path, rcaide_state, point_name: str="Desi
     pd.set_option('display.float_format', '{:.4e}'.format)
     
     print("\n" + "="*80)
-    print(f" PyCycle vs. RCAIDE {point_name} Point Validation")
+    print(f" PyCycle vs. Trace {point_name} Point Validation")
     print("="*80)
     print(df.to_string(index=False))
     print("="*80 + "\n")

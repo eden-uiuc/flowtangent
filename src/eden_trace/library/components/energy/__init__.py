@@ -1,7 +1,7 @@
-# RCAIDE/Library/Compoments/Energy/Sources/__init__.py
+# Trace/Library/Compoments/Energy/Sources/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""RCAIDE Package Setup"""
+"""Trace Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

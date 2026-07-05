@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Missions/Initialize/state.py
+# Trace/Framework/Missions/Initialize/state.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart

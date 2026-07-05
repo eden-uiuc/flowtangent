@@ -1,4 +1,4 @@
-# RCAIDE/Library/Attributes/AC_Classes.py
+# Trace/Library/Attributes/AC_Classes.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
 # Created:  May 2024, J. Smart
@@ -13,7 +13,7 @@ from typing import Literal
 # package imports
 import equinox as eqx
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field
 
 from src.eden_trace.library import units

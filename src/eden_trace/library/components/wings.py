@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Components/Wing.py
+# Trace/Framework/Components/Wing.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Sep, 2024, RCAIDE Team
+# Created: Sep, 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT

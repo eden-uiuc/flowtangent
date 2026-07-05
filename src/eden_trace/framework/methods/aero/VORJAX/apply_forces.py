@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Methods/Aerodynamics/Vortex_Lattice/apply_forces.py
+# Trace/Framework/Methods/Aerodynamics/Vortex_Lattice/apply_forces.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart

@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Conditions/Freestream.py
+# Trace/Framework/Missions/Conditions/Freestream.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 # package imports
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field
 
 from src.eden_trace.library.atmospheres import Atmosphere, USStandard1976

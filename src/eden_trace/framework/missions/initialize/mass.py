@@ -1,12 +1,12 @@
-# RCAIDE/Framework/Missions/Initialization/mass.py
+# Trace/Framework/Missions/Initialization/mass.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-# RCAIDE Imports
+# Trace Imports
 import equinox as eqx
 
 import src.eden_trace.framework as rcf

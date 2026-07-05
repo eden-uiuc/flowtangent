@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Analyses/Batched.py
+# Trace/Framework/Analyses/Batched.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart
@@ -253,7 +253,7 @@ class JAXCompileFilter(logging.Filter):
 
 
 class ShardManager:
-    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="rcaide_dataset.manager"):
+    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="Trace_dataset.manager"):
         self.local_dir = Path(cache_dir)
         self.hdd_dir = Path(storage_dir)
         self.max_rows = max_rows
@@ -318,7 +318,7 @@ class ShardManager:
 
 class ShardedDatasetGenerator:
     """
-    Orchestrates batched runs for any RCAIDE BatchProcess.
+    Orchestrates batched runs for any Trace BatchProcess.
     Slices total design space into manageable shards, executes them locally,
     and offloads them to medium-term storage.
     """

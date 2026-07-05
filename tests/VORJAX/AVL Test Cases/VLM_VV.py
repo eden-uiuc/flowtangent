@@ -30,8 +30,8 @@ from src.eden_trace.framework.conditions import Time
 
 from src.eden_trace.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
-from src.eden_trace.framework.Interfaces.AVL import parse_avl_file, convert_to_RCAIDE
-from src.eden_trace.framework.Plotting import plot_vlm_panels
+from src.eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from src.eden_trace.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -331,13 +331,13 @@ def VORJAX_ONERA_M6():
             percent_span_location=0.0,
             root_chord_percent=1.0,
             sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/Trace/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
         ),
         WingSegment(
             tag="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file("/home/jordan/dev/RCAIDE/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/Trace/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
         )
     )
     
@@ -868,10 +868,10 @@ def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_
 if __name__ == "__main__":
 
 
-    # geometry_file = '/home/jordan/dev/RCAIDE/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
+    # geometry_file = '/home/jordan/dev/Trace/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
 
     # avl_b737_data = parse_avl_file(Path(geometry_file))
-    # vehicle = convert_to_RCAIDE(avl_b737_data)
+    # vehicle = convert_to_Trace(avl_b737_data)
     
 
     # AVL_basic_test(geometry_file, oper_mode="st")

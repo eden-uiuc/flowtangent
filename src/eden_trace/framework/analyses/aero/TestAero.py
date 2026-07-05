@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Analyses/Aerodynamics/Test_Aero.py
+# Trace/Framework/Analyses/Aerodynamics/Test_Aero.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: Jan, 2026, RCAIDE Team
+# Created: Jan, 2026, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT

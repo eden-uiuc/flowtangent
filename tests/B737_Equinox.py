@@ -8,14 +8,14 @@ import dataclasses as dc
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE Imports
+# Trace Imports
 import src.eden_trace.utils as ru
 
 from src.eden_trace.framework import Process, State, Settings
 from src.eden_trace.framework.conditions import Time
 from src.eden_trace.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from src.eden_trace.framework.missions.Segments import Segment
-from src.eden_trace.framework.missions.Segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from src.eden_trace.framework.missions.segments import Segment
+from src.eden_trace.framework.missions.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
@@ -23,7 +23,7 @@ from src.eden_trace.framework.conditions.controls import Control
 from src.eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from trace.framework.analyses.energy.sizing import update_design_parameters
 from src.eden_trace.framework.analyses.energy import build_analysis_from_network
-from src.eden_trace.framework.Plotting import plot_vlm_panels
+from src.eden_trace.framework.plotting import plot_vlm_panels
 
 from src.eden_trace.library import units
 from src.eden_trace.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties

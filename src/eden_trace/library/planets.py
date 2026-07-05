@@ -1,7 +1,7 @@
-# RCAIDE/Library/Planets.py
+# Trace/Library/Planets.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, RCAIDE Team
+# Created: May 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

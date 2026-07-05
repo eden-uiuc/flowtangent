@@ -1,4 +1,4 @@
-# RCAIDE/Library/Components/Energy/Nodes.py
+# Trace/Library/Components/Energy/Nodes.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart

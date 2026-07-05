@@ -1,6 +1,6 @@
-# RCAIDE/Framework/Missions/Initialization/energy.py
+# Trace/Framework/Missions/Initialization/energy.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -17,7 +17,7 @@ import equinox as eqx
 
 from src.eden_trace.library.components.energy.networks import EnergyNetwork
 
-# RCAIDE Imports
+# Trace Imports
 from src.eden_trace.framework.conditions.Energy import EnergyNodeConditions, TurbojetNetworkConditions
 
 # ----------------------------------------------------------------------------------------------------------------------

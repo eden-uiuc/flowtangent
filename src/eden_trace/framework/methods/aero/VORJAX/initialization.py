@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Methods/Aerodynamics/VLM/initialization
+# Trace/Framework/Methods/Aerodynamics/VLM/initialization
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -43,7 +43,7 @@ def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settin
     if "VORJAX" not in settings.analysis.aerodynamics.__class__.__name__:
         raise ValueError(
             "settings.analysis.aerodynamics are not VORJAX Settings."
-            "Please use RCAIDE.Framework.Analysis.Vortex_Lattice.VLMSettings"
+            "Please use Trace.Framework.Analysis.Vortex_Lattice.VLMSettings"
         )
 
     # Standard Python Control Flow (Safe outside of @jax.jit)

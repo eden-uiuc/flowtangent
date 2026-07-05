@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Conditions/Conditions.py
+# Trace/Framework/Missions/Conditions/Conditions.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

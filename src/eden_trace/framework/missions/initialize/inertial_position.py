@@ -1,6 +1,6 @@
-# RCAIDE/Framework/Missions/Initialization/inertial_position.py
+# Trace/Framework/Missions/Initialization/inertial_position.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -12,7 +12,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 import equinox as eqx
 
-# RCAIDE Imports
+# Trace Imports
 import src.eden_trace.framework as rcf
 
 

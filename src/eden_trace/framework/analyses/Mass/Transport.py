@@ -1,10 +1,10 @@
 from src.eden_trace.utils import init_field
 
-from src.eden_trace.library.methods.Mass import Transport as Mass
+from src.eden_trace.library.methods.mass import transport as Mass
 
 from src.eden_trace.framework import Process, ProcessStep
 
-# from RCAIDE.Framework.Methods.Mass.Energy import tf_mass_from_SLS
+# from Trace.Framework.Methods.Mass.Energy import tf_mass_from_SLS
 
 
 def _default_transport_steps() -> tuple[ProcessStep, ...]:

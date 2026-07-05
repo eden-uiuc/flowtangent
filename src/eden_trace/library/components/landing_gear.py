@@ -1,7 +1,7 @@
-# RCAIDE/Library/Components/Landing_Gear.py
+# Trace/Library/Components/Landing_Gear.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May, 2025, RCAIDE Team
+# Created: May, 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -9,7 +9,7 @@
 
 # package imports
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field
 
 from src.eden_trace.library import Component

@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Components/Airfoil.py
+# Trace/Framework/Components/Airfoil.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Sep 2024, RCAIDE Team
+# Created: Sep 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -15,8 +15,8 @@ from pathlib import Path
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
-# RCAIDE imports
-from src.eden_trace.utils import empty_array, get_RCAIDE_root, init_field
+# Trace imports
+from src.eden_trace.utils import empty_array, get_Trace_root, init_field
 
 from src.eden_trace.library import Component
 
@@ -264,7 +264,7 @@ class Airfoil(Component):
 #  Airfoil Directory
 # ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = get_RCAIDE_root() / "/library/data/airfoil_files"
+_AF_DIR = get_Trace_root() / "/library/data/airfoil_files"
 
 
 @lru_cache(maxsize=None)
@@ -272,7 +272,7 @@ def _load_map_from_disk(name: str):
     """Hidden helper that does the disk I/O, safely cached, and routes by type."""
     file_path = _AF_DIR / f"{name}.txt"
     if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in RCAIDE library ({_AF_DIR}).")
+        raise AttributeError(f"Map '{name}' not found in Trace library ({_AF_DIR}).")
 
     return Airfoil.from_file(file_path)
 

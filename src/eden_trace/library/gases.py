@@ -1,7 +1,7 @@
-# RCAIDE/Library/Gases.py
+# Trace/Library/Gases.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, RCAIDE Team
+# Created: Apr 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -13,9 +13,9 @@ from functools import lru_cache
 import equinox as eqx
 import jax.numpy as jnp
 
-from src.eden_trace.utils import empty_array, get_RCAIDE_root, init_field
+from src.eden_trace.utils import empty_array, get_Trace_root, init_field
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -367,7 +367,7 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
 #  Thermo Database
 # ----------------------------------------------------------------------------------------------------------------------
 
-_DB_PATH = get_RCAIDE_root() / "library/data/thermo_database.json"
+_DB_PATH = get_Trace_root() / "library/data/thermo_database.json"
 
 
 @lru_cache(maxsize=1)

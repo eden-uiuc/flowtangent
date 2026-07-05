@@ -1,7 +1,7 @@
-# RCAIDE/Library/Atmospheres.py
+# Trace/Library/Atmospheres.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, RCAIDE Team
+# Created: May 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -13,7 +13,7 @@ from typing import Literal
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field
 
 from src.eden_trace.library.gases import Air, IdealGas

@@ -1,7 +1,7 @@
 # $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, RCAIDE Team
+# Created: Apr 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 # package imports
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field
 
 from src.eden_trace.library import Component, ComponentDimensions

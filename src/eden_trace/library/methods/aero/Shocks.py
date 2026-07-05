@@ -1,4 +1,4 @@
-# RCAIDE/Library/Methods/Aerodynamics/shocks.py
+# Trace/Library/Methods/Aerodynamics/shocks.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: May 2026, J Smart

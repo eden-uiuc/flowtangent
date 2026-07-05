@@ -1,7 +1,7 @@
-# RCAIDE/Framework/Missions/Update/acceleration.py
+# Trace/Framework/Missions/Update/acceleration.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, RCAIDE Team
+# Created: Aug 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -11,7 +11,7 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 import src.eden_trace.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------

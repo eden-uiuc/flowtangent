@@ -1,7 +1,7 @@
-# RCAIDE/Library/Components/Energy/Network.py
+# Trace/Library/Components/Energy/Network.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, RCAIDE Team
+# Created: Apr 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field, register
 
 from src.eden_trace.library import units

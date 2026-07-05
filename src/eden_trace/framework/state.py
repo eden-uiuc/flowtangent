@@ -1,7 +1,7 @@
-# RCAIDE/Framework/State.py
+# Trace/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 # Modified: Mar 2026, J.Smart
 
 # ----------------------------------------------------------------------------------------------------------------------

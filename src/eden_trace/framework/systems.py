@@ -1,7 +1,7 @@
-# RCAIDE/Framework/State.py
+# Trace/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, RCAIDE Team
+# Created: Jul 2024, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,7 +14,7 @@ import equinox as eqx
 # package imports
 import jax.numpy as jnp
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import empty_array, init_field, register
 
 from src.eden_trace.library import Component, MassProperties

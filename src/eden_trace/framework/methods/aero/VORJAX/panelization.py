@@ -1,4 +1,4 @@
-# RCAIDE/Framework/Methods/Aerodynamics/panelization.py
+# Trace/Framework/Methods/Aerodynamics/panelization.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created:  Jun 2021, A. Blaufox
@@ -30,7 +30,7 @@ from src.eden_trace.utils import inputs, outputs
 
 from src.eden_trace.library.components.wings import Wing, WingSegment, WingSweeps
 
-# from RCAIDE.Library.Components.Wings import All_Moving_Surface
+# from Trace.Library.Components.Wings import All_Moving_Surface
 
 # ----------------------------------------------------------------------------------------------------------------------
 # VortexDistribution Data Structure

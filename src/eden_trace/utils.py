@@ -1,4 +1,4 @@
-# RCAIDE/utils.py
+# Trace/utils.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Apr 2026, J. Smart
@@ -68,7 +68,7 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
 # ----------------------------------------------------------
 
 
-def get_RCAIDE_root():
+def get_Trace_root():
     return Path(os.path.dirname(os.path.abspath(__file__))).resolve()
 
 
@@ -275,16 +275,16 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
 # Saving and Loading
 #----------------------------------------------------------
 
-RCAIDE_REGISTRY = {}
+Trace_REGISTRY = {}
 
 def register(cls):
-    """Decorator to safely register any RCAIDE class for standalone serialization."""
-    if cls.__name__ in RCAIDE_REGISTRY:
-        raise ValueError(f"RCAIDE class '{cls.__name__}' is already registered.")
-    RCAIDE_REGISTRY[cls.__name__] = cls
+    """Decorator to safely register any Trace class for standalone serialization."""
+    if cls.__name__ in Trace_REGISTRY:
+        raise ValueError(f"Trace class '{cls.__name__}' is already registered.")
+    Trace_REGISTRY[cls.__name__] = cls
     return cls
 
-def serialize_rcaide_node(obj):
+def serialize_Trace_node(obj):
     """Recursively walks data, skipping attributes that match class defaults."""
     
     # 1. JAX or Numpy Array
@@ -294,8 +294,8 @@ def serialize_rcaide_node(obj):
         else:
             return {"__type__": "ndarray", "data": obj.tolist()}
         
-    # 2. Registered RCAIDE Class
-    elif type(obj).__name__ in RCAIDE_REGISTRY:
+    # 2. Registered Trace Class
+    elif type(obj).__name__ in Trace_REGISTRY:
         cls = type(obj)
         state = {}
         
@@ -318,17 +318,17 @@ def serialize_rcaide_node(obj):
                 if is_equivalent(v, default_v):
                     continue  # SKIP SAVING! Massive file size reduction.
                     
-            state[k] = serialize_rcaide_node(v)
+            state[k] = serialize_Trace_node(v)
             
         return {"__class__": cls.__name__, "state": state}
         
     # 3. Standard Python Containers
     elif isinstance(obj, list):
-        return {"__type__": "list", "data": [serialize_rcaide_node(i) for i in obj]}
+        return {"__type__": "list", "data": [serialize_Trace_node(i) for i in obj]}
     elif isinstance(obj, tuple):
-        return {"__type__": "tuple", "data": [serialize_rcaide_node(i) for i in obj]}
+        return {"__type__": "tuple", "data": [serialize_Trace_node(i) for i in obj]}
     elif isinstance(obj, dict):
-        return {"__type__": "dict", "data": {k: serialize_rcaide_node(v) for k, v in obj.items()}}
+        return {"__type__": "dict", "data": {k: serialize_Trace_node(v) for k, v in obj.items()}}
         
     # 4. Standard Scalars
     elif isinstance(obj, (int, float, str, bool, type(None))):
@@ -338,28 +338,28 @@ def serialize_rcaide_node(obj):
         if hasattr(obj, "tag") and obj.tag:
             warnings.warn(
                 f"Attempted to save '{obj.tag}' wing unregisterd class {type(obj).__name__}. "
-                "RCAIDE will be unable to load this data until the class is registered.", UserWarning)
+                "Trace will be unable to load this data until the class is registered.", UserWarning)
         else:
             warnings.warn(
                 f"Attempted to save unregisterd class {type(obj).__name__}. "
-                "RCAIDE will be unable to load this data until the class is registered.", UserWarning)
+                "Trace will be unable to load this data until the class is registered.", UserWarning)
         return {"__type__": "unknown", "data": str(obj)}
         
 
 
-def deserialize_rcaide_node(data):
+def deserialize_Trace_node(data):
     """Unpacks JSON, relying on default initializers to fill in missing attributes."""
     if not isinstance(data, dict):
         return data
         
-    # 1. Reconstruct RCAIDE Classes
+    # 1. Reconstruct Trace Classes
     if "__class__" in data:
         cls_name = data["__class__"]
         
-        if cls_name not in RCAIDE_REGISTRY:
-            raise ValueError(f"Class '{cls_name}' is not a registered RCAIDE class and cannot be loaded.")
+        if cls_name not in Trace_REGISTRY:
+            raise ValueError(f"Class '{cls_name}' is not a registered Trace class and cannot be loaded.")
             
-        cls = RCAIDE_REGISTRY[cls_name]
+        cls = Trace_REGISTRY[cls_name]
         
         # Conjure the instance
         try:
@@ -372,7 +372,7 @@ def deserialize_rcaide_node(data):
         
         # Overwrite defaults with any saved differences
         for k, v in data["state"].items():
-            object.__setattr__(instance, k, deserialize_rcaide_node(v))
+            object.__setattr__(instance, k, deserialize_Trace_node(v))
             
         return instance
         
@@ -382,19 +382,19 @@ def deserialize_rcaide_node(data):
         
     # 3. Reconstruct Containers
     elif data.get("__type__") == "list":
-        return [deserialize_rcaide_node(i) for i in data["data"]]
+        return [deserialize_Trace_node(i) for i in data["data"]]
     elif data.get("__type__") == "tuple":
-        return tuple(deserialize_rcaide_node(i) for i in data["data"])
+        return tuple(deserialize_Trace_node(i) for i in data["data"])
     elif data.get("__type__") == "dict":
-        return {k: deserialize_rcaide_node(v) for k, v in data["data"].items()}
+        return {k: deserialize_Trace_node(v) for k, v in data["data"].items()}
         
     return data
 
 def save_data(obj, filename:str | Path):
     """
-    Serializes any registered RCAIDE data structure and compresses it to a file.
+    Serializes any registered Trace data structure and compresses it to a file.
     """
-    payload = serialize_rcaide_node(obj)
+    payload = serialize_Trace_node(obj)
     
     with gzip.open(filename, 'wt', encoding='utf-8') as f:
         json.dump(payload, f)
@@ -407,13 +407,13 @@ def save_data(obj, filename:str | Path):
 
 def load_data(filename: str | Path):
     """
-    Loads any RCAIDE data structure from a file.
+    Loads any Trace data structure from a file.
     No setup scripts or templates are required.
     """
     with gzip.open(filename, 'rt', encoding='utf-8') as f:
         payload = json.load(f)
         
-    obj = deserialize_rcaide_node(payload)
+    obj = deserialize_Trace_node(payload)
     
     if hasattr(obj, "tag") and obj.tag:
         print(f"Successfully loaded {type(obj).__name__} '{obj.tag}' from {filename}")
@@ -469,13 +469,13 @@ def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
 # ---------------------------------------------------------
 
 def initialize_jax_cache(
-    cache_dir="~/.rcaide/jax_cache", 
+    cache_dir="~/.Trace/jax_cache", 
     max_size_gb=2.0, 
     max_age_days=30
 ):
     """
     Initializes the JAX persistent compilation cache and prunes old entries.
-    Safe to call every time RCAIDE is imported.
+    Safe to call every time Trace is imported.
     """
     # 1. Resolve the absolute path and ensure it exists
     cache_path = os.path.expanduser(cache_dir)
@@ -489,7 +489,7 @@ def initialize_jax_cache(
         _prune_cache(cache_path, max_size_gb, max_age_days)
     except Exception as e:
         # Never let a cache cleanup error crash the main physics library
-        print(f"RCAIDE Warning: Failed to prune JAX compilation cache - {e}")
+        print(f"Trace Warning: Failed to prune JAX compilation cache - {e}")
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):
     """
@@ -550,4 +550,4 @@ def cubic_spline_blender(x, start, end):
 
 
 if __name__ == "__main__":
-    print(get_RCAIDE_root())
+    print(get_Trace_root())

@@ -1,4 +1,4 @@
-# RCAIDE/Library/Methods/Aerodynamics/VLM/check_freestream.py
+# Trace/Library/Methods/Aerodynamics/VLM/check_freestream.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart

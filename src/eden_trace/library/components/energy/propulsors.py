@@ -1,7 +1,7 @@
-# RCAIDE/Library/Components/Energy/Propulsors.py
+# Trace/Library/Components/Energy/Propulsors.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, RCAIDE Team
+# Created: May 2025, Trace Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -22,27 +22,27 @@ import jax.numpy as jnp
 
 import src.eden_trace.utils as ru
 
-# RCAIDE imports
+# Trace imports
 from src.eden_trace.utils import init_field, register
 
 from src.eden_trace.library.components.energy import maps
 from src.eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
 from src.eden_trace.library.components.energy.nodes import EnergyInput, EnergyNode, FlowNode
 from src.eden_trace.library.gases import Air, BurnedJetA, IdealGas
-from src.eden_trace.library.methods.energy.Transmission.Combustors import (
+from eden_trace.library.methods.energy.transmission.combustors import (
     func_combustor_design as combustor_design,
     func_combustor_performance as combustor_performance,
 )
-from src.eden_trace.library.methods.energy.Transmission.Fan_Compressors import func_fan_compressor_performance as fan_compressor_performance
-from src.eden_trace.library.methods.energy.Transmission.Nozzles import (
+from eden_trace.library.methods.energy.transmission.fan_compressors import func_fan_compressor_performance as fan_compressor_performance
+from eden_trace.library.methods.energy.transmission.nozzles import (
     func_inlet_design as inlet_design,
     func_inlet_performance as inlet_performance,
     func_nozzle_design as nozzle_design,
     func_nozzle_performance as nozzle_performance,
     func_variable_nozzle_performance as variable_nozzle_performance
 )
-from src.eden_trace.library.methods.energy.Transmission.Turbines import func_turbine_performance as turbine_performance
-from src.eden_trace.library.methods.energy.Transmission.Turbofans import func_thrust_and_power as engine_performance
+from eden_trace.library.methods.energy.transmission.turbines import func_turbine_performance as turbine_performance
+from eden_trace.library.methods.energy.transmission.turbofans import func_thrust_and_power as engine_performance
 from src.eden_trace.library.propellants import JetA, Propellant
 
 # ----------------------------------------------------------------------------------------------------------------------
