@@ -332,7 +332,7 @@ if __name__ == "__main__":
 
     for pt in ['DESIGN']+mp_turbojet.od_pts:
         viewer(prob, pt)
-        export_pycycle_to_json(prob, pt, filename=f"./Tests/PyCycle/turbojet_{pt}.json")
+        export_pycycle_to_json(prob, pt, filename=f"./tests/PyCycle/turbojet_{pt}.json")
 
     # map_plots(prob,'DESIGN')
 

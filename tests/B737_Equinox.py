@@ -546,8 +546,8 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
 
     updated_mission = eqx.tree_at(lambda m: m.steps, mission, tuple(updated_segments))
 
-    VORJAX_Graph = aero_analysis.to_mermaid(save_path="./Tests/VORJAX_graph.md")
-    Energy_Graph = energy_analysis.to_mermaid(save_path="./Tests/energy_graph.md")
+    VORJAX_Graph = aero_analysis.to_mermaid(save_path="./tests/VORJAX_graph.md")
+    Energy_Graph = energy_analysis.to_mermaid(save_path="./tests/energy_graph.md")
 
     updated_state = state
 

@@ -111,7 +111,7 @@ def run_AVL_alpha_sweep(avl_file, alpha, run_name, oper_mode="st"):
 
     # 2. Loop through each alpha and build the execution sequence
     for i, a in enumerate(alpha):
-        file_name = f"./Tests/VORJAX/AVL Test Cases/{run_name}_{oper_mode}_a{i}.txt"
+        file_name = f"./tests/VORJAX/AVL Test Cases/{run_name}_{oper_mode}_a{i}.txt"
         output_files.append(file_name)
 
         # CRITICAL: Pre-delete the file so AVL never throws an overwrite prompt
@@ -223,7 +223,7 @@ def AVL_basic_test(geometry_file=None, run_name=None, oper_mode="st", alpha=2.0,
         run_name = Path(geometry_file).stem
 
     if geometry_file is None:
-        geometry_file = f"./Tests/VORJAX/AVL Test Cases/{run_name}.avl"
+        geometry_file = f"./tests/VORJAX/AVL Test Cases/{run_name}.avl"
         AVL_straight_wing(geometry_file, span=span, chord=chord)
 
     output_files = run_AVL_alpha_sweep(geometry_file, alpha=alpha, run_name=run_name, oper_mode=oper_mode)
@@ -520,7 +520,7 @@ class NumpyEncoder(json.JSONEncoder):
             return float(obj)
         return super(NumpyEncoder, self).default(obj)
 
-def save_plot_cache(plot_key, filepath="./Tests/VORJAX/plotting.json", **kwargs):
+def save_plot_cache(plot_key, filepath="./tests/VORJAX/plotting.json", **kwargs):
     """Saves kwargs to a JSON file under a specific plot_key."""
     cache = {}
     if os.path.exists(filepath):
@@ -533,7 +533,7 @@ def save_plot_cache(plot_key, filepath="./Tests/VORJAX/plotting.json", **kwargs)
         json.dump(cache, f, cls=NumpyEncoder, indent=4)
     print(f"Cached data for '{plot_key}' to {filepath}")
 
-def load_plot_cache(key, filepath="./Tests/VORJAX/plotting.json"):
+def load_plot_cache(key, filepath="./tests/VORJAX/plotting.json"):
     """Loads the entire JSON cache dictionary."""
     if not os.path.exists(filepath):
         print(f"Warning: Cache file {filepath} not found.")
@@ -593,7 +593,7 @@ def plot_avl_validation_mpl(alpha, cl_vjx, cd_vjx, cm_vjx, cl_avl, cd_avl, cm_av
 
         # Save and close to prevent memory leaks
         plt.tight_layout()
-        plt.savefig("./Tests/VORJAX/plots/"+filename, format='pdf', bbox_inches='tight')
+        plt.savefig("./tests/VORJAX/plots/"+filename, format='pdf', bbox_inches='tight')
         plt.close(fig)
         print(f"Saved {filename}")
 
@@ -681,7 +681,7 @@ def plot_spanwise_loading_mpl(eta, gamma, CL, b, AR, v_inf):
     
     # 9. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/spanwise_loading.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/spanwise_loading.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     # Set global font to match LaTeX standard
@@ -736,7 +736,7 @@ def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     
     # 10. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/elliptical_lift.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/elliptical_lift.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     # Set global font to match LaTeX standard
@@ -796,7 +796,7 @@ def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     
     # 10. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig(f"./Tests/VORJAX/plots/elliptical_drag_{field}.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig(f"./tests/VORJAX/plots/elliptical_drag_{field}.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     
@@ -1048,7 +1048,7 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     
     # 7. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/fd_v_curve.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/fd_v_curve.pdf", format='pdf', bbox_inches='tight')
 
 def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, grad_truth):
     
@@ -1270,7 +1270,7 @@ def plot_delta_log_sweep_mpl(ARs, grad_AD):
               fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/delta_wing_ar_sweep.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/delta_wing_ar_sweep.pdf", format='pdf', bbox_inches='tight')
 
 def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_truth):
     
@@ -1419,7 +1419,7 @@ def plot_delta_convergence_and_memory_mpl(n_panels, grad_AD, memory_gb):
     plt.title(r"Delta Wing Convergence and VRAM", fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/delta_convergence_memory.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/delta_convergence_memory.pdf", format='pdf', bbox_inches='tight')
 
 def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
     """
@@ -1589,7 +1589,7 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
     # 7. Export
     plt.tight_layout()
-    plt.savefig("./Tests/VORJAX/plots/onera_transonic_spline.pdf", format='pdf', bbox_inches='tight')
+    plt.savefig("./tests/VORJAX/plots/onera_transonic_spline.pdf", format='pdf', bbox_inches='tight')
 # Execution ------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -2020,7 +2020,7 @@ if __name__ == "__main__":
     # Batch Analysis Test ----------------------------------------------------------------------------------------------
     if TEST_BATCH:
         print("\n--- Batch Analysis Test ---")
-        db_path = "./Tests/VORJAX/batch_test"
+        db_path = "./tests/VORJAX/batch_test"
         if NEW_DATA:
             
             alpha = jnp.linspace(0.0, 5.0, 51) * units.deg
@@ -2072,7 +2072,7 @@ if __name__ == "__main__":
 
             generator = ShardedDatasetGenerator(
                 batch_analysis=solver,
-                cache_dir="./Tests/VORJAX/shard_test",
+                cache_dir="./tests/VORJAX/shard_test",
                 storage_dir="/media/jordan/Ashley_Backup/shard_test",
                 shard_size=3_000_000,
                 tag="Rectangle AR 10"

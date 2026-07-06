@@ -216,7 +216,7 @@ class Compressor(FlowNode):
             
             # Rline drops out of controls in variable nozzle engine
             if network_state.Rline.size == 0:
-                Rline = jnp.ones_like(state.energy.mass_flow_rate) * self.design_parameters.Rline
+                Rline = jnp.ones_like(state.energy.mass_flow_rate) * self.map.Rline_des
                 # TODO: Shift to Rline scheduling on altitude, Mach number in future
             else:
                 Rline = jnp.atleast_2d(network_state.Rline)
@@ -231,6 +231,13 @@ class Compressor(FlowNode):
             PR=PR,
             n_isn=n_isn,
         )
+
+        if settings.analysis.energy.design_mode:
+            updated_system = eqx.tree_at(
+                lambda s: s.energy.design_parameters.power,
+                updated_system,
+                power
+            )
 
         outputs = state.energy.nodes[self.network_ID].outputs
 
@@ -393,10 +400,22 @@ class Turbine(FlowNode):
                 (s_Wp, PR, s_eff, self.design_parameters.rotation_speed)
             )
 
+            updated_design = eqx.tree_at(
+                lambda d: d.pressure_ratio,
+                self.design_parameters,
+                PR
+            )
+
             updated_system = eqx.tree_at(
-                lambda s: s.energy.nodes[self.network_ID].map,
-                updated_system,
-                updated_map
+                lambda s: (
+                    s.energy.nodes[self.network_ID].map,
+                    s.energy.nodes[self.network_ID].design_parameters,
+                ),
+                    updated_system,
+                (
+                    updated_map,
+                    updated_design
+                )
             )
 
         else:
@@ -404,7 +423,8 @@ class Turbine(FlowNode):
             Np = N / jnp.sqrt(T_t / 288.15)
             Np_des = self.design_parameters.rotation_speed
 
-            PR = jnp.atleast_2d(network_state.turbine_PR)
+            # PR = jnp.atleast_2d(network_state.turbine_PR)
+            PR = jnp.atleast_2d(self.design_parameters.pressure_ratio)
             alpha = self.alpha_schedule(Np, Np_des)
 
             Wp, n_isn = self.map.evaluate(alpha, Np, PR)
@@ -637,6 +657,7 @@ class VariableNozzle(FlowNode):
                     P_t=P_t,
                     P0=P0,
                     mdot_in=mdot,
+                    # A_throat=self.design_parameters.A_throat
                 )
             )
 
@@ -682,12 +703,15 @@ class Turboshaft(EnergyNode):
         
         # c_norm = [i for i in self.inputs if "compressor" in i.network_ID and i.domain == "mechanical"][0]
 
-        d_power = (self.sum_domain_inputs(state, "mechanical", "power") / system.energy.design_parameters.power) #type: ignore
+        
         if settings.analysis.energy.design_mode:
             d_mass = jnp.atleast_2d(0.)
+            d_power = (self.sum_domain_inputs(state, "mechanical", "power") / 2e7)
         else:
             d_mass = (self.diff_domain_inputs(state, "flow", "mass_flow_rate") / 
                     self.average_domain_inputs(state, "flow", "mass_flow_rate"))
+            d_power = (self.sum_domain_inputs(state, "mechanical", "power") / 
+                       system.energy.design_parameters.power) #type: ignore
         
         outputs = state.energy.nodes[self.network_ID].outputs
 

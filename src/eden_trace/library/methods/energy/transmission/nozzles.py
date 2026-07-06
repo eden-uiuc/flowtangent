@@ -219,6 +219,7 @@ def func_variable_nozzle_performance(
         P_t: jnp.ndarray,
         P0: jnp.ndarray,
         mdot_in: jnp.ndarray,  # Mass flow is now the driver
+        # A_throat,
     ):
 
     gamma = gas.compute_gamma(T_t)

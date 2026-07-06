@@ -121,11 +121,11 @@ class TurbojetEnergyLine(EnergyLine):
         updated_state = eqx.tree_at(
             lambda s: (
                 s.energy.nodes[self.network_ID].outputs.residual.mass_flow_rate,
-                s.energy.nodes[self.network_ID].outputs.residual.work,
+                s.energy.nodes[self.network_ID].outputs.residual.power,
             ),
             updated_state, (
                 self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate"),
-                self.sum_domain_inputs(updated_state, "residual", "work"),
+                self.sum_domain_inputs(updated_state, "residual", "power"),
             )
         )
 

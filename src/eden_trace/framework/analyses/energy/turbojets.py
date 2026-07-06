@@ -91,21 +91,21 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
         bounds=(1.001, 1e2),
     )
 
-    thrust_res = Residual(
+    d_thrust = Residual(
         tag="Design Thrust",
         get_value=lambda s: s.energy.outputs.residual.thrust
     )
 
-    work_res = Residual(
-        tag="Work",
-        get_value=lambda s: s.energy.outputs.residual.work
+    d_power = Residual(
+        tag="Power Imbalance",
+        get_value=lambda s: s.energy.outputs.residual.power
     )
 
     design_analysis = ResidualAnalysis(
         tag="Turbojet Design",
         analyze=base_analysis,
         controls=(mass_ctrl, turb_ctrl),
-        residuals=(thrust_res, work_res),
+        residuals=(d_thrust, d_power),
         solver=LevenbergMarquardt
     )
 
@@ -298,7 +298,7 @@ def TurbojetPerformance(
     
     # Residual Setup -----------------------------------------------------------
 
-    d_mdot = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.outputs.residual.mass_flow_rate)
+    d_m_nozz = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.outputs.residual.mass_flow_rate)
     
     d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.outputs.residual.power)
     
@@ -308,19 +308,19 @@ def TurbojetPerformance(
 
     d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.outputs.residual.Wp)
 
-    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.outputs.residuals.area)
+    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.outputs.residual.area)
 
     # Variable Setup -----------------------------------------------------------
     
-    base_res = (d_mdot, d_power, d_thrust)
-    base_ctrls = (turb_PR, N, W, FAR)
+    base_ctrls = (N, W, FAR, Rline)
+    base_res = (d_power, d_thrust, d_Wc, d_area)
     
-    if isinstance(network.core_nozzle, VariableNozzle):
+    if isinstance(network.line.engine.core_nozzle, VariableNozzle):
         ctrls = base_ctrls
-        res = base_res + (d_area,)
+        res = base_res
     else:    
-        ctrls = base_ctrls + (Rline,)
-        res = base_res + (d_Wc, d_Wp)
+        ctrls = base_ctrls + (turb_PR,)
+        res = base_res + (d_Wp, d_m_nozz)
 
     # Construct Analysis -------------------------------------------------------
 

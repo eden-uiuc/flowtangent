@@ -271,12 +271,12 @@ class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
 
         # Mass & Work Imbalance -------------------------------------------------------
 
-        total_d_work = self.sum_domain_inputs(updated_state, "residual", "work")
+        total_d_work = self.sum_domain_inputs(updated_state, "residual", "power")
         # total_d_mass = self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate")
 
         updated_state = eqx.tree_at(
             lambda s: (
-                s.energy.outputs.residual.work,
+                s.energy.outputs.residual.power,
                 # s.energy.outputs.residual.mass_flow_rate
             ),
             updated_state,(

@@ -180,7 +180,7 @@ for i, col in enumerate(input_columns):
     ax.legend(fontsize=8)
 
 plt.tight_layout()
-plt.savefig("./Tests/VORJAX/Wing Data Generation/anomaly_distributions.png")
+plt.savefig("./tests/VORJAX/Wing Data Generation/anomaly_distributions.png")
 print("\nPlot saved as 'anomaly_distributions.png'")
 
 print("--- Extracting Anomaly Geometries ---")
@@ -266,7 +266,7 @@ for anom in anomaly_types:
         print(unique_geom_df.to_string(index=False))
         
         # Save to CSV for your mesher
-        csv_filename = f"./Tests/VORJAX/Wing Data Generation/unique_failed_geometries_{anom}.csv"
+        csv_filename = f"./tests/VORJAX/Wing Data Generation/unique_failed_geometries_{anom}.csv"
         unique_geom_df.to_csv(csv_filename, index=False)
         print(f"-> Saved unique geometries to {csv_filename}")
 
@@ -274,7 +274,7 @@ for anom in anomaly_types:
 
         # for faulty_wing, meta in faulty_wing_gen:
             # wing_fig = wing_renderer(faulty_wing)
-            # wing_fig.write_html("./Tests/VORJAX/Wing Data Generation/Wing Renders/"+encode_wing_id(**meta, prefix=f"{anom}")+".html")
+            # wing_fig.write_html("./tests/VORJAX/Wing Data Generation/Wing Renders/"+encode_wing_id(**meta, prefix=f"{anom}")+".html")
         
     else:
         print(f"\n[ {anom.upper()} ] - 0 instances found.")

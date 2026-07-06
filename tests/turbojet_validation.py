@@ -287,13 +287,14 @@ if __name__ == "__main__":
     # Control Board
     DEBUG = False
     VERBOSE = True
+    V_NOZZ = True
 
-    DESIGN_POINT = True
-    OFF_DESIGN_0 = False
+    DESIGN_POINT = False
+    OFF_DESIGN_0 = True
     OFF_DESIGN_1 = False
 
     # Build Turbojet------------------------------------------------------------
-    system = system_setup(variable_nozzle=False)
+    system = system_setup(variable_nozzle=V_NOZZ)
 
     settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
 
@@ -305,19 +306,20 @@ if __name__ == "__main__":
             state=State(),
             system=system,
             settings=settings,
-        )   
+        )
+
+        save_data(sys, "./tests/PyCycle/PyCycle_Examples/simple_turbojet.trs")
 
         validation_df = validate_design_point(
-            "./Tests/PyCycle/turbojet_DESIGN.json",
+            "./tests/PyCycle/PyCycle_Examples/turbojet_DESIGN.json",
             st
         )
         validation_df.to_csv(
-            "./Tests/PyCycle/DESIGN_validation.csv"
+            "./tests/PyCycle/PyCycle_Examples/DESIGN_validation.csv"
         )
-
-        save_data(sys, "./Tests/PyCycle/simple_turbojet.rcs")
+     
     else:
-        sys: Aircraft = load_data("./Tests/PyCycle/simple_turbojet.rcs")
+        sys: Aircraft = load_data("./tests/PyCycle/PyCycle_Examples/simple_turbojet.trs")
     
     sys = sys.sort_network_topology()
 
@@ -364,18 +366,23 @@ if __name__ == "__main__":
             settings=settings,
             initial_Rline= 2.0,
             initial_turb_PR=3.86,
-            initial_RPM= 8197.38 * units.rev / units.mins,
-            initial_MFR= 166.073 * units.lbm / units.s,
+            initial_RPM= 8197.38 * units.parse('rev/mins'),
+            initial_MFR= 145.5 * units.parse('lbm/s'),
             initial_FAR= 0.01680,
+            # initial_Rline= 1.19909,
+            # initial_turb_PR=3.367353,
+            # initial_RPM= 758.1789,
+            # initial_MFR= 48.95279,
+            # initial_FAR= 0.03481776,
         )
 
         OD0_df = validate_design_point(
-            "./Tests/PyCycle/turbojet_OD0.json",
+            "./tests/PyCycle/PyCycle_Examples/turbojet_OD0.json",
             OD0_st,
             point_name="Off Design 0"
         )
         OD0_df.to_csv(
-            "./Tests/PyCycle/OD0_validation.csv"
+            "./tests/PyCycle/PyCycle_Examples/OD0_validation.csv"
         )
     
     if OFF_DESIGN_1:
@@ -391,18 +398,18 @@ if __name__ == "__main__":
             settings=settings,
             initial_Rline= 2.0,
             initial_turb_PR=3.86,
-            initial_RPM= 8197.38 * units.rev / units.mins,
-            initial_MFR= 145.5 * units.lbm / units.s,
+            initial_RPM= 8197.38 * units.parse('rev/mins'),
+            initial_MFR= 145.5 * units.parse('lbm/s'),
             initial_FAR= 0.01680,
         )
 
         OD0_df = validate_design_point(
-            "./Tests/PyCycle/turbojet_OD1.json",
+            "./tests/PyCycle/turbojet_OD1.json",
             OD1_st,
             point_name="Off Design 1"
         )
         OD0_df.to_csv(
-            "./Tests/PyCycle/OD1_validation.csv"
+            "./tests/PyCycle/OD1_validation.csv"
         )
 
 

@@ -232,7 +232,7 @@ if __name__ == "__main__":
         df_geometry_W1 = df_geometry_W1[cols]
 
         fig = plot_sampling_validation(df_geometry_W1, beta_distributions)
-        fig.write_image("./Tests/VORJAX/Wing Data Generation/sampling_validation.png")
+        fig.write_image("./tests/VORJAX/Wing Data Generation/sampling_validation.png")
         # fig.show()
 
         alphas, betas, machs = generate_flow_state_grid()
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 
         generator = ShardedDatasetGenerator(
             batch_analysis=solver,
-            cache_dir="./Tests/VORJAX/Wing Data Generation/W1",
+            cache_dir="./tests/VORJAX/Wing Data Generation/W1",
             storage_dir="/media/jordan/Ashley_Backup/Wing Data Generation/W1",
             shard_size=3_000_000,
             tag="W1"

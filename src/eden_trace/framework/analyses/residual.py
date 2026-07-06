@@ -187,7 +187,6 @@ class ResidualAnalysis(Process):
             analysis_state = state.update_controls(control_values)
             updated_state, _, _ = self.analyze(analysis_state, system, settings)
             residual_array = updated_state.get_residual_array()
-
             return residual_array
         
         # Set up solver ------------------------------------------------------------------------------------------------
