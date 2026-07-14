@@ -328,7 +328,8 @@ class ResidualAnalysis(Process):
             print(f"{'='*60}\n")
         
         # if settings.DEBUG_MODE:
-            print(opt_state)
+            from pprint import pprint
+            pprint(opt_state)
         
         # Return control back to higher process
         final_state = eqx.tree_at(lambda s: s.controls, f_st, state.controls)

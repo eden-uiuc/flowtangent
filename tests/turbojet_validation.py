@@ -9,7 +9,7 @@ from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
 from eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-from eden_trace.library.components.energy.propulsors import TurbojetEngine, JetDesign
+from eden_trace.library.components.energy.turbojets import TurbojetEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbojetEnergyLine
 
 from eden_trace.framework import State, Aircraft, Settings
@@ -34,12 +34,14 @@ def system_setup(variable_nozzle: bool = False):
         (
             c.design_parameters.pressure_ratio,
             c.design_parameters.rotation_speed,
+            c.design_parameters.exit_mach_number,
             c.efficiencies.flow,
         ),
         engine.compressor,
         (
             13.5,
             8070. * units.rev/units.mins,
+            0.2,
             0.83
         )
     )
@@ -48,11 +50,13 @@ def system_setup(variable_nozzle: bool = False):
         (
             b.design_parameters.output_temperature,
             b.design_parameters.pressure_ratio,
+            b.design_parameters.exit_mach_number,
         ),
         engine.combustor,
         (
             2370 * units.R,
             0.97,
+            0.2,
         )
     )
 
@@ -60,11 +64,13 @@ def system_setup(variable_nozzle: bool = False):
         (
             t.efficiencies.flow,
             t.design_parameters.rotation_speed,
+            t.design_parameters.exit_mach_number,
         ),
         engine.turbine,
         (
             0.86,
             8070. * units.rev/units.mins,
+            0.4,
         )
     )
 
@@ -364,14 +370,14 @@ if __name__ == "__main__":
             thrust=11_000 * units.lbf,
             system=sys,
             settings=settings,
-            initial_Rline= 2.0,
-            initial_turb_PR=3.86,
-            initial_RPM= 8197.38 * units.parse('rev/mins'),
-            initial_MFR= 145.5 * units.parse('lbm/s'),
-            initial_FAR= 0.01680,
-            # initial_Rline= 1.19909,
-            # initial_turb_PR=3.367353,
-            # initial_RPM= 758.1789,
+            initial_Rline=2.0,
+            initial_turb_PR=4.669,
+            initial_RPM=8197.38 * units.parse('rev/mins'),
+            initial_MFR=166.073 * units.parse('lbm/s'),
+            initial_FAR=0.01680,
+            # initial_Rline=2.0,
+            # initial_turb_PR=4.669,
+            #initial_RPM=8197.38 * units.parse('rev/mins'),
             # initial_MFR= 48.95279,
             # initial_FAR= 0.03481776,
         )

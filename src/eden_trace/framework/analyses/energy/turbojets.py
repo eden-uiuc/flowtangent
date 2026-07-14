@@ -24,7 +24,7 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.propulsors import FixedNozzle, VariableNozzle
+from eden_trace.library.components.energy.turbojets import FixedNozzle, VariableNozzle
 
 from eden_trace.framework import State, Aircraft, Settings
 from eden_trace.framework.settings import EnergyAnalysisSettings
@@ -257,7 +257,7 @@ def TurbojetPerformance(
     RPM_bnds = (max(Nc_bnds[0], Np_bnds[0]) * 0.5,
                 min(Nc_bnds[1], Np_bnds[1]) * 1.5)
     
-    FAR_bnds = (1e-4, 5e-2)
+    FAR_bnds = (1e-4, 0.017)
 
     # Control Setup -----------------------------------------------------------
     
@@ -265,14 +265,16 @@ def TurbojetPerformance(
         tag="Rline",
         state_path=DataPath(("energy", "Rline")),
         initial_value=initial_Rline,
-        bounds=R_bnds
+        bounds=R_bnds,
+        scaling='logistic'
     )
 
     turb_PR = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
         initial_value=initial_turb_PR,
-        bounds=PR_bnds
+        bounds=PR_bnds,
+        scaling='logistic'
     )
 
     N = Control(
@@ -280,6 +282,7 @@ def TurbojetPerformance(
         state_path=DataPath(("energy", "rotation_speed")),
         initial_value=initial_RPM,
         bounds=RPM_bnds,
+        scaling='logistic'
     )
 
     W = Control(
@@ -287,13 +290,15 @@ def TurbojetPerformance(
         state_path=DataPath(("energy", "mass_flow_rate")),
         initial_value=initial_MFR,
         bounds=Wc_bnds,
+        scaling='logistic'
     )
 
     FAR = Control(
         tag="Fuel Air Ratio",
         state_path=DataPath(("energy", "fuel_air_ratio")),
         initial_value=initial_FAR,
-        bounds=FAR_bnds
+        bounds=FAR_bnds,
+        scaling='logistic'
     )
     
     # Residual Setup -----------------------------------------------------------
@@ -312,22 +317,20 @@ def TurbojetPerformance(
 
     # Variable Setup -----------------------------------------------------------
     
-    base_ctrls = (N, W, FAR, Rline)
-    base_res = (d_power, d_thrust, d_Wc, d_area)
+    ctrls = (N, W, FAR, Rline, turb_PR)
+    base_res = (d_power, d_thrust, d_Wc, d_Wp)
     
     if isinstance(network.line.engine.core_nozzle, VariableNozzle):
-        ctrls = base_ctrls
-        res = base_res
+        res = base_res + (d_area,)
     else:    
-        ctrls = base_ctrls + (turb_PR,)
-        res = base_res + (d_Wp, d_m_nozz)
+        res = base_res + (d_m_nozz,)
 
     # Construct Analysis -------------------------------------------------------
 
     return ResidualAnalysis(
         tag="Turbojet Performance",
         analyze=build_analysis_from_network(network),
-        solver=GaussNewton,
+        solver=LevenbergMarquardt,
         controls=ctrls,
         residuals=res
     )

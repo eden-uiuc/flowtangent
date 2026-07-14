@@ -25,31 +25,127 @@ import eden_trace.utils as tu
 # Trace imports
 from eden_trace.utils import init_field, register
 
+from eden_trace.library import units
 from eden_trace.library.components.energy import maps
 from eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
 from eden_trace.library.components.energy.nodes import EnergyInput, EnergyNode, FlowNode, FlowDesign
 from eden_trace.library.gases import Air, BurnedJetA, IdealGas
-from eden_trace.library.methods.energy.transmission.combustors import (
-    func_combustor_design as combustor_design,
-    func_combustor_performance as combustor_performance,
-)
-from eden_trace.library.methods.energy.transmission.fan_compressors import func_fan_compressor_performance as fan_compressor_performance
-from eden_trace.library.methods.energy.transmission.nozzles import (
-    func_inlet_design as inlet_design,
-    func_inlet_performance as inlet_performance,
-    func_nozzle_design as nozzle_design,
-    func_nozzle_performance as nozzle_performance,
-    func_variable_nozzle_performance as variable_nozzle_performance
-)
-from eden_trace.library.methods.energy.transmission.turbines import func_turbine_performance as turbine_performance
-from eden_trace.library.methods.energy.transmission.turbofans import func_thrust_and_power as engine_performance
 from eden_trace.library.propellants import JetA, Propellant
+
+# ----------------------------------------------------------------------------------------------------------------------
+# General Helpers
+# ----------------------------------------------------------------------------------------------------------------------
+
+def _average_gamma_stagnation(
+        gas: IdealGas,
+        T_t: jnp.ndarray | float,
+        P_t: jnp.ndarray | float,
+        PR: jnp.ndarray | float,
+        n_isn: jnp.ndarray | float,
+):
+    """
+    Averages gamma across T_t and T_t_out to converge T_t_out
+    """
+    
+    gamma_in = gas.compute_gamma(T_t)
+    gamma_avg = gamma_in
+    T_t_out_ideal = T_t * (PR ** ((gamma_in - 1.0) / gamma_in))
+
+    for _ in range(3):
+        gamma_out = gas.compute_gamma(T_t_out_ideal)
+        gamma_avg = 0.5 * (gamma_in + gamma_out)
+        T_t_out_ideal = T_t * (PR ** ((gamma_avg - 1.0) / gamma_avg))
+    
+    # Compressor passes 1 / n_isn, so T_t_out is higher, Turbine passes n_isn, so T_t_out is lower
+    T_t_out = T_t + (T_t_out_ideal - T_t) * n_isn
+
+    return T_t_out, P_t * PR
+
+def _station_kinematic_design(
+        gas: IdealGas,
+        T_t_out,
+        P_t_out,
+        M_design,
+        mdot,
+):
+    
+    # Unpack boundary stagnation properties
+    R = gas.R_specific
+    gamma = gas.compute_gamma(T_t_out)
+    
+    # Compute exit static properties
+    T_out = T_t_out / (1.0 + ((gamma - 1.0) / 2.0) * M_design ** 2)
+    P_out = P_t_out * (T_out / T_t_out) ** (gamma / (gamma - 1.0))
+
+    # Compute exit kinematic properties
+    h_out = gas.compute_enthalpy(T_out)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 1e-10))
+
+    rho_out = P_out / (R * T_out)
+    
+    A_out = mdot / (rho_out * u_out)
+
+    return A_out, u_out, P_out, T_out, h_t_out, h_out
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbojet Components
 # ----------------------------------------------------------------------------------------------------------------------
+
+# Inlet ------------------------------------------------------------------------
+
+def _inlet_stagnation(gas, T_t, P_t, M0, PR, n_r):
+    gamma = gas.compute_gamma(T_t)
+    
+    # Base isentropic recovery
+    P_t_out_sub = P_t * PR * n_r
+    
+    # Normal Shock Recovery
+    ns_P_t = (
+        PR * P_t
+        * ((((gamma + 1.0) * (M0**2.0)) / ((gamma - 1.0) * M0**2.0 + 2.0)) ** (gamma / (gamma - 1.0)))
+        * ((gamma + 1.0) / (2.0 * gamma * M0**2.0 - (gamma - 1.0))) ** (1.0 / (gamma - 1.0))
+    )
+    
+    P_t_out = jnp.where(M0 > 1.0, ns_P_t, P_t_out_sub)
+    T_t_out = T_t # Adiabatic
+    
+    return P_t_out, T_t_out
+
+def _inlet_performance(gas, T_t, P_t, M0, PR, n_r, mdot, A_exit):
+    
+    P_t_out, T_t_out = _inlet_stagnation(gas, T_t, P_t, M0, PR, n_r)
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+    
+    # The non-dimensional mass flow parameter we need to match
+    Q = (mdot * jnp.sqrt(R * T_t_out)) / (P_t_out * A_exit * jnp.sqrt(gamma))
+    
+    # Newton loop to find subsonic Mach number
+    M_out = 0.5 # Subsonic initial guess
+    for _ in range(5):
+        term = 1.0 + (gamma - 1.0) / 2.0 * M_out**2
+        power = - (gamma + 1.0) / (2.0 * (gamma - 1.0))
+        
+        f = M_out * (term ** power) - Q
+        
+        # Derivative df/dM
+        df_dM = (term ** power) + M_out * power * (term ** (power - 1.0)) * (gamma - 1.0) * M_out
+        
+        M_out = jnp.clip(M_out - f / df_dM, 1e-6, 0.99)
+        
+    # Calculate static properties using the solved Mach
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
+    P_out = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+    
+    return M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out
+
 @register
-class InletNozzle(FlowNode):
+class Inlet(FlowNode):
     tag: str = init_field("Inlet Nozzle", static=True)
 
     @tu.inputs(
@@ -80,21 +176,28 @@ class InletNozzle(FlowNode):
         network_state: TurbojetNetworkConditions = state.energy
 
         if settings.analysis.energy.design_mode:
-            A_exit, M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out = inlet_design(
-                gas=fs.atmosphere.fluid,
-                T_t=fs.stagnation_temperature,
-                P_t=fs.stagnation_pressure,
-                M0=fs.mach_number,
-                mdot=jnp.atleast_2d(network_state.mass_flow_rate),
-                PR=self.design_parameters.pressure_ratio,
-                n_r=self.design_parameters.pressure_recovery,
-                M_design=self.design_parameters.exit_mach_number,
-            )
+            gas = fs.atmosphere.fluid
+            T_t = fs.stagnation_temperature
+            P_t = fs.stagnation_pressure
+            M0  = fs.mach_number
 
+            PR    = self.design_parameters.pressure_ratio
+            n_r   = self.design_parameters.pressure_recovery
+            M_out = self.design_parameters.exit_mach_number
+            
+            P_t_out, T_t_out = _inlet_stagnation(gas, T_t, P_t, M0, PR, n_r)
+            A_out, u_out, P_out, T_out, h_t_out, h_out = _station_kinematic_design(
+                gas=gas,
+                T_t_out=T_t_out,
+                P_t_out=P_t_out,
+                M_design=M_out,
+                mdot=network_state.mass_flow_rate
+            )
+        
             updated_design_paramters = eqx.tree_at(
                 lambda d: d.A_exit,
                 self.design_parameters,
-                A_exit.squeeze()
+                A_out.squeeze()
             )
             updated_system = eqx.tree_at(
                 lambda s: s.energy.nodes[self.network_ID].design_parameters,
@@ -103,7 +206,7 @@ class InletNozzle(FlowNode):
             )
 
         else:
-            M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out = inlet_performance(
+            M_out, u_out, P_t_out, T_t_out, P_out, T_out, h_t_out, h_out = _inlet_performance(
                 gas=fs.atmosphere.fluid,
                 T_t=fs.stagnation_temperature,
                 P_t=fs.stagnation_pressure,
@@ -130,8 +233,33 @@ class InletNozzle(FlowNode):
         return updated_state, updated_system, settings
 
 
+# Compressor -------------------------------------------------------------------
+
 def _comp_alpha_schedule(Nc, Nc_design):
+    """
+    Schedules alpha (inlet guide vane angle in degrees) according to rotation speed.
+    """
     return jnp.where(Nc_design > 0.0, jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), jnp.zeros_like(Nc))
+
+def _fan_compressor_performance(
+        gas,
+        T_t,
+        P_t,
+        PR,
+        n_isn,
+):
+    """
+    Computes power and output thermal quantities for a fan or compressor.
+    """
+
+    T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
+
+    # 3. Calculate work using absolute enthalpies
+    h_t = gas.compute_enthalpy(T_t)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    d_power = h_t_out - h_t
+
+    return d_power, P_t_out, T_t_out, h_t_out
 
 @register
 class Compressor(FlowNode):
@@ -169,10 +297,13 @@ class Compressor(FlowNode):
 
         theta_c = T_t/288.15
         delta_c = P_t/101325.0
+
+        gas = self.working_fluid
         
         if design_mode:
-            PR  = self.design_parameters.pressure_ratio
-            n_isn = self.efficiencies.flow
+            M_out   = self.design_parameters.exit_mach_number
+            PR      = self.design_parameters.pressure_ratio
+            n_isn   = self.efficiencies.flow
 
             W   = jnp.atleast_2d(network_state.mass_flow_rate)
             Wc_tgt = W * jnp.sqrt(theta_c) / delta_c
@@ -187,6 +318,22 @@ class Compressor(FlowNode):
             s_PR = (PR - 1.0)/(PR_map - 1.0)
             s_eff = n_isn / eff_map
 
+            T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
+
+            A_out, u_out, P_out, T_out, h_t_out, h_out = _station_kinematic_design(
+                gas=gas,
+                T_t_out=T_t_out,
+                P_t_out=P_t_out,
+                M_design=M_out,
+                mdot=network_state.mass_flow_rate
+            )
+
+            updated_design_paramters = eqx.tree_at(
+                lambda d: d.A_exit,
+                self.design_parameters,
+                A_out.squeeze()
+            )
+
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
                 self.map,
@@ -195,11 +342,13 @@ class Compressor(FlowNode):
 
             updated_system = eqx.tree_at(
                 lambda s: (
+                    s.energy.nodes[self.network_ID].design_parameters,
                     s.energy.nodes[self.network_ID].map,
                     s.energy.design_parameters.mass_flow_rate,
                 ),
                     updated_system,
                 (
+                    updated_design_paramters,
                     updated_map,
                     state.energy.mass_flow_rate,
                 )
@@ -224,8 +373,8 @@ class Compressor(FlowNode):
             PR, Wc, n_isn = self.map.evaluate(alpha, Nc, Rline)
             W = Wc * delta_c / jnp.sqrt(theta_c)
 
-        power, P_t_out, T_t_out, h_t_out = fan_compressor_performance(
-            gas=self.working_fluid,
+        power, P_t_out, T_t_out, h_t_out = _fan_compressor_performance(
+            gas=gas,
             T_t=T_t,
             P_t=P_t,
             PR=PR,
@@ -259,8 +408,79 @@ class Compressor(FlowNode):
 
         return updated_state, updated_system, settings
 
+# Combustor --------------------------------------------------------------------
+
+def _combustor_design(
+    gas: IdealGas,
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    T_t_out: jnp.ndarray,
+    mdot_in: jnp.ndarray,
+    LHV: jnp.ndarray | float,
+    h_t_f: jnp.ndarray | float,
+    PR: jnp.ndarray | float,
+    n_b: jnp.ndarray | float,
+):
+    
+    h_t_in = gas.compute_enthalpy(T_t)
+    P_t_out = P_t * PR
+
+    # Target exit enthalpy based on the commanded exit temperature
+    h_t_out = gas.compute_enthalpy(T_t_out)
+
+    # Simple First-Law FAR calculation using LHV
+    numerator = h_t_out - h_t_in
+    denominator = (LHV * n_b) + h_t_f - h_t_out
+    
+    FAR = numerator / denominator
+    
+    # Calculate explicit mass flow additions
+    mdot_fuel = mdot_in * FAR
+    mdot_out = mdot_in + mdot_fuel
+
+    return P_t_out, h_t_out, jnp.atleast_2d(FAR), mdot_out
+
+def _combustor_performance(
+    gas: IdealGas,            # IdealGas or BurnedGas model
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    mdot_in: jnp.ndarray,
+    FAR: jnp.ndarray,
+    LHV: jnp.ndarray | float,
+    h_t_f: jnp.ndarray | float,
+    PR: jnp.ndarray | float,
+    n_b: jnp.ndarray | float,
+):
+    # 1. Pressure and Mass Flow additions
+    P_t_out = P_t * PR
+    mdot_fuel = mdot_in * FAR
+    mdot_out = mdot_in + mdot_fuel
+
+    # 2. Forward Energy Balance to find Exit Enthalpy
+    h_t_in = gas.compute_enthalpy(T_t)
+    
+    # Derivation: m_in*h_in + m_fuel*h_fuel + m_fuel*LHV*n_b = m_out*h_out
+    h_t_out = (h_t_in + FAR * (LHV * n_b + h_t_f)) / (1.0 + FAR)
+
+    # 3. Newton-Raphson to invert Enthalpy back to Temperature
+    # Initial guess using inlet Cp to get us in the ballpark
+    Cp_guess = gas.compute_Cp(T_t)
+    T_t_out = T_t + (h_t_out - h_t_in) / Cp_guess
+
+    # 5 steps is more than enough for NASA polynomials to converge perfectly
+    for _ in range(5):
+        h_current = gas.compute_enthalpy(T_t_out)
+        Cp_current = gas.compute_Cp(T_t_out)
+        
+        error = h_current - h_t_out
+        
+        # True Newton Step: x_new = x_old - f(x)/f'(x)
+        T_t_out = T_t_out - (error / Cp_current)
+
+    return P_t_out, T_t_out, h_t_out, mdot_out
+
 @register
-class TurbojetCombustor(FlowNode):
+class Combustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
     inputs: tuple = init_field((EnergyInput("flow", "Compressor"),), static=True)
@@ -283,6 +503,8 @@ class TurbojetCombustor(FlowNode):
     )
     def transmit(self, state: State, system: System, settings: Settings):
         
+        updated_system = system
+
         T_t=self.average_domain_inputs(state, "flow", "stagnation_temperature")
         P_t=self.average_domain_inputs(state, "flow", "stagnation_pressure")
         mdot_in=self.sum_domain_inputs(state, "flow", "mass_flow_rate")
@@ -294,7 +516,7 @@ class TurbojetCombustor(FlowNode):
         if settings.analysis.energy.design_mode:
             T_t_out = jnp.atleast_2d(self.design_parameters.output_temperature)
 
-            P_t_out, h_t_out, FAR, mdot_out = combustor_design(
+            P_t_out, h_t_out, FAR, mdot_out = _combustor_design(
                 gas=self.working_fluid,
                 T_t=T_t,
                 P_t=P_t,
@@ -305,11 +527,30 @@ class TurbojetCombustor(FlowNode):
                 PR=PR,
                 n_b=n_b,
             )
+
+            A_out, u_out, P_out, T_out, h_t_out, h_out = _station_kinematic_design(
+                gas=BurnedJetA(FAR),
+                T_t_out=T_t_out,
+                P_t_out=P_t_out,
+                M_design=self.design_parameters.exit_mach_number,
+                mdot=state.energy.mass_flow_rate * (1.0 + FAR)
+            )
+
+            updated_design_paramters = eqx.tree_at(
+                lambda d: d.A_exit,
+                self.design_parameters,
+                A_out.squeeze()
+            )
+            updated_system = eqx.tree_at(
+                lambda s: s.energy.nodes[self.network_ID].design_parameters,
+                updated_system,
+                updated_design_paramters
+            )
         
         else:    
             FAR = state.energy.fuel_air_ratio
 
-            P_t_out, T_t_out, h_t_out, mdot_out = combustor_performance(
+            P_t_out, T_t_out, h_t_out, mdot_out = _combustor_performance(
                 gas=self.working_fluid,
                 T_t=T_t,
                 P_t=P_t,
@@ -332,7 +573,32 @@ class TurbojetCombustor(FlowNode):
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
 
-        return updated_state, system, settings
+        return updated_state, updated_system, settings
+
+# Turbine ----------------------------------------------------------------------
+
+def _turbine_performance(
+    gas,  # The BurnedGas mixture
+    FAR,  # Fuel-to-air ratio from the combustor
+    PR,   # Pressure Ratio (guessed by global solver or map)
+    n_isn,  # Isentropic efficiency (from the TurbineMap or PyCycle)
+    n_mech, # Mechanical work transmission efficiency
+    T_t,
+    P_t,
+):
+    # Target exit pressure based on the given PR
+    P_t_out = P_t / PR
+    T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
+
+    # 3. Calculate actual work extracted per kg of core air
+    h_t_in = gas.compute_enthalpy(T_t)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+
+    # Turbine mass flow is higher than compressor due to added fuel
+    # Work will be a negative value (energy leaving the fluid)
+    power = (1.0 + FAR) * (h_t_out - h_t_in) * n_mech
+
+    return T_t_out, P_t_out, h_t_out, power
 
 @register
 class Turbine(FlowNode):
@@ -378,6 +644,7 @@ class Turbine(FlowNode):
         delta_t = P_t/101325.0
         
         FAR = self.average_domain_inputs(state, "fuel", "fuel_air_ratio")
+        gas = BurnedJetA(FAR)
 
         if design_mode:
             PR = jnp.atleast_2d(network_state.turbine_PR)
@@ -394,6 +661,16 @@ class Turbine(FlowNode):
             s_Wp = (Wp_tgt / Wp_map).squeeze()
             s_eff = (self.efficiencies.flow / eff_map).squeeze()
 
+            # Turbine passes 1 / PR to reflect pressure drop
+            T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
+            A_out, u_out, P_out, T_out, h_t_out, h_out = _station_kinematic_design(
+                gas=BurnedJetA(FAR),
+                T_t_out=T_t_out,
+                P_t_out=P_t_out,
+                M_design=self.design_parameters.exit_mach_number,
+                mdot=network_state.mass_flow_rate
+            )
+
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),
                 self.map,
@@ -401,9 +678,15 @@ class Turbine(FlowNode):
             )
 
             updated_design = eqx.tree_at(
-                lambda d: d.pressure_ratio,
-                self.design_parameters,
-                PR
+                lambda d: (
+                    d.pressure_ratio,
+                    d.A_exit,
+                ),
+                    self.design_parameters,
+                (
+                    PR,
+                    A_out,
+                )
             )
 
             updated_system = eqx.tree_at(
@@ -423,15 +706,15 @@ class Turbine(FlowNode):
             Np = N / jnp.sqrt(T_t / 288.15)
             Np_des = self.design_parameters.rotation_speed
 
-            # PR = jnp.atleast_2d(network_state.turbine_PR)
-            PR = jnp.atleast_2d(self.design_parameters.pressure_ratio)
+            PR = jnp.atleast_2d(network_state.turbine_PR)
+            # PR = jnp.atleast_2d(self.design_parameters.pressure_ratio)
             alpha = self.alpha_schedule(Np, Np_des)
 
             Wp, n_isn = self.map.evaluate(alpha, Np, PR)
             W = Wp * delta_t / jnp.sqrt(theta_t) * (1. + FAR)
 
-        T_t_out, P_t_out, h_t_out, power = turbine_performance(
-            gas=BurnedJetA(FAR),
+        T_t_out, P_t_out, h_t_out, power = _turbine_performance(
+            gas=gas,
             FAR=FAR,
             PR=PR,
             n_isn=n_isn,
@@ -460,6 +743,130 @@ class Turbine(FlowNode):
         )
 
         return updated_state, updated_system, settings
+
+# Nozzle -----------------------------------------------------------------------
+
+def _isentropic_expansion(
+    T_t: jnp.ndarray,
+    P_t: jnp.ndarray,
+    P0: jnp.ndarray,
+    gamma: jnp.ndarray,
+    PR: jnp.ndarray | float,
+    n_r: jnp.ndarray | float,
+):
+
+    # Isentropic Outputs
+    P_t_out = jnp.maximum(P_t * PR * n_r, P0)  # Output stagnation pressure, minimum is freestream pressure
+    T_t_out = T_t  # Output stagnation temperature, adiabatically conserved
+
+    M_out = jnp.sqrt((((P_t_out / P0) ** ((gamma - 1.0) / gamma)) - 1.0) * 2.0 / (gamma - 1.0))  # Output Mach number
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)  # Output temperature
+
+    return P_t_out, T_t_out, T_out, M_out
+
+def _nozzle_design(
+        gas: IdealGas,
+        T_t: jnp.ndarray,
+        P_t: jnp.ndarray,
+        mdot: jnp.ndarray,
+        P0: jnp.ndarray,
+        PR: jnp.ndarray | float,
+):
+    # Dynamic gas properties for the exhaust flow
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+
+    P_t_out, T_t_out, T_out, M_isn = _isentropic_expansion(T_t, P_t, P0, gamma, PR, 1.0)
+
+    # Supersonic Expansion / Choking Logic
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    is_choked = (P_t / P0) >= critical_PR
+
+    M_out = jnp.maximum(M_isn, 0.001)
+
+    # Recalculate static conditions
+    P_out = P_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    P_out = jnp.where(is_choked, P_out, P0)
+
+    T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
+
+    # Enthalpy and velocity
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+
+    # Exit area
+    rho_out = P_out / (R * T_out)
+    A_exit = mdot / (rho_out * u_out)
+
+    # Throat area
+    T_star = T_t / (1.0 + (gamma - 1.0) / 2.0)
+    P_star = P_t / critical_PR
+    rho_star = P_star / (R * T_star)
+    u_star = jnp.sqrt(gamma * R * T_star)
+
+    A_throat_choked = mdot / (rho_star * u_star)
+    A_throat = jnp.where(is_choked, A_throat_choked, A_exit)
+
+    return A_throat, A_exit, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
+
+def _nozzle_performance(
+        gas: IdealGas,
+        T_t: jnp.ndarray,
+        P_t: jnp.ndarray,
+        P0: jnp.ndarray,
+        A_throat: float,
+        A_exit: float,
+    ):
+
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+    AR = A_exit / A_throat
+
+    # Check for choked flow
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    actual_PR = P_t / P0
+    safe_PR = 1.0 + jnp.sqrt((actual_PR - 1.0)**2 + 1e-4)
+    choked = actual_PR >= critical_PR
+
+    # Find exit Mach number
+    M_exit_sup = 2.0
+    for _ in range(5):
+        term = (2.0 / (gamma + 1.0)) * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2)
+        power = (gamma + 1.0) / (2.0 * (gamma - 1.0))
+        AR_calc = (1.0 / M_exit_sup) * (term ** power)
+        
+        # Analytical derivative: d(A/A*) / dM
+        dAR_dM = AR_calc * (M_exit_sup**2 - 1.0) / (M_exit_sup * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2))
+        
+        # Newton step
+        M_exit_sup = jnp.maximum(M_exit_sup - (AR_calc - AR) / dAR_dM, 1.001)
+    
+    M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
+    M_exit      = jnp.where(choked, M_exit_sup, M_exit_sub)
+    M_throat    = jnp.where(choked, 1.0, M_exit)
+
+    # Nozzle Mass Flow
+    m_1 = (P_t * A_throat) / jnp.sqrt(R * T_t)
+    m_2 = jnp.sqrt(gamma) * M_throat
+    m_3 = (1.0 + (gamma - 1.0) / 2.0 * M_throat**2) ** (- (gamma + 1.0) / (2.0 * (gamma - 1.0)))
+
+    mdot_out = m_1 * m_2 * m_3
+
+    P_out_choked = P_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    P_out = jnp.where(choked, P_out_choked, P0)
+    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_exit**2) ** (gamma / (gamma - 1.0))
+    
+    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
+    T_t_out = T_t
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+
+    rho_out = P_out / (R * T_out)
+
+    return mdot_out, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
 @register
 class FixedNozzle(FlowNode):
@@ -511,7 +918,7 @@ class FixedNozzle(FlowNode):
             
             mdot_out=state.energy.mass_flow_rate * (1. + FAR)
 
-            A_t, A_x, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = nozzle_design(
+            A_t, A_x, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = _nozzle_design(
                 gas=working_fluid,
                 T_t=T_t,
                 P_t=P_t,
@@ -540,7 +947,7 @@ class FixedNozzle(FlowNode):
             A_t = self.design_parameters.A_throat
             A_x = self.design_parameters.A_exit
             
-            mdot_out, M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = nozzle_performance(
+            mdot_out, M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = _nozzle_performance(
                 gas=working_fluid,
                 T_t=T_t,
                 P_t=P_t,
@@ -574,7 +981,58 @@ class FixedNozzle(FlowNode):
         )
 
         return updated_state, updated_system, settings
+
+def _variable_nozzle_performance(
+        gas,
+        T_t: jnp.ndarray,
+        P_t: jnp.ndarray,
+        P0: jnp.ndarray,
+        mdot_in: jnp.ndarray,
+    ):
+
+    gamma = gas.compute_gamma(T_t)
+    R = gas.R_specific
+
+    # 1. Determine Pressure Ratio and Choking
+    critical_PR = (1.0 + (gamma - 1.0) / 2.0) ** (gamma / (gamma - 1.0))
+    actual_PR = P_t / P0
+    safe_PR = jnp.maximum(actual_PR, 1.00001) # Prevent div by zero or negative root
+    choked = actual_PR >= critical_PR
+
+    # 2. Perfect Expansion Exit Mach
+    # Because we vary the nozzle to perfectly expand to ambient pressure (P_out = P0),
+    # M_exit is explicitly a function of the total-to-ambient pressure ratio.
+    M_out = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
     
+    # 3. Throat Mach
+    M_throat = jnp.where(choked, 1.0, M_out)
+
+    # 4. Explicitly Calculate Required Physical Areas
+    def calc_area_for_mach(M):
+        # Apply a floor to M to prevent NaN gradients in JAX if M approaches 0
+        M_safe = jnp.maximum(M, 1e-5) 
+        m_term = jnp.sqrt(gamma) * M_safe
+        temp_term = (1.0 + (gamma - 1.0) / 2.0 * M_safe**2) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+        return (mdot_in * jnp.sqrt(R * T_t) * temp_term) / (P_t * m_term)
+
+    A_throat = calc_area_for_mach(M_throat)
+    A_exit = calc_area_for_mach(M_out)
+
+    # 5. Thermodynamics and Kinematics
+    P_out = P0  # Perfect expansion assumption guarantees this
+    P_t_out = P_out * (1.0 + (gamma - 1.0) / 2.0 * M_out**2) ** (gamma / (gamma - 1.0))
+    
+    T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
+    T_t_out = T_t
+    
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
+    u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0))
+
+    rho_out = P_out / (R * T_out)
+
+    return M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out, A_throat, A_exit
+
 @register
 class VariableNozzle(FlowNode):
     tag: str = init_field("Core Nozzle", static=True)
@@ -624,7 +1082,7 @@ class VariableNozzle(FlowNode):
         mdot=state.energy.mass_flow_rate * (1. + FAR)
         
         if settings.analysis.energy.design_mode:
-            A_t, A_x, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = nozzle_design(
+            A_t, A_x, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = _nozzle_design(
                 gas=working_fluid,
                 T_t=T_t,
                 P_t=P_t,
@@ -651,13 +1109,12 @@ class VariableNozzle(FlowNode):
         
         else:            
             M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out, A_t, A_x = (
-                variable_nozzle_performance(
+                _variable_nozzle_performance(
                     gas=working_fluid,
                     T_t=T_t,
                     P_t=P_t,
                     P0=P0,
                     mdot_in=mdot,
-                    # A_throat=self.design_parameters.A_throat
                 )
             )
 
@@ -686,7 +1143,15 @@ class VariableNozzle(FlowNode):
             (A_t - A_t_des)/A_t_des
         )
 
+        updated_state = eqx.tree_at(
+            lambda s: s.energy.outputs.residual.mass_flow_rate,
+            updated_state,
+            (mdot / (1. + FAR) - state.energy.mass_flow_rate)/system.energy.design_parameters.mass_flow_rate
+        )
+
         return updated_state, updated_system, settings
+
+# Turboshaft -------------------------------------------------------------------
 
 @register
 class Turboshaft(EnergyNode):
@@ -724,14 +1189,67 @@ class Turboshaft(EnergyNode):
         return updated_state, system, settings
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Turbojet Engine
+# Engines
 # ----------------------------------------------------------------------------------------------------------------------
+
+def _engine_performance(
+    u0,
+    P0,
+    g, 
+    delta_SFC,
+    v_fan_nozzle,
+    A_fan_nozzle,
+    P_fan_nozzle,
+    v_core_nozzle,
+    A_core_nozzle,
+    P_core_nozzle,
+    fuel_air_ratio,
+    mdot_core,
+    BPR,
+):
+
+    # 1. Calculate mass flows
+    mdot_fan = mdot_core * BPR
+    mdot_in_core = mdot_core / (1.0 + fuel_air_ratio) # Strip fuel for inlet momentum
+    
+    # 2. Raw Dimensional Thrust (Gross Thrust - Ram Drag)
+    # Core
+    gross_thrust_core = (mdot_core * v_core_nozzle) + (P_core_nozzle - P0) * A_core_nozzle
+    ram_drag_core = mdot_in_core * u0
+    F_core = gross_thrust_core - ram_drag_core
+    
+    # Fan
+    gross_thrust_fan = (mdot_fan * v_fan_nozzle) + (P_fan_nozzle - P0) * A_fan_nozzle
+    ram_drag_fan = mdot_fan * u0
+    F_fan = gross_thrust_fan - ram_drag_fan
+    
+    # 3. Total Actual Thrust (in Newtons)
+    F_actual = F_core + F_fan
+    
+    # 4. Power and Efficiency (Calculated directly from F_actual to avoid singularities)
+    p = F_actual * u0
+    
+    mdot_fuel = mdot_in_core * fuel_air_ratio
+    
+    # Protect against divide-by-zero if fuel flow is exactly 0.0
+    safe_mdot_fuel = jnp.maximum(mdot_fuel, 1e-9)
+    safe_F_actual = jnp.maximum(F_actual, 1e-9)
+    
+    I_sp = F_actual / (safe_mdot_fuel * g)
+    TSFC = (safe_mdot_fuel / safe_F_actual) * (1.0 - delta_SFC) / units.hr
+    
+    # Fuel flow in kg/hr
+    ff = mdot_fuel * units.parse('kg/hr')
+    
+    specific_thrust_core = F_actual / mdot_core
+
+    return F_actual, specific_thrust_core, I_sp, TSFC, p, ff
 
 def _TurbojetSetup():
 
-    inlet = InletNozzle()
+    inlet = Inlet()
     comp = Compressor()
-    comb = TurbojetCombustor()
+    comb = Combustor()
     turb = Turbine()
     shaft = Turboshaft()
     nozz = FixedNozzle()
@@ -794,9 +1312,9 @@ class TurbojetEngine(FlowNode[JetDesign]):
         **kwargs
     ):
         
-        inlet = InletNozzle()
+        inlet = Inlet()
         comp = Compressor()
-        comb = TurbojetCombustor()
+        comb = Combustor()
         turb = Turbine()
         shaft = Turboshaft()
 
@@ -838,7 +1356,7 @@ class TurbojetEngine(FlowNode[JetDesign]):
         fs = state.freestream
         mdot_core = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
 
-        F, F_sp, I_sp, TSFC, p, ff = engine_performance(
+        F, F_sp, I_sp, TSFC, p, ff = _engine_performance(
             u0=fs.speed,
             P0=fs.pressure,
             g=fs.gravity,

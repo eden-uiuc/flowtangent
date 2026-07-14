@@ -32,7 +32,7 @@ from eden_trace.library.components.fuselages import *
 from eden_trace.library.components.landing_gear import LandingGear
 from eden_trace.library.components.nacelles import Nacelle, NacelleDiameters
 from eden_trace.library.components.energy.networks import EnergyNetwork
-from eden_trace.library.components.energy.propulsors import TurbofanEngine, JetDesign
+from eden_trace.library.components.energy.turbojets import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.nodes import FuelTank
 from eden_trace.library.components.energy.lines import TurbojetEnergyLine
 
