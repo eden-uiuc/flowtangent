@@ -94,10 +94,10 @@ def outputs(*outputs: str):
 # Formatting
 # ---------------------------------------------------------
 
-def format_array(v, precision=3):
+def format_array(v, precision=3, width=10):
     v_np = np.asarray(v)
     if v_np.size == 1:
-        return f"{v_np.item():>12.{precision}e}"
+        return f"{v_np.item():>{width}.{precision}e}"
     # For 1D/2D arrays, use numpy's built-in pretty printer
     return np.array2string(v_np, precision=precision, separator=', ')
 

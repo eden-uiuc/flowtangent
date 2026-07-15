@@ -125,8 +125,10 @@ def parse(unit_string: str) -> float:
     Evaluates a string of units and returns the float multiplier.
 
     Example:
-        Units.parse("kg * m**2 / s**3")
-        Units.parse("lbf / inch**2")
+    ```python
+    units.parse("kg * m**2 / s**3")
+    units.parse("lbf / inch**2")
+    ```
     """
     # Grab the dictionary of everything defined in this module
     module_dict = globals()

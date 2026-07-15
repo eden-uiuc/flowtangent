@@ -78,8 +78,8 @@ def _station_kinematic_design(
     P_out = P_t_out * (T_out / T_t_out) ** (gamma / (gamma - 1.0))
 
     # Compute exit kinematic properties
-    h_out = gas.compute_enthalpy(T_out)
-    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_absolute_enthalpy(T_out)
+    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
     u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 1e-10))
 
     rho_out = P_out / (R * T_out)
@@ -429,11 +429,11 @@ def _combustor_design(
     n_b: jnp.ndarray | float,
 ):
     
-    h_t_in = gas.compute_enthalpy(T_t)
+    h_t_in = gas.compute_absolute_enthalpy(T_t)
     P_t_out = P_t * PR
 
     # Target exit enthalpy based on the commanded exit temperature
-    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
 
     # Simple First-Law FAR calculation using LHV
     numerator = h_t_out - h_t_in
@@ -449,12 +449,11 @@ def _combustor_design(
 
 def _combustor_performance(
     gas: IdealGas,            # IdealGas or BurnedGas model
+    fuel: Propellant,
     T_t: jnp.ndarray,
     P_t: jnp.ndarray,
     mdot_in: jnp.ndarray,
     FAR: jnp.ndarray,
-    LHV: jnp.ndarray | float,
-    h_t_f: jnp.ndarray | float,
     PR: jnp.ndarray | float,
     n_b: jnp.ndarray | float,
 ):
@@ -467,17 +466,20 @@ def _combustor_performance(
     h_t_in = gas.compute_enthalpy(T_t)
     
     # Derivation: m_in*h_in + m_fuel*h_fuel + m_fuel*LHV*n_b = m_out*h_out
+    LHV = fuel.specific_energy
+    h_t_f = fuel.enthalpy_of_formation
     h_t_out = (h_t_in + FAR * (LHV * n_b + h_t_f)) / (1.0 + FAR)
 
     # 3. Newton-Raphson to invert Enthalpy back to Temperature
     # Initial guess using inlet Cp to get us in the ballpark
-    Cp_guess = gas.compute_Cp(T_t)
+    ox = fuel.oxidized_form(FAR)
+    Cp_guess = ox.compute_Cp(T_t)
     T_t_out = T_t + (h_t_out - h_t_in) / Cp_guess
 
     # 5 steps is more than enough for NASA polynomials to converge perfectly
     for _ in range(5):
-        h_current = gas.compute_enthalpy(T_t_out)
-        Cp_current = gas.compute_Cp(T_t_out)
+        h_current = ox.compute_enthalpy(T_t_out)
+        Cp_current = ox.compute_Cp(T_t_out)
         
         error = h_current - h_t_out
         
@@ -536,7 +538,7 @@ class Combustor(FlowNode):
             )
 
             A_out, u_out, P_out, T_out, h_t_out, h_out = _station_kinematic_design(
-                gas=BurnedJetA(FAR),
+                gas=self.working_fluid,
                 T_t_out=T_t_out,
                 P_t_out=P_t_out,
                 M_design=self.design_parameters.exit_mach_number,
@@ -559,12 +561,11 @@ class Combustor(FlowNode):
 
             P_t_out, T_t_out, h_t_out, mdot_out = _combustor_performance(
                 gas=self.working_fluid,
+                fuel=self.fuel,
                 T_t=T_t,
                 P_t=P_t,
                 mdot_in=mdot_in,
                 FAR=FAR,
-                LHV=LHV,
-                h_t_f=0.0,
                 PR=PR,
                 n_b=n_b
             )
@@ -803,8 +804,8 @@ def _nozzle_design(
     T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
 
     # Enthalpy and velocity
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out = gas.compute_enthalpy(T_out)
+    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
+    h_out = gas.compute_absolute_enthalpy(T_out)
     u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     # Exit area
@@ -873,8 +874,8 @@ def _nozzle_performance(
     T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
     T_t_out = T_t
     
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out = gas.compute_enthalpy(T_out)
+    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
+    h_out = gas.compute_absolute_enthalpy(T_out)
     u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     rho_out = P_out / (R * T_out)
@@ -1041,8 +1042,8 @@ def _variable_nozzle_performance(
     T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
     T_t_out = T_t
     
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    h_out = gas.compute_enthalpy(T_out)
+    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
+    h_out = gas.compute_absolute_enthalpy(T_out)
     u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0)) * n_v
 
     rho_out = P_out / (R * T_out)

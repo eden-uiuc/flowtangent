@@ -58,7 +58,7 @@ class IdealGas(eqx.Module):
 
         return cp_eval
 
-    def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
+    def compute_absolute_enthalpy(self, T: float | jnp.ndarray = 298.15):
         T_arr = jnp.atleast_1d(T)
 
         def _h(coeffs, t):
@@ -72,6 +72,11 @@ class IdealGas(eqx.Module):
 
         h_eval = jnp.where(T_arr > self.nasa_T_mid, h_high, h_low)
         return h_eval.squeeze()
+    
+    def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
+        h_abs = self.compute_absolute_enthalpy(T)
+        h_ref = self.compute_absolute_enthalpy(298.15)
+        return h_abs - h_ref
 
     def compute_entropy(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.0):
         T_arr = jnp.atleast_1d(T)
@@ -179,6 +184,13 @@ class MixedGas(IdealGas):
         Cp_mixed = jnp.sum(Cp_arr * self.composition.mass_fractions, axis=-1)
         return Cp_mixed
 
+    def compute_absolute_enthalpy(self, T: float | jnp.ndarray = 298.15):
+        h_arr = jnp.stack([elem.compute_absolute_enthalpy(T) for elem in self.composition.elements], axis=-1)
+
+        # Mass-weighted sum
+        h_mixed = jnp.sum(h_arr * self.composition.mass_fractions, axis=-1)
+        return h_mixed
+    
     def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
         h_arr = jnp.stack([elem.compute_enthalpy(T) for elem in self.composition.elements], axis=-1)
 
@@ -260,11 +272,11 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
         elements=("O2", "AR", "CO2", "N2", "H2O"),
         mass_fractions=jnp.concatenate(
             [
-                m_O2 / m_total,
-                m_Ar / m_total,
-                m_CO2 / m_total,
-                m_N2 / m_total,
-                m_H2O / m_total,
+                jnp.atleast_2d(m_O2 / m_total),
+                jnp.atleast_2d(m_Ar / m_total),
+                jnp.atleast_2d(m_CO2 / m_total),
+                jnp.atleast_2d(m_N2 / m_total),
+                jnp.atleast_2d(m_H2O / m_total),
             ],
             axis=-1,
         ),

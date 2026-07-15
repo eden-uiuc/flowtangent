@@ -240,7 +240,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                 'PyCycle Val': pyc_val,
                 'Trace Val': Trace_val,
                 'Diff': diff,
-                'Rel. Error': rel_error
+                'Rel. Error': rel_error,
+                'Mag. Error': np.abs(rel_error)
             })
     
     for pyc_station, pyc_props in pycycle_data.get('flow_stations', {}).items():
@@ -278,7 +279,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                     'PyCycle Val': pyc_val,
                     'Trace Val': Trace_val,
                     'Diff': diff,
-                    'Rel. Error': rel_error
+                    'Rel. Error': rel_error,
+                    'Mag. Error': np.abs(rel_error)
                 })
             
     # Convert to DataFrame
@@ -290,10 +292,18 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     
     print("\n" + "="*80)
     print(f" PyCycle vs. Trace {point_name} Point Validation")
-    print("="*80)
-    print(df.to_string(index=False))
-    print("="*80 + "\n")
+    print("-"*80)
+    print(df.drop(columns='Mag. Error').to_string(index=False))
     
+    print("\n"+"-"*80)
+    print(" Error Magnitude Summary:")
+    print(f" - Mean: {df['Mag. Error'].mean():.4e}")
+    print(f" - Min:  {df['Mag. Error'].min():.4e}")
+    print(f" - Max:  {df['Mag. Error'].max():.4e}")
+    print("\n" + "="*80 + "\n")
+    
+
+
     return df
 
 if __name__ == "__main__":
@@ -305,7 +315,7 @@ if __name__ == "__main__":
 
     DESIGN_POINT = True
     OFF_DESIGN_0 = True
-    OFF_DESIGN_1 = False
+    OFF_DESIGN_1 = True
 
     # Build Turbojet------------------------------------------------------------
     system = system_setup(variable_nozzle=V_NOZZ)
@@ -313,9 +323,9 @@ if __name__ == "__main__":
     settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
 
     if DESIGN_POINT:
-        print("-"*60)
+        print("="*80)
         print(" Design Point Analysis")
-        print("-"*60)
+        print("-"*80)
         st, sys, set = design_turbojet(
             state=State(),
             system=system,
@@ -337,9 +347,9 @@ if __name__ == "__main__":
     
     sys = sys.sort_network_topology()
 
-    print("-"*60)
+    print("="*80)
     print(" System Validation")
-    print("-"*60)
+    print("-"*80)
 
     for comp in sys.energy.line.engine.subcomponents:
         if hasattr(comp, "design_parameters") and comp.design_parameters:
@@ -357,24 +367,25 @@ if __name__ == "__main__":
     
     print("Compressor Map Scaling:")
     c_map = sys.energy.line.engine.compressor.map
-    print(f" - s_Wc:  {format_array(c_map.s_Wc)}")
-    print(f" - s_PR: {format_array(c_map.s_PR)}")
-    print(f" - s_eff: {format_array(c_map.s_eff)}")
-    print(f" - s_Nc:  {format_array(c_map.s_Nc)}")
+    print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
+    print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
+    print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
+    print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
 
     print("Turbine Map Scaling:")
     t_map = sys.energy.line.engine.turbine.map
-    print(f" - s_Wp:  {format_array(t_map.s_Wp)}")
-    print(f" - s_PR: {format_array(t_map.s_PR)}")
-    print(f" - s_eff: {format_array(t_map.s_eff)}")
-    print(f" - s_Np:  {format_array(t_map.s_Np)}")
+    print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
+    print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
+    print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
+    print(f" - {'s_Np':<11}: {format_array(t_map.s_Np)}")
+    print("="*80)
     print ("\n\n")
 
 
     if OFF_DESIGN_0:
-        print("-"*60)
+        print("="*80)
         print(" Off Design Point 0 Analysis")
-        print("-"*60)
+        print("-"*80)
         
         OD0_st, OD0_sys, OD0_set = off_design_point(
             M0=1e-6,
@@ -406,9 +417,9 @@ if __name__ == "__main__":
         )
     
     if OFF_DESIGN_1:
-        print("-"*60)
-        print(" Beginning Off Design Point 1 Analysis")
-        print("-"*60)
+        print("="*80)
+        print(" Off Design Point 1 Analysis")
+        print("-"*80)
         
         OD1_st, OD1_sys, OD1_set = off_design_point(
             M0=0.2,
@@ -417,22 +428,20 @@ if __name__ == "__main__":
             system=sys,
             settings=settings,
             initial_Rline= 2.0,
-            initial_turb_PR=3.86,
+            initial_turb_PR=4.669,
             initial_RPM= 8197.38 * units.parse('rev/mins'),
-            initial_MFR= 145.5 * units.parse('lbm/s'),
+            initial_MFR= 168.45 * units.parse('lbm/s'),
             initial_FAR= 0.01680,
         )
 
         OD0_df = validate_design_point(
-            "./tests/PyCycle/turbojet_OD1.json",
+            "./tests/PyCycle/PyCycle_Examples/turbojet_OD1.json",
             OD1_st,
             point_name="Off Design 1"
         )
         OD0_df.to_csv(
-            "./tests/PyCycle/OD1_validation.csv"
+            "./tests/PyCycle/PyCycle_Examples/OD1_validation.csv"
         )
-
-
 
     
     

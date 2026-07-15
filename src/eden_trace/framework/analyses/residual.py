@@ -115,9 +115,9 @@ class ResidualAnalysis(Process):
 
         if settings.verbose:
             print("\n")
-            print("="*60)
+            print("="*70)
             print(f" {self.tag} Controls Setup")
-            print("="*60)
+            print("-"*70)
 
             active_controls = state.controls.active_controls
             active_residuals = state.dynamics.active_residuals
@@ -126,17 +126,19 @@ class ResidualAnalysis(Process):
             # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
             pad = max((len(t) for t in all_tags), default=20) + 2
 
-            print("\nActive Controls, Initial Values, and Bounds:")
+            print(f"\n{'Active Controls':<{pad+2}}| {'Init. Values':<14}| Bounds")
+            print("-"*65)
             for control in state.controls.active_controls:
-                print(f"- {control.tag:<{pad}}: {format_array(control.initial_value)} : {format_array(jnp.asarray(control.bounds))}")
+                print(f"- {control.tag:<{pad}}| {format_array(control.initial_value, width=12)} | {format_array(jnp.asarray(control.bounds))}")
 
-            print("\nActive Residuals:")
+            print("\nActive Residuals")
+            print("-"*65)
             for residual in state.dynamics.active_residuals:
                 if residual.get_value.__name__ != "<lambda>":
                     print(f"- {residual.tag}; func: {residual.get_value.__name__}")
                 else:
                     print(f"- {residual.tag}")
-            print("="*60)
+            print("="*70)
             print("\n")
 
         return valid_controls
@@ -287,14 +289,14 @@ class ResidualAnalysis(Process):
         if settings.verbose:
             import numpy as np
             
-            print(f"\n{'='*60}")
+            print(f"\n{'='*70}")
             print(f"Final {self.tag} Solver State")
-            print(f"{'-'*60}")
+            print(f"{'-'*70}")
             
             # Safely extract scalar values for iterations and objective
             iter_num = np.asarray(opt_state.iter_num).item()
             obj_val = np.mean(np.asarray(opt_state.value)).item()
-            print(f"  Solver :          {self.solver.__name__}")
+            print(f"  Solver          : {self.solver.__name__}")
             print(f"  Num. Iterations : {iter_num}")
             print(f"  Final Objective : {obj_val:.6e}")
                 
@@ -312,24 +314,28 @@ class ResidualAnalysis(Process):
             print(f"\n  Final Control Values:")
             for ctrl in active_controls:
                 val = get_target(f_st, ctrl.state_path)
-                print(f"    {ctrl.tag:<{pad}}: {format_array(val, 6)}")
+                print(f"    {ctrl.tag:<{pad}}: {format_array(val)}")
 
             print(f"\n  Final Residual Values:")
             for i, res in enumerate(f_st.dynamics.active_residuals):
-                print(f"    {res.tag:<{pad}}: {final_residuals[i]:>12.6e}")
+                print(f"    {res.tag:<{pad}}: {format_array(final_residuals[i])}")
 
             if self.solver is GaussNewton or self.solver is LevenbergMarquardt:
 
                 print(f"\n Final Jacobian:")
                 grad_np = np.asarray(opt_state.gradient)
                 for i, ctrl in enumerate(active_controls):
-                    print(f"    {ctrl.tag:<{pad}}: {grad_np[i]:>12.6e}")
+                    print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
             
-            print(f"{'='*60}\n")
+            print(f"{'='*70}\n")
         
-        # if settings.DEBUG_MODE:
+        if settings.DEBUG_MODE:
+            print(f"\n{'='*70}")
+            print(f"DEBUG: Full {self.tag} Solver State")
+            print(f"{'-'*70}")
             from pprint import pprint
-            pprint(opt_state)
+            pprint(opt_state._asdict())
+            print(f"\n{'='*70}")
         
         # Return control back to higher process
         final_state = eqx.tree_at(lambda s: s.controls, f_st, state.controls)
