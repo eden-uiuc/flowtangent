@@ -2,6 +2,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -266,7 +267,7 @@ class TurbineMap(eqx.Module):
 # -----------------------------------------------------------------------------------------------------------------------
 
 _MAP_DIR = get_Trace_root() / "library/data/turbo_maps"
-
+STUB_FILE = get_Trace_root() / "library/components/energy/maps.pyi"
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):
@@ -292,7 +293,7 @@ def _load_map_from_disk(name: str):
         raise ValueError(f"Unrecognized map type '{map_type}' in {name}.json")
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """Intercepts module-level attribute access."""
     # Ignore private attributes to prevent messing with Python internals
     if name.startswith("_"):
@@ -394,6 +395,28 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
 
         print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
 
+def generate_stub():
+    lines = [
+        "from typing import Any",
+        "from .maps import CompressorMap, TurbineMap",  # Update import path
+        "",
+    ]
+    
+    for map_file in _MAP_DIR.glob("*.json"):
+        # Optional: You can actually read the JSON here during generation 
+        # to give Pylance the EXACT type instead of Any!
+        with open(map_file, "r") as f:
+            data = json.load(f)
+        
+        map_type = data.get("type", "compressor").lower()
+        type_hint = "CompressorMap" if map_type == "compressor" else "TurbineMap"
+        
+        # Write the attribute to the stub file
+        lines.append(f"{map_file.stem}: {type_hint}")
+
+    STUB_FILE.write_text("\n".join(lines))
+    print(f"Generated {STUB_FILE.name} with {len(lines) - 3} maps.")
 
 if __name__ == "__main__":
     harvest_pycycle_maps()
+    generate_stub()

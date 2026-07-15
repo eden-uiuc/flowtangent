@@ -27,7 +27,7 @@ import equinox as eqx
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.nodes import EnergyDomain, EnergyInput, EnergyNode
+from eden_trace.library.components.energy.nodes import EnergyDomain, GraphInput, GraphNode
 from eden_trace.library.atmospheres import USStandard1976
 
 from .lines import EnergyLine, TurbojetEnergyLine
@@ -63,7 +63,7 @@ def _resolve_namespaces(node, parent_prefix=""):
         else:
             return parent_prefix + "." + flat_input_parts[-1]
 
-    new_inputs = tuple(EnergyInput(i.domain, parse_input(i.network_ID)) for i in node.inputs)
+    new_inputs = tuple(GraphInput(i.domain, parse_input(i.network_ID)) for i in node.inputs)
 
     # Update the node itself
     node = replace(
@@ -81,10 +81,10 @@ def _resolve_namespaces(node, parent_prefix=""):
 
 
 @register
-class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
+class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
     
     tag: str = init_field("Energy Network", static=True)
-    nodes: dict[str, "EnergyNode"] = init_field(dict)
+    nodes: dict[str, "GraphNode"] = init_field(dict)
     domains: tuple[EnergyDomain, ...] = init_field(tuple, static=True)
     design_parameters: DesignType = init_field(NetworkDesign)
 
@@ -101,7 +101,7 @@ class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
 
         def _temp_recurse(subs):
             for c in subs:
-                if isinstance(c, EnergyNode):
+                if isinstance(c, GraphNode):
                     temp_dict[c.network_ID] = c
                 if hasattr(c, "subcomponents") and c.subcomponents:
                     _temp_recurse(c.subcomponents)
@@ -125,11 +125,11 @@ class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
             return self
 
         def _apply(node):
-            if isinstance(node, EnergyNode) and node.network_ID in corrected_fractions:
+            if isinstance(node, GraphNode) and node.network_ID in corrected_fractions:
                 return eqx.tree_at(lambda n: n.extraction_fraction, node, corrected_fractions[node.network_ID])
             return node
 
-        return jax.tree_util.tree_map(_apply, self, is_leaf=lambda x: isinstance(x, EnergyNode))
+        return jax.tree_util.tree_map(_apply, self, is_leaf=lambda x: isinstance(x, GraphNode))
 
     def assign_network_IDs(self):
 
@@ -152,7 +152,7 @@ class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
 
         def _recurse(subcomponents):
             for comp in subcomponents:
-                if isinstance(comp, EnergyNode):
+                if isinstance(comp, GraphNode):
                     nodes_dict[comp.network_ID] = comp
                 if hasattr(comp, "subcomponents") and comp.subcomponents:
                     _recurse(comp.subcomponents)
@@ -184,7 +184,7 @@ class EnergyNetwork[DesignType: NetworkDesign](EnergyNode):
         """
         def _walk_and_sync(component):
             # If we hit an EnergyNode, replace it with the latest version from the dict
-            if isinstance(component, EnergyNode):
+            if isinstance(component, GraphNode):
                 # Grab the updated node (fallback to current if not in dict)
                 component = self.nodes.get(component.network_ID, component)
 
@@ -236,8 +236,8 @@ class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
 
     inputs: tuple = init_field(
         (
-            EnergyInput("force", "network.line"),
-            EnergyInput("residual", "network.line"),
+            GraphInput("force", "network.line"),
+            GraphInput("residual", "network.line"),
         )
     )
 

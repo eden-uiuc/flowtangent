@@ -28,7 +28,7 @@ from eden_trace.utils import init_field, register
 from eden_trace.library import units
 from eden_trace.library.components.energy import maps
 from eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
-from eden_trace.library.components.energy.nodes import EnergyInput, EnergyNode, FlowNode, FlowDesign
+from eden_trace.library.components.energy.nodes import GraphInput, GraphNode, GraphSplitter, FlowNode, FlowDesign
 from eden_trace.library.gases import Air, BurnedJetA, IdealGas
 from eden_trace.library.propellants import JetA, Propellant
 
@@ -265,11 +265,15 @@ def _fan_compressor_performance(
 class Compressor(FlowNode):
     tag: str = init_field("Compressor", static=True)
 
-    inputs: tuple=init_field((EnergyInput("flow", "Inlet"),))
+    inputs: tuple | GraphInput =init_field(GraphInput("flow", "Inlet"), static=True)
 
     map: CompressorMap = init_field(maps.AXI5)
 
     alpha_schedule: Callable = init_field(_comp_alpha_schedule, as_value=True, static=True)
+
+    def __post_init__(self):
+        if not isinstance(self.map, CompressorMap):
+            raise TypeError(f"'{self.tag}' requires a CompressorMap, got {type(self.map).__name__}")
 
     @tu.inputs(
         "state.freestream.Cp",
@@ -492,7 +496,7 @@ def _combustor_performance(
 class Combustor(FlowNode):
     tag: str = init_field("Combustor", static=True)
 
-    inputs: tuple = init_field((EnergyInput("flow", "Compressor"),), static=True)
+    inputs: tuple | GraphInput = init_field(GraphInput("flow", "Compressor"), static=True)
     fuel: Propellant = init_field(JetA)
 
     @tu.inputs(
@@ -616,12 +620,16 @@ class Turbine(FlowNode):
 
     alpha_schedule: Callable = init_field(lambda Np, Np_des: jnp.full_like(Np, 1.0), as_value=True, static=True)
 
-    inputs: tuple = init_field(
+    inputs: tuple | GraphInput = init_field(
         (
-            EnergyInput("flow", "Combustor"),
-            EnergyInput("fuel", "Combustor"),
+            GraphInput("flow", "Combustor"),
+            GraphInput("fuel", "Combustor"),
         ), static=True,
     )
+
+    def __post_init__(self):
+        if not isinstance(self.map, TurbineMap):
+            raise TypeError(f"'{self.tag}' requires a TurbineMap, got {type(self.map).__name__}")
 
     @tu.inputs(
         "state.freestream.gamma",
@@ -887,8 +895,8 @@ class FixedNozzle(FlowNode):
     tag: str = init_field("Core Nozzle", static=True)
 
     inputs: tuple = (
-        EnergyInput("flow", "Turbine"),
-        EnergyInput("fuel", "Combustor"),
+        GraphInput("flow", "Turbine"),
+        GraphInput("fuel", "Combustor"),
     )
 
     @tu.inputs(
@@ -1054,9 +1062,9 @@ def _variable_nozzle_performance(
 class VariableNozzle(FlowNode):
     tag: str = init_field("Core Nozzle", static=True)
 
-    inputs: tuple = (
-        EnergyInput("flow", "Turbine"),
-        EnergyInput("fuel", "Combustor"),
+    inputs: tuple | GraphInput = (
+        GraphInput("flow", "Turbine"),
+        GraphInput("fuel", "Combustor"),
     )
 
     @tu.inputs(
@@ -1168,37 +1176,26 @@ class VariableNozzle(FlowNode):
 # Turboshaft -------------------------------------------------------------------
 
 @register
-class Turboshaft(EnergyNode):
+class Turboshaft(GraphNode):
     tag: str = init_field("Turboshaft", static=True)
 
-    inputs: tuple = (
-        EnergyInput("flow", "compressor"),
-        EnergyInput("flow", "turbine"),
-        EnergyInput("mechanical", "compressor"),
-        EnergyInput("mechanical", "turbine"),
+    inputs: tuple | GraphInput = (
+        GraphInput("mechanical", "compressor"),
+        GraphInput("mechanical", "turbine"),
     )
 
     def transmit(self, state: State, system: System, settings: Settings):
         
-        # c_norm = [i for i in self.inputs if "compressor" in i.network_ID and i.domain == "mechanical"][0]
-
-        
         if settings.analysis.energy.design_mode:
-            d_mass = jnp.atleast_2d(0.)
             d_power = (self.sum_domain_inputs(state, "mechanical", "power") / 2e7)
         else:
-            d_mass = (self.diff_domain_inputs(state, "flow", "mass_flow_rate") / 
-                    self.average_domain_inputs(state, "flow", "mass_flow_rate"))
             d_power = (self.sum_domain_inputs(state, "mechanical", "power") / 
                        system.energy.design_parameters.power) #type: ignore
         
         outputs = state.energy.nodes[self.network_ID].outputs
-
         outputs = eqx.tree_at(lambda o: o.residual.power, outputs, d_power)
-        outputs = eqx.tree_at(lambda o: o.residual.mass_flow_rate, outputs, d_mass)
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
-
 
         return updated_state, system, settings
 
@@ -1266,7 +1263,7 @@ def _TurbojetSetup():
     comb = Combustor()
     turb = Turbine()
     shaft = Turboshaft()
-    nozz = FixedNozzle()
+    nozz = VariableNozzle()
 
     return (inlet, comp, comb, turb, shaft, nozz)
 
@@ -1306,23 +1303,30 @@ class TurbojetEngine(FlowNode[JetDesign]):
     working_fluid: IdealGas = init_field(Air)
     design_parameters: JetDesign = init_field(JetDesign)
 
-    inputs: tuple = init_field(
+    inputs: tuple | GraphInput = init_field(
         (
-            EnergyInput("flow", "self.core_nozzle"),
-            EnergyInput("fuel", "self.combustor"),
-            EnergyInput("residual", "self.turboshaft"),
+            GraphInput("flow", "self.core_nozzle"),
+            GraphInput("fuel", "self.combustor"),
+            GraphInput("residual", "self.turboshaft"),
         ),
         static=True,
     )
 
     installation_geometry: JetGeometry = init_field(JetGeometry)
 
-    _bookkeeping: dict = init_field(lambda: {"compressors": Compressor, "turbines": Turbine}, static=True)
+    _bookkeeping: dict = init_field(lambda: {
+        "compressors": Compressor,
+        "turbines": Turbine,
+        "nozzles": VariableNozzle | FixedNozzle,
+        "shafts": Turboshaft,
+        "ducts": GraphSplitter,
+        }, static=True
+    )
 
     @classmethod
     def build_custom(
         cls,
-        variable_nozzle: bool = False,
+        variable_nozzle: bool = True,
         **kwargs
     ):
         
@@ -1410,7 +1414,50 @@ class TurbojetEngine(FlowNode[JetDesign]):
 
         return updated_state, system, settings
 
+def _TurbofanSetup(BPR: float):
 
+    alpha = BPR / (1.0 + BPR)
+    beta = 1.0 / (1.0 + BPR)
+
+    inlet = Inlet()
+    fan = Compressor(tag="Fan", map=maps.Fan)
+
+    fan_flow = GraphSplitter(tag="Bypass Duct", inputs=GraphInput("flow", "fan"), split_fraction=alpha)
+    core_flow = GraphSplitter(tag="Core Duct", inputs=GraphInput("flow", "fan"), split_fraction=beta)
+
+    lpc = Compressor(tag="LPC", map=maps.LPC, inputs=GraphInput("flow", "core duct"))
+    hpc = Compressor(tag="HPC", map=maps.HPC, inputs=GraphInput("flow", "lpc"))
+    
+    comb = Combustor(inputs=GraphInput("flow", "hpc"))
+    
+    hpt = Turbine(tag="HPT", map=maps.HPT)
+    lpt = Turbine(tag="LPT", map=maps.LPT, inputs=(GraphInput("flow", "hpt"), GraphInput("fuel", "combustor")))
+    
+    lp_shaft = Turboshaft(tag="Low Power Shaft", inputs=(
+            GraphInput("mechanical", "lpc"),
+            GraphInput("mechanical", "fan"),
+            GraphInput("mechanical", "lpt"),
+        )
+    )
+    
+    hp_shaft = Turboshaft(tag="High Power Shaft", inputs=(
+            GraphInput("mechanical", "hpc"),
+            GraphInput("mechanical", "hpt"),
+        )
+    )
+    
+    f_nozz = VariableNozzle(tag="Fan Nozzle", inputs=(GraphInput("flow", "bypass duct")))
+    c_nozz = VariableNozzle(inputs=(GraphInput("flow", "lpt"), GraphInput("fuel", "combustor")))
+
+    return (inlet, fan, core_flow, fan_flow, lpc, hpc, comb, hpt, lpt, lp_shaft, hp_shaft, f_nozz, c_nozz)
+
+def TurbofanEngine(BPR: float = 4.0, **kwargs):
+    return TurbojetEngine(
+        subcomponents=_TurbofanSetup(BPR),
+        inputs = (None,), # TODO: Setup Nozzle and Shaft Inputs
+        **kwargs)
+
+    
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbofan Engine
 # ----------------------------------------------------------------------------------------------------------------------

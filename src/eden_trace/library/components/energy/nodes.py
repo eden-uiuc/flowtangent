@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -30,7 +30,7 @@ from eden_trace.library.gases import Air, IdealGas
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class EnergyEfficiencies(eqx.Module):
+class Efficiencies(eqx.Module):
     total: float = 1.0
 
     mechanical: float = 1.0
@@ -43,18 +43,25 @@ class EnergyEfficiencies(eqx.Module):
 EnergyDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "residual"]
 
 @register
-class EnergyInput(eqx.Module):
+class GraphInput(eqx.Module):
     domain: EnergyDomain = init_field("flow", static=True)
     network_ID: str = init_field("network", static=True)
 
+    # Define iter to make castable to tuple as (self,)
+    def __iter__(self):
+        yield self
+
 @register
-class EnergyNode(Component):
+class GraphNode(Component):
     network_ID: str = init_field("energy_node", static=True)
 
-    efficiencies: EnergyEfficiencies = init_field(EnergyEfficiencies)
+    efficiencies: Efficiencies = init_field(Efficiencies)
 
-    inputs: tuple[EnergyInput, ...] = init_field(tuple, static=True)
+    inputs: tuple[GraphInput, ...] | GraphInput = init_field(tuple, static=True)
 
+    def __post_init__(self):
+        if isinstance(self.inputs, GraphInput):
+            object.__setattr__(self, "inputs", (self.inputs,))
     
 
     def __getattr__(self, item: str):
@@ -62,15 +69,15 @@ class EnergyNode(Component):
             domain = item.replace("_inputs", "")
             return tuple(i.network_ID for i in self._get_inputs_by_domain(domain))
         else:
-            return super(EnergyNode, self).__getattr__(item)
+            return super(GraphNode, self).__getattr__(item)
     
     @eqx.filter_jit
-    def get_input(self, state, input: EnergyInput, input_field: str):
+    def get_input(self, state, input: GraphInput, input_field: str):
         return getattr(getattr(state.energy.nodes[input.network_ID].outputs, input.domain), input_field)
 
     @eqx.filter_jit
     def _get_inputs_by_domain(self, domain: EnergyDomain | str):
-        return tuple(i for i in self.inputs if i.domain == domain)
+        return tuple(i for i in cast(tuple, self.inputs) if i.domain == domain)
 
     @eqx.filter_jit
     def get_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
@@ -104,13 +111,15 @@ class EnergyNode(Component):
         )
 
 @register
-class EnergySplitter(EnergyNode):
-    extraction_fraction: float = 1.0
+class GraphSplitter(GraphNode):
+    split_fraction: float = 1.0
 
     _splitter_type: str = init_field("flow", static=True)
     split_values: tuple[str] = init_field(("mass_flow_rate",), static=True)
 
     def __post_init__(self):
+        super(GraphSplitter, self).__post_init__()
+        assert(isinstance(self.inputs, tuple))
         assert len(self.inputs) == 1, f"Energy splitters can only have one input. Found: {self.inputs}"
         for splitter in ["flow", "mechanical", "electrical", "fuel", "force"]:
             if len(getattr(self, splitter + "_inputs")) > 0:
@@ -118,12 +127,12 @@ class EnergySplitter(EnergyNode):
 
     def transmit(self, state: State, system: System, settings: Settings):
 
-        total_input = getattr(state.energy.nodes[self.inputs[0]].outputs, self._splitter_type)
+        total_input = getattr(state.energy.nodes[tuple(self.inputs)[0]].outputs, self._splitter_type)
 
         extracted_input = eqx.tree_at(
             lambda t: tuple(getattr(t, s) for s in self.split_values),
             total_input,
-            tuple(getattr(total_input, s) * self.extraction_fraction for s in self.split_values),
+            tuple(getattr(total_input, s) * self.split_fraction for s in self.split_values),
         )
 
         updated_state = eqx.tree_at(
@@ -155,18 +164,17 @@ class FlowDesign(eqx.Module):
     noise_speed: float = 0.0
 
 @register
-class FlowNode[DesignType: FlowDesign](EnergyNode):
+class FlowNode[DesignType: FlowDesign](GraphNode):
     
     design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
-
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Energy Store
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class EnergyStore(EnergyNode):
+class EnergyStore(GraphNode):
     tag: str = init_field("Energy Store", static=True)
 
     max_energy: float = 0.0

@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from eden_trace.utils import init_field, outputs, register
 from eden_trace.utils import inputs as func_inputs
 
-from .nodes import EnergyInput, EnergyNode, EnergySplitter, EnergyStore, FuelTank
+from .nodes import GraphInput, GraphNode, GraphSplitter, EnergyStore, FuelTank
 from .turbojets import TurbojetEngine
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -19,10 +19,10 @@ from .turbojets import TurbojetEngine
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class EnergyLine(EnergyNode):
+class EnergyLine(GraphNode):
     _bookkeeping: dict = init_field(
         lambda: {
-            "splitters": EnergySplitter,
+            "splitters": GraphSplitter,
             "stores": EnergyStore,
         },
         static=True,
@@ -47,9 +47,9 @@ class TurbojetEnergyLine(EnergyLine):
     
     inputs: tuple = init_field(
         (
-            EnergyInput("fuel", "self.engine"),
-            EnergyInput("force", "self.engine"),
-            EnergyInput("residual", "self.engine")
+            GraphInput("fuel", "self.engine"),
+            GraphInput("force", "self.engine"),
+            GraphInput("residual", "self.engine")
         ),
         static=True,
     )
