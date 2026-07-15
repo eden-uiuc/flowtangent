@@ -204,6 +204,12 @@ def export_pycycle_to_json(prob, pt, filename="pycycle_design_data.json"):
         "PR": get_val("comp.PR"),
         "eff": get_val("comp.eff"),
         "power": get_val("comp.power"),
+        # Map parameters and scalars
+        "Rline": get_val("comp.Rline"),
+        "s_Wc": get_val("comp.s_Wc"),
+        "s_PR": get_val("comp.s_PR"),
+        "s_eff": get_val("comp.s_eff"),
+        "s_Nc": get_val("comp.s_Nc")
     }
     
     data["components"]["burner"] = {
@@ -216,6 +222,12 @@ def export_pycycle_to_json(prob, pt, filename="pycycle_design_data.json"):
         "PR": get_val("turb.PR"),
         "eff": get_val("turb.eff"),
         "power": get_val("turb.power"),
+        # Map parameters and scalars
+        "PRmap": get_val("turb.PRmap"),
+        "s_Wp": get_val("turb.s_Wp"),
+        "s_PR": get_val("turb.s_PR"),
+        "s_eff": get_val("turb.s_eff"),
+        "s_Np": get_val("turb.s_Np")
     }
     
     data["components"]["nozz"] = {
@@ -332,7 +344,7 @@ if __name__ == "__main__":
 
     for pt in ['DESIGN']+mp_turbojet.od_pts:
         viewer(prob, pt)
-        export_pycycle_to_json(prob, pt, filename=f"./tests/PyCycle/turbojet_{pt}.json")
+        export_pycycle_to_json(prob, pt, filename=f"./tests/PyCycle/PyCycle_Examples/turbojet_{pt}.json")
 
     # map_plots(prob,'DESIGN')
 

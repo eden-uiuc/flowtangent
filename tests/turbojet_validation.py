@@ -24,9 +24,9 @@ def system_setup(variable_nozzle: bool = False):
     )
     engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
     
-    inlet_design = eqx.tree_at(lambda c:
-        c.design_parameters.exit_mach_number,
-        engine.inlet_nozzle,
+    inlet_design = eqx.tree_at(lambda i:
+        i.design_parameters.exit_mach_number,
+        engine.inlet,
         0.6
     )
     
@@ -41,7 +41,7 @@ def system_setup(variable_nozzle: bool = False):
         (
             13.5,
             8070. * units.rev/units.mins,
-            0.2,
+            0.02,
             0.83
         )
     )
@@ -56,7 +56,7 @@ def system_setup(variable_nozzle: bool = False):
         (
             2370 * units.R,
             0.97,
-            0.2,
+            0.02,
         )
     )
 
@@ -74,18 +74,26 @@ def system_setup(variable_nozzle: bool = False):
         )
     )
 
+    nozz_design = eqx.tree_at(
+        lambda n: n.efficiencies.flow,
+        engine.core_nozzle,
+        0.99
+    )
+
     engine = eqx.tree_at(lambda e:
         (
-            e.inlet_nozzle,
+            e.inlet,
             e.compressor,
             e.combustor,
-            e.turbine
+            e.turbine,
+            e.core_nozzle,
         ), engine,
         (
             inlet_design,
             comp_design,
             burn_design,
-            turb_design
+            turb_design,
+            nozz_design
         )                
     )
 
@@ -174,7 +182,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     # 2. Map PyCycle flow stations to Trace network IDs
     station_map = {
         # 'fc.Fl_O':     'freestream',
-        'inlet.Fl_O':  'network.line.engine.inlet_nozzle',
+        'inlet.Fl_O':  'network.line.engine.inlet',
         'comp.Fl_O':   'network.line.engine.compressor',
         'burner.Fl_O': 'network.line.engine.combustor',
         'turb.Fl_O':   'network.line.engine.turbine',
@@ -295,7 +303,7 @@ if __name__ == "__main__":
     VERBOSE = True
     V_NOZZ = True
 
-    DESIGN_POINT = False
+    DESIGN_POINT = True
     OFF_DESIGN_0 = True
     OFF_DESIGN_1 = False
 
@@ -350,12 +358,16 @@ if __name__ == "__main__":
     print("Compressor Map Scaling:")
     c_map = sys.energy.line.engine.compressor.map
     print(f" - s_Wc:  {format_array(c_map.s_Wc)}")
+    print(f" - s_PR: {format_array(c_map.s_PR)}")
     print(f" - s_eff: {format_array(c_map.s_eff)}")
+    print(f" - s_Nc:  {format_array(c_map.s_Nc)}")
 
     print("Turbine Map Scaling:")
     t_map = sys.energy.line.engine.turbine.map
     print(f" - s_Wp:  {format_array(t_map.s_Wp)}")
+    print(f" - s_PR: {format_array(t_map.s_PR)}")
     print(f" - s_eff: {format_array(t_map.s_eff)}")
+    print(f" - s_Np:  {format_array(t_map.s_Np)}")
     print ("\n\n")
 
 
@@ -370,16 +382,18 @@ if __name__ == "__main__":
             thrust=11_000 * units.lbf,
             system=sys,
             settings=settings,
-            initial_Rline=2.0,
-            initial_turb_PR=4.669,
-            initial_RPM=8197.38 * units.parse('rev/mins'),
-            initial_MFR=166.073 * units.parse('lbm/s'),
-            initial_FAR=0.01680,
+            # PyCycle Initial Guess Values
             # initial_Rline=2.0,
             # initial_turb_PR=4.669,
-            #initial_RPM=8197.38 * units.parse('rev/mins'),
-            # initial_MFR= 48.95279,
-            # initial_FAR= 0.03481776,
+            # initial_RPM=8197.38 * units.parse('rev/mins'),
+            # initial_MFR=166.073 * units.parse('lbm/s'),
+            # initial_FAR=0.01680,
+            # PyCycle Converged Values
+            initial_Rline=2.0,
+            initial_turb_PR=3.88,
+            initial_RPM=8197.38 * units.parse('rev/mins'),
+            initial_MFR=70.00,
+            initial_FAR=0.0168,
         )
 
         OD0_df = validate_design_point(

@@ -146,7 +146,7 @@ def _inlet_performance(gas, T_t, P_t, M0, PR, n_r, mdot, A_exit):
 
 @register
 class Inlet(FlowNode):
-    tag: str = init_field("Inlet Nozzle", static=True)
+    tag: str = init_field("Inlet", static=True)
 
     @tu.inputs(
         "state.freestream.stagnation_temperature",
@@ -265,7 +265,7 @@ def _fan_compressor_performance(
 class Compressor(FlowNode):
     tag: str = init_field("Compressor", static=True)
 
-    inputs: tuple=init_field((EnergyInput("flow", "Inlet Nozzle"),))
+    inputs: tuple=init_field((EnergyInput("flow", "Inlet"),))
 
     map: CompressorMap = init_field(maps.AXI5)
 
@@ -295,8 +295,8 @@ class Compressor(FlowNode):
         T_t = self.average_domain_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_domain_inputs(state, "flow", "stagnation_pressure")
 
-        theta_c = T_t/288.15
-        delta_c = P_t/101325.0
+        theta_c = T_t / 288.15
+        delta_c = P_t / 101325.0
 
         gas = self.working_fluid
         
@@ -305,18 +305,22 @@ class Compressor(FlowNode):
             PR      = self.design_parameters.pressure_ratio
             n_isn   = self.efficiencies.flow
 
+            N_des   = self.design_parameters.rotation_speed
+            Nc_des  = N_des / jnp.sqrt(theta_c)
+
             W   = jnp.atleast_2d(network_state.mass_flow_rate)
             Wc_tgt = W * jnp.sqrt(theta_c) / delta_c
             
             PR_map, Wc_map, eff_map = self.map.evaluate(
-                alpha=0.0,
-                Nc=1.0,
+                alpha=self.map.alpha_des,
+                Nc=self.map.Nc_des,
                 Rline=self.map.Rline_des
             )
             
             s_Wc =  (Wc_tgt / Wc_map).squeeze()
             s_PR = (PR - 1.0)/(PR_map - 1.0)
             s_eff = n_isn / eff_map
+            s_Nc = (Nc_des/self.map.Nc_des).squeeze()
 
             T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
 
@@ -337,7 +341,7 @@ class Compressor(FlowNode):
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
                 self.map,
-                (s_Wc, s_PR, s_eff, self.design_parameters.rotation_speed)
+                (s_Wc, s_PR, s_eff, s_Nc)
             )
 
             updated_system = eqx.tree_at(
@@ -358,7 +362,7 @@ class Compressor(FlowNode):
         else:
             N      = jnp.atleast_2d(network_state.rotation_speed)
             Nc_des = self.design_parameters.rotation_speed
-            Nc     = N / jnp.sqrt(T_t / 288.15)
+            Nc     = N / jnp.sqrt(theta_c)
             
             
             alpha   = self.alpha_schedule(Nc, Nc_des)
@@ -400,10 +404,13 @@ class Compressor(FlowNode):
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
 
         # Residual Update
+        W_des = system.energy.design_parameters.mass_flow_rate
+        Wc_res = (W - state.energy.mass_flow_rate)/W_des
+
         updated_state = eqx.tree_at(
             lambda s:s.energy.outputs.residual.Wc,
             updated_state,
-            (W - state.energy.mass_flow_rate)/system.energy.design_parameters.mass_flow_rate
+            Wc_res
         )
 
         return updated_state, updated_system, settings
@@ -639,9 +646,6 @@ class Turbine(FlowNode):
         
         T_t = self.average_domain_inputs(state, "flow", "stagnation_temperature")
         P_t = self.average_domain_inputs(state, "flow", "stagnation_pressure")
-
-        theta_t = T_t/288.15
-        delta_t = P_t/101325.0
         
         FAR = self.average_domain_inputs(state, "fuel", "fuel_air_ratio")
         gas = BurnedJetA(FAR)
@@ -650,16 +654,21 @@ class Turbine(FlowNode):
             PR = jnp.atleast_2d(network_state.turbine_PR)
             n_isn = self.efficiencies.flow
 
+            N_des = self.design_parameters.rotation_speed
+            Np_des = N_des / jnp.sqrt(T_t)
+
             W = self.sum_domain_inputs(state, "flow", "mass_flow_rate")
-            Wp_tgt = W * jnp.sqrt(theta_t) / delta_t
+            Wp_tgt = W * jnp.sqrt(T_t) / P_t
 
             Wp_map, eff_map = self.map.evaluate(
-                alpha=jnp.zeros_like(PR),
-                Np=jnp.ones_like(PR),
-                PR=PR)
+                alpha=self.map.alpha_des,
+                Np=self.map.Np_des,
+                PR=self.map.PR_des)
             
             s_Wp = (Wp_tgt / Wp_map).squeeze()
+            s_PR = ((PR - 1.0)/(self.map.PR_des - 1.0)).squeeze()
             s_eff = (self.efficiencies.flow / eff_map).squeeze()
+            s_Np = (Np_des/self.map.Np_des).squeeze()
 
             # Turbine passes 1 / PR to reflect pressure drop
             T_t_out, P_t_out = _average_gamma_stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
@@ -674,7 +683,7 @@ class Turbine(FlowNode):
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),
                 self.map,
-                (s_Wp, PR, s_eff, self.design_parameters.rotation_speed)
+                (s_Wp, s_PR, s_eff, s_Np)
             )
 
             updated_design = eqx.tree_at(
@@ -703,7 +712,7 @@ class Turbine(FlowNode):
 
         else:
             N = jnp.atleast_2d(network_state.rotation_speed)
-            Np = N / jnp.sqrt(T_t / 288.15)
+            Np = N / jnp.sqrt(T_t)
             Np_des = self.design_parameters.rotation_speed
 
             PR = jnp.atleast_2d(network_state.turbine_PR)
@@ -711,7 +720,7 @@ class Turbine(FlowNode):
             alpha = self.alpha_schedule(Np, Np_des)
 
             Wp, n_isn = self.map.evaluate(alpha, Np, PR)
-            W = Wp * delta_t / jnp.sqrt(theta_t) * (1. + FAR)
+            W = Wp * P_t / jnp.sqrt(T_t) * (1. + FAR)
 
         T_t_out, P_t_out, h_t_out, power = _turbine_performance(
             gas=gas,
@@ -736,10 +745,12 @@ class Turbine(FlowNode):
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
 
         # Residual Update
+        W_des = system.energy.design_parameters.mass_flow_rate
+        Wp_res = (W / (1. + FAR) - state.energy.mass_flow_rate)/W_des
         updated_state = eqx.tree_at(
             lambda s:s.energy.outputs.residual.Wp,
             updated_state,
-            (W / (1. + FAR) - state.energy.mass_flow_rate)/system.energy.design_parameters.mass_flow_rate
+            Wp_res
         )
 
         return updated_state, updated_system, settings
@@ -771,6 +782,7 @@ def _nozzle_design(
         mdot: jnp.ndarray,
         P0: jnp.ndarray,
         PR: jnp.ndarray | float,
+        n_v: jnp.ndarray | float,
 ):
     # Dynamic gas properties for the exhaust flow
     gamma = gas.compute_gamma(T_t)
@@ -793,7 +805,7 @@ def _nozzle_design(
     # Enthalpy and velocity
     h_t_out = gas.compute_enthalpy(T_t_out)
     h_out = gas.compute_enthalpy(T_out)
-    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     # Exit area
     rho_out = P_out / (R * T_out)
@@ -817,6 +829,7 @@ def _nozzle_performance(
         P0: jnp.ndarray,
         A_throat: float,
         A_exit: float,
+        n_v: jnp.ndarray | float,
     ):
 
     gamma = gas.compute_gamma(T_t)
@@ -862,7 +875,7 @@ def _nozzle_performance(
     
     h_t_out = gas.compute_enthalpy(T_t_out)
     h_out = gas.compute_enthalpy(T_out)
-    u_out = jnp.sqrt(2.0 * (h_t_out - h_out))
+    u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     rho_out = P_out / (R * T_out)
 
@@ -925,6 +938,7 @@ class FixedNozzle(FlowNode):
                 mdot=mdot_out,
                 P0=P0,
                 PR=self.design_parameters.pressure_ratio,
+                n_v=self.efficiencies.flow,
             )
             
             updated_design_parameters = eqx.tree_at(lambda d:(
@@ -954,6 +968,7 @@ class FixedNozzle(FlowNode):
                 P0=P0,
                 A_throat=A_t,
                 A_exit=A_x,
+                n_v=self.efficiencies.flow,
             )
 
         # Physical outflow
@@ -983,11 +998,12 @@ class FixedNozzle(FlowNode):
         return updated_state, updated_system, settings
 
 def _variable_nozzle_performance(
-        gas,
+        gas: IdealGas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,
         P0: jnp.ndarray,
         mdot_in: jnp.ndarray,
+        n_v: jnp.ndarray | float,
     ):
 
     gamma = gas.compute_gamma(T_t)
@@ -1027,7 +1043,7 @@ def _variable_nozzle_performance(
     
     h_t_out = gas.compute_enthalpy(T_t_out)
     h_out = gas.compute_enthalpy(T_out)
-    u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0))
+    u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0)) * n_v
 
     rho_out = P_out / (R * T_out)
 
@@ -1089,6 +1105,7 @@ class VariableNozzle(FlowNode):
                 mdot=mdot,
                 P0=P0,
                 PR=self.design_parameters.pressure_ratio,
+                n_v=self.efficiencies.flow,
             )
             
             updated_design_parameters = eqx.tree_at(lambda d:(
@@ -1115,6 +1132,7 @@ class VariableNozzle(FlowNode):
                     P_t=P_t,
                     P0=P0,
                     mdot_in=mdot,
+                    n_v=self.efficiencies.flow,
                 )
             )
 
@@ -1137,16 +1155,11 @@ class VariableNozzle(FlowNode):
 
         # Residual update
         A_t_des = self.design_parameters.A_throat
+        A_t_res =  (A_t - A_t_des)/A_t_des
         updated_state = eqx.tree_at(
             lambda s: s.energy.outputs.residual.area,
             updated_state,
-            (A_t - A_t_des)/A_t_des
-        )
-
-        updated_state = eqx.tree_at(
-            lambda s: s.energy.outputs.residual.mass_flow_rate,
-            updated_state,
-            (mdot / (1. + FAR) - state.energy.mass_flow_rate)/system.energy.design_parameters.mass_flow_rate
+            A_t_res
         )
 
         return updated_state, updated_system, settings

@@ -91,6 +91,7 @@ class CompressorMap(eqx.Module):
     s_Nc: float = 1.0
 
     Nc_des: float = 1.0
+    PR_des: float = 5.0
     alpha_des: float = 0.0
     Rline_des: float = 2.0
     Rline_stall: float = 1.0
@@ -137,6 +138,13 @@ class CompressorMap(eqx.Module):
         with open(filepath, "r") as f:
             data = json.load(f)
 
+        # Extract Scalars
+        Nc_des = float(data["Nc_des"])
+        PR_des = float(data["PR_des"])
+        alpha_des = float(data["alpha_des"])
+        Rline_des = float(data["Rline_des"])
+        Rline_stall = float(data["Rline_stall"])
+
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
         Nc_grid = jnp.array(data["Nc"])
@@ -152,16 +160,17 @@ class CompressorMap(eqx.Module):
 
         return cls(
             tag=Path(filepath).stem,
+            Nc_des=Nc_des,
+            PR_des=PR_des,
+            alpha_des=alpha_des,
+            Rline_des=Rline_des,
+            Rline_stall=Rline_stall,
             alpha_grid=alpha_grid,
             Nc_grid=Nc_grid,
             Rline_grid=Rline_grid,
             Wc_table=Wc_table,
             PR_table=PR_table,
             eff_table=eff_table,
-            Nc_des=data["Nc_des"],
-            alpha_des=data["alpha_des"],
-            Rline_des=data["Rline_des"],
-            Rline_stall=data["Rline_stall"],
         )
 
 
@@ -185,12 +194,13 @@ class TurbineMap(eqx.Module):
     s_Np: float = 1.0
 
     alpha_des: float = 0.0
-    Np_des: float = 1.0
+    Np_des: float = 100.0
+    PR_des: float = 5.0
 
     def evaluate(self, alpha, Np, PR):
         # Un-scale the inputs to read the base map
-        Np_map = Np / self.s_Np * 100.0  
-        PR_map = PR  
+        Np_map = Np / self.s_Np 
+        PR_map = (PR - 1.0) * self.s_PR + 1.0
 
         def eval_slice(alpha_idx):
             Wp = interp_2d_extrapolate(Np_map, PR_map, self.Np_grid, self.PR_grid, self.Wp_table[alpha_idx])
@@ -221,6 +231,11 @@ class TurbineMap(eqx.Module):
         with open(filepath, "r") as f:
             data = json.load(f)
 
+        # Extract Scalars
+        alpha_des = float(data["alpha_des"])
+        Np_des = float(data["Np_des"])
+        PR_des = float(data["PR_des"])
+
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
         Np_grid = jnp.array(data["Np"])
@@ -235,6 +250,9 @@ class TurbineMap(eqx.Module):
 
         return cls(
             tag=Path(filepath).stem,
+            alpha_des=alpha_des,
+            Np_des=Np_des,
+            PR_des=PR_des,
             alpha_grid=alpha_grid,
             Np_grid=Np_grid,
             PR_grid=PR_grid,
@@ -328,7 +346,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
         "alphaMap": "alpha_des",
         "NcMap": "Nc_des",
         "NpMap": "Np_des",
-        "PR": "PR_des",
+        "PRmap": "PR_des",
         "RlineMap": "Rline_des",
     }
 
@@ -343,7 +361,10 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
                 val_units = map_obj.units.get(pyc_attr, None)
                 if val_units is not None:
                     if val_units == "rpm":
-                        val = val
+                        if map_type == "compressor":
+                            val = val * units.rev / units.mins
+                        else:
+                            val = val
                     else:
                         val = val * units.parse(val_units)
                 if hasattr(val, "tolist"):
@@ -357,7 +378,10 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             val_units = map_obj.units.get(pyc_attr, None)
             if val_units is not None:
                 if val_units == "rpm":
-                    val = val
+                    if map_type == "compressor":
+                        val = val * units.rev / units.mins
+                    else:
+                        val = val
                 else:
                     val = val * units.parse(val_units)
             if val is not None:

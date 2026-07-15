@@ -228,8 +228,8 @@ def TurbojetPerformance(
     c_des = comp.design_parameters
     c_map: CompressorMap = comp.map
     
-    Nc_bnds = (min(c_map.Nc_grid).item() * c_des.rotation_speed * 0.5,
-               max(c_map.Nc_grid).item() * c_des.rotation_speed * 1.5)
+    Nc_bnds = (min(c_map.Nc_grid).item() * c_map.s_Nc * 0.5,
+               max(c_map.Nc_grid).item() * c_map.s_Nc * 1.5)
     
     R_bnds = (min(c_map.Rline_grid).item() * 0.5,
               max(c_map.Rline_grid).item() * 1.5)
@@ -243,8 +243,8 @@ def TurbojetPerformance(
     t_des = turb.design_parameters
     t_map: TurbineMap = turb.map
 
-    Np_bnds = (min(t_map.Np_grid).item() * t_des.rotation_speed / 100,
-               max(t_map.Np_grid).item() * t_des.rotation_speed / 100)
+    # Np_bnds = (min(t_map.Np_grid).item() * t_des.rotation_speed / 100,
+    #            max(t_map.Np_grid).item() * t_des.rotation_speed / 100)
     
     PR_bnds = (min(t_map.PR_grid).item() * 0.5,
                max(t_map.PR_grid).item() * 1.5)
@@ -254,10 +254,10 @@ def TurbojetPerformance(
     
     # Composite Bounds ---------------------------------------------------------
     
-    RPM_bnds = (max(Nc_bnds[0], Np_bnds[0]) * 0.5,
-                min(Nc_bnds[1], Np_bnds[1]) * 1.5)
+    # RPM_bnds = (max(Nc_bnds[0], Np_bnds[0]) * 0.5,
+    #             min(Nc_bnds[1], Np_bnds[1]) * 1.5)
     
-    FAR_bnds = (1e-4, 0.017)
+    FAR_bnds = (1e-4, 0.02)
 
     # Control Setup -----------------------------------------------------------
     
@@ -281,7 +281,7 @@ def TurbojetPerformance(
         tag="Rotation Speed",
         state_path=DataPath(("energy", "rotation_speed")),
         initial_value=initial_RPM,
-        bounds=RPM_bnds,
+        bounds=Nc_bnds,
         scaling='logistic'
     )
 

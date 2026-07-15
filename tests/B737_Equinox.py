@@ -363,7 +363,7 @@ def vehicle_setup():
     # Direct Replacement
     tf = eqx.tree_at(
         lambda tf: (
-                tf.inlet_nozzle.efficiencies.flow, tf.inlet_nozzle.pressure_ratio,
+                tf.inlet.efficiencies.flow, tf.inlet.pressure_ratio,
                 tf.fan.efficiencies.flow, tf.fan.pressure_ratio,
                 tf.lpc.efficiencies.flow, tf.lpc.pressure_ratio,
                 tf.hpc.efficiencies.flow, tf.hpc.pressure_ratio,
