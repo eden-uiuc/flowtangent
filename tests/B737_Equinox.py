@@ -14,8 +14,8 @@ import eden_trace.utils as tu
 from eden_trace.framework import Process, State, Settings
 from eden_trace.framework.conditions import Time
 from eden_trace.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
-from eden_trace.framework.missions.segments import Segment
-from eden_trace.framework.missions.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
+from eden_trace.framework.simulation.segments import Segment
+from eden_trace.framework.simulation.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
@@ -31,10 +31,10 @@ from eden_trace.library.components.wings import Wing, WingChords, WingControlSur
 from eden_trace.library.components.fuselages import *
 from eden_trace.library.components.landing_gear import LandingGear
 from eden_trace.library.components.nacelles import Nacelle, NacelleDiameters
-from eden_trace.library.components.energy.networks import EnergyNetwork
-from eden_trace.library.components.energy.turbojets import TurbofanEngine, JetDesign
+from eden_trace.library.components.energy.networks import GraphNetwork
+from eden_trace.library.components.energy.jets import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.nodes import FuelTank
-from eden_trace.library.components.energy.lines import TurbojetEnergyLine
+from eden_trace.library.components.energy.lines import TurbojetLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Boeing 737 New Process
@@ -393,9 +393,9 @@ def vehicle_setup():
     )
     fuel = FuelTank(origin=jnp.array([[13.61, 0., -0.93]]), mass_properties=fuel_mass)
 
-    tf_line = TurbojetEnergyLine(tag="Turbofan Line", subcomponents=(tf, tf2, fuel))
+    tf_line = TurbojetLine(tag="Turbofan Line", subcomponents=(tf, tf2, fuel))
 
-    tf_network = EnergyNetwork(tag="Turbofan Network", subcomponents=(tf_line,))
+    tf_network = GraphNetwork(tag="Turbofan Network", subcomponents=(tf_line,))
     vehicle = vehicle.add_subcomponent(tf_network)
 
     # ------------------------------------------------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.framework.conditions import Condition
 
@@ -173,3 +173,24 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     turbine_PR: jnp.ndarray = empty_array(0)
 
     target_thrust: jnp.ndarray = empty_array(0)
+
+class TurbofanNetworkConditions(EnergyNetworkConditions):
+
+    tag: str = init_field("Turbofan Network", static=True)
+
+    # Control hooks
+    fuel_air_ratio: jnp.ndarray = empty_array(0)
+    mass_flow_rate: jnp.ndarray = empty_array(0)
+    
+    LP_speed: jnp.ndarray = empty_array(0)
+    HP_speed: jnp.ndarray = empty_array(0)
+
+    LP_Rline: jnp.ndarray = empty_array(0)
+    HP_Rline: jnp.ndarray = empty_array(0)
+    
+    LPT_PR: jnp.ndarray = empty_array(0)
+    HPT_PR: jnp.ndarray = empty_array(0)
+
+    bypass_ratio: jnp.ndarray = empty_array(0)
+    target_thrust: jnp.ndarray = empty_array(0)
+

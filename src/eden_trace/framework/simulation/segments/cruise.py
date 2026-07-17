@@ -20,7 +20,7 @@ from eden_trace.utils import init_field
 
 from eden_trace.framework import ProcessStep
 from eden_trace.framework.conditions.controls import Control, Control, NamedResidual
-from eden_trace.framework.missions.segments import Segment
+from eden_trace.framework.simulation.segments import Segment
 
 from .profiles import *
 

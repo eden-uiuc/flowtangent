@@ -19,7 +19,7 @@ from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.library import Component, MassProperties
 from eden_trace.library.attributes import AircraftClass, MediumRange
-from eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.networks import GraphNetwork
 from eden_trace.library.components.fuselages import Fuselage
 from eden_trace.library.components.landing_gear import LandingGear
 from eden_trace.library.components.nacelles import Nacelle
@@ -79,7 +79,7 @@ class AircraftDesign(eqx.Module):
     cruise_alt: float = init_field(0.0, static=True)
 
 @register
-class Aircraft[EnergyType: EnergyNetwork](System):
+class Aircraft[EnergyType: GraphNetwork](System):
     tag: str = init_field("Aircraft", static=True)
 
     mass_properties: AircraftMassProperties = init_field(AircraftMassProperties)  # type: ignore
@@ -87,7 +87,7 @@ class Aircraft[EnergyType: EnergyNetwork](System):
 
     _bookkeeping: dict = init_field(
         lambda: {
-            "energy_networks": EnergyNetwork,
+            "energy_networks": GraphNetwork,
             "wings": Wing,
             "fuselages": Fuselage,
             "nacelles": Nacelle,

@@ -42,7 +42,7 @@ from eden_trace.framework.methods.aero.VORJAX import (
     discretize_surfaces,
     initialize_VORJAX_data,
 )
-from eden_trace.framework.missions.initialize import initialize_aerodynamics
+from eden_trace.framework.simulation.initialize import initialize_aerodynamics
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings

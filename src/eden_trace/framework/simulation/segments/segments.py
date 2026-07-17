@@ -32,8 +32,8 @@ from eden_trace.utils import init_field, scan_for_invalid_JAX_types
 
 from eden_trace.framework import Process, ProcessStep
 from eden_trace.framework.conditions.controls import Control, Residual
-from eden_trace.framework.missions.initialize import *
-from eden_trace.framework.missions.update import *
+from eden_trace.framework.simulation.initialize import *
+from eden_trace.framework.simulation.update import *
 from eden_trace.framework.processes import null_step
 
 # Trace imports

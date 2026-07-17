@@ -11,12 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-    from eden_trace.library.components.energy.maps import CompressorMap, TurbineMap
+    from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbofanNetwork, TurbojetDesign, TurbofanDesign
+    from eden_trace.library.components.energy.maps.classes import CompressorMap, TurbineMap
 
 import jax.numpy as jnp
 import equinox as eqx
-from jaxopt import LevenbergMarquardt, GaussNewton
+from jaxopt import LevenbergMarquardt
 
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
@@ -24,26 +24,24 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.turbojets import FixedNozzle, VariableNozzle
+from eden_trace.library.components.energy.jets import VariableNozzle
 
-from eden_trace.framework import State, Aircraft, Settings
+from eden_trace.framework import State, System, Aircraft, Settings, Process
 from eden_trace.framework.settings import EnergyAnalysisSettings
 from eden_trace.framework.analyses.residual import ResidualAnalysis
 from eden_trace.framework.conditions.controls import Control, Residual
 
-from eden_trace.framework.missions.initialize import initialize_energy
-from eden_trace.framework.missions.update import update_freestream
+from eden_trace.framework.simulation.initialize import initialize_energy
+from eden_trace.framework.simulation.update import update_freestream
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Design Point Turbojet Analysis
+#  Design Point Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
+def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[State, System, Settings, Process]:
 
-    # Setup test state according to design parameters
-
-    network: TurbojetEnergyNetwork = system.energy
-    des: TurbojetDesign = network.design_parameters
+    network: TurbojetNetwork | TurbofanNetwork = system.energy
+    des: TurbojetDesign | TurbofanDesign = network.design_parameters
 
     alt = des.altitude
     M0 = des.mach_number
@@ -57,7 +55,7 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
             s.freestream.mach_number,
             s.frames.inertial.velocity_vector,
         ),
-        State().expand_rows(1),
+        state.expand_rows(1),
         (
             jnp.array([[0., 0., -alt]]),
             jnp.atleast_2d(M0),
@@ -71,8 +69,16 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
 
     # Build design analysis
-
     base_analysis = build_analysis_from_network(des_system.energy)
+
+    return des_state, des_system, des_settings, base_analysis
+
+def DesignTurbojet(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
+
+    # Setup test state according to design parameters
+
+    des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
+    des: TurbojetDesign = des_system.energy.design_parameters
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
@@ -109,6 +115,78 @@ def design_turbojet(state: State, system: Aircraft, settings: Settings) -> tuple
         solver=LevenbergMarquardt
     )
 
+    des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
+    des_net = des_system.energy.sync_and_clear_nodes()
+    des_system = des_system.replace_subcomponent(des_net)
+    
+    return des_state, des_system, settings
+
+def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
+
+    # Setup test state according to design parameters
+
+    des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
+
+    des: TurbofanDesign = des_system.energy.design_parameters
+    
+    # Set Design Bypass Ratio
+    des_state = eqx.tree_at(
+        lambda s: s.energy.bypass_ratio,
+        des_state,
+        des_system.energy.lines.engine.design_parameters.bypass_ratio
+    )
+
+    # Controls Setup
+    mass_ctrl = Control(
+        tag="Mass Flow Rate",
+        state_path=DataPath(("energy", "mass_flow_rate")),
+        initial_value=des.initial_MFR,
+        bounds=(
+            1e-3 * units.kg / units.s,
+            5e3  * units.kg / units.s,
+        ),
+    )
+
+    LPT_ctrl = Control(
+        tag="LPT Pressure Ratio",
+        state_path=DataPath(("energy", "LPT_PR")),
+        initial_value=des.initial_LPT_PR,
+        bounds=(1.001, 1e2),
+    )
+
+    HPT_ctrl = Control(
+        tag="HPT Pressure Ratio",
+        state_path=DataPath(("energy", "HPT_PR")),
+        initial_value=des.initial_LPT_PR,
+        bounds=(1.001, 1e2),
+    )
+
+    # Residuals Setup
+
+    d_thrust = Residual(
+        tag="Design Thrust",
+        get_value=lambda s: s.energy.outputs.residual.thrust
+    )
+
+    d_LP_power = Residual(
+        tag="LP Power Imbalance",
+        get_value=lambda s: s.energy.line.engine.lp_shaft.outputs.residual.power
+    )
+
+    d_HP_power = Residual(
+        tag="HP Power Imbalance",
+        get_value=lambda s: s.energy.line.engine.hp_shaft.outputs.residual.power
+    )
+
+    design_analysis = ResidualAnalysis(
+        tag="Turbojet Design",
+        analyze=base_analysis,
+        controls=(mass_ctrl, LPT_ctrl, HPT_ctrl),
+        residuals=(d_thrust, d_LP_power, d_HP_power),
+        solver=LevenbergMarquardt
+    )
+
+    # Run design analysis and update paramters
     des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
     des_net = des_system.energy.sync_and_clear_nodes()
     des_system = des_system.replace_subcomponent(des_net)
@@ -214,7 +292,7 @@ def _TurbojetResiduals():
 
 
 def TurbojetPerformance(
-        network: TurbojetEnergyNetwork,
+        network: TurbojetNetwork,
         initial_Rline: float | jnp.ndarray = 2.0,
         initial_turb_PR: float | jnp.ndarray = 5.0,
         initial_RPM: float | jnp.ndarray = 10_000 * units.rev / units.mins,
@@ -225,7 +303,6 @@ def TurbojetPerformance(
     # Compressor Map Bounds ----------------------------------------------------
 
     comp =  network.line.engine.compressor
-    c_des = comp.design_parameters
     c_map: CompressorMap = comp.map
     
     Nc_bnds = (min(c_map.Nc_grid).item() * c_map.s_Nc * 0.5,
@@ -240,11 +317,8 @@ def TurbojetPerformance(
     # Turbine Map Bounds -------------------------------------------------------
 
     turb =  network.line.engine.turbine
-    t_des = turb.design_parameters
     t_map: TurbineMap = turb.map
 
-    # Np_bnds = (min(t_map.Np_grid).item() * t_des.rotation_speed / 100,
-    #            max(t_map.Np_grid).item() * t_des.rotation_speed / 100)
     
     PR_bnds = (min(t_map.PR_grid).item() * 0.5,
                max(t_map.PR_grid).item() * 1.5)
@@ -253,9 +327,6 @@ def TurbojetPerformance(
                jnp.max(t_map.Wp_table).item(),)
     
     # Composite Bounds ---------------------------------------------------------
-    
-    # RPM_bnds = (max(Nc_bnds[0], Np_bnds[0]) * 0.5,
-    #             min(Nc_bnds[1], Np_bnds[1]) * 1.5)
     
     FAR_bnds = (1e-4, 0.02)
 

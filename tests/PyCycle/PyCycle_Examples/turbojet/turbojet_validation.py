@@ -8,14 +8,14 @@ import pandas as pd
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.networks import TurbojetEnergyNetwork, TurbojetDesign
-from eden_trace.library.components.energy.turbojets import TurbojetEngine, JetDesign
-from eden_trace.library.components.energy.lines import TurbojetEnergyLine
+from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbojetDesign
+from eden_trace.library.components.energy.jets import TurbojetEngine, JetDesign
+from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.turbojets import design_turbojet, TurbojetPerformance
-from eden_trace.framework.missions.initialize import initialize_energy
-from eden_trace.framework.missions.update import update_freestream
+from eden_trace.framework.analyses.energy.turbojets import DesignTurbojet, TurbojetPerformance
+from eden_trace.framework.simulation.initialize import initialize_energy
+from eden_trace.framework.simulation.update import update_freestream
 
 def system_setup(variable_nozzle: bool = False):
 
@@ -97,7 +97,7 @@ def system_setup(variable_nozzle: bool = False):
         )                
     )
 
-    line = TurbojetEnergyLine(tag="Line", subcomponents=(engine,),)
+    line = TurbojetLine(tag="Line", subcomponents=(engine,),)
     
     net_design = TurbojetDesign(
         altitude=0.0,
@@ -107,7 +107,7 @@ def system_setup(variable_nozzle: bool = False):
         initial_turb_PR=4.46138725662
     )
     
-    net = TurbojetEnergyNetwork(subcomponents=(line,), design_parameters=net_design)
+    net = TurbojetNetwork(subcomponents=(line,), design_parameters=net_design)
     
     sys = Aircraft(tag="Simple Turbojet System", subcomponents=(net,))
 
@@ -126,7 +126,7 @@ def off_design_point(
     initial_FAR: float | jnp.ndarray = 1e-4,
 ):
 
-    network: TurbojetEnergyNetwork = system.energy
+    network: TurbojetNetwork = system.energy
     des: TurbojetDesign = network.design_parameters
 
     atmo = des.atmosphere_model
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
-        st, sys, set = design_turbojet(
+        st, sys, set = DesignTurbojet(
             state=State(),
             system=system,
             settings=settings,

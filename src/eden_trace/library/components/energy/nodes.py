@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, Callable, Iterable, get_args, cast
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -26,8 +26,10 @@ from eden_trace.library import Component
 from eden_trace.library.gases import Air, IdealGas
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Energy Nodes
+#  Graph Nodes
 # ----------------------------------------------------------------------------------------------------------------------
+
+# Inputs & Nodes ---------------------------------------------------------------
 
 @register
 class Efficiencies(eqx.Module):
@@ -40,11 +42,11 @@ class Efficiencies(eqx.Module):
     force: float = 1.0
 
 
-EnergyDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "residual"]
+GraphDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "residual"]
 
 @register
 class GraphInput(eqx.Module):
-    domain: EnergyDomain = init_field("flow", static=True)
+    domain: GraphDomain = init_field("flow", static=True)
     network_ID: str = init_field("network", static=True)
 
     # Define iter to make castable to tuple as (self,)
@@ -67,42 +69,44 @@ class GraphNode(Component):
     def __getattr__(self, item: str):
         if item.endswith("_inputs"):
             domain = item.replace("_inputs", "")
-            return tuple(i.network_ID for i in self._get_inputs_by_domain(domain))
+            return self._get_inputs_by_domain(domain)
         else:
             return super(GraphNode, self).__getattr__(item)
     
     @eqx.filter_jit
-    def get_input(self, state, input: GraphInput, input_field: str):
+    def _get_inputs_by_domain(self, domain: GraphDomain | str):
+        return tuple(filter(lambda i: i.domain == domain, cast(tuple, self.inputs)))
+
+    @eqx.filter_jit
+    def get_input_state(self, state: State, input: GraphInput, input_field: str):
         return getattr(getattr(state.energy.nodes[input.network_ID].outputs, input.domain), input_field)
 
     @eqx.filter_jit
-    def _get_inputs_by_domain(self, domain: EnergyDomain | str):
-        return tuple(i for i in cast(tuple, self.inputs) if i.domain == domain)
-
-    @eqx.filter_jit
-    def get_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
-        output_conditions = [
-            getattr(state.energy.nodes[i.network_ID].outputs, input_type)
-            for i in self._get_inputs_by_domain(input_type)
+    def get_input_states(self, state: State, inputs: Iterable[GraphInput]):
+        return [
+            getattr(state.energy.nodes[i.network_ID].outputs, i.domain)
+            for i in inputs
         ]
-        input_values = [jnp.asarray(getattr(out, input_field)) for out in output_conditions]
-        return jnp.concatenate([jnp.atleast_2d(v) for v in input_values if v.size > 0], axis=-1)
-
-    @eqx.filter_jit
-    def sum_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
-        all_inputs = self.get_domain_inputs(state, input_type, input_field)
-        return jnp.atleast_2d(jnp.sum(all_inputs, axis=-1)).T
-        
-
-    @eqx.filter_jit
-    def diff_domain_inputs(self, state, input_type: EnergyDomain, input_field:str):
-        all_inputs = self.get_domain_inputs(state, input_type, input_field)
-        return jnp.atleast_2d(jnp.diff(all_inputs, axis=-1)).T
     
     @eqx.filter_jit
-    def average_domain_inputs(self, state, input_type: EnergyDomain, input_field: str):
-        all_inputs = self.get_domain_inputs(state, input_type, input_field)
-        return jnp.atleast_2d(jnp.mean(all_inputs, axis=-1)).T
+    def _get_input_array(self, state: State, inputs: Iterable[GraphInput], input_field: str):
+        input_conditions = self.get_input_states(state, inputs)
+        input_values = [jnp.asarray(getattr(inp, input_field)) for inp in input_conditions]
+        return jnp.concatenate([jnp.atleast_2d(v) for v in input_values if v.size > 0], axis=-1)
+    
+    # Input Operations
+    @eqx.filter_jit
+    def apply_input_op(self, arr_func:Callable, state:State, inputs: Iterable[GraphInput], input_field:str):
+        input_arr = self._get_input_array(state, inputs, input_field)
+        return jnp.atleast_2d(arr_func(input_arr, axis=-1)).T
+    
+    @eqx.filter_jit
+    def apply_domain_op(self, arr_func:Callable, state:State, domain: GraphDomain, input_field:str):
+        inputs = self._get_inputs_by_domain(domain)
+        input_arr = self._get_input_array(state, inputs, input_field)
+        return jnp.atleast_2d(arr_func(input_arr, axis=-1)).T
+    
+
 
     def transmit(self, state: State, system: System, settings: Settings):
         raise NotImplementedError(
@@ -110,33 +114,40 @@ class GraphNode(Component):
             "Subclasses of EnergyNode must implement their individual transmission methods."
         )
 
+# Splitters --------------------------------------------------------------------
+
 @register
 class GraphSplitter(GraphNode):
-    split_fraction: float = 1.0
+    fraction: float | Callable[[State], float|jnp.ndarray] = init_field(1.0, as_value=True, static=True)
 
-    _splitter_type: str = init_field("flow", static=True)
-    split_values: tuple[str] = init_field(("mass_flow_rate",), static=True)
+    values: tuple[str] = init_field(("mass_flow_rate",), static=True)
+    _domain: str = init_field("flow", static=True)
 
     def __post_init__(self):
         super(GraphSplitter, self).__post_init__()
         assert(isinstance(self.inputs, tuple))
-        assert len(self.inputs) == 1, f"Energy splitters can only have one input. Found: {self.inputs}"
-        for splitter in ["flow", "mechanical", "electrical", "fuel", "force"]:
+        assert len(self.inputs) == 1, f"Graph splitters can only have one input. Found: {self.inputs}"
+        for splitter in get_args(GraphDomain):
             if len(getattr(self, splitter + "_inputs")) > 0:
-                self._splitter_type = splitter
+                self._domain = splitter
 
     def transmit(self, state: State, system: System, settings: Settings):
 
-        total_input = getattr(state.energy.nodes[tuple(self.inputs)[0]].outputs, self._splitter_type)
+        total_input = getattr(state.energy.nodes[tuple(self.inputs)[0]].outputs, self._domain)
+
+        if callable(self.fraction):
+            frac = self.fraction(state)
+        else:
+            frac = self.fraction
 
         extracted_input = eqx.tree_at(
-            lambda t: tuple(getattr(t, s) for s in self.split_values),
+            lambda t: tuple(getattr(t, s) for s in self.values),
             total_input,
-            tuple(getattr(total_input, s) * self.split_fraction for s in self.split_values),
+            tuple(getattr(total_input, s) * frac for s in self.values),
         )
 
         updated_state = eqx.tree_at(
-            lambda s: getattr(s.energy.nodes[self.network_ID].outputs, self._splitter_type), state, extracted_input
+            lambda s: getattr(s.energy.nodes[self.network_ID].outputs, self._domain), state, extracted_input
         )
 
         return updated_state, system, settings
@@ -225,3 +236,9 @@ class Battery(EnergyStore):
     resistance: float = 0.0
 
     ragone: BatteryRagoneParameters = init_field(BatteryRagoneParameters)
+
+if __name__ == "__main__":
+
+    doms = get_args(GraphDomain)
+    for d in doms:
+        print(d)

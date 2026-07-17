@@ -15,10 +15,10 @@ if TYPE_CHECKING:
 # package imports
 import equinox as eqx
 
-from eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.networks import GraphNetwork
 
 # Trace Imports
-from eden_trace.framework.conditions.energy import EnergyNodeConditions, TurbojetNetworkConditions
+from eden_trace.framework.conditions.energy import EnergyNodeConditions, TurbojetNetworkConditions, TurbofanNetworkConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
@@ -29,7 +29,8 @@ def initialize_energy(state: State, system: System, settings: Settings):
 
     flat_state_nodes = {}
     conditions_map = {
-        "TurbojetEnergyNetwork": TurbojetNetworkConditions,
+        "TurbojetNetwork": TurbojetNetworkConditions,
+        "TurbofanNetwork": TurbofanNetworkConditions,
     }
 
     def _extract_to_flat_state(n):
@@ -47,7 +48,7 @@ def initialize_energy(state: State, system: System, settings: Settings):
     updated_system = system
 
     for network in updated_system.energy_networks:
-        network: EnergyNetwork
+        network: GraphNetwork
         network_sc_idx = updated_system.subcomponents.index(network)
         updated_network = network.assign_network_IDs()
 

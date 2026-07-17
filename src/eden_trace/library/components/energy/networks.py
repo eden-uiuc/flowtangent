@@ -27,10 +27,10 @@ import equinox as eqx
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.nodes import EnergyDomain, GraphInput, GraphNode
 from eden_trace.library.atmospheres import USStandard1976
 
-from .lines import EnergyLine, TurbojetEnergyLine
+from .nodes import GraphDomain, GraphInput, GraphNode
+from .lines import EnergyLine, TurbojetLine, TurbofanLine
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Conditions
@@ -81,11 +81,13 @@ def _resolve_namespaces(node, parent_prefix=""):
 
 
 @register
-class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
+class GraphNetwork[DesignType: NetworkDesign](GraphNode):
     
-    tag: str = init_field("Energy Network", static=True)
+    tag: str = init_field("Network", static=True)
+    network_ID: str = init_field("network", static=True)
+    
     nodes: dict[str, "GraphNode"] = init_field(dict)
-    domains: tuple[EnergyDomain, ...] = init_field(tuple, static=True)
+    domains: tuple[GraphDomain, ...] = init_field(tuple, static=True)
     design_parameters: DesignType = init_field(NetworkDesign)
 
     _bookkeeping: dict = init_field(lambda: {"lines": EnergyLine}, static=True)
@@ -94,7 +96,7 @@ class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
     controls: tuple[Control, ...] = init_field(tuple, static=True)
     residuals: tuple[Residual, ...] = init_field(tuple, static=True)
 
-    def _rebalance_flow_splitters(self) -> "EnergyNetwork":
+    def _rebalance_flow_splitters(self) -> "GraphNetwork":
         """Rebalances fractions directly within the subcomponents tree."""
         # Grab a temporary flat dict just to look at the hierarchy
         temp_dict = {}
@@ -147,7 +149,7 @@ class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
 
         return updated_network
 
-    def _get_all_nodes(self) -> "EnergyNetwork":
+    def _get_all_nodes(self) -> "GraphNetwork":
         nodes_dict = {}
 
         def _recurse(subcomponents):
@@ -160,7 +162,7 @@ class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
         _recurse(self.subcomponents)
         return eqx.tree_at(lambda n: n.nodes, self, nodes_dict)
 
-    def sort_network_topology(self) -> "EnergyNetwork":
+    def sort_network_topology(self) -> "GraphNetwork":
         """The single entry point to finalize the network for execution.
         Use after running initialize_energy so parts are properly ID'd."""
 
@@ -176,7 +178,7 @@ class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
     
-    def sync_and_clear_nodes(self) -> EnergyNetwork:
+    def sync_and_clear_nodes(self) -> GraphNetwork:
         """
         Projects the updated nodes from the flat 'nodes' dictionary
         back onto their original positions in the nested subcomponents tree.
@@ -209,32 +211,15 @@ class EnergyNetwork[DesignType: NetworkDesign](GraphNode):
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-#  Turbojet Energy Network
+#  Turbojet Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
 
-def _TurbojetNetworkSetup():
-    return (TurbojetEnergyLine(tag="Line"),)
+class _JetNetwork[DesignType: TurbojetDesign | TurbofanDesign](GraphNetwork[DesignType]):
+    """
+    Jet network shell without design parameters.
+    """
 
-@register
-class TurbojetDesign(NetworkDesign):
-
-    initial_MFR: float = 100.0 * units.lbm / units.s
-    initial_turb_PR: float = 5.0
-
-    mass_flow_rate: float = 100 * units.kg / units.s
-    power: float = 2e7 * units.W
-
-
-
-@register
-class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
-    tag: str = init_field("Network", static=True)
-    network_ID: str = init_field("network", static=True)
-
-    subcomponents: tuple = init_field(_TurbojetNetworkSetup)
-    design_parameters: TurbojetDesign = init_field(TurbojetDesign)
-
-    inputs: tuple = init_field(
+    inputs: tuple | GraphInput = init_field(
         (
             GraphInput("force", "network.line"),
             GraphInput("residual", "network.line"),
@@ -247,11 +232,9 @@ class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
 
         # Total Thrust----------------------------------------------------------
 
-        total_thrust = jnp.atleast_2d(self.sum_domain_inputs(state, "force", "thrust"))
+        total_thrust = jnp.atleast_2d(self.apply_domain_op(jnp.sum, state, "force", "thrust"))
 
-        total_force_vector = jnp.hstack(
-            (total_thrust, jnp.zeros((total_thrust.shape[0], 2)))
-        )
+        total_force_vector = jnp.hstack((total_thrust, jnp.zeros((total_thrust.shape[0], 2))))
         if settings.analysis.energy.design_mode:
             target_thrust = self.design_parameters.thrust
         else:
@@ -268,21 +251,50 @@ class TurbojetEnergyNetwork(EnergyNetwork[TurbojetDesign]):
             )
         )
 
+        # Power Imbalance (Single Shaft Only) ----------------------------------
 
-        # Mass & Work Imbalance -------------------------------------------------------
+        total_d_power = self.apply_domain_op(jnp.sum, updated_state, "residual", "power")
 
-        total_d_work = self.sum_domain_inputs(updated_state, "residual", "power")
-        # total_d_mass = self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate")
-
-        updated_state = eqx.tree_at(
-            lambda s: (
-                s.energy.outputs.residual.power,
-                # s.energy.outputs.residual.mass_flow_rate
-            ),
-            updated_state,(
-                total_d_work,
-                # total_d_mass
-            )
-        )
+        updated_state = eqx.tree_at(lambda s: s.energy.outputs.residual.power, updated_state, total_d_power)
 
         return updated_state, system, settings
+
+# Turbojet ---------------------------------------------------------------------
+
+def _TurbojetNetworkSetup():
+    return (TurbojetLine(tag="Line"),)
+
+@register
+class TurbojetDesign(NetworkDesign):
+
+    initial_MFR: float = 100.0 * units.kg / units.s
+    initial_turb_PR: float = 5.0
+
+    mass_flow_rate: float = 100 * units.kg / units.s
+    power: float = 2e7 * units.W
+
+@register
+class TurbojetNetwork(_JetNetwork[TurbojetDesign]):
+    subcomponents: tuple = init_field(_TurbojetNetworkSetup)
+    design_parameters: TurbojetDesign = init_field(TurbojetDesign)
+
+
+# Turbofan ---------------------------------------------------------------------
+
+def _TurbofanNetworkSetup():
+    return TurbofanLine()
+
+@register
+class TurbofanDesign(NetworkDesign):
+
+    initial_MFR:    float = 100.0 * units.kg / units.s
+    initial_LPT_PR: float = 3.0
+    initial_HPT_PR: float = 5.0
+
+    mass_flow_rate: float = 100 * units.kg / units.s
+    power: float = 2e7 * units.W
+
+@register
+class TurbofanNetwork(_JetNetwork[TurbofanDesign]):
+    subcomponents: tuple = init_field(_TurbofanNetworkSetup)
+    design_parameters: TurbofanDesign = init_field(TurbofanDesign)

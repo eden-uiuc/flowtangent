@@ -18,7 +18,7 @@ import networkx as nx
 
 from eden_trace.utils import init_field, inputs, outputs
 
-from eden_trace.library.components.energy.networks import EnergyNetwork
+from eden_trace.library.components.energy.networks import GraphNetwork
 
 from eden_trace.framework import Process, ProcessStep
 
@@ -28,7 +28,7 @@ from eden_trace.framework import Process, ProcessStep
 
 
 class GraphEnergyAnalysis(Process):
-    analysis_network: EnergyNetwork = init_field(EnergyNetwork)
+    analysis_network: GraphNetwork = init_field(GraphNetwork)
 
     def graph(self, **kwargs) -> nx.DiGraph:
 
@@ -46,7 +46,7 @@ class GraphEnergyAnalysis(Process):
         return G
 
 
-def build_analysis_from_network(network: EnergyNetwork):
+def build_analysis_from_network(network: GraphNetwork):
 
     analysis_network = network.assign_network_IDs()
 

@@ -12,7 +12,7 @@ from eden_trace.utils import init_field, outputs, register
 from eden_trace.utils import inputs as func_inputs
 
 from .nodes import GraphInput, GraphNode, GraphSplitter, EnergyStore, FuelTank
-from .turbojets import TurbojetEngine
+from .jets import TurbojetEngine, TurbofanEngine
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Line
@@ -20,6 +20,7 @@ from .turbojets import TurbojetEngine
 
 @register
 class EnergyLine(GraphNode):
+    tag: str = init_field("Line", static=True)
     _bookkeeping: dict = init_field(
         lambda: {
             "splitters": GraphSplitter,
@@ -32,20 +33,18 @@ class EnergyLine(GraphNode):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Jets
 # ----------------------------------------------------------------------------------------------------------------------
+
+# Turbojet ---------------------------------------------------------------------
+
 def _TurbojetLineSetup():
-    E1 = TurbojetEngine(tag="Engine")
-    tank = FuelTank()
-
-    return E1, tank
-
+    return TurbojetEngine(), FuelTank()
 
 @register
-class TurbojetEnergyLine(EnergyLine):
-    tag: str = init_field("Turbojet Energy Line", static=True)
+class TurbojetLine(EnergyLine):
 
     subcomponents: tuple = init_field(_TurbojetLineSetup)
     
-    inputs: tuple = init_field(
+    inputs: tuple | GraphInput = init_field(
         (
             GraphInput("fuel", "self.engine"),
             GraphInput("force", "self.engine"),
@@ -57,7 +56,11 @@ class TurbojetEnergyLine(EnergyLine):
     tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
 
     _bookkeeping: dict = init_field(
-        lambda: {"engines": TurbojetEngine, "stores": FuelTank, "fuel_tanks": FuelTank},
+        lambda: {
+            "engines": TurbojetEngine,
+            "stores": FuelTank,
+            "fuel_tanks": FuelTank
+        },
         static=True,
     )
 
@@ -71,8 +74,8 @@ class TurbojetEnergyLine(EnergyLine):
     @outputs("state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate")
     def transmit(self, state: State, system: System, settings: Settings):
 
-        # Fuel Burn --------------------------------------------------------------------------------------------------
-        total_fuel_burn = self.sum_domain_inputs(state, "fuel", "flow_rate")
+        # Fuel Burn ------------------------------------------------------------
+        total_fuel_burn = self.apply_domain_op(jnp.sum, state, "fuel", "flow_rate")
 
         #  Compute fuel fraction
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
@@ -108,15 +111,15 @@ class TurbojetEnergyLine(EnergyLine):
             lambda s: s.mass.rate_of_change, updated_state, updated_state.mass.rate_of_change - total_fuel_burn
         )
 
-        # Total Thrust -------------------------------------------------------------------------------------------------
+        # Total Thrust ---------------------------------------------------------
 
         updated_state = eqx.tree_at(
             lambda s: s.energy.nodes[self.network_ID].outputs.force.thrust,
             updated_state,
-            self.sum_domain_inputs(updated_state, "force", "thrust")
+            self.apply_domain_op(jnp.sum, updated_state, "force", "thrust")
         )
 
-        # Mass & Work Imbalance ----------------------------------------------------------------------------------------
+        # Mass & Work Imbalance ------------------------------------------------
 
         updated_state = eqx.tree_at(
             lambda s: (
@@ -124,9 +127,21 @@ class TurbojetEnergyLine(EnergyLine):
                 s.energy.nodes[self.network_ID].outputs.residual.power,
             ),
             updated_state, (
-                self.sum_domain_inputs(updated_state, "residual", "mass_flow_rate"),
-                self.sum_domain_inputs(updated_state, "residual", "power"),
+                self.apply_domain_op(jnp.sum, updated_state, "residual", "mass_flow_rate"),
+                self.apply_domain_op(jnp.sum, updated_state, "residual", "power"),
             )
         )
 
         return updated_state, system, settings
+
+
+# Turbofan ---------------------------------------------------------------------
+
+def _TurbofanLineSetup():
+    return TurbofanEngine(), FuelTank()
+
+def TurbofanLine(**kwargs):
+    return TurbojetLine(
+        subcomponents=_TurbofanLineSetup(),
+        **kwargs
+    )
