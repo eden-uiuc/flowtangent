@@ -126,7 +126,7 @@ class ResidualAnalysis(Process):
             # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
             pad = max((len(t) for t in all_tags), default=20) + 2
 
-            print(f"\n{'Active Controls':<{pad+2}}| {'Init. Values':<14}| Bounds")
+            print(f"\n{'Active Controls':<{pad+2}}| {'Init. Values':<13}| Bounds")
             print("-"*65)
             for control in state.controls.active_controls:
                 print(f"- {control.tag:<{pad}}| {format_array(control.initial_value, width=12)} | {format_array(jnp.asarray(control.bounds))}")

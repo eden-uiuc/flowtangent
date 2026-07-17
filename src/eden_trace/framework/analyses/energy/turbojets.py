@@ -157,7 +157,7 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     HPT_ctrl = Control(
         tag="HPT Pressure Ratio",
         state_path=DataPath(("energy", "HPT_PR")),
-        initial_value=des.initial_LPT_PR,
+        initial_value=des.initial_HPT_PR,
         bounds=(1.001, 1e2),
     )
 
@@ -179,7 +179,7 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     )
 
     design_analysis = ResidualAnalysis(
-        tag="Turbojet Design",
+        tag="Turbofan Design",
         analyze=base_analysis,
         controls=(mass_ctrl, LPT_ctrl, HPT_ctrl),
         residuals=(d_thrust, d_LP_power, d_HP_power),

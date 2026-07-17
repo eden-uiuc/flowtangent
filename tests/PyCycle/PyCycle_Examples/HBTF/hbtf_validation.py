@@ -17,6 +17,8 @@ from eden_trace.library.components.energy.lines import TurbofanLine
 from eden_trace.framework import State, Aircraft, Settings
 from eden_trace.framework.analyses.energy.turbojets import DesignTurbofan
 
+test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
+
 def system_setup():
 
     engine = TurbofanEngine(design_parameters=JetDesign(thrust=5900 * units.lbf, bypass_ratio=5.105))
@@ -159,20 +161,22 @@ def system_setup():
         mach_number=0.8,
         thrust=5900 * units.lbf,
         initial_MFR=100.0 * units.lbm / units.s,
-        initial_LPT_PR=4.0,
-        initial_HPT_PR=3.0,
+        initial_LPT_PR=3.0,
+        initial_HPT_PR=4.0,
     )
     
     net = TurbofanNetwork(subcomponents=(line,), design_parameters=net_design)
     
     sys = Aircraft(tag="HBTF System", subcomponents=(net,))
 
+    save_data(sys, test_dir / "HBTF_template.trs")
+
     return sys
 
 if __name__ == "__main__":
 
     # Control Board
-    DEBUG = True
+    DEBUG = False
     VERBOSE = True
 
     DESIGN_POINT = True
@@ -180,12 +184,12 @@ if __name__ == "__main__":
     # Build HBTF ---------------------------------------------------------------
     system = system_setup()
     settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
-    test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 
     if DESIGN_POINT:
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
+        
         st, sys, set = DesignTurbofan(
             state=State(),
             system=system,

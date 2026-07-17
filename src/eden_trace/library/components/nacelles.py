@@ -13,14 +13,14 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field
 
-from eden_trace.library import Component, ComponentDimensions
+from eden_trace.library import Component, Dimensions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Nacelle
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NacelleDiameters(ComponentDimensions):
+class NacelleDiameters(Dimensions):
     inlet: float = 0.0
 
 

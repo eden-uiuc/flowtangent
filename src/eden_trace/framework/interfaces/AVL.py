@@ -14,7 +14,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 from eden_trace.library import units
-from eden_trace.library.components import ComponentAreas
+from eden_trace.library.components import Areas
 from eden_trace.library.components.airfoils import Airfoil
 from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 
@@ -133,7 +133,7 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
     sref, cref, bref = avl_data["reference_area"]
     xref, yref, zref = avl_data["reference_point"]
 
-    global_areas = ComponentAreas(reference=sref)
+    global_areas = Areas(reference=sref)
     vehicle = Aircraft(tag=avl_data["name"], areas=global_areas)
     vehicle = eqx.tree_at(lambda v: v.mass_properties.center_of_gravity, vehicle, jnp.array([[xref, yref, zref]]))
 

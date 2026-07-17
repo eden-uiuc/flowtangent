@@ -12,7 +12,7 @@ import jax.numpy as jnp
 
 from eden_trace.utils import empty_array, init_field
 
-from eden_trace.library import Component, ComponentDimensions
+from eden_trace.library import Component, Dimensions
 from eden_trace.library.components.airfoils import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ from eden_trace.library.components.airfoils import Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WingDimensions(ComponentDimensions):
+class WingDimensions(Dimensions):
     root: float = 0.0
     tip: float = 0.0
 

@@ -11,9 +11,9 @@
 
 from .component import (
     Component,
-    ComponentAreas,
-    ComponentDimensions,
-    ComponentFineness,
+    Areas,
+    Dimensions,
+    Fineness,
     MassProperties,
     MaterialProperties,
 )

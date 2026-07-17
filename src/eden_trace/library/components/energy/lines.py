@@ -138,7 +138,7 @@ def _TurbofanLineSetup():
 def TurbofanLine(**kwargs):
 
     if "subcomponents" not in kwargs:
-        kwargs['subcombponents'] = _TurbofanLineSetup()
+        kwargs['subcomponents'] = _TurbofanLineSetup()
 
     return TurbojetLine(
         **kwargs

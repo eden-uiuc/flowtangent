@@ -337,15 +337,13 @@ def serialize_Trace_node(obj):
     else:
         if hasattr(obj, "tag") and obj.tag:
             warnings.warn(
-                f"Attempted to save '{obj.tag}' wing unregisterd class {type(obj).__name__}. "
+                f"Attempted to save '{obj.tag}' with unregisterd class {type(obj).__name__}. "
                 "Trace will be unable to load this data until the class is registered.", UserWarning)
         else:
             warnings.warn(
-                f"Attempted to save unregisterd class {type(obj).__name__}. "
+                f"Attempted to save '{obj}' with unregisterd class {type(obj).__name__}. "
                 "Trace will be unable to load this data until the class is registered.", UserWarning)
         return {"__type__": "unknown", "data": str(obj)}
-        
-
 
 def deserialize_Trace_node(data):
     """Unpacks JSON, relying on default initializers to fill in missing attributes."""
@@ -394,7 +392,9 @@ def save_data(obj, filename:str | Path):
     """
     Serializes any registered Trace data structure and compresses it to a file.
     """
-    payload = serialize_Trace_node(obj)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        payload = serialize_Trace_node(obj)
     
     with gzip.open(filename, 'wt', encoding='utf-8') as f:
         json.dump(payload, f)

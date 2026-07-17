@@ -1436,6 +1436,18 @@ class TurbojetEngine(FlowNode[JetDesign]):
 
         return updated_state, system, settings
 
+# Makes BPR split serializable for save/load
+@register
+class BPRSplit(eqx.Module):
+    is_bypass: bool = init_field(True, static=True)
+
+    def __call__(self, state):
+        bpr = state.energy.bypass_ratio
+        if self.is_bypass:
+            return bpr / (1.0 + bpr)
+        else:
+            return 1.0 / (1.0 + bpr)
+
 def _TurbofanSetup():
 
     def alpha(state: State):
@@ -1448,8 +1460,8 @@ def _TurbofanSetup():
     inlet = Inlet()
     fan = Compressor(tag="Fan", map=map_data.Fan)
 
-    fan_flow = GraphSplitter(tag="Fan Duct", inputs=GraphInput("flow", "fan"), fraction=alpha)
-    core_flow = GraphSplitter(tag="Core Duct", inputs=GraphInput("flow", "fan"), fraction=beta)
+    fan_flow = GraphSplitter(tag="Fan Duct", inputs=GraphInput("flow", "fan"), fraction=BPRSplit(is_bypass=True))
+    core_flow = GraphSplitter(tag="Core Duct", inputs=GraphInput("flow", "fan"), fraction=BPRSplit(is_bypass=False))
 
     lpc = Compressor(tag="LPC", map=map_data.LPC, inputs=GraphInput("flow", "core duct"))
     hpc = Compressor(tag="HPC", map=map_data.HPC, inputs=GraphInput("flow", "lpc"))

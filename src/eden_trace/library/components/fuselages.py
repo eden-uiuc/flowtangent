@@ -13,21 +13,21 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field
 
-from eden_trace.library import Component, ComponentAreas, ComponentDimensions, ComponentFineness
+from eden_trace.library import Component, Areas, Dimensions, Fineness
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Fuselage
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FuselageHeights(ComponentDimensions):
+class FuselageHeights(Dimensions):
     quarter_length: float = 0.0
     three_quarters_length: float = 0.0
     wing_root_quarter_chord: float = 0.0
     vertical_root_quarter_chord: float = 0.0
 
 
-class FuselageLengths(ComponentDimensions):
+class FuselageLengths(Dimensions):
     nose: float = 0.0
     tail: float = 0.0
     cabin: float = 0.0
@@ -49,11 +49,11 @@ class Fuselage(Component):
     seat_pitch: float = init_field(0.0, static=True)
     differential_pressure: float = init_field(0.0, static=True)
 
-    heights: ComponentDimensions = init_field(FuselageHeights)
-    lengths: ComponentDimensions = init_field(FuselageLengths)
+    heights: Dimensions = init_field(FuselageHeights)
+    lengths: Dimensions = init_field(FuselageLengths)
 
-    diameters: ComponentDimensions = init_field(ComponentDimensions)
-    fineness: ComponentFineness = init_field(ComponentFineness)
+    diameters: Dimensions = init_field(Dimensions)
+    fineness: Fineness = init_field(Fineness)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -61,7 +61,7 @@ class Fuselage(Component):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class BWBAreas(ComponentAreas):
+class BWBAreas(Areas):
     aft_centerbody: float = 0.0
 
 

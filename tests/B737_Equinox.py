@@ -26,7 +26,7 @@ from eden_trace.framework.analyses.energy import build_analysis_from_network
 from eden_trace.framework.plotting import plot_vlm_panels
 
 from eden_trace.library import units
-from eden_trace.library.components import ComponentAreas, Airfoil, _AF_DIR, MassProperties
+from eden_trace.library.components import Areas, Airfoil, _AF_DIR, MassProperties
 from eden_trace.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
 from eden_trace.library.components.fuselages import *
 from eden_trace.library.components.landing_gear import LandingGear
@@ -64,7 +64,7 @@ def vehicle_setup():
         tag='Boeing 737',
         passengers=170,
         mass_properties=mass_props,
-        areas=ComponentAreas(reference=124.862),
+        areas=Areas(reference=124.862),
         envelope=VehicleEnvelope(ultimate_load_factor=3.75, limit_load_factor=1.5),
         design_mach_number=0.78,
         design_range=3582,
@@ -155,7 +155,7 @@ def vehicle_setup():
         sweeps=WingSweeps(quarter_chord=25. * units.deg),
         spans=WingDimensions(projected=34.32),
         chords=WingChords(root=7.760, tip=0.782, mean_aerodynamic=4.235),
-        areas=ComponentAreas(reference=124.862, wetted=225.08),
+        areas=Areas(reference=124.862, wetted=225.08),
         twists=WingDimensions(root=4.0 * units.deg, tip=0.0 * units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
         subcomponents=(slat, flap, aileron)
@@ -205,7 +205,7 @@ def vehicle_setup():
         sweeps                  =WingSweeps(quarter_chord=28.2250 * units.deg),
         spans                   =WingDimensions(projected=14.4),
         chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
-        areas                   =ComponentAreas(reference=41.49, exposed=59.354, wetted=71.81),
+        areas                   =Areas(reference=41.49, exposed=59.354, wetted=71.81),
         twists                  =WingDimensions(root=3.0 * units.deg, tip=3.0 * units.deg),
         segments                =(h_root_segment, h_tip_segment),
         subcomponents           =(elevator,)).update_geometry()
@@ -254,7 +254,7 @@ def vehicle_setup():
         sweeps                  =WingSweeps(quarter_chord=32.2 * units.deg),
         spans                   =WingDimensions(projected=8.33),
         chords                  =WingChords(root=10.1, tip=1.20, mean_aerodynamic=4.0),
-        areas                   =ComponentAreas(reference=34.89, wetted=57.25),
+        areas                   =Areas(reference=34.89, wetted=57.25),
         segments=(root_segment, mid_segment, tip_segment)).update_geometry()
 
     vehicle = vehicle.add_subcomponent(v_stab)
@@ -289,8 +289,8 @@ def vehicle_setup():
             tag=f'Fuselage Segment {idx}',
             percent_x_location=x,
             percent_z_location=z,
-            heights=ComponentDimensions(maximum=h),
-            widths=ComponentDimensions(maximum=w)))
+            heights=Dimensions(maximum=h),
+            widths=Dimensions(maximum=w)))
 
     # Fuselage Properties ----------------------------------------------------------------------------------------------
     fuse = Fuselage(
@@ -299,15 +299,15 @@ def vehicle_setup():
         seats_abreast=6,
         seat_pitch=0.7874,
         differential_pressure=5.0e4,
-        diameters=ComponentDimensions(effective=3.74),
-        fineness=ComponentFineness(nose=1.6, tail=2.),
+        diameters=Dimensions(effective=3.74),
+        fineness=Fineness(nose=1.6, tail=2.),
         lengths=FuselageLengths(nose=6.4, tail=8.0, cabin=28.85, total=38.02, fore_space=6., aft_space=5.),
-        widths=ComponentDimensions(maximum=3.74),
+        widths=Dimensions(maximum=3.74),
         heights=FuselageHeights(maximum=3.74,
                                 quarter_length=3.74,
                                 three_quarters_length=3.65,
                                 wing_root_quarter_chord=3.74),
-        areas=ComponentAreas(side_projected=142.1948, wetted=385.51, front_projected=12.57),
+        areas=Areas(side_projected=142.1948, wetted=385.51, front_projected=12.57),
         segments=tuple(f_segments)
     )
 
@@ -331,9 +331,9 @@ def vehicle_setup():
         flow_through= True,
         airfoil=Airfoil.NACA_4_Series('2410'),
         origin= jnp.array([[13.72, -4.86, -1.9]]),
-        lengths=ComponentDimensions(total=2.71),
+        lengths=Dimensions(total=2.71),
         diameters=NacelleDiameters(maximum=2.05, inlet=1.90),
-        areas=ComponentAreas(wetted=1.1 * jnp.pi * 2.05 * 2.71)
+        areas=Areas(wetted=1.1 * jnp.pi * 2.05 * 2.71)
     )
 
     nacelle_2 = dc.replace(nacelle, tag="Engine Nacelle 2", origin=jnp.array([[13.72, 4.86, -1.9]]))
@@ -351,7 +351,7 @@ def vehicle_setup():
         origin=jnp.array([[13.72, -4.86, -1.9]]),
         bypass_ratio=5.4,
         plug_diameter=0.1,
-        lengths=ComponentDimensions(total=2.71),
+        lengths=Dimensions(total=2.71),
         design_parameters=JetDesign(
             thrust=24000.,
             altitude=10668.,

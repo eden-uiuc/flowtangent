@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, Callable, Iterable, get_args, cast
 
+import warnings
 import equinox as eqx
 import jax.numpy as jnp
 
@@ -126,7 +127,8 @@ class GraphSplitter(GraphNode):
     def __post_init__(self):
         super(GraphSplitter, self).__post_init__()
         assert(isinstance(self.inputs, tuple))
-        assert len(self.inputs) == 1, f"Graph splitters can only have one input. Found: {self.inputs}"
+        if len(self.inputs) != 1:
+            warnings.warn(f"Graph splitters can only have one input. Found: {self.inputs}", RuntimeWarning)
         for splitter in get_args(GraphDomain):
             if len(getattr(self, splitter + "_inputs")) > 0:
                 self._domain = splitter

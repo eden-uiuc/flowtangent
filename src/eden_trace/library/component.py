@@ -17,7 +17,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.library.attributes.materials import Aluminum, Solid
 
@@ -26,7 +26,8 @@ from eden_trace.library.attributes.materials import Aluminum, Solid
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ComponentFineness(eqx.Module):
+@register
+class Fineness(eqx.Module):
     # Attribute     Type    Default Value
     effective: float = 1.0
     nose: float = 0.0
@@ -35,8 +36,8 @@ class ComponentFineness(eqx.Module):
     def __repr__(self):
         return f"Eff.: {self.effective}"
 
-
-class ComponentDimensions(eqx.Module):
+@register
+class Dimensions(eqx.Module):
     # Attribute         Type    Default Value
     ordinal_direction: bool = init_field(False, static=True)
 
@@ -53,8 +54,8 @@ class ComponentDimensions(eqx.Module):
     def __repr__(self):
         return ""
 
-
-class ComponentAreas(eqx.Module):
+@register
+class Areas(eqx.Module):
     # Attribute         Type    Default Value
     reference: float = 0.0
     total: float = 0.0
@@ -79,6 +80,7 @@ class ComponentAreas(eqx.Module):
         return ""
 
 
+@register
 class MaterialProperties(eqx.Module):
     # Attribute                 Type        Default Value
     tensile_stress_carrier: Solid = init_field(Aluminum)
@@ -89,6 +91,7 @@ class MaterialProperties(eqx.Module):
         return ""
 
 
+@register
 class MassProperties(eqx.Module):
     # Attribute                         Type        Default Value
     total: float = 0.0
@@ -106,6 +109,7 @@ class MassProperties(eqx.Module):
         return ""
 
 
+@register
 class Component(eqx.Module):
     tag: str = init_field("Component", static=True)
     is_control_component: bool = init_field(False, static=True)
@@ -115,13 +119,13 @@ class Component(eqx.Module):
     origin: jnp.ndarray = empty_array(3)
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
-    areas: ComponentAreas = init_field(ComponentAreas)
+    areas: Areas = init_field(Areas)
 
     # -------------------------------------------------DIMENSIONS-------------------------------------------------------
-    lengths: ComponentDimensions = init_field(ComponentDimensions)
-    widths: ComponentDimensions = init_field(ComponentDimensions)
-    heights: ComponentDimensions = init_field(ComponentDimensions)
-    diameters: ComponentDimensions = init_field(ComponentDimensions)
+    lengths: Dimensions = init_field(Dimensions)
+    widths: Dimensions = init_field(Dimensions)
+    heights: Dimensions = init_field(Dimensions)
+    diameters: Dimensions = init_field(Dimensions)
 
     # -----------------------------------------------MASS & MATERIALS---------------------------------------------------
     mass_properties: MassProperties = init_field(MassProperties)

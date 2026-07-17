@@ -20,7 +20,7 @@ from plotly.subplots import make_subplots
 import eden_trace.utils as tu
 
 from eden_trace.library import units
-from eden_trace.library.components import ComponentAreas
+from eden_trace.library.components import Areas
 from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
 from eden_trace.library.components.airfoils import Airfoil
 
@@ -185,7 +185,7 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     wing_chords = WingChords(root=chord, tip=chord, mean_aerodynamic=chord)
 
-    wing_areas = ComponentAreas(reference=span * chord, wetted=2 * span * chord)
+    wing_areas = Areas(reference=span * chord, wetted=2 * span * chord)
 
     wing = Wing(
         symmetric=True,
@@ -245,7 +245,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
         root_chord_percent=0.01
     ),)
 
-    wing_areas = ComponentAreas(reference=S_ref, wetted=2.0 * S_ref)
+    wing_areas = Areas(reference=S_ref, wetted=2.0 * S_ref)
 
     wing = Wing(tag=f"Elliptical {n_segments}",
                 segments=segments,
@@ -290,7 +290,7 @@ def VORJAX_delta_wing(AR=2.0):
         )
     )
 
-    wing_areas = ComponentAreas(reference=S_ref, wetted=2.0 * S_ref)
+    wing_areas = Areas(reference=S_ref, wetted=2.0 * S_ref)
 
     wing = Wing(tag=f"Delta_AR_{AR}",
                 segments=segments,
