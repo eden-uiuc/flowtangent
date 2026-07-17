@@ -119,17 +119,12 @@ class TurbojetLine(EnergyLine):
             self.apply_domain_op(jnp.sum, updated_state, "force", "thrust")
         )
 
-        # Mass & Work Imbalance ------------------------------------------------
+        # Power Imbalance ------------------------------------------------------
 
         updated_state = eqx.tree_at(
-            lambda s: (
-                s.energy.nodes[self.network_ID].outputs.residual.mass_flow_rate,
-                s.energy.nodes[self.network_ID].outputs.residual.power,
-            ),
-            updated_state, (
-                self.apply_domain_op(jnp.sum, updated_state, "residual", "mass_flow_rate"),
-                self.apply_domain_op(jnp.sum, updated_state, "residual", "power"),
-            )
+            lambda s: s.energy.nodes[self.network_ID].outputs.residual.power,
+            updated_state, 
+            self.apply_domain_op(jnp.sum, updated_state, "residual", "power"),
         )
 
         return updated_state, system, settings
@@ -141,7 +136,10 @@ def _TurbofanLineSetup():
     return TurbofanEngine(), FuelTank()
 
 def TurbofanLine(**kwargs):
+
+    if "subcomponents" not in kwargs:
+        kwargs['subcombponents'] = _TurbofanLineSetup()
+
     return TurbojetLine(
-        subcomponents=_TurbofanLineSetup(),
         **kwargs
     )

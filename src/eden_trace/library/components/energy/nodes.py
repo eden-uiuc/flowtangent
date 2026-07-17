@@ -133,7 +133,7 @@ class GraphSplitter(GraphNode):
 
     def transmit(self, state: State, system: System, settings: Settings):
 
-        total_input = getattr(state.energy.nodes[tuple(self.inputs)[0]].outputs, self._domain)
+        total_input = getattr(state.energy.nodes[tuple(self.inputs)[0].network_ID].outputs, self._domain)
 
         if callable(self.fraction):
             frac = self.fraction(state)

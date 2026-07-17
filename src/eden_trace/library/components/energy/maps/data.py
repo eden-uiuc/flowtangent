@@ -1,3 +1,5 @@
+
+
 import json
 import os
 from functools import lru_cache
@@ -6,9 +8,7 @@ from typing import Any
 import pycycle.api as pyc
 
 from eden_trace.utils import get_Trace_root
-
 from eden_trace.library import units
-
 from .classes import CompressorMap, TurbineMap
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
@@ -96,6 +96,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
         "NcMap": "Nc_des",
         "NpMap": "Np_des",
         "PRmap": "PR_des",
+        "PR": "PR_des",
         "RlineMap": "Rline_des",
     }
 

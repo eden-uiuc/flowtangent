@@ -5,6 +5,8 @@ import equinox as eqx
 import numpy as np
 import pandas as pd
 
+from pathlib import Path
+
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
@@ -319,8 +321,8 @@ if __name__ == "__main__":
 
     # Build Turbojet------------------------------------------------------------
     system = system_setup(variable_nozzle=V_NOZZ)
-
     settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
+    test_dir = Path("./tests/PyCycle/PyCycle_Examples/turbojet")
 
     if DESIGN_POINT:
         print("="*80)
@@ -332,18 +334,13 @@ if __name__ == "__main__":
             settings=settings,
         )
 
-        save_data(sys, "./tests/PyCycle/PyCycle_Examples/simple_turbojet.trs")
+        save_data(sys, test_dir / "simple_turbojet.trs")
 
-        validation_df = validate_design_point(
-            "./tests/PyCycle/PyCycle_Examples/turbojet_DESIGN.json",
-            st
-        )
-        validation_df.to_csv(
-            "./tests/PyCycle/PyCycle_Examples/DESIGN_validation.csv"
-        )
+        validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", st)
+        validation_df.to_csv(test_dir / "DESIGN_validation.csv")
      
     else:
-        sys: Aircraft = load_data("./tests/PyCycle/PyCycle_Examples/simple_turbojet.trs")
+        sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
     
     sys = sys.sort_network_topology()
 

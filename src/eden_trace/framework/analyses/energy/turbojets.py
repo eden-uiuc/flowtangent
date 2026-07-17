@@ -133,7 +133,7 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     des_state = eqx.tree_at(
         lambda s: s.energy.bypass_ratio,
         des_state,
-        des_system.energy.lines.engine.design_parameters.bypass_ratio
+        des_system.energy.line.engine.design_parameters.bypass_ratio
     )
 
     # Controls Setup
@@ -170,12 +170,12 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
-        get_value=lambda s: s.energy.line.engine.lp_shaft.outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power
     )
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.line.engine.hp_shaft.outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power
     )
 
     design_analysis = ResidualAnalysis(
@@ -328,7 +328,7 @@ def TurbojetPerformance(
     
     # Composite Bounds ---------------------------------------------------------
     
-    FAR_bnds = (1e-4, 0.02)
+    FAR_bnds = (1e-4, 0.03)
 
     # Control Setup -----------------------------------------------------------
     

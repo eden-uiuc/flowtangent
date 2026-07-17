@@ -5,14 +5,16 @@ import equinox as eqx
 import numpy as np
 import pandas as pd
 
+from pathlib import Path
+
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbojetDesign
+from eden_trace.library.components.energy.networks import TurbofanNetwork, TurbofanDesign
 from eden_trace.library.components.energy.jets import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbofanLine
 
-from eden_trace.framework import Aircraft
+from eden_trace.framework import State, Aircraft, Settings
 from eden_trace.framework.analyses.energy.turbojets import DesignTurbofan
 
 def system_setup():
@@ -31,28 +33,43 @@ def system_setup():
             f.design_parameters.exit_mach_number,
             f.efficiencies.flow,
         ),
-        engine.compressor,
+        engine.fan,
         (
             1.685,
-            8070. * units.rev/units.mins,
             0.4578,
             0.8948
         )
     )
     
-    comp_design = eqx.tree_at(lambda c:
+    lpc_design = eqx.tree_at(lambda c:
         (
             c.design_parameters.pressure_ratio,
             c.design_parameters.rotation_speed,
             c.design_parameters.exit_mach_number,
             c.efficiencies.flow,
         ),
-        engine.compressor,
+        engine.lpc,
         (
-            13.5,
-            8070. * units.rev/units.mins,
-            0.02,
-            0.83
+            1.935,
+            5000. * units.rev/units.mins,
+            0.3059,
+            0.9243
+        )
+    )
+
+    hpc_design = eqx.tree_at(lambda c:
+        (
+            c.design_parameters.pressure_ratio,
+            c.design_parameters.rotation_speed,
+            c.design_parameters.exit_mach_number,
+            c.efficiencies.flow,
+        ),
+        engine.hpc,
+        (
+            9.369,
+            15000. * units.rev/units.mins,
+            0.2442,
+            0.8707
         )
     )
 
@@ -64,61 +81,163 @@ def system_setup():
         ),
         engine.combustor,
         (
-            2370 * units.R,
-            0.97,
-            0.02,
+            2857 * units.R,
+            (1.0 - 0.054),
+            0.1025,
         )
     )
 
-    turb_design = eqx.tree_at(lambda t:
+    lpt_design = eqx.tree_at(lambda t:
         (
             t.efficiencies.flow,
             t.design_parameters.rotation_speed,
             t.design_parameters.exit_mach_number,
         ),
-        engine.turbine,
+        engine.lpt,
         (
-            0.86,
-            8070. * units.rev/units.mins,
-            0.4,
+            0.8996,
+            5000. * units.rev/units.mins,
+            0.4127,
         )
     )
 
-    nozz_design = eqx.tree_at(
+    hpt_design = eqx.tree_at(lambda t:
+        (
+            t.efficiencies.flow,
+            t.design_parameters.rotation_speed,
+            t.design_parameters.exit_mach_number,
+        ),
+        engine.hpt,
+        (
+            0.8888,
+            15000. * units.rev/units.mins,
+            0.3650,
+        )
+    )
+
+    cn_design = eqx.tree_at(
         lambda n: n.efficiencies.flow,
         engine.core_nozzle,
-        0.99
+        0.9933
+    )
+
+    fn_design = eqx.tree_at(
+        lambda n: n.efficiencies.flow,
+        engine.fan_nozzle,
+        0.9939
     )
 
     engine = eqx.tree_at(lambda e:
         (
             e.inlet,
-            e.compressor,
+            e.fan,
+            e.lpc,
+            e.hpc,
             e.combustor,
-            e.turbine,
+            e.hpt,
+            e.lpt,
             e.core_nozzle,
+            e.fan_nozzle,
         ), engine,
         (
             inlet_design,
-            comp_design,
+            fan_design,
+            lpc_design,
+            hpc_design,
             burn_design,
-            turb_design,
-            nozz_design
+            hpt_design,
+            lpt_design,
+            cn_design,
+            fn_design,
         )                
     )
 
-    line = TurbojetEnergyLine(tag="Line", subcomponents=(engine,),)
+    line = TurbofanLine(subcomponents=(engine,))
     
-    net_design = TurbojetDesign(
-        altitude=0.0,
-        mach_number=1e-6,
-        thrust=11_800 * units.lbf,
-        initial_MFR=168.453135137 * units.lbm / units.s,
-        initial_turb_PR=4.46138725662
+    net_design = TurbofanDesign(
+        altitude=35_000.0 * units.ft,
+        mach_number=0.8,
+        thrust=5900 * units.lbf,
+        initial_MFR=100.0 * units.lbm / units.s,
+        initial_LPT_PR=4.0,
+        initial_HPT_PR=3.0,
     )
     
-    net = TurbojetNetwork(subcomponents=(line,), design_parameters=net_design)
+    net = TurbofanNetwork(subcomponents=(line,), design_parameters=net_design)
     
-    sys = Aircraft(tag="Simple Turbojet System", subcomponents=(net,))
+    sys = Aircraft(tag="HBTF System", subcomponents=(net,))
 
     return sys
+
+if __name__ == "__main__":
+
+    # Control Board
+    DEBUG = True
+    VERBOSE = True
+
+    DESIGN_POINT = True
+
+    # Build HBTF ---------------------------------------------------------------
+    system = system_setup()
+    settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
+    test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
+
+    if DESIGN_POINT:
+        print("="*80)
+        print(" Design Point Analysis")
+        print("-"*80)
+        st, sys, set = DesignTurbofan(
+            state=State(),
+            system=system,
+            settings=settings,
+        )
+
+        save_data(sys, test_dir / "HBTF.trs")
+
+        print("="*80)
+        print(" System Validation")
+        print("-"*80)
+
+        for comp in sys.energy.line.engine.subcomponents:
+            if hasattr(comp, "design_parameters") and comp.design_parameters:
+                d = comp.design_parameters
+                A_i = d.A_intake
+                A_t = d.A_throat
+                A_x = d.A_exit
+                AR = d.A_ratio
+                d_params = {"Intake Area": A_i, "Throat Area": A_t, "Exit Area":A_x, "Area_Ratio":AR}
+                real_params = {k:a for k, a in d_params.items() if a != 1.0}
+                if any(real_params):
+                    print(f"{comp.tag}:")
+                    for p in real_params:
+                        print(f" - {p:<11}: {format_array(real_params[p])}")
+        
+        print("LPC Map Scaling:")
+        c_map = sys.energy.line.engine.lpc.map
+        print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
+        print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
+        print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
+
+        print("HPC Map Scaling:")
+        c_map = sys.energy.line.engine.hpc.map
+        print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
+        print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
+        print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
+
+        print("HPT Map Scaling:")
+        t_map = sys.energy.line.engine.hpt.map
+        print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
+        print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
+        print(f" - {'s_Np':<11}: {format_array(t_map.s_Np)}")
+
+        print("LPT Map Scaling:")
+        t_map = sys.energy.line.engine.lpt.map
+        print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
+        print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
+        print(f" - {'s_Np':<11}: {format_array(t_map.s_Np)}")
+        print("="*80)
+        print ("\n\n")

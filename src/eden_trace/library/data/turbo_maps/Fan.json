@@ -1146,5 +1146,6 @@
     "Rline_stall": 1.0,
     "alpha_des": 0.0,
     "Nc_des": 0.10367255756846318,
+    "PR_des": 1.754,
     "Rline_des": 2.2
 }

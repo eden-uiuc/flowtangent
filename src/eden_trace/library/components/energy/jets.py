@@ -652,7 +652,7 @@ class Turbine(FlowNode):
         updated_system = system
 
         design_mode = settings.analysis.energy.design_mode
-        network_state: TurbojetNetworkConditions = state.energy
+        network_state = state.energy
         
         T_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
         P_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
@@ -661,7 +661,12 @@ class Turbine(FlowNode):
         gas = BurnedJetA(FAR)
 
         if design_mode:
-            PR = jnp.atleast_2d(network_state.turbine_PR)
+            if self.tag.lower() == "lpt":
+                PR = jnp.atleast_2d(network_state.LPT_PR)
+            elif self.tag.lower() == "hpt":
+                PR = jnp.atleast_2d(network_state.HPT_PR)
+            else:
+                PR = jnp.atleast_2d(network_state.turbine_PR)
             n_isn = self.efficiencies.flow
 
             N_des = self.design_parameters.rotation_speed
@@ -1374,25 +1379,25 @@ class TurbojetEngine(FlowNode[JetDesign]):
     def transmit(self, state: State, system: System, settings: Settings):        
 
         fs = state.freestream
-        FAR = self.apply_domain_op(lambda x: x, state, "fuel", "fuel_air_ratio"),
+        FAR = state.energy.nodes[self.network_ID + '.combustor'].outputs.fuel.fuel_air_ratio
         
         # Core Flow
         core_flow = next((f for f in self.flow_inputs if "core" in f.network_ID), None)
 
         v_core = self.get_input_state(state, core_flow, "speed") if core_flow is not None else 0.0
-        A_core = self.get_input_state(state, core_flow, "Area") if core_flow is not None else 0.0
-        P_core = self.get_input_state(state, core_flow, "Pressure") if core_flow is not None else 0.0
+        A_core = self.get_input_state(state, core_flow, "area") if core_flow is not None else 0.0
+        P_core = self.get_input_state(state, core_flow, "pressure") if core_flow is not None else 0.0
+
+        mdot_core = self.get_input_state(state, core_flow, "mass_flow_rate") if core_flow is not None else 1.0
 
         # Fan Flow
         fan_flow = next((f for f in self.flow_inputs if "fan" in f.network_ID), None)
 
         v_fan = self.get_input_state(state, fan_flow, "speed") if fan_flow is not None else 0.0
-        A_fan = self.get_input_state(state, fan_flow, "Area") if fan_flow is not None else 0.0
-        P_fan = self.get_input_state(state, fan_flow, "Pressure") if fan_flow is not None else 0.0
+        A_fan = self.get_input_state(state, fan_flow, "area") if fan_flow is not None else 0.0
+        P_fan = self.get_input_state(state, fan_flow, "pressure") if fan_flow is not None else 0.0
 
         BPR = getattr(state.energy, "bypass_ratio", 0.0)
-        
-        mdot_core = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
 
         F, F_sp, I_sp, TSFC, p, ff = _engine_performance(
             u0=fs.speed,
@@ -1425,9 +1430,6 @@ class TurbojetEngine(FlowNode[JetDesign]):
         
         outputs = eqx.tree_at(
             lambda o: o.residual.power, outputs, self.apply_domain_op(jnp.sum, state, "residual", "power")
-        )
-        outputs = eqx.tree_at(
-            lambda o: o.residual.mass_flow_rate, outputs, self.apply_domain_op(jnp.sum, state, "residual", "mass_flow_rate")
         )
 
         updated_state = eqx.tree_at(lambda s: s.energy.nodes[self.network_ID].outputs, state, outputs)
@@ -1475,7 +1477,7 @@ def _TurbofanSetup():
         )
     )
     
-    f_nozz = VariableNozzle(tag="Fan Nozzle", inputs=(GraphInput("flow", "fan duct")))
+    f_nozz = VariableNozzle(tag="Fan Nozzle", inputs=(GraphInput("flow", "fan duct"), GraphInput("fuel", "combustor")))
     c_nozz = VariableNozzle(inputs=(GraphInput("flow", "lpt"), GraphInput("fuel", "combustor")))
 
     return (inlet, fan, core_flow, fan_flow, lpc, hpc, comb, hpt, lpt, lp_shaft, hp_shaft, f_nozz, c_nozz)
@@ -1486,7 +1488,7 @@ def TurbofanEngine(**kwargs):
         inputs = (
             GraphInput("flow", "self.core_nozzle"),
             GraphInput("flow", "self.fan_nozzle"),
-            GraphInput("fuel", "self.combuster"),
+            GraphInput("fuel", "self.combustor"),
             GraphInput("residual", "self.lp_shaft"),
             GraphInput("residual", "self.hp_shaft"),
         ),
