@@ -10,6 +10,7 @@ import json
 from functools import lru_cache
 
 # package imports
+import jax
 import equinox as eqx
 import jax.numpy as jnp
 
@@ -78,6 +79,17 @@ class IdealGas(eqx.Module):
         h_ref = self.compute_absolute_enthalpy(298.15)
         return h_abs - h_ref
 
+    def invert_enthalpy(self, h_target, T_guess=1000.0):
+
+        def newton_step(i, T):
+            h = self.compute_enthalpy(T)
+            cp = self.compute_Cp(T)
+
+            return T - (h - h_target) / cp
+
+        T_final = jax.lax.fori_loop(0, 5, newton_step, T_guess)
+        return T_final
+
     def compute_entropy(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.0):
         T_arr = jnp.atleast_1d(T)
 
@@ -128,7 +140,6 @@ class IdealGas(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mixed Gases
 # ----------------------------------------------------------------------------------------------------------------------
-
 
 class GasComposition(eqx.Module):
     elements: tuple[str | IdealGas, ...] = init_field(tuple)

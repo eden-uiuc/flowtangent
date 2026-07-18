@@ -13,6 +13,7 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
 
+from eden_trace.library.gases import IdealGas, Air
 from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -45,6 +46,7 @@ class FuelOutputs(Condition):
 
 class FlowOutputs(Condition):
     tag = "Flow Outputs"
+    fluid: IdealGas = init_field(Air)
 
     speed: jnp.ndarray = empty_array(0)
     speed_of_sound: jnp.ndarray = empty_array(0)

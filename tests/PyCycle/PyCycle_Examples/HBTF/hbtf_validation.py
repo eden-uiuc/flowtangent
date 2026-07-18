@@ -24,9 +24,15 @@ def system_setup():
     engine = TurbofanEngine(design_parameters=JetDesign(thrust=5900 * units.lbf, bypass_ratio=5.105))
     
     inlet_design = eqx.tree_at(lambda i:
-        i.design_parameters.exit_mach_number,
-        engine.inlet,
-        0.751
+        (
+            i.design_parameters.exit_mach_number,
+            i.design_parameters.pressure_recovery,
+        ),
+            engine.inlet,
+        (
+            0.751,
+            0.999,
+        )
     )
 
     fan_design = eqx.tree_at(lambda f:

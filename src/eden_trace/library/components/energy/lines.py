@@ -11,7 +11,7 @@ import jax.numpy as jnp
 from eden_trace.utils import init_field, outputs, register
 from eden_trace.utils import inputs as func_inputs
 
-from .nodes import GraphInput, GraphNode, GraphSplitter, EnergyStore, FuelTank
+from .nodes import GraphInput, GraphNode, Splitter, EnergyStore, FuelTank
 from .jets import TurbojetEngine, TurbofanEngine
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ class EnergyLine(GraphNode):
     tag: str = init_field("Line", static=True)
     _bookkeeping: dict = init_field(
         lambda: {
-            "splitters": GraphSplitter,
+            "splitters": Splitter,
             "stores": EnergyStore,
         },
         static=True,

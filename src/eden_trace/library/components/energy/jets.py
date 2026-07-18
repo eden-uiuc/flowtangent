@@ -29,7 +29,7 @@ from eden_trace.library import units
 
 from .maps import data as map_data
 from .maps.classes import CompressorMap, TurbineMap
-from eden_trace.library.components.energy.nodes import GraphInput, GraphNode, GraphSplitter, FlowNode, FlowDesign
+from eden_trace.library.components.energy.nodes import GraphInput, GraphNode, Splitter, FlowNode, FlowDesign
 from eden_trace.library.gases import Air, BurnedJetA, IdealGas
 from eden_trace.library.propellants import JetA, Propellant
 
@@ -297,13 +297,10 @@ class Compressor(FlowNode):
         design_mode = settings.analysis.energy.design_mode
         network_state: TurbojetNetworkConditions = state.energy
         
-        T_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
-        P_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
+        gas, T_t, P_t, _, _ = self.mix_inputs(state)
 
         theta_c = T_t / 288.15
         delta_c = P_t / 101325.0
-
-        gas = self.working_fluid
         
         if design_mode:
             M_out   = self.design_parameters.exit_mach_number
@@ -519,8 +516,7 @@ class Combustor(FlowNode):
         
         updated_system = system
 
-        T_t=self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
-        P_t=self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
+        gas, T_t, P_t, _, _ = self.mix_inputs(state)
         mdot_in=self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
 
         LHV=self.fuel.specific_energy
@@ -531,7 +527,7 @@ class Combustor(FlowNode):
             T_t_out = jnp.atleast_2d(self.design_parameters.output_temperature)
 
             P_t_out, h_t_out, FAR, mdot_out = _combustor_design(
-                gas=self.working_fluid,
+                gas=gas,
                 T_t=T_t,
                 P_t=P_t,
                 T_t_out=T_t_out,
@@ -581,6 +577,7 @@ class Combustor(FlowNode):
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_temperature, outputs, T_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.stagnation_enthalpy, outputs, h_t_out)
         outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, mdot_out)
+        outputs = eqx.tree_at(lambda o: o.flow.fluid, outputs, BurnedJetA(FAR))
 
         outputs = eqx.tree_at(lambda o: o.fuel.fuel_air_ratio, outputs, FAR)
 
@@ -654,11 +651,7 @@ class Turbine(FlowNode):
         design_mode = settings.analysis.energy.design_mode
         network_state = state.energy
         
-        T_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
-        P_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
-        
-        FAR = self.apply_domain_op(jnp.average, state, "fuel", "fuel_air_ratio")
-        gas = BurnedJetA(FAR)
+        gas, T_t, P_t, W, FAR = self.mix_inputs(state)
 
         if design_mode:
             if self.tag.lower() == "lpt":
@@ -672,7 +665,6 @@ class Turbine(FlowNode):
             N_des = self.design_parameters.rotation_speed
             Np_des = N_des / jnp.sqrt(T_t)
 
-            W = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
             Wp_tgt = W * jnp.sqrt(T_t) / P_t
 
             Wp_map, eff_map = self.map.evaluate(
@@ -900,7 +892,7 @@ def _nozzle_performance(
 class FixedNozzle(FlowNode):
     tag: str = init_field("Core Nozzle", static=True)
 
-    inputs: tuple = (
+    inputs: tuple | GraphInput = (
         GraphInput("flow", "Turbine"),
         GraphInput("fuel", "Combustor"),
     )
@@ -936,18 +928,14 @@ class FixedNozzle(FlowNode):
         fs = state.freestream
         P0 = fs.pressure
         
-        FAR = self.apply_domain_op(jnp.average, state, "fuel", "fuel_air_ratio")
-        working_fluid = BurnedJetA(FAR)
-
-        T_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
-        P_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
+        gas, T_t, P_t, W, FAR = self.mix_inputs(state)
         
         if settings.analysis.energy.design_mode:
             
             mdot_out=state.energy.mass_flow_rate * (1. + FAR)
 
             A_t, A_x, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = _nozzle_design(
-                gas=working_fluid,
+                gas=gas,
                 T_t=T_t,
                 P_t=P_t,
                 mdot=mdot_out,
@@ -977,7 +965,7 @@ class FixedNozzle(FlowNode):
             A_x = self.design_parameters.A_exit
             
             mdot_out, M_out, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out = _nozzle_performance(
-                gas=working_fluid,
+                gas=gas,
                 T_t=T_t,
                 P_t=P_t,
                 P0=P0,
@@ -1104,11 +1092,12 @@ class VariableNozzle(FlowNode):
         fs = state.freestream
         P0 = fs.pressure
         
-        FAR = self.apply_domain_op(jnp.average, state, "fuel", "fuel_air_ratio")
-        working_fluid = BurnedJetA(FAR)
+        working_fluid, T_t, W = self.mix_inputs(state)
+        p_FAR = self.get_primary_input_state(state, "fuel", "fuel_air_ratio")
+        p_W = self.get_primary_input_state(state, "fuel", "mass_flow_rate")
+        FAR = p_FAR * p_W / W
 
-        T_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_temperature")
-        P_t = self.apply_domain_op(jnp.average, state, "flow", "stagnation_pressure")
+        P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
 
         mdot=state.energy.mass_flow_rate * (1. + FAR)
         
@@ -1326,7 +1315,7 @@ class TurbojetEngine(FlowNode[JetDesign]):
         "turbines": Turbine,
         "nozzles": VariableNozzle | FixedNozzle,
         "shafts": Turboshaft,
-        "ducts": GraphSplitter,
+        "ducts": Splitter,
         }, static=True
     )
 
@@ -1460,8 +1449,8 @@ def _TurbofanSetup():
     inlet = Inlet()
     fan = Compressor(tag="Fan", map=map_data.Fan)
 
-    fan_flow = GraphSplitter(tag="Fan Duct", inputs=GraphInput("flow", "fan"), fraction=BPRSplit(is_bypass=True))
-    core_flow = GraphSplitter(tag="Core Duct", inputs=GraphInput("flow", "fan"), fraction=BPRSplit(is_bypass=False))
+    fan_flow = Splitter(tag="Fan Duct", inputs=GraphInput("flow", "fan"), value_fractions=BPRSplit(is_bypass=True))
+    core_flow = Splitter(tag="Core Duct", inputs=GraphInput("flow", "fan"), value_fractions=BPRSplit(is_bypass=False))
 
     lpc = Compressor(tag="LPC", map=map_data.LPC, inputs=GraphInput("flow", "core duct"))
     hpc = Compressor(tag="HPC", map=map_data.HPC, inputs=GraphInput("flow", "lpc"))
