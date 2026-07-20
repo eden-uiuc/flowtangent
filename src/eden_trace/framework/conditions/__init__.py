@@ -22,7 +22,7 @@ from .energy import (
     BatteryCellConditions,
     BatteryPackConditions,
     EnergyNetworkConditions,
-    EnergyNodeConditions,
+    NodeConditions,
 )
 
 from .frames import BodyFrame, Frame, Frames, InertialFrame, PlanetFrame, WindFrame

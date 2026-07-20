@@ -37,7 +37,7 @@ def system_setup(variable_nozzle: bool = False):
             c.design_parameters.pressure_ratio,
             c.design_parameters.rotation_speed,
             c.design_parameters.exit_mach_number,
-            c.efficiencies.flow,
+            c.design_parameters.efficiencies.flow,
         ),
         engine.compressor,
         (
@@ -64,7 +64,7 @@ def system_setup(variable_nozzle: bool = False):
 
     turb_design = eqx.tree_at(lambda t:
         (
-            t.efficiencies.flow,
+            t.design_parameters.efficiencies.flow,
             t.design_parameters.rotation_speed,
             t.design_parameters.exit_mach_number,
         ),
@@ -77,7 +77,7 @@ def system_setup(variable_nozzle: bool = False):
     )
 
     nozz_design = eqx.tree_at(
-        lambda n: n.efficiencies.flow,
+        lambda n: n.design_parameters.efficiencies.flow,
         engine.core_nozzle,
         0.99
     )

@@ -14,11 +14,12 @@ if TYPE_CHECKING:
 
 # package imports
 import equinox as eqx
+import jax.numpy as jnp
 
 from eden_trace.library.components.energy.networks import GraphNetwork
 
 # Trace Imports
-from eden_trace.framework.conditions.energy import EnergyNodeConditions, TurbojetNetworkConditions, TurbofanNetworkConditions
+from eden_trace.framework.conditions.energy import NodeConditions, TurbojetNetworkConditions, TurbofanNetworkConditions
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
@@ -27,7 +28,25 @@ from eden_trace.framework.conditions.energy import EnergyNodeConditions, Turboje
 
 def initialize_energy(state: State, system: System, settings: Settings):
 
-    flat_state_nodes = {}
+    # Phantom freestream node
+    fs_state = state.freestream
+    fs_node = eqx.tree_at(lambda n:
+                (
+                    n.outputs.flow.fluid,
+                    n.outputs.flow.stagnation_temperature,
+                    n.outputs.flow.stagnation_pressure,
+                    n.outputs.flow.mach_number,
+                ),
+                NodeConditions(tag="freestream"),
+                (
+                    fs_state.atmosphere.fluid,
+                    fs_state.stagnation_temperature,
+                    fs_state.stagnation_pressure,
+                    fs_state.mach_number,
+                )
+            )
+    
+    node_states = {"freestream": fs_node}
     conditions_map = {
         "TurbojetNetwork": TurbojetNetworkConditions,
         "TurbofanNetwork": TurbofanNetworkConditions,
@@ -35,11 +54,11 @@ def initialize_energy(state: State, system: System, settings: Settings):
 
     def _extract_to_flat_state(n):
         if str(n.__class__.__name__) in conditions_map:
-            flat_state_nodes[n.network_ID] = conditions_map[str(n.__class__.__name__)](
+            node_states[n.network_ID] = conditions_map[str(n.__class__.__name__)](
                 tag=n.network_ID
             )  # Initialize the state
         else:
-            flat_state_nodes[n.network_ID] = EnergyNodeConditions(tag=n.network_ID)  # Initialize the state
+            node_states[n.network_ID] = NodeConditions(tag=n.network_ID)  # Initialize the state
         if hasattr(n, "subcomponents"):
             for child in n.subcomponents:
                 _extract_to_flat_state(child)
@@ -61,6 +80,6 @@ def initialize_energy(state: State, system: System, settings: Settings):
             network_state = conditions_map[str(network.__class__.__name__ )]()
             updated_state = eqx.tree_at(lambda s: s.energy, updated_state, network_state)
         
-        updated_state = eqx.tree_at(lambda s: s.energy.nodes, updated_state, flat_state_nodes)
+        updated_state = eqx.tree_at(lambda s: s.energy.nodes, updated_state, node_states)
 
     return updated_state, updated_system, settings

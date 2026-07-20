@@ -10,6 +10,9 @@ from pathlib import Path
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
+from eden_trace.library.components.energy.nodes import FlowDesign
+from eden_trace.library.components.energy.nodes import Efficiencies as Eff
+
 from eden_trace.library.components.energy.networks import TurbofanNetwork, TurbofanDesign
 from eden_trace.library.components.energy.jets import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbofanLine
@@ -20,145 +23,75 @@ from eden_trace.framework.analyses.energy.turbojets import DesignTurbofan
 test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 
 def system_setup():
-
+    
     engine = TurbofanEngine(design_parameters=JetDesign(thrust=5900 * units.lbf, bypass_ratio=5.105))
+
+    # Inlet & Fan
+    inlet_des = FlowDesign(exit_mach_number=0.751, pressure_recovery=0.999)
+    fan_des = FlowDesign(pressure_ratio=1.685, exit_mach_number=0.4578, eff=Eff(flow=0.8948))
     
-    inlet_design = eqx.tree_at(lambda i:
-        (
-            i.design_parameters.exit_mach_number,
-            i.design_parameters.pressure_recovery,
-        ),
-            engine.inlet,
-        (
-            0.751,
-            0.999,
-        )
-    )
+    c_duct_des = FlowDesign(pressure_ratio=(1-0.0048), exit_mach_number=0.3121)
+    f_duct_des = FlowDesign(pressure_ratio=(1-0.0149), exit_mach_number=0.4589)
 
-    fan_design = eqx.tree_at(lambda f:
-        (
-            f.design_parameters.pressure_ratio,
-            f.design_parameters.exit_mach_number,
-            f.efficiencies.flow,
-        ),
-        engine.fan,
-        (
-            1.685,
-            0.4578,
-            0.8948
-        )
-    )
+    engine = eqx.tree_at(lambda e: (
+        e.inlet.design_parameters,
+        e.fan.design_parameters,
+        e.core_duct.design_parameters,
+        e.fan_duct.design_parameters,
+    ), engine, (inlet_des, fan_des, c_duct_des, f_duct_des))
     
-    lpc_design = eqx.tree_at(lambda c:
-        (
-            c.design_parameters.pressure_ratio,
-            c.design_parameters.rotation_speed,
-            c.design_parameters.exit_mach_number,
-            c.efficiencies.flow,
-        ),
-        engine.lpc,
-        (
-            1.935,
-            5000. * units.rev/units.mins,
-            0.3059,
-            0.9243
-        )
-    )
+    # Compressors
+    lpc_des = FlowDesign(
+            pressure_ratio=1.935,
+            rotation_speed=5000. * units.rev/units.mins,
+            exit_mach_number=0.3059,
+            eff=Eff(flow=0.9243),)
 
-    hpc_design = eqx.tree_at(lambda c:
-        (
-            c.design_parameters.pressure_ratio,
-            c.design_parameters.rotation_speed,
-            c.design_parameters.exit_mach_number,
-            c.efficiencies.flow,
-        ),
-        engine.hpc,
-        (
-            9.369,
-            15000. * units.rev/units.mins,
-            0.2442,
-            0.8707
-        )
-    )
+    c_stat_des = FlowDesign(pressure_ratio=(1-0.0101), exit_mach_number=0.3563)
 
-    burn_design = eqx.tree_at(lambda b:
-        (
-            b.design_parameters.output_temperature,
-            b.design_parameters.pressure_ratio,
-            b.design_parameters.exit_mach_number,
-        ),
-        engine.combustor,
-        (
-            2857 * units.R,
-            (1.0 - 0.054),
-            0.1025,
-        )
-    )
+    hpc_des = FlowDesign(
+            pressure_ratio=9.369,
+            rotation_speed=15000. * units.rev/units.mins,
+            exit_mach_number=0.2442,
+            eff = Eff(flow=0.8707))
+    
+    cool_des = FlowDesign(exit_mach_number=0.3)
 
-    lpt_design = eqx.tree_at(lambda t:
-        (
-            t.efficiencies.flow,
-            t.design_parameters.rotation_speed,
-            t.design_parameters.exit_mach_number,
-        ),
-        engine.lpt,
-        (
-            0.8996,
-            5000. * units.rev/units.mins,
-            0.4127,
-        )
-    )
+    engine = eqx.tree_at(lambda e: (
+        e.lpc.design_parameters,
+        e.compressor_stator.design_parameters,
+        e.hpc.design_parameters,
+        e.cooling_duct.design_parameters,
+    ), engine, (lpc_des, c_stat_des, hpc_des, cool_des))
+    
+    # Combustor
+    burn_des = FlowDesign(output_temperature=2857 * units.R, pressure_ratio=(1.0 - 0.054), exit_mach_number=0.1025,)
+    
+    engine = eqx.tree_at(lambda e: e.combustor.design_parameters, engine, burn_des)
+    
+    # Turbines
+    hpt_des = FlowDesign(eff=Eff(flow=0.8888), rotation_speed=15000. * units.rev/units.mins, exit_mach_number=0.3650,)
+    
+    t_stat_des = FlowDesign(pressure_ratio=(1-0.0051), exit_mach_number=0.3063)
+    
+    lpt_des = FlowDesign(rotation_speed=5000. * units.rev/units.mins, exit_mach_number=0.4127, eff=Eff(flow=0.8996),)
 
-    hpt_design = eqx.tree_at(lambda t:
-        (
-            t.efficiencies.flow,
-            t.design_parameters.rotation_speed,
-            t.design_parameters.exit_mach_number,
-        ),
-        engine.hpt,
-        (
-            0.8888,
-            15000. * units.rev/units.mins,
-            0.3650,
-        )
-    )
+    engine = eqx.tree_at(lambda e: (
+        e.hpt.design_parameters,
+        e.turbine_stator.design_parameters,
+        e.lpt.design_parameters,
+    ), engine, (hpt_des, t_stat_des, lpt_des))
 
-    cn_design = eqx.tree_at(
-        lambda n: n.efficiencies.flow,
-        engine.core_nozzle,
-        0.9933
-    )
+    # Nozzles
+    cn_duct_des = FlowDesign(pressure_ratio=(1-0.0107), exit_mach_number=0.4463)
+    cn_des = FlowDesign(eff=Eff(flow=0.9933))
+    fn_des = FlowDesign(eff=Eff(flow=0.9939))
 
-    fn_design = eqx.tree_at(
-        lambda n: n.efficiencies.flow,
-        engine.fan_nozzle,
-        0.9939
-    )
-
-    engine = eqx.tree_at(lambda e:
-        (
-            e.inlet,
-            e.fan,
-            e.lpc,
-            e.hpc,
-            e.combustor,
-            e.hpt,
-            e.lpt,
-            e.core_nozzle,
-            e.fan_nozzle,
-        ), engine,
-        (
-            inlet_design,
-            fan_design,
-            lpc_design,
-            hpc_design,
-            burn_design,
-            hpt_design,
-            lpt_design,
-            cn_design,
-            fn_design,
-        )                
-    )
+    engine = eqx.tree_at(lambda e: (
+        e.core_nozzle_duct.design_parameters,
+        e.core_nozzle.design_parameters,
+        e.fan_nozzle.design_parameters,
+    ), engine, (cn_duct_des, cn_des, fn_des))
 
     line = TurbofanLine(subcomponents=(engine,))
     

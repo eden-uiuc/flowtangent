@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, init_field
 
 from eden_trace.library.gases import IdealGas, Air
 from eden_trace.framework.conditions import Condition
@@ -39,7 +39,6 @@ class ElectricalOutputs(Condition):
 class FuelOutputs(Condition):
     tag = "Fuel Outputs"
 
-    fuel_air_ratio: jnp.ndarray = empty_array(0)
     TSFC: jnp.ndarray = empty_array(0)
     flow_rate: jnp.ndarray = empty_array(0)
 
@@ -64,6 +63,7 @@ class FlowOutputs(Condition):
     area: jnp.ndarray = empty_array(0)
     density: jnp.ndarray = empty_array(0)
     mass_flow_rate: jnp.ndarray = empty_array(0)
+    fuel_air_ratio: jnp.ndarray = empty_array(0)
 
     dynamic_viscosity: jnp.ndarray = empty_array(0)
     dynamic_pressure: jnp.ndarray = empty_array(0)
@@ -107,7 +107,7 @@ class OutputConditions(Condition):
     residual: ResidualOutputs = init_field(ResidualOutputs)
 
 
-class EnergyNodeConditions(Condition):
+class NodeConditions(Condition):
     # Attribute         Type                Default Value
     tag: str = init_field("Energy Node Conditions", static=True)
 
@@ -117,7 +117,7 @@ class EnergyNodeConditions(Condition):
 #  Energy Stores
 # ----------------------------------------------------------------------------------------------------------------------
 
-class BatteryCellConditions(EnergyNodeConditions):
+class BatteryCellConditions(NodeConditions):
     # Attribute                 Type        Default Value
     tag: str = init_field("Battery Cell", static=True)
 
@@ -131,7 +131,7 @@ class BatteryCellConditions(EnergyNodeConditions):
     state_of_charge: jnp.ndarray = empty_array(0)
 
 
-class BatteryPackConditions(EnergyNodeConditions):
+class BatteryPackConditions(NodeConditions):
     # Attribute             Type                    Default Value
     tag: str = init_field("Battery Pack", static=True)
 
@@ -148,7 +148,7 @@ class BatteryPackConditions(EnergyNodeConditions):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class EnergyNetworkConditions(EnergyNodeConditions):
+class EnergyNetworkConditions(NodeConditions):
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)

@@ -79,7 +79,7 @@ class IdealGas(eqx.Module):
         h_ref = self.compute_absolute_enthalpy(298.15)
         return h_abs - h_ref
 
-    def invert_enthalpy(self, h_target, T_guess=1000.0):
+    def invert_enthalpy(self, h_target: float | jnp.ndarray, T_guess: float | jnp.ndarray=1000.0):
 
         def newton_step(i, T):
             h = self.compute_enthalpy(T)

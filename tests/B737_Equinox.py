@@ -363,14 +363,14 @@ def vehicle_setup():
     # Direct Replacement
     tf = eqx.tree_at(
         lambda tf: (
-                tf.inlet.efficiencies.flow, tf.inlet.pressure_ratio,
-                tf.fan.efficiencies.flow, tf.fan.pressure_ratio,
-                tf.lpc.efficiencies.flow, tf.lpc.pressure_ratio,
-                tf.hpc.efficiencies.flow, tf.hpc.pressure_ratio,
-                tf.hpt.efficiencies.flow, tf.hpt.efficiencies.mechanical,
-                tf.lpt.efficiencies.flow, tf.lpt.efficiencies.mechanical,
-                tf.core_nozzle.efficiencies.flow, tf.core_nozzle.pressure_ratio, tf.core_nozzle.diameters.reference,
-                tf.fan_nozzle.efficiencies.flow, tf.fan_nozzle.pressure_ratio, tf.fan_nozzle.diameters.reference,
+                tf.inlet.design_parameters.efficiencies.flow, tf.inlet.pressure_ratio,
+                tf.fan.design_parameters.efficiencies.flow, tf.fan.pressure_ratio,
+                tf.lpc.design_parameters.efficiencies.flow, tf.lpc.pressure_ratio,
+                tf.hpc.design_parameters.efficiencies.flow, tf.hpc.pressure_ratio,
+                tf.hpt.design_parameters.efficiencies.flow, tf.hpt.design_parameters.efficiencies.mechanical,
+                tf.lpt.design_parameters.efficiencies.flow, tf.lpt.design_parameters.efficiencies.mechanical,
+                tf.core_nozzle.design_parameters.efficiencies.flow, tf.core_nozzle.pressure_ratio, tf.core_nozzle.diameters.reference,
+                tf.fan_nozzle.design_parameters.efficiencies.flow, tf.fan_nozzle.pressure_ratio, tf.fan_nozzle.diameters.reference,
             ),tf,
             (
                 0.98, 0.98,
