@@ -27,26 +27,7 @@ from eden_trace.framework.conditions.energy import NodeConditions, TurbojetNetwo
 
 
 def initialize_energy(state: State, system: System, settings: Settings):
-
-    # Phantom freestream node
-    fs_state = state.freestream
-    fs_node = eqx.tree_at(lambda n:
-                (
-                    n.outputs.flow.fluid,
-                    n.outputs.flow.stagnation_temperature,
-                    n.outputs.flow.stagnation_pressure,
-                    n.outputs.flow.mach_number,
-                ),
-                NodeConditions(tag="freestream"),
-                (
-                    fs_state.atmosphere.fluid,
-                    fs_state.stagnation_temperature,
-                    fs_state.stagnation_pressure,
-                    fs_state.mach_number,
-                )
-            )
-    
-    node_states = {"freestream": fs_node}
+    node_states = {}
     conditions_map = {
         "TurbojetNetwork": TurbojetNetworkConditions,
         "TurbofanNetwork": TurbofanNetworkConditions,
@@ -68,13 +49,12 @@ def initialize_energy(state: State, system: System, settings: Settings):
 
     for network in updated_system.energy_networks:
         network: GraphNetwork
-        network_sc_idx = updated_system.subcomponents.index(network)
         updated_network = network.assign_network_IDs()
 
         for line in updated_network.lines:
             _extract_to_flat_state(line)
 
-        updated_system = updated_system.replace_subcomponent(updated_network, network_sc_idx)
+        updated_system = updated_system.replace_subcomponent(updated_network)
         
         if str(network.__class__.__name__ ) in conditions_map:
             network_state = conditions_map[str(network.__class__.__name__ )]()

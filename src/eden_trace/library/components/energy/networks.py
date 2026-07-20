@@ -29,7 +29,7 @@ from eden_trace.utils import init_field, register
 from eden_trace.library import units
 from eden_trace.library.atmospheres import USStandard1976
 
-from .nodes import GraphDomain, GraphInput, GraphNode
+from .nodes import GraphDomain, GraphInput, GraphNode, BleedFlow
 from .lines import EnergyLine, TurbojetLine, TurbofanLine
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -57,13 +57,24 @@ def _resolve_namespaces(node, parent_prefix=""):
     absolute_id = f"{parent_prefix}.{node.get_field_name()}" if parent_prefix else node.get_field_name()
 
     def parse_input(input: str):
+        if input == "freestream":
+            return "freestream"
         flat_input_parts = input.replace(" ", "_").lower().split(".")
-        if flat_input_parts[0] == "self" or node.get_field_name() in flat_input_parts:
-            return absolute_id + "." + flat_input_parts[-1]
+        if len(flat_input_parts) > 1:
+            if flat_input_parts[0] == "self" or node.get_field_name() in flat_input_parts:
+                return absolute_id + "." + flat_input_parts[-1]
+            elif flat_input_parts[0] == "parent":
+                grandparent_prefix = ".".join(parent_prefix.split(".")[:-1])
+                return grandparent_prefix + "." + flat_input_parts[-1]
+            else:
+                return parent_prefix + "." + ".".join(flat_input_parts)
         else:
-            return parent_prefix + "." + flat_input_parts[-1]
+            if flat_input_parts[0] == "parent":
+                return parent_prefix
+            else:
+                return parent_prefix + "." + flat_input_parts[-1]
 
-    new_inputs = tuple(GraphInput(i.domain, parse_input(i.network_ID)) for i in node.inputs)
+    new_inputs = tuple(i if i._assigned else GraphInput(i.domain, parse_input(i.network_ID), _assigned=True) for i in node.inputs)
 
     # Update the node itself
     node = replace(
@@ -71,6 +82,14 @@ def _resolve_namespaces(node, parent_prefix=""):
         network_ID=absolute_id,
         inputs=new_inputs,
     )
+
+    # Special handling for bleed flows
+    if isinstance(node, BleedFlow):
+        node = replace(
+            node,
+            parent_ID=parent_prefix,
+            grandparent_ID=parent_prefix + ".mixer"
+        )
 
     # Recurse through any subcomponents
     if hasattr(node, "subcomponents") and node.subcomponents:
@@ -144,13 +163,16 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
             resolved_lines.append(resolved_line)
 
         updated_network = eqx.tree_at(
-            lambda e: e.subcomponents, updated_network, tuple(resolved_lines)
+            lambda n: n.subcomponents,
+            updated_network,
+            tuple(resolved_lines)
         ).sort_network_topology()
 
         return updated_network
 
     def _get_all_nodes(self) -> "GraphNetwork":
         nodes_dict = {}
+
 
         def _recurse(subcomponents):
             for comp in subcomponents:

@@ -51,6 +51,7 @@ class GraphInput(eqx.Module):
     domain: GraphDomain = init_field("flow", static=True)
     network_ID: str = init_field("network", static=True)
     primary: bool = init_field(False, static=True)
+    _assigned: bool = init_field(False)
 
     # Define iter to make castable to tuple as (self,)
     def __iter__(self):
@@ -139,10 +140,7 @@ class GraphNode(Component):
         return jnp.atleast_2d(arr_func(input_arr, axis=-1)).T
 
     def transmit(self, state: State, system: System, settings: Settings):
-        raise NotImplementedError(
-            "No transmission method implemented. "
-            "Subclasses of EnergyNode must implement their individual transmission methods."
-        )
+        return state, system, settings
 
 # Splitters --------------------------------------------------------------------
 
@@ -179,7 +177,8 @@ class Splitter(GraphNode):
         
         for v_idx, value in enumerate(self.values):
 
-            total_input = getattr(getattr(state.energy.nodes[ID].outputs, domain), value)
+            domain_input = getattr(state.energy.nodes[ID].outputs, domain)
+            total_input = getattr(domain_input, value)
 
             if callable(self.fractions[v_idx]):
                 frac = self.fractions[v_idx](state)  # type: ignore
@@ -188,8 +187,8 @@ class Splitter(GraphNode):
 
             split_input = eqx.tree_at(
                 lambda t: getattr(t, value),
-                total_input,
-                getattr(total_input, value) * frac,
+                domain_input,
+                jnp.atleast_2d(total_input * frac),
             )
 
             updated_state = eqx.tree_at(
@@ -233,7 +232,11 @@ class BleedFlow(GraphNode):
 
     def transmit(self, state: State, system: System, settings: Settings):
         
-        updated_state = state
+        updated_state = eqx.tree_at(
+            lambda s: s.energy.nodes[self.network_ID].outputs.flow,
+            state,
+            state.energy.nodes[self.grandparent_ID].outputs.flow,
+        )
         
         for attr in self.fractions_dict:
             if callable(self.fractions_dict[attr]):
@@ -254,6 +257,15 @@ class BleedFlow(GraphNode):
                 updated_state,
                 bleed_value
             )
+
+            if attr == "stagnation_enthalpy":
+                fluid: IdealGas = state.energy.nodes[self.parent_ID].outputs.flow.fluid
+                T_t = fluid.invert_enthalpy(bleed_value)
+                updated_state = eqx.tree_at(
+                    lambda s: s.energy.nodes[self.network_ID].outputs.flow.stagnation_temperature,
+                    updated_state,
+                    T_t
+                )   
         
         return updated_state, system, settings
 
@@ -263,40 +275,56 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
     
     design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
+    add_mixer: bool = init_field(False)
 
     output_bleeds: tuple[BleedFlow,...] = init_field(tuple)
 
     def __post_init__(self):
         super(FlowNode, self).__post_init__()
 
-        object.__setattr__(self, "subcomponents", self.subcomponents + self.output_bleeds)
+        if len(self.output_bleeds) > 0:
+            add_mixer = not hasattr(self, "mixer")
+            self_bleeds = tuple(replace(b, inputs=GraphInput("flow", "parent")) for b in self.output_bleeds)
+            object.__setattr__(self, "subcomponents", self.subcomponents + self_bleeds)
+            object.__setattr__(self, "output_bleeds", tuple())
+        else:
+            add_mixer = self.add_mixer and not hasattr(self, "mixer")
+
+        if add_mixer:
+            parent_inputs = tuple(replace(i, network_ID="parent."+i.network_ID) for i in self.flow_inputs)
+            mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False)
+            
+            other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
+            
+            object.__setattr__(self, "inputs", other_inputs + (GraphInput("flow", "self.mixer"),))
+            object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
     
     def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         
-        W_fracs = jnp.array([i.get_value("mass_flow_rate") for i in self.flow_inputs])
-        T_fracs = jnp.array([i.get_value("stagnation_temperature") for i in self.flow_inputs])
-        h_fracs = jnp.array([i.get_value("enthalpy") for i in self.flow_inputs])
+        W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=0)
+        T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=0)
+        h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=0)
         
         W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
-        h_mix = jnp.dot(W_fracs, h_fracs) / W_mix
+        h_t_mix = jnp.dot(W_fracs, h_t_fracs) / W_mix
 
         mixed_fluid = MixedGas(
             tag = f"{self.tag} input flow",
             composition=GasComposition(
-                    elements=tuple(i.get_value("fluid") for i in self.flow_inputs),
+                    elements=tuple(i.get_value(state, "fluid") for i in self.flow_inputs),
                     mass_fractions=W_fracs,
                 )
             )
         
-        T_t_guess = jnp.dot(W_fracs, T_fracs) / W_mix
-        T_t = mixed_fluid.invert_enthalpy(h_mix, T_t_guess)
+        T_t_guess = jnp.dot(W_fracs, T_t_fracs) / W_mix
+        T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
         P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
 
-        if len(self.fuel_inputs) > 0:
-            p_FAR = self.get_primary_input_state(state, "fuel", "fuel_air_ratio")
+        try:
+            p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
             p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
             FAR = p_FAR * p_W / W_mix
-        else:
+        except:
             FAR = jnp.atleast_2d(0.0)
         
         M = self.get_primary_input_state(state, "flow", "mach_number")
@@ -315,8 +343,8 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
     def kinematics(gas: IdealGas, T_t_out, P_t_out, M_out, mdot):
 
         # Unpack boundary stagnation properties
-        R = gas.R_specific
-        gamma = gas.compute_gamma(T_t_out)
+        R       = gas.R_specific
+        gamma   = gas.compute_gamma(T_t_out)
         
         # Compute exit static properties
         T_out = T_t_out / (1.0 + ((gamma - 1.0) / 2.0) * M_out ** 2)
@@ -377,8 +405,8 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         mdot: float | jnp.ndarray,
         area: float | jnp.ndarray
     ):
-        gamma = gas.compute_gamma(T_t)
-        R = gas.R_specific
+        gamma   = jnp.atleast_2d(gas.compute_gamma(T_t))
+        R       = jnp.atleast_2d(gas.R_specific)
 
         # Non-dimensional mass flow
         Q = (mdot * jnp.sqrt(R * T_t)) / (P_t * area * jnp.sqrt(gamma))
@@ -396,12 +424,12 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             
             M = jnp.clip(M - f / df_dM, 1e-6, 0.99)
 
-        T = T_t / (1.0 + (gamma - 1.0) / 2.0 * M**2)
-        P = P_t / (1.0 + (gamma - 1.0) / 2.0 * M**2) ** (gamma / (gamma - 1.0))
+        T = jnp.atleast_2d(T_t / (1.0 + (gamma - 1.0) / 2.0 * M**2))
+        P = jnp.atleast_2d(P_t / (1.0 + (gamma - 1.0) / 2.0 * M**2) ** (gamma / (gamma - 1.0)))
         
-        h_t = gas.compute_enthalpy(T_t)
-        h = gas.compute_enthalpy(T)
-        u = jnp.sqrt(2.0 * (h_t - h))
+        h_t = jnp.atleast_2d(gas.compute_enthalpy(T_t))
+        h   = jnp.atleast_2d(gas.compute_enthalpy(T))
+        u   = jnp.atleast_2d(jnp.sqrt(2.0 * (h_t - h)))
 
         return T, P, h_t, h, u, M
     
@@ -416,15 +444,15 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         gas, T_t, P_t, W_in, FAR, M = self.mix_inputs(state)
         W_out = W_in * (1.0 - self.bleed_MFR_frac(state))
         
-        PR = self.design_parameters.pressure_ratio
-        P_rec = self.design_parameters.pressure_recovery
-        n_isn = self.design_parameters.eff.flow
+        PR    = jnp.atleast_2d(self.design_parameters.pressure_ratio)
+        P_rec = jnp.atleast_2d(self.design_parameters.pressure_recovery)
+        n_isn = jnp.atleast_2d(self.design_parameters.eff.flow)
 
         T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR, n_isn, M, P_rec)
 
         if settings.analysis.energy.design_mode:
 
-            M_out = self.design_parameters.exit_mach_number
+            M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
 
             A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematics(
                 gas=gas,
@@ -447,38 +475,29 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             )
         
         else:
-            A_exit = self.design_parameters.A_exit
-            T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(gas, T_t_out, P_t_out, W_out, A_exit)
+            A_out = jnp.atleast_2d(self.design_parameters.A_exit)
+            T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(gas, T_t_out, P_t_out, W_out, A_out)
 
-            flow_outputs = state.energy.nodes[self.network_ID].outputs.flow
+        outputs = state.energy.nodes[self.network_ID].outputs.flow
 
-            flow_outputs = eqx.tree_at(lambda o: o.mach_number, flow_outputs, M_out)
-            flow_outputs = eqx.tree_at(lambda o: o.speed, flow_outputs, u_out)
-            flow_outputs = eqx.tree_at(lambda o: o.stagnation_pressure, flow_outputs, P_t_out)
-            flow_outputs = eqx.tree_at(lambda o: o.stagnation_temperature, flow_outputs, T_t_out)
-            flow_outputs = eqx.tree_at(lambda o: o.temperature, flow_outputs, T_out)
-            flow_outputs = eqx.tree_at(lambda o: o.pressure, flow_outputs, P_out)
-            flow_outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy, flow_outputs, h_t_out)
-            flow_outputs = eqx.tree_at(lambda o: o.enthalpy, flow_outputs, h_out)
-            flow_outputs = eqx.tree_at(lambda o: o.area, flow_outputs, A_exit)
+        outputs = eqx.tree_at(lambda o: o.mass_flow_rate, outputs,          jnp.atleast_2d(W_out))
+        outputs = eqx.tree_at(lambda o: o.mach_number, outputs,             jnp.atleast_2d(M_out))
+        outputs = eqx.tree_at(lambda o: o.speed, outputs,                   jnp.atleast_2d(u_out))
+        outputs = eqx.tree_at(lambda o: o.stagnation_pressure, outputs,     jnp.atleast_2d(P_t_out))
+        outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs,  jnp.atleast_2d(T_t_out))
+        outputs = eqx.tree_at(lambda o: o.temperature, outputs,             jnp.atleast_2d(T_out))
+        outputs = eqx.tree_at(lambda o: o.pressure, outputs,                jnp.atleast_2d(P_out))
+        outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy, outputs,     jnp.atleast_2d(h_t_out))
+        outputs = eqx.tree_at(lambda o: o.enthalpy, outputs,                jnp.atleast_2d(h_out))
+        outputs = eqx.tree_at(lambda o: o.area, outputs,                    jnp.atleast_2d(A_out))
+        outputs = eqx.tree_at(lambda o: o.fuel_air_ratio, outputs,          jnp.atleast_2d(FAR))
 
-            fuel_outputs = eqx.tree_at(
-                lambda o: o.fuel_air_ratio,
-                state.energy.nodes[self.network_ID].outputs.flow,
-                FAR
-            )
 
-            updated_state = eqx.tree_at(lambda s:
-                (
-                    s.energy.nodes[self.network_ID].outputs.flow,
-                    s.energy.nodes[self.network_ID].outputs.fuel,
-                ), 
-                updated_state,
-                (
-                    flow_outputs,
-                    fuel_outputs,
-                ),
-            )
+        updated_state = eqx.tree_at(lambda s:
+            s.energy.nodes[self.network_ID].outputs.flow,
+            updated_state,
+            outputs,
+        )
 
         return updated_state, updated_system, settings
         

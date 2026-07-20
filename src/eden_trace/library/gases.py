@@ -40,6 +40,9 @@ class IdealGas(eqx.Module):
 
     thermal_coefficients: tuple = init_field(tuple)
 
+    def __repr__(self) -> str:
+        return f"{self.tag}"
+
     def __post_init__(self):
         self.molecular_mass = self.R / self.R_specific
 
@@ -146,6 +149,9 @@ class GasComposition(eqx.Module):
     mass_fractions: jnp.ndarray = empty_array()
     mole_fractions: jnp.ndarray = empty_array()
 
+    def __repr__(self) -> str:
+        return "; ".join([f"{e.tag}: {self.mass_fractions[i]}" for i, e in enumerate(self.elements)])
+    
     def __post_init__(self):
 
         new_elements = tuple()
@@ -180,6 +186,9 @@ class MixedGas(IdealGas):
     tag: str = init_field("Mixed Gas", static=True)
 
     composition: GasComposition = init_field(GasComposition)
+
+    def __repr__(self) -> str:
+        return f"{self.tag}: [{self.composition}]"
 
     @property
     def R_specific(self):
