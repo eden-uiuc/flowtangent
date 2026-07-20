@@ -9,22 +9,19 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Callable, Iterable, Self, get_args, cast
+from typing import TYPE_CHECKING, Any, Literal, Callable, Iterable, get_args, cast
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    pass
+    from eden_trace.framework import State, System, Settings
 
 import warnings
 import equinox as eqx
 import jax.numpy as jnp
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from functools import reduce
 from collections import defaultdict
 
-from eden_trace.framework.settings import Settings
-from eden_trace.framework.state import State
-from eden_trace.framework.systems import System
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import Component
@@ -78,7 +75,7 @@ class GraphNode(Component):
             if len(domain_inputs) == 1:
                 p_input = domain_inputs[0]
                 p_idx = self.inputs.index(p_input)
-                self.inputs = (self.inputs[:p_idx] + replace(p_input, primary=True) + self.inputs[p_idx + 1:])
+                self.inputs = (self.inputs[:p_idx] + (replace(p_input, primary=True),) + self.inputs[p_idx + 1:])
 
     def __getattr__(self, item: str):
         if item.endswith("_inputs"):
@@ -158,7 +155,6 @@ class Splitter(GraphNode):
     def __post_init__(self):
         
         # Set inputs
-        object.__setattr__(self, "inputs", (s.input for s in self.splits))
         super(Splitter, self).__post_init__()
         assert(isinstance(self.inputs, tuple))
         input_nodes = self.input_node_IDs
@@ -230,7 +226,7 @@ class FlowDesign(eqx.Module):
 class BleedFlow(GraphNode):
 
     tag: str = init_field("Bleed Flow", static=True)
-    fraction_dict: dict[str, float | Callable] = init_field(defaultdict(lambda: 0.0), static=True)
+    fractions_dict: dict[str, float | Callable] = init_field(dict)
 
     parent_ID: str = init_field('', static=True)
     grandparent_ID: str = init_field(tuple, static=True)
@@ -239,11 +235,11 @@ class BleedFlow(GraphNode):
         
         updated_state = state
         
-        for attr in self.fraction_dict:
-            if callable(self.fraction_dict[attr]):
-                frac = self.fraction_dict[attr](state)  # type: ignore
+        for attr in self.fractions_dict:
+            if callable(self.fractions_dict[attr]):
+                frac = self.fractions_dict[attr](state)  # type: ignore
             else:
-                frac = self.fraction_dict[attr]
+                frac = self.fractions_dict[attr]
 
             in_value = getattr(state.energy.nodes[self.grandparent_ID].outputs.flow, attr)
             out_value = getattr(state.energy.nodes[self.parent_ID].outputs.flow, attr)
@@ -268,7 +264,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
     design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
 
-    output_bleeds: tuple[BleedFlow,...] = init_field(tuple, static=True)
+    output_bleeds: tuple[BleedFlow,...] = init_field(tuple)
 
     def __post_init__(self):
         super(FlowNode, self).__post_init__()
@@ -309,7 +305,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
     
     def bleed_MFR_frac(self, state:State):
         if len(self.output_bleeds) > 0:
-            bleed_fracs = [b.fraction_dict.get("mass_flow_rate", 0.0) for b in self.output_bleeds]
+            bleed_fracs = [b.fractions_dict.get("mass_flow_rate", 0.0) for b in self.output_bleeds]
             actual_fracs = jnp.array([f(state) if callable(f) else f for f in bleed_fracs])
             return jnp.atleast_2d(jnp.sum(actual_fracs))
         else:

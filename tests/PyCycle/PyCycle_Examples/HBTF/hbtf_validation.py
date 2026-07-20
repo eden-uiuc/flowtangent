@@ -24,11 +24,19 @@ test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 
 def system_setup():
     
-    engine = TurbofanEngine(design_parameters=JetDesign(thrust=5900 * units.lbf, bypass_ratio=5.105))
+    # Design Parameters --------------------------------------------------------
 
+    engine = TurbofanEngine(
+        design_parameters=JetDesign(
+            thrust=5900 * units.lbf,
+            bypass_ratio=5.105))
+    
     # Inlet & Fan
     inlet_des = FlowDesign(exit_mach_number=0.751, pressure_recovery=0.999)
-    fan_des = FlowDesign(pressure_ratio=1.685, exit_mach_number=0.4578, eff=Eff(flow=0.8948))
+    fan_des = FlowDesign(
+        pressure_ratio=1.685,
+        exit_mach_number=0.4578,
+        eff=Eff(flow=0.8948))
     
     c_duct_des = FlowDesign(pressure_ratio=(1-0.0048), exit_mach_number=0.3121)
     f_duct_des = FlowDesign(pressure_ratio=(1-0.0149), exit_mach_number=0.4589)
@@ -65,16 +73,28 @@ def system_setup():
     ), engine, (lpc_des, c_stat_des, hpc_des, cool_des))
     
     # Combustor
-    burn_des = FlowDesign(output_temperature=2857 * units.R, pressure_ratio=(1.0 - 0.054), exit_mach_number=0.1025,)
+    burn_des = FlowDesign(
+        output_temperature=2857 * units.R,
+        pressure_ratio=(1.0 - 0.054),
+        exit_mach_number=0.1025,)
     
-    engine = eqx.tree_at(lambda e: e.combustor.design_parameters, engine, burn_des)
+    engine = eqx.tree_at(
+        lambda e: e.combustor.design_parameters,
+        engine,
+        burn_des)
     
     # Turbines
-    hpt_des = FlowDesign(eff=Eff(flow=0.8888), rotation_speed=15000. * units.rev/units.mins, exit_mach_number=0.3650,)
+    hpt_des = FlowDesign(
+        eff=Eff(flow=0.8888),
+        rotation_speed=15000. * units.rev/units.mins,
+        exit_mach_number=0.3650,)
     
     t_stat_des = FlowDesign(pressure_ratio=(1-0.0051), exit_mach_number=0.3063)
     
-    lpt_des = FlowDesign(rotation_speed=5000. * units.rev/units.mins, exit_mach_number=0.4127, eff=Eff(flow=0.8996),)
+    lpt_des = FlowDesign(
+        rotation_speed=5000. * units.rev/units.mins,
+        exit_mach_number=0.4127,
+        eff=Eff(flow=0.8996),)
 
     engine = eqx.tree_at(lambda e: (
         e.hpt.design_parameters,
@@ -85,6 +105,7 @@ def system_setup():
     # Nozzles
     cn_duct_des = FlowDesign(pressure_ratio=(1-0.0107), exit_mach_number=0.4463)
     cn_des = FlowDesign(eff=Eff(flow=0.9933))
+    
     fn_des = FlowDesign(eff=Eff(flow=0.9939))
 
     engine = eqx.tree_at(lambda e: (
@@ -92,6 +113,26 @@ def system_setup():
         e.core_nozzle.design_parameters,
         e.fan_nozzle.design_parameters,
     ), engine, (cn_duct_des, cn_des, fn_des))
+
+    # Bleed Flows --------------------------------------------------------------
+
+    bleed_params = (
+        {"mass_flow_rate": 0.0445, "stagnation_enthalpy": 0.5, "stagnation_pressure": 0.5}, # HPC Outlet
+        {"mass_flow_rate": 0.050708, "stagnation_enthalpy": 0.5, "stagnation_pressure": 0.5}, # HPC -> LPT Cooling
+        {"mass_flow_rate": 0.020274, "stagnation_enthalpy": 0.5, "stagnation_pressure": 0.55}, # HPC -> Nozzle Cooling
+        {"mass_flow_rate": 0.067214}, # Duct -> HPT Cooling
+        {"mass_flow_rate": 0.101256}, # Duct -> LPT Cooling
+        {"mass_flow_rate": 0.0005}, # Bypass Outlet
+    )
+
+    engine = eqx.tree_at(lambda e: (
+        e.hpc.outlet.fractions_dict,
+        e.hpc.lpt_cooling.fractions_dict,
+        e.hpc.nozzle_cooling.fractions_dict,
+        e.cooling_duct.hpt_cooling.fractions_dict,
+        e.cooling_duct.lpt_cooling.fractions_dict,
+        e.fan_duct.outlet.fractions_dict,
+    ), engine, bleed_params)
 
     line = TurbofanLine(subcomponents=(engine,))
     

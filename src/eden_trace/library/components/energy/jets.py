@@ -214,6 +214,7 @@ class Compressor(FlowNode):
     def __post_init__(self):
         if not isinstance(self.map, CompressorMap):
             raise TypeError(f"'{self.tag}' requires a CompressorMap, got {type(self.map).__name__}")
+        super(Compressor, self).__post_init__()
 
     @tu.inputs(
         "state.freestream.Cp",
@@ -566,6 +567,7 @@ class Turbine(FlowNode):
     def __post_init__(self):
         if not isinstance(self.map, TurbineMap):
             raise TypeError(f"'{self.tag}' requires a TurbineMap, got {type(self.map).__name__}")
+        super(Turbine, self).__post_init__()
 
     @tu.inputs(
         "state.freestream.gamma",
@@ -1440,7 +1442,8 @@ def _TurbofanSetup():
         inputs=GraphInput("flow", "fan"),
         fractions=BPRSplit(is_bypass=True))
     
-    fn_duct = FlowNode(tag="Fan Duct", inputs=GraphInput("flow", "fan flow"))
+    fn_duct = FlowNode(tag="Fan Duct", inputs=GraphInput("flow", "fan flow"),
+                       output_bleeds=(BleedFlow(tag="outlet"),))
     
     f_nozz = VariableNozzle(tag="Fan Nozzle", inputs=(
         GraphInput("flow", "fan duct"),
