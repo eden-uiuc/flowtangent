@@ -57,6 +57,13 @@ class GraphInput(eqx.Module):
     def __iter__(self):
         yield self
 
+    def __repr__(self) -> str:
+        if self.primary:
+            p_str = "Primary "
+        else:
+            p_str = ""
+        return p_str + f"{self.domain.title()} Input: {self.network_ID}"
+
     def get_value(self, state:State, value: str):
         return reduce(getattr, (state.energy.nodes[self.network_ID].outputs, self.domain, value))
 
@@ -295,28 +302,27 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False)
             
             other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
-            
-            object.__setattr__(self, "inputs", other_inputs + (GraphInput("flow", "self.mixer"),))
+            object.__setattr__(self, "inputs", other_inputs + (GraphInput(domain="flow", network_ID="self.mixer", primary=True),))
             object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
     
     def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         
-        W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=0)
-        T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=0)
-        h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=0)
+        W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
+        T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
+        h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
         
         W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
-        h_t_mix = jnp.dot(W_fracs, h_t_fracs) / W_mix
+        h_t_mix = jnp.dot(W_fracs, h_t_fracs.T) / W_mix
 
         mixed_fluid = MixedGas(
-            tag = f"{self.tag} input flow",
+            tag = f"{self.tag} Input Fluid",
             composition=GasComposition(
                     elements=tuple(i.get_value(state, "fluid") for i in self.flow_inputs),
-                    mass_fractions=W_fracs,
+                    mass_fractions=W_fracs/W_mix,
                 )
             )
         
-        T_t_guess = jnp.dot(W_fracs, T_t_fracs) / W_mix
+        T_t_guess = jnp.dot(W_fracs, T_t_fracs.T) / W_mix
         T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
         P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
 
@@ -378,10 +384,11 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_t_out_ideal = P_t * PR * P_rec
 
         # Normal Shock Recovery
+        safe_M = jnp.maximum(M, 1.0)
         ns_P_t = (
             PR * P_t
-            * ((((gamma_in + 1.0) * (M**2.0)) / ((gamma_in - 1.0) * M**2.0 + 2.0)) ** (gamma_in / (gamma_in - 1.0)))
-            * ((gamma_in + 1.0) / (2.0 * gamma_in * M**2.0 - (gamma_in - 1.0))) ** (1.0 / (gamma_in - 1.0))
+            * ((((gamma_in + 1.0) * (safe_M**2.0)) / ((gamma_in - 1.0) * safe_M**2.0 + 2.0)) ** (gamma_in / (gamma_in - 1.0)))
+            * ((gamma_in + 1.0) / (2.0 * gamma_in * safe_M**2.0 - (gamma_in - 1.0))) ** (1.0 / (gamma_in - 1.0))
         )
 
         P_t_out = jnp.where(M > 1.0, ns_P_t, P_t_out_ideal)

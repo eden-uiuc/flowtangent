@@ -124,7 +124,7 @@ class Inlet(FlowNode):
         P_rec = jnp.atleast_2d(self.design_parameters.pressure_recovery)
         M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
         
-        P_t_out, T_t_out = self.stagnation(gas, T_t, P_t, M0, PR, P_rec)
+        T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, M0, PR, P_rec)
 
         if settings.analysis.energy.design_mode:
 
@@ -631,9 +631,10 @@ class Turbine(FlowNode):
             s_Np = (Np_des/self.map.Np_des).squeeze()
 
             # Turbine passes 1 / PR to reflect pressure drop
-            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
+            safe_PR = jnp.clip(PR, min=1e-5)
+            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, 1.0 / safe_PR, n_isn)
             A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematics(
-                gas=BurnedJetA(FAR),
+                gas=gas,
                 T_t_out=T_t_out,
                 P_t_out=P_t_out,
                 M_out=M_out,

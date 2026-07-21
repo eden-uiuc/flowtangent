@@ -156,7 +156,7 @@ def system_setup():
 if __name__ == "__main__":
 
     # Control Board
-    DEBUG = True
+    DEBUG = False
     VERBOSE = True
 
     DESIGN_POINT = True

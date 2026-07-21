@@ -74,7 +74,11 @@ def _resolve_namespaces(node, parent_prefix=""):
             else:
                 return parent_prefix + "." + flat_input_parts[-1]
 
-    new_inputs = tuple(i if i._assigned else GraphInput(i.domain, parse_input(i.network_ID), _assigned=True) for i in node.inputs)
+    new_inputs = tuple(
+        i if i._assigned
+        else replace(i, network_ID=parse_input(i.network_ID), _assigned=True)
+        for i in node.inputs
+    )
 
     # Update the node itself
     node = replace(

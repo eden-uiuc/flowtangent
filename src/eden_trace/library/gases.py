@@ -8,6 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 import json
 from functools import lru_cache
+from collections import defaultdict
 
 # package imports
 import jax
@@ -41,7 +42,7 @@ class IdealGas(eqx.Module):
     thermal_coefficients: tuple = init_field(tuple)
 
     def __repr__(self) -> str:
-        return f"{self.tag}"
+        return f"{self.tag}".upper()
 
     def __post_init__(self):
         self.molecular_mass = self.R / self.R_specific
@@ -147,39 +148,68 @@ class IdealGas(eqx.Module):
 class GasComposition(eqx.Module):
     elements: tuple[str | IdealGas, ...] = init_field(tuple)
     mass_fractions: jnp.ndarray = empty_array()
-    mole_fractions: jnp.ndarray = empty_array()
 
     def __repr__(self) -> str:
-        return "; ".join([f"{e.tag}: {self.mass_fractions[i]}" for i, e in enumerate(self.elements)])
+        return "; ".join([f"{e.tag}: {jnp.atleast_2d(self.mass_fractions[:, i]).squeeze()}" for i, e in enumerate(self.elements)])
+    
+    def flatten(self):
+
+        def _extract_elements(comp: GasComposition, current_fraction: jnp.ndarray) -> dict[str, jnp.ndarray]:
+            base_dict = defaultdict(lambda: jnp.zeros_like(current_fraction))
+            for e_idx, elem in enumerate(comp.elements):
+                
+                e_frac = current_fraction * jnp.atleast_2d(comp.mass_fractions)[..., e_idx:e_idx+1]
+                
+                if hasattr(elem, "composition"):
+                    sub_dict = _extract_elements(elem.composition, e_frac)
+                    for gas, frac in sub_dict.items():
+                        gas_name = str(gas).upper() 
+                        base_dict[gas_name] = base_dict[gas_name] + frac
+                else:
+                    gas_name = str(elem).upper()
+                    base_dict[gas_name] = base_dict[gas_name] + e_frac
+            
+            return base_dict
+
+        base_dict = _extract_elements(self, jnp.ones((1, 1)))
+        sorted_elements = tuple(sorted(base_dict.keys()))
+        stacked_fractions = jnp.concatenate([base_dict[k] for k in sorted_elements], axis=-1)
+
+        flat_composition =  GasComposition(
+            elements=sorted_elements,
+            mass_fractions=stacked_fractions
+        )
+
+        return flat_composition
+
     
     def __post_init__(self):
 
         new_elements = tuple()
 
         for elem in self.elements:
+
             if isinstance(elem, str):
                 try:
                     new_elements += (_get_gas(elem.upper()),)
                 except AttributeError:
                     raise ValueError(f"Unrecognized element '{elem}' not found in database.")
-
             elif isinstance(elem, IdealGas):
                 new_elements += (elem,)
             else:
                 raise ValueError(f"Invalid element type {type(elem)} supplied. Discarding...")
         object.__setattr__(self, "elements", new_elements)
 
-        @property
-        def mole_fractions(self):
-            mm_mix = (
-                1
-                / jnp.sum(
-                    jnp.asarray([self.mass_fractions[i] / e.molecular_mass for i, e in enumerate(self.elements)])
-                ).item()
-            )
+    @property
+    def mole_fractions(self):
+        mm_mix = (
+            1
+            / jnp.sum(
+                jnp.asarray([self.mass_fractions[i] / e.molecular_mass for i, e in enumerate(self.elements)])
+            ).item()
+        )
 
-            return tuple(self.mass_fractions[i] * mm_mix / e.molecular_mass for i, e in enumerate(self.elements)),
-            
+        return tuple(self.mass_fractions[i] * mm_mix / e.molecular_mass for i, e in enumerate(self.elements)),
 
 
 class MixedGas(IdealGas):
@@ -187,12 +217,15 @@ class MixedGas(IdealGas):
 
     composition: GasComposition = init_field(GasComposition)
 
+    def __post_init__(self):
+        object.__setattr__(self, "composition", self.composition.flatten())
+    
     def __repr__(self) -> str:
         return f"{self.tag}: [{self.composition}]"
 
     @property
     def R_specific(self):
-        R_arr = jnp.stack([elem.R_specific for elem in self.composition.elements], axis=-1)
+        R_arr = jnp.stack([jnp.atleast_1d(elem.R_specific).squeeze() for elem in self.composition.elements], axis=-1)
 
         R_mixed = jnp.sum(R_arr * self.composition.mass_fractions, axis=-1)
         return R_mixed
@@ -212,7 +245,7 @@ class MixedGas(IdealGas):
         return h_mixed
     
     def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
-        h_arr = jnp.stack([elem.compute_enthalpy(T) for elem in self.composition.elements], axis=-1)
+        h_arr = jnp.stack([jnp.atleast_1d(elem.compute_enthalpy(T)).squeeze() for elem in self.composition.elements], axis=-1)
 
         # Mass-weighted sum
         h_mixed = jnp.sum(h_arr * self.composition.mass_fractions, axis=-1)

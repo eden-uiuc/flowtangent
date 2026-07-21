@@ -47,7 +47,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
     M0 = des.mach_number
 
     atmo = des.atmosphere_model
-    a0 = atmo.compute_speed_of_sound(alt)
+    a0 = atmo.compute_speed_of_sound(alt).squeeze()
 
     des_state = eqx.tree_at(
         lambda s: (
