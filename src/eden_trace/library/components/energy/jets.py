@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 # package imports
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 
 import eden_trace.utils as tu
@@ -67,8 +68,7 @@ def _inlet_performance(gas, T_t, P_t, M0, PR, P_rec, mdot, A_exit):
     Q = (mdot * jnp.sqrt(R * T_t_out)) / (P_t_out * A_exit * jnp.sqrt(gamma))
     
     # Newton loop to find subsonic Mach number
-    M_out = 0.5 # Subsonic initial guess
-    for _ in range(5):
+    def step(M_out, _):
         term = 1.0 + (gamma - 1.0) / 2.0 * M_out**2
         power = - (gamma + 1.0) / (2.0 * (gamma - 1.0))
         
@@ -78,6 +78,10 @@ def _inlet_performance(gas, T_t, P_t, M0, PR, P_rec, mdot, A_exit):
         df_dM = (term ** power) + M_out * power * (term ** (power - 1.0)) * (gamma - 1.0) * M_out
         
         M_out = jnp.clip(M_out - f / df_dM, 1e-6, 0.99)
+        
+        return M_out, None
+    
+    M_out, _ = jax.lax.scan(step, 0.5 * jnp.ones_like(gamma), jnp.arange(5))
         
     # Calculate static properties using the solved Mach
     T_out, P_out, h_t_out, h_out, u_out, M_out = FlowNode.statics(gas, T_t_out, P_t_out, mdot, A_exit)
@@ -383,11 +387,11 @@ def _combustor_design(
     n_b: jnp.ndarray | float,
 ):
     
-    h_t_in = gas.compute_absolute_enthalpy(T_t)
+    h_t_in = gas.compute_enthalpy(T_t)
     P_t_out = P_t * PR
 
     # Target exit enthalpy based on the commanded exit temperature
-    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
+    h_t_out = gas.compute_enthalpy(T_t_out)
 
     # Simple First-Law FAR calculation using LHV
     numerator = h_t_out - h_t_in
@@ -431,7 +435,7 @@ def _combustor_performance(
     T_t_out = T_t + (h_t_out - h_t_in) / Cp_guess
 
     # 5 steps is more than enough for NASA polynomials to converge perfectly
-    for _ in range(5):
+    def step(T_t_out, _):
         h_current = ox.compute_enthalpy(T_t_out)
         Cp_current = ox.compute_Cp(T_t_out)
         
@@ -439,6 +443,10 @@ def _combustor_performance(
         
         # True Newton Step: x_new = x_old - f(x)/f'(x)
         T_t_out = T_t_out - (error / Cp_current)
+
+        return T_t_out, None
+    
+    T_t_out, _ = jax.lax.scan(step, T_t_out, jnp.arange(5))
 
     return P_t_out, T_t_out, h_t_out, mdot_out
 
@@ -779,8 +787,8 @@ def _nozzle_design(
     T_out = T_t_out / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
 
     # Enthalpy and velocity
-    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
-    h_out = gas.compute_absolute_enthalpy(T_out)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
     u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     # Exit area
@@ -819,8 +827,7 @@ def _nozzle_performance(
     choked = actual_PR >= critical_PR
 
     # Find exit Mach number
-    M_exit_sup = 2.0
-    for _ in range(5):
+    def step(M_exit_sup, _):
         term = (2.0 / (gamma + 1.0)) * (1.0 + (gamma - 1.0) / 2.0 * M_exit_sup**2)
         power = (gamma + 1.0) / (2.0 * (gamma - 1.0))
         AR_calc = (1.0 / M_exit_sup) * (term ** power)
@@ -830,6 +837,10 @@ def _nozzle_performance(
         
         # Newton step
         M_exit_sup = jnp.maximum(M_exit_sup - (AR_calc - AR) / dAR_dM, 1.001)
+
+        return M_exit_sup, None
+    
+    M_exit_sup, _ = jax.lax.scan(step, 2.0 * jnp.ones_like(gamma), jnp.arange(5))
     
     M_exit_sub  = jnp.sqrt((2.0 / (gamma - 1.0)) * ((safe_PR)**((gamma - 1.0) / gamma) - 1.0))
     M_exit      = jnp.where(choked, M_exit_sup, M_exit_sub)
@@ -849,8 +860,8 @@ def _nozzle_performance(
     T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_exit**2)
     T_t_out = T_t
     
-    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
-    h_out = gas.compute_absolute_enthalpy(T_out)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
     u_out = jnp.sqrt(2.0 * (h_t_out - h_out)) * n_v
 
     rho_out = P_out / (R * T_out)
@@ -1013,8 +1024,8 @@ def _variable_nozzle_performance(
     T_out = T_t / (1.0 + (gamma - 1.0) / 2.0 * M_out**2)
     T_t_out = T_t
     
-    h_t_out = gas.compute_absolute_enthalpy(T_t_out)
-    h_out = gas.compute_absolute_enthalpy(T_out)
+    h_t_out = gas.compute_enthalpy(T_t_out)
+    h_out = gas.compute_enthalpy(T_out)
     u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 0.0)) * n_v
 
     rho_out = P_out / (R * T_out)

@@ -27,7 +27,7 @@ from eden_trace.library import units
 
 class IdealGas(eqx.Module):
     tag: str = init_field("Gas", static=True)
-    molecular_mass: float = 1.0 * units.gram
+    molecular_mass: float | jnp.ndarray = init_field(1.0 * units.gram, static=True)
     R: float = init_field(8.314462, static=True)  # ideal gas constant (J/(mol·K))
 
     @property
@@ -39,7 +39,7 @@ class IdealGas(eqx.Module):
     nasa_high_coeffs: tuple = init_field(tuple, static=True)
     nasa_T_mid: float = init_field(1000.0, static=True)
 
-    thermal_coefficients: tuple = init_field(tuple)
+    thermal_coefficients: tuple = init_field(tuple, static=True)
 
     def __repr__(self) -> str:
         return f"{self.tag}".upper()
@@ -83,15 +83,17 @@ class IdealGas(eqx.Module):
         h_ref = self.compute_absolute_enthalpy(298.15)
         return h_abs - h_ref
 
-    def invert_enthalpy(self, h_target: float | jnp.ndarray, T_guess: float | jnp.ndarray=1000.0):
-
-        def newton_step(i, T):
+    def invert_enthalpy(self, h_target: float | jnp.ndarray, T_guess: float | jnp.ndarray=1000.0, max_iter: int = 5):
+        def step(T, _):
             h = self.compute_enthalpy(T)
             cp = self.compute_Cp(T)
 
-            return T - (h - h_target) / cp
+            T =  T - (h - h_target) / cp
 
-        T_final = jax.lax.fori_loop(0, 5, newton_step, T_guess)
+            return T, None
+    
+        T_final, _ = jax.lax.scan(step, T_guess * jnp.ones_like(h_target), jnp.arange(max_iter))
+
         return T_final
 
     def compute_entropy(self, T: float | jnp.ndarray = 298.15, P: float | jnp.ndarray = 101325.0):
@@ -146,43 +148,64 @@ class IdealGas(eqx.Module):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class GasComposition(eqx.Module):
-    elements: tuple[str | IdealGas, ...] = init_field(tuple)
+    elements: tuple[str | IdealGas, ...] = init_field(tuple, static=True)
     mass_fractions: jnp.ndarray = empty_array()
 
     def __repr__(self) -> str:
-        return "; ".join([f"{e.tag}: {jnp.atleast_2d(self.mass_fractions[:, i]).squeeze()}" for i, e in enumerate(self.elements)])
+        return "; ".join([f"{e.tag}: {jnp.atleast_2d(self.mass_fractions)[:, i].squeeze()}" for i, e in enumerate(self.elements)])
     
-    def flatten(self):
+    @classmethod
+    def flatten_elements(cls, elements: tuple, mass_fractions: jnp.ndarray):
 
-        def _extract_elements(comp: GasComposition, current_fraction: jnp.ndarray) -> dict[str, jnp.ndarray]:
+        def _extract_elements(
+            elements: tuple, 
+            mass_fractions: jnp.ndarray, 
+            current_fraction: jnp.ndarray
+        ) -> dict[str, jnp.ndarray]:
+            """
+            Recursively drills down into nested elements and accumulates 
+            the absolute mass fractions of the base elements.
+            """
             base_dict = defaultdict(lambda: jnp.zeros_like(current_fraction))
-            for e_idx, elem in enumerate(comp.elements):
+            
+            # Ensure 2D for broadcasting safely
+            mass_fractions_2d = jnp.atleast_2d(mass_fractions)
+            
+            for e_idx, elem in enumerate(elements):
                 
-                e_frac = current_fraction * jnp.atleast_2d(comp.mass_fractions)[..., e_idx:e_idx+1]
+                # Calculate this specific element's absolute fraction
+                e_frac = current_fraction * mass_fractions_2d[..., e_idx:e_idx+1]
                 
                 if hasattr(elem, "composition"):
-                    sub_dict = _extract_elements(elem.composition, e_frac)
+                    # It's a MixedGas! Feed its inner components into the recursion
+                    sub_dict = _extract_elements(
+                        elements=elem.composition.elements, 
+                        mass_fractions=elem.composition.mass_fractions, 
+                        current_fraction=e_frac
+                    )
+                    
+                    # Merge the returned sub-elements into our dictionary
                     for gas, frac in sub_dict.items():
-                        gas_name = str(gas).upper() 
+                        gas_name = str(gas).upper()
                         base_dict[gas_name] = base_dict[gas_name] + frac
                 else:
+                    # It's a base element (string or IdealGas). Add directly.
                     gas_name = str(elem).upper()
                     base_dict[gas_name] = base_dict[gas_name] + e_frac
-            
+                    
             return base_dict
 
-        base_dict = _extract_elements(self, jnp.ones((1, 1)))
+        base_dict = _extract_elements(elements, mass_fractions, jnp.ones((1, 1)))
         sorted_elements = tuple(sorted(base_dict.keys()))
         stacked_fractions = jnp.concatenate([base_dict[k] for k in sorted_elements], axis=-1)
 
-        flat_composition =  GasComposition(
+        flat_composition =  cls(
             elements=sorted_elements,
             mass_fractions=stacked_fractions
         )
 
         return flat_composition
 
-    
     def __post_init__(self):
 
         new_elements = tuple()
@@ -216,12 +239,13 @@ class MixedGas(IdealGas):
     tag: str = init_field("Mixed Gas", static=True)
 
     composition: GasComposition = init_field(GasComposition)
-
-    def __post_init__(self):
-        object.__setattr__(self, "composition", self.composition.flatten())
+    molecular_mass: float | jnp.ndarray = empty_array()
     
     def __repr__(self) -> str:
         return f"{self.tag}: [{self.composition}]"
+    
+    def __post_init__(self):
+        self.molecular_mass = jnp.atleast_2d(self.R / self.R_specific)
 
     @property
     def R_specific(self):
@@ -264,32 +288,26 @@ class MixedGas(IdealGas):
         S_mixed = jnp.sum(S_arr * self.composition.mass_fractions, axis=-1)
         return S_mixed
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Custom Mixes
+# ----------------------------------------------------------------------------------------------------------------------
 
 @lru_cache(maxsize=1)
 def _build_air():
     """Private builder for standard air."""
-    return MixedGas(
+    air =  MixedGas(
         tag="Air",
         composition=GasComposition(
             elements=("O2", "AR", "CO2", "N2"), mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552])
         ),
     )
 
+    return air
+
 
 _CUSTOM_MIXTURES = {
     "Air": _build_air,
 }
-
-
-def Air():
-    return MixedGas(
-        tag="Air",
-        composition=GasComposition(
-            elements=("O2", "Ar", "CO2", "N2"),
-            mass_fractions=jnp.asarray([0.2314, 0.0128, 0.0006, 0.7552]),
-        ),
-    )
-
 
 def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
     """
@@ -338,6 +356,72 @@ def burned_JetA_composition(FAR: float | jnp.ndarray) -> GasComposition:
 def BurnedJetA(FAR: float | jnp.ndarray) -> MixedGas:
     return MixedGas(tag="Burned Jet-A", composition=burned_JetA_composition(FAR))
 
+# ----------------------------------------------------------------------------------------------------------------------
+#  Caching Mixes
+# ----------------------------------------------------------------------------------------------------------------------
+
+@lru_cache(maxsize=None)
+def MixedGasTemplate(tag: str, elements: tuple[str, ...]) -> MixedGas:
+    dummy_fractions = jnp.zeros((1, len(elements)))
+    comp = GasComposition(elements=elements, mass_fractions=dummy_fractions)
+    return MixedGas(tag=tag, composition=comp)
+
+def flatten_element_names(elements) -> tuple[str, ...]:
+    e_set = set()
+    for elem in elements:
+        if hasattr(elem, "composition"):
+            sub_set = flatten_element_names(elem.composition.elements)
+            e_set = e_set.union(sub_set)
+        else:
+            e_set.add(str(elem))
+    
+    return tuple(sorted(e_set))
+
+def flatten_elements(elements: tuple, mass_fractions: jnp.ndarray):
+
+    def _extract_elements(
+        elements: tuple, 
+        mass_fractions: jnp.ndarray, 
+        current_fraction: jnp.ndarray
+    ) -> dict[str, jnp.ndarray]:
+        """
+        Recursively drills down into nested elements and accumulates 
+        the absolute mass fractions of the base elements.
+        """
+        base_dict = defaultdict(lambda: jnp.zeros_like(current_fraction))
+        
+        # Ensure 2D for broadcasting safely
+        mass_fractions_2d = jnp.atleast_2d(mass_fractions)
+        
+        for e_idx, elem in enumerate(elements):
+            
+            # Calculate this specific element's absolute fraction
+            e_frac = current_fraction * mass_fractions_2d[..., e_idx:e_idx+1]
+            
+            if hasattr(elem, "composition"):
+                # It's a MixedGas! Feed its inner components into the recursion
+                sub_dict = _extract_elements(
+                    elements=elem.composition.elements, 
+                    mass_fractions=elem.composition.mass_fractions, 
+                    current_fraction=e_frac
+                )
+                
+                # Merge the returned sub-elements into our dictionary
+                for gas, frac in sub_dict.items():
+                    gas_name = str(gas).upper()
+                    base_dict[gas_name] = base_dict[gas_name] + frac
+            else:
+                # It's a base element (string or IdealGas). Add directly.
+                gas_name = str(elem).upper()
+                base_dict[gas_name] = base_dict[gas_name] + e_frac
+                
+        return base_dict
+
+    base_dict = _extract_elements(elements, mass_fractions, jnp.ones((1, 1)))
+    sorted_elements = tuple(sorted(base_dict.keys()))
+    stacked_fractions = jnp.concatenate([base_dict[k] for k in sorted_elements], axis=-1)
+
+    return sorted_elements, stacked_fractions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  CHEMKIN Harvester

@@ -16,16 +16,16 @@ if TYPE_CHECKING:
 
 import warnings
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 
 from dataclasses import replace
 from functools import reduce
-from collections import defaultdict
 
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import Component
-from eden_trace.library.gases import Air, IdealGas, MixedGas, GasComposition
+from eden_trace.library.gases import Air, IdealGas, MixedGas, MixedGasTemplate, flatten_elements
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Nodes
@@ -307,25 +307,30 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
     
     def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         
+        # Get incoming flow values
         W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
         T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
         h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
         
+        # Calculate mixed baseline
         W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
         h_t_mix = jnp.dot(W_fracs, h_t_fracs.T) / W_mix
 
-        mixed_fluid = MixedGas(
-            tag = f"{self.tag} Input Fluid",
-            composition=GasComposition(
-                    elements=tuple(i.get_value(state, "fluid") for i in self.flow_inputs),
-                    mass_fractions=W_fracs/W_mix,
-                )
-            )
+        # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
+        elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
+        template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
         
+        mixed_fluid = eqx.tree_at(
+            lambda t: t.composition.mass_fractions,
+            template_fluid,
+            fractions)
+        
+        # Invert temperature from enthalpy
         T_t_guess = jnp.dot(W_fracs, T_t_fracs.T) / W_mix
         T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
         P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
 
+        # Check for fuel in mixture and dilute
         try:
             p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
             p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
@@ -357,8 +362,8 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_out = P_t_out * (T_out / T_t_out) ** (gamma / (gamma - 1.0))
 
         # Compute exit kinematic properties
-        h_out = gas.compute_absolute_enthalpy(T_out)
-        h_t_out = gas.compute_absolute_enthalpy(T_t_out)
+        h_out = gas.compute_enthalpy(T_out)
+        h_t_out = gas.compute_enthalpy(T_t_out)
         u_out = jnp.sqrt(jnp.maximum(2.0 * (h_t_out - h_out), 1e-10))
 
         rho_out = P_out / (R * T_out)
@@ -394,10 +399,13 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_t_out = jnp.where(M > 1.0, ns_P_t, P_t_out_ideal)
         PR_actual = P_t_out / P_t
 
-        for _ in range(3):
+        def step(T_t_out_ideal, _):
             gamma_out = gas.compute_gamma(T_t_out_ideal)
             gamma_avg = 0.5 * (gamma_in + gamma_out)
             T_t_out_ideal = T_t * (PR_actual ** ((gamma_avg - 1.0) / gamma_avg))
+            return T_t_out_ideal, None
+        
+        T_t_out_ideal, _ = jax.lax.scan(step, T_t_out_ideal, jnp.arange(5))
         
         # Compressor passes 1 / n_isn, so T_t_out is higher, Turbine passes n_isn, so T_t_out is lower
         T_t_out = T_t + (T_t_out_ideal - T_t) * n_isn
@@ -419,8 +427,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         Q = (mdot * jnp.sqrt(R * T_t)) / (P_t * area * jnp.sqrt(gamma))
 
         # Newton loop to find subsonic Mach number
-        M = 0.5 # Subsonic initial guess
-        for _ in range(5):
+        def step(M, _):
             term = 1.0 + (gamma - 1.0) / 2.0 * M**2
             power = - (gamma + 1.0) / (2.0 * (gamma - 1.0))
             
@@ -430,6 +437,10 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             df_dM = (term ** power) + M * power * (term ** (power - 1.0)) * (gamma - 1.0) * M
             
             M = jnp.clip(M - f / df_dM, 1e-6, 0.99)
+
+            return M, None
+        
+        M, _ = jax.lax.scan(step, 0.5 * jnp.ones_like(gamma), jnp.arange(5))
 
         T = jnp.atleast_2d(T_t / (1.0 + (gamma - 1.0) / 2.0 * M**2))
         P = jnp.atleast_2d(P_t / (1.0 + (gamma - 1.0) / 2.0 * M**2) ** (gamma / (gamma - 1.0)))

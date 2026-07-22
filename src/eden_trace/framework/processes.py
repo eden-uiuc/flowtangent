@@ -10,12 +10,15 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable, Generator, Optional, Self, Tuple
-
 if TYPE_CHECKING:
     from eden_trace.framework import Settings, State, System
 
 import os
 import re
+import time
+from datetime import datetime
+
+from collections import Counter
 
 import equinox as eqx
 
@@ -47,9 +50,63 @@ class ProcessStep(eqx.Module):
     system_delta: System | None = None
     settings_delta: Settings | None = None
 
-    def __call__(self, state, system, settings):
-        if settings.DEBUG_MODE:
-            print(f"  Step: '{self.tag}'")
+    def _profile_complexity(self, state: State, system: System, settings: Settings, top_n=5):
+        try:
+            jaxpr_obj = jax.make_jaxpr(self.function)(state, system, settings)
+        except Exception as e:
+            return f" - {self.tag} | Could not trace ({e})"
+
+        source_counts = Counter()
+        
+        # 1. Define everything we want the profiler to IGNORE
+        exclude_strings = [
+            "jax/", "jax\\", "equinox", "jaxtyping", # Core internals
+            "residual.py",                          # Orchestrator
+            "graph_network.py",
+        ]
+
+        for eqn in jaxpr_obj.jaxpr.eqns:
+            if eqn.source_info.traceback:
+                user_location = "Unknown Source"
+                
+                for frame in reversed(eqn.source_info.traceback.frames):
+                    file_name = getattr(frame, "file_name", None) or getattr(frame, "file", "")
+                    
+                    # 2. Check if this frame is in our ignore list
+                    is_ignored = any(bad_string in file_name for bad_string in exclude_strings)
+                    
+                    # 3. Also ignore the wrapper function by name, just to be safe
+                    func_name = getattr(frame, "code_name", None) or getattr(frame, "name", "")
+                    is_wrapper_func = func_name in [
+                        "make_node_function",
+                        "transmit",
+                        "net_transmit"
+                    ]
+                    
+                    if file_name != "" and not is_ignored and not is_wrapper_func:
+                        line_num = getattr(frame, "line_num", None) or getattr(frame, "lineno", "?")
+                        short_file = file_name.split('/')[-1].split('\\')[-1]
+                        user_location = f"{func_name} ({short_file}:{line_num})"
+                        break 
+                
+                source_counts[user_location] += 1
+            else:
+                source_counts["Unknown Source"] += 1
+
+        total_ops = len(jaxpr_obj.jaxpr.eqns)
+        report = [f" - {self.tag} | Total Ops: {total_ops}"]
+        for loc, count in source_counts.most_common(top_n):
+            pct = (count / total_ops) * 100
+            report.append(f" - - {count:4d} ops ({pct:4.1f}%) : {loc}")
+            
+        return "\n".join(report)
+
+
+    def __call__(self, state: State, system: System, settings: Settings):
+        if settings._DEV_MODE and settings.verbose:
+            print(self._profile_complexity(state, system, settings))
+        if not settings._DEV_MODE and settings.DEBUG_MODE:
+            print(f" - {self.tag}")
         # Default calling behavior, assumes function is callable.
         # String overwrite only for steps with __call__ override
         return self.function(state, system, settings)  # type: ignore
@@ -263,18 +320,20 @@ class Process(ProcessStep):
         raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
     def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
-        if settings.DEBUG_MODE:
-            print(f"Beginning Process: '{self.tag}'")
+        if settings.DEBUG_MODE or settings._DEV_MODE:
+            start_time = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
+            print(f"Beginning Process: '{self.tag}' | {start_time}")
 
         for step in self.steps[self.initial_step :]:
             state, system, settings = step(state, system, settings)
 
-        if settings.DEBUG_MODE:
-            print(f"Process '{self.tag}' Complete.")
+        if settings.DEBUG_MODE or settings._DEV_MODE:
+            end_time = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
+            print(f"Process '{self.tag}' Complete.  | {end_time}")
         return state, system, settings
 
     def _run_with_raw_history(self, state, system, settings):
-        if settings.DEBUG_MODE:
+        if settings.DEBUG_MODE or settings._DEV_MODE:
             print(f"Beginning Process: '{self.tag}'")
         history = [(state, system, settings)]
 
@@ -382,9 +441,9 @@ class Process(ProcessStep):
                     lambda s: (s.state_delta, s.system_delta, s.settings_delta),
                     step,
                     (
-                        ru.compute_tree_delta(raw_hist[i + 1][0], raw_hist[i][0]),
-                        ru.compute_tree_delta(raw_hist[i + 1][1], raw_hist[i][1]),
-                        ru.compute_tree_delta(raw_hist[i + 1][2], raw_hist[i][2]),
+                        tu.compute_tree_delta(raw_hist[i + 1][0], raw_hist[i][0]),
+                        tu.compute_tree_delta(raw_hist[i + 1][1], raw_hist[i][1]),
+                        tu.compute_tree_delta(raw_hist[i + 1][2], raw_hist[i][2]),
                     ),
                 )
                 logged_steps.append(logged_step)
@@ -405,9 +464,9 @@ class Process(ProcessStep):
                     initial_state,
                     initial_system,
                     initial_settings,
-                    ru.compute_tree_delta(state, initial_state),
-                    ru.compute_tree_delta(system, initial_system),
-                    ru.compute_tree_delta(settings, initial_settings),
+                    tu.compute_tree_delta(state, initial_state),
+                    tu.compute_tree_delta(system, initial_system),
+                    tu.compute_tree_delta(settings, initial_settings),
                 ),
                 is_leaf=lambda x: x is None,
             )

@@ -90,7 +90,11 @@ class Settings(eqx.Module):
     verbose: bool = init_field(False, static=True)
     JAX_device_index: int = init_field(0, static=True)
 
+    _DEV_MODE: bool = init_field(False, static=True)
+
     def __post_init__(self):
+        if self._DEV_MODE:
+            pass
         if self.DEBUG_MODE:
             jax.config.update("jax_disable_jit", True)
             jax.config.update("jax_debug_nans", True)

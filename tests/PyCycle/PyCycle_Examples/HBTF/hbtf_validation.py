@@ -1,5 +1,12 @@
-import json
+import sys
+import warnings
+import logging
+# warnings.filterwarnings("error", category=UserWarning)
 
+import os
+os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+
+import jax
 import jax.numpy as jnp
 import equinox as eqx
 import numpy as np
@@ -18,6 +25,7 @@ from eden_trace.library.components.energy.jets import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbofanLine
 
 from eden_trace.framework import State, Aircraft, Settings
+from eden_trace.framework.analyses.batched import JAXCompileFilter
 from eden_trace.framework.analyses.energy.turbojets import DesignTurbofan
 
 test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
@@ -157,13 +165,45 @@ if __name__ == "__main__":
 
     # Control Board
     DEBUG = False
-    VERBOSE = True
+    DEV_MODE = True
+    VERBOSE = False
 
     DESIGN_POINT = True
 
+    # # 1. Get the specific JAX compiler logger
+    # jax_logger = logging.getLogger("jax._src.dispatch")
+    # jax_logger.setLevel(logging.DEBUG)
+
+    # # 2. Clear old filters and add ours
+    # jax_logger.filters.clear() 
+    # jax_logger.addFilter(JAXCompileFilter())
+
+    # # 3. GUARANTEE OUTPUT: Clear old handlers and attach both Console and File handlers
+    # jax_logger.handlers.clear() 
+
+    # # Add a custom prefix so you know exactly which logs are from JAX
+    # formatter = logging.Formatter('[JAX] %(message)s')
+
+    # # --- Console Handler (stdout) ---
+    # console_handler = logging.StreamHandler(sys.stdout)
+    # console_handler.setLevel(logging.DEBUG)
+    # console_handler.setFormatter(formatter)
+    # jax_logger.addHandler(console_handler)
+
+    # # --- File Handler (saved to disk) ---
+    # # mode="w" ensures a fresh log file on every run so it doesn't grow infinitely
+    # file_handler = logging.FileHandler(test_dir / "jax_compile_debug.log", mode="w", encoding="utf-8")
+    # file_handler.setLevel(logging.DEBUG)
+    # file_handler.setFormatter(formatter)
+    # jax_logger.addHandler(file_handler)
+
+    # # 4. Turn on the JAX flag
+    # # jax.config.update("jax_log_compiles", True)
+    # jax.config.update("jax_log_compiles", False)
+
     # Build HBTF ---------------------------------------------------------------
     system = system_setup()
-    settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
+    settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE, _DEV_MODE=DEV_MODE)
 
     if DESIGN_POINT:
         print("="*80)

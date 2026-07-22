@@ -16,17 +16,20 @@ import sys
 import time
 import warnings
 import threading
+
 from dataclasses import replace
+from collections import Counter
 
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+
+from jax.core import Tracer
 from jaxopt import GaussNewton, LevenbergMarquardt, Broyden
 
+from tqdm import tqdm
+
 jax.config.update("jax_enable_x64", True)
-
-# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
-
 
 from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
 from eden_trace.framework import Process, Settings, State, System
@@ -73,6 +76,117 @@ class Spinner:
                 self.thread.join()
             sys.stdout.write(f"\nAnalysis complete.\n")
             sys.stdout.flush()
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Helper/Diagnostic Functions
+# ----------------------------------------------------------------------------------------------------------------------
+
+_last_static = None
+_last_shapes = None
+_trace_count = 0
+
+def check_what_changed(args):
+    global _last_static, _last_shapes, _trace_count
+    _trace_count += 1
+    
+    dynamic, static = eqx.partition(args, eqx.is_array)
+
+    dynamic_leaves = jax.tree_util.tree_leaves(dynamic)
+    if len(dynamic_leaves) > 0:
+        if isinstance(dynamic_leaves[0], Tracer):
+            print("  [EXECUTION MODE] TRACING (JAX Compiler / AD is active)")
+        else:
+            print("  [EXECUTION MODE] EAGER PYTHON (JIT is disabled, actual numbers flowing)")
+
+    shapes = jax.tree_util.tree_map(
+        lambda x: (x.shape, x.dtype) if hasattr(x, "shape") else type(x), 
+        dynamic
+    )
+    
+    print(f"\n--- TRACE PASS {_trace_count} ---")
+    
+    if _last_static is not None:
+        differences_found = False
+        
+        # 1. Check Dynamic Shapes
+        old_dyn, _ = jax.tree_util.tree_flatten_with_path(_last_shapes)
+        new_dyn, _ = jax.tree_util.tree_flatten_with_path(shapes)
+        for (path, old_val), (_, new_val) in zip(old_dyn, new_dyn):
+            if old_val != new_val:
+                print(f"  [SHAPE CHANGED] {jax.tree_util.keystr(path)}: {old_val} -> {new_val}")
+                differences_found = True
+                
+        # 2. Check Static Values & Structure
+        old_stat, old_treedef = jax.tree_util.tree_flatten_with_path(_last_static)
+        new_stat, new_treedef = jax.tree_util.tree_flatten_with_path(static)
+        
+        if old_treedef != new_treedef:
+            print(f"  [TREEDEF CHANGED] The fundamental static PyTree structure mutated!")
+            differences_found = True
+        else:
+            for (path, old_val), (_, new_val) in zip(old_stat, new_stat):
+                # Check both value and exact type
+                if type(old_val) != type(new_val) or old_val != new_val:
+                    print(f"  [STATIC VALUE CHANGED] {jax.tree_util.keystr(path)}")
+                    print(f"    Old: {type(old_val)} {old_val} | New: {type(new_val)} {new_val}")
+                    differences_found = True
+                    
+        if not differences_found:
+            print("  [IDENTICAL INPUTS] JAX retraced despite identical inputs!")
+            
+    _last_static = static
+    _last_shapes = shapes
+
+def analyze_compute_graph(func, *args):
+    print("Tracing AD graph to count operations...")
+    
+    # Trace the Jacobian
+    jaxpr_obj = jax.make_jaxpr(jax.jacfwd(func))(*args)
+    
+    source_counts = Counter()
+    
+    for eqn in jaxpr_obj.jaxpr.eqns:
+        if eqn.source_info.traceback:
+            user_location = "Unknown Source"
+            
+            # Walk backward from the innermost frame (JAX internals) up to the user code
+            for frame in reversed(eqn.source_info.traceback.frames):
+                # Handle varying JAX attribute naming conventions
+                file_name = getattr(frame, "file_name", None) or getattr(frame, "file", "unknown_file")
+                
+                # Skip internal libraries to find YOUR code
+                is_internal = any(lib in file_name for lib in ["jax/", "jax\\", "equinox", "jaxtyping"])
+                
+                if file_name != "unknown_file" and not is_internal:
+                    func_name = getattr(frame, "code_name", None) or getattr(frame, "name", "unknown_func")
+                    line_num = getattr(frame, "line_num", None) or getattr(frame, "lineno", "?")
+                    
+                    short_file = file_name.split('/')[-1].split('\\')[-1]
+                    user_location = f"{func_name} ({short_file}:{line_num})"
+                    break  # Found the user code, stop walking up the stack!
+            
+            source_counts[user_location] += 1
+        else:
+            source_counts["Unknown Source"] += 1
+            
+    print("\n" + "="*60)
+    print("Top 20 Functions by Node Count")
+    print("="*60)
+    
+    total_nodes = sum(source_counts.values())
+    
+    for loc, count in source_counts.most_common(20):
+        percentage = (count / total_nodes) * 100
+        print(f"{count:8d} nodes ({percentage:4.1f}%) | {loc}")
+        
+    print("="*60)
+    print(f"Total Nodes Analyzed: {total_nodes}")
+
+    
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Residual Analysis Class
+# ----------------------------------------------------------------------------------------------------------------------
 
 class ResidualAnalysis(Process):
 
@@ -186,6 +300,9 @@ class ResidualAnalysis(Process):
 
         def _get_residuals(control_values, state: State, system: System, settings: Settings):
             
+            if settings.DEBUG_MODE:
+                check_what_changed((control_values, state, system, settings))
+
             analysis_state = state.update_controls(control_values)
             updated_state, _, _ = self.analyze(analysis_state, system, settings)
             residual_array = updated_state.get_residual_array()
@@ -212,6 +329,9 @@ class ResidualAnalysis(Process):
                 fun_kwarg: _get_residuals,
                 "tol": tol,
                 "maxiter": maxiter,
+                "jac_fun": jax.jacfwd(_get_residuals),
+                "unroll": False,
+                "implicit_diff": False,
             }
         else:
             solver_kwargs = self.solver_kwargs
@@ -220,45 +340,48 @@ class ResidualAnalysis(Process):
 
         solver = self.solver(**solver_kwargs)
 
-        # print("Tracing Forward Pass...")
-        # t0 = time.time()
-        # # Use your objective wrapper from earlier
-        # forward_func = jax.jit(lambda x: _get_residuals(x, state, system, settings))
-        # _ = forward_func(control_values) # Force compile
-        # print(f"Forward Pass Compile Time: {time.time() - t0:.2f} seconds")
+        if settings._DEV_MODE:
+            print("Tracing Forward Pass...")
+            t0 = time.time()
+            # Use your objective wrapper from earlier
+            forward_func = jax.jit(lambda x: _get_residuals(x, state, system, settings))
+            _ = forward_func(control_values) # Force compile
+            print(f"Forward Pass Compile Time: {time.time() - t0:.2f} seconds")
 
-        # # 2. Profile the Jacobian
-        # print("Tracing Jacobian...")
-        # t0 = time.time()
-        # jac_func = jax.jit(jax.jacfwd(lambda x: _get_residuals(x, state, system, settings)))
-        # _ = jac_func(control_values) # Force compile
-        # print(f"Jacobian Compile Time: {time.time() - t0:.2f} seconds")
+            # 2. Profile the Jacobian
+            print("\nTracing Jacobian...")
+            t0 = time.time()
+            jac_func = jax.jit(jax.jacfwd(lambda x: _get_residuals(x, state, system, settings)))
+            _ = jac_func(control_values) # Force compile
+            print(f"Jacobian Compile Time: {time.time() - t0:.2f} seconds")
 
-        # print(f"\n{'='*60}")
-        # print("Starting JAX AOT Compilation Profiler...")
-        # print(f"{'-'*60}")
+            print(f"\n{'='*60}")
+            print("Starting JAX AOT Compilation Profiler...")
+            print(f"{'-'*60}")
 
-        # # 1. Profile the JAX 'Lowering' Phase
-        # t0 = time.time()
-        # # We use a lambda to cleanly pass all arguments to the solver's run method
-        # run_fn = lambda c, s, sys, set: solver.run(c, s, sys, set)
-        # lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
-        # t_lower = time.time() - t0
-        # print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
+            # 1. Profile the JAX 'Lowering' Phase
+            t0 = time.time()
+            # We use a lambda to cleanly pass all arguments to the solver's run method
+            run_fn = lambda c, s, sys, set: solver.run(c, s, sys, set)
+            lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
+            t_lower = time.time() - t0
+            print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
 
-        # # 2. Measure the Graph Size
-        # hlo_text = lowered.as_text()
-        # print(f"XLA HLO Graph Size (Lines of Code)     : {len(hlo_text.splitlines())}")
+            # 2. Measure the Graph Size
+            hlo_text = lowered.as_text()
+            graph_length = len(hlo_text.splitlines())
+            print(f"XLA HLO Graph Size (Lines of Code)     : {graph_length:,}")
 
-        # # 3. Profile the XLA 'Compiling' Phase
-        # t0 = time.time()
-        # compiled = lowered.compile()
-        # t_compile = time.time() - t0
-        # print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
-        # print(f"{'='*60}\n")
-
-        # # Run the actually compiled function to get your result
-        # results = compiled(control_values, state, system, settings)
+            if graph_length < 2e5:
+                # 3. Profile the XLA 'Compiling' Phase
+                t0 = time.time()
+                compiled = lowered.compile()
+                t_compile = time.time() - t0
+                print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
+                print(f"{'='*60}\n")
+            else:
+                sys.exit("Graph complexity too high to proceed. Terminating.")
+        
         results = solver.run(control_values, state, system, settings)
         
         return results
@@ -275,7 +398,8 @@ class ResidualAnalysis(Process):
 
         # Get analysis control values 
         initial_control_values = analysis_state.get_control_array()
-        with Spinner(enabled=not settings.DEBUG_MODE, message=f"Compiling {self.tag}...") as spin_obj:
+        with Spinner(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE,
+                     message=f"Compiling {self.tag}...") as spin_obj:
             final_control_values, opt_state = self._run_solver(
                 initial_control_values,
                 analysis_state,

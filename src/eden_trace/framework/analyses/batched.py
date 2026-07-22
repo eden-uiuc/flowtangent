@@ -220,8 +220,8 @@ class BatchAnalysis:
 #  Sharded Dataset Generator
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class JAXCompileFilter(logging.Filter):
+    
     def filter(self, record):
         msg = record.getMessage()
 
@@ -234,8 +234,8 @@ class JAXCompileFilter(logging.Filter):
         # 2. If it IS a compile log, apply our strict whitelist & formatting
         if is_compile_log:
             # Block it if it's not the main solve
-            if "jit(run)" not in msg:
-                return False
+            # if "jit(run)" not in msg:
+            #     return False
 
             # If it is the main solve, truncate the massive PyTree dump
             if "with global shapes and types" in msg:
