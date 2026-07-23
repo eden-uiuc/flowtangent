@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "RB211-535E",
+    "Manufacturer": "Rolls Royce",
+    "Takeoff Thrust (lbf)": 40100.0,
+    "Takeoff BR": 4.3,
+    "Takeoff OPR": 25.8,
+    "Takeoff Airflow (lbm/s)": 1151.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 8495.0,
+    "Cruise TSFC": 0.607,
+    "Application": "757-200",
+    "TIT (F)": 2300.0
+}

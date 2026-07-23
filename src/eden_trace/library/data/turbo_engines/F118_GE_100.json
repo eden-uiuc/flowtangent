@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F118-GE-100",
+    "AB": false,
+    "Thrust (lbf)": 19000.0,
+    "TSFC": null,
+    "Airflow (lbm/s)": null,
+    "OPR": null,
+    "D (in)": null,
+    "L (in)": null,
+    "Weight (lbf)": null,
+    "TIT (F)": null,
+    "FPR": null,
+    "BR": null,
+    "Application": "B-2",
+    "AET (F)": 3200.0
+}

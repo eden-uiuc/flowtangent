@@ -68,7 +68,7 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
 # ----------------------------------------------------------
 
 
-def get_Trace_root():
+def get_trace_root():
     return Path(os.path.dirname(os.path.abspath(__file__))).resolve()
 
 
@@ -550,4 +550,4 @@ def cubic_spline_blender(x, start, end):
 
 
 if __name__ == "__main__":
-    print(get_Trace_root())
+    print(get_trace_root())

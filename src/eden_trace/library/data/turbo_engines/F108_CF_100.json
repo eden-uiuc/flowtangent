@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F108-CF-100",
+    "AB": false,
+    "Thrust (lbf)": 21634.0,
+    "TSFC": 0.363,
+    "Airflow (lbm/s)": 785.0,
+    "OPR": 23.7,
+    "D (in)": 72.0,
+    "L (in)": 115.4,
+    "Weight (lbf)": 4610.0,
+    "TIT (F)": 2228.0,
+    "FPR": 1.5,
+    "BR": 6.0,
+    "Application": "KC-135R",
+    "AET (F)": 3200.0
+}

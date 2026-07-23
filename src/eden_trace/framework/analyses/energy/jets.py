@@ -16,15 +16,15 @@ if TYPE_CHECKING:
 
 import jax.numpy as jnp
 import equinox as eqx
-from jaxopt import LevenbergMarquardt
+import optimistix as optx
 
 from ..residual import ResidualAnalysis
 from .graph_network import build_analysis_from_network
 
-from eden_trace.utils import DataPath
+from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.jets import VariableNozzle
+from eden_trace.library.components.energy.jets.classes import VariableNozzle
 
 from eden_trace.framework import State, System, Aircraft, Settings, Process
 from eden_trace.framework.settings import EnergyAnalysisSettings
@@ -33,6 +33,17 @@ from eden_trace.framework.conditions.controls import Control, Residual
 
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
+
+# ----------------------------------------------------------------------------------------------------------------------
+#  Jet Analysis Settings
+# ----------------------------------------------------------------------------------------------------------------------
+
+class JetSettings(EnergyAnalysisSettings):
+
+    design_mode: bool = init_field(False, static=True)
+
+    kinematics: bool = init_field(False, static=True)
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Point Analysis
@@ -63,7 +74,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
         ),
     )
 
-    des_e_settings = EnergyAnalysisSettings(design_mode=True)
+    des_e_settings = JetSettings(design_mode=True)
     des_settings = eqx.tree_at(lambda s: s.analysis.energy, settings, des_e_settings)
     des_state, des_system, des_settings = initialize_energy(des_state, system, des_settings)
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
@@ -112,7 +123,6 @@ def DesignTurbojet(state: State, system: Aircraft, settings: Settings) -> tuple[
         analyze=base_analysis,
         controls=(mass_ctrl, turb_ctrl),
         residuals=(d_thrust, d_power),
-        solver=LevenbergMarquardt
     )
 
     des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
@@ -175,15 +185,14 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power
     )
 
     design_analysis = ResidualAnalysis(
         tag="Turbofan Design",
         analyze=base_analysis,
         controls=(mass_ctrl, LPT_ctrl, HPT_ctrl),
-        residuals=(d_thrust, d_LP_power, d_HP_power),
-        solver=LevenbergMarquardt
+        residuals=(d_thrust, d_LP_power, d_HP_power)
     )
 
     # Run design analysis and update paramters
@@ -196,100 +205,6 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
 # ----------------------------------------------------------------------------------------------------------------------
 #  Off-Design Turbojet Analysis
 # ----------------------------------------------------------------------------------------------------------------------
-
-def _TurbojetControls(
-    initial_Rline: float | jnp.ndarray = 2.0,
-    R_line_bnds: tuple = (1.0, 2.6),
-    initial_turb_PR: float | jnp.ndarray = 5.0,
-    turb_PR_bnds: tuple = (1.0, 2.6),
-    initial_RPM: float | jnp.ndarray = 10_000 * units.rev / units.mins,
-    RPM_bnds: tuple = (1.0, 2.6),
-    initial_MFR: float | jnp.ndarray = 50 * units.kg / units.s,
-    MFR_bnds: tuple = (10., 100.),
-    initial_FAR: float | jnp.ndarray = 1e-2,
-    FAR_bnds = (1e-4, 5e-2)
-):
-
-    Rline = Control(
-        tag="Rline",
-        state_path=DataPath(("energy", "Rline")),
-        initial_value=initial_Rline,
-        bounds=R_line_bnds
-    )
-
-    turb_PR = Control(
-        tag="Turbine Pressure Ratio",
-        state_path=DataPath(("energy", "turbine_PR")),
-        initial_value=initial_turb_PR,
-        bounds=turb_PR_bnds
-    )
-
-    N = Control(
-        tag="Rotation Speed",
-        state_path=DataPath(("energy", "rotation_speed")),
-        initial_value=initial_RPM,
-        bounds=RPM_bnds,
-    )
-
-    W = Control(
-        tag="Mass Flow Rate",
-        state_path=DataPath(("energy", "mass_flow_rate")),
-        initial_value=initial_MFR,
-        bounds=MFR_bnds,
-    )
-
-    FAR = Control(
-        tag="Fuel Air Ratio",
-        state_path=DataPath(("energy", "fuel_air_ratio")),
-        initial_value=initial_FAR,
-        bounds=FAR_bnds
-    )
-
-    return (
-        Rline, 
-        turb_PR,
-        N,
-        W,
-        FAR
-    )
-
-def _TurbojetResiduals():
-
-    d_Wc = Residual(
-        tag="Compressor Mass Flow",
-        get_value=lambda s: s.energy.outputs.residual.Wc
-    )
-
-    d_Wp = Residual(
-        tag="Turbine Mass Flow",
-        get_value=lambda s: s.energy.outputs.residual.Wp
-    )
-
-    d_mdot = Residual(
-        tag="Mass Flow Rate",
-        get_value=lambda s: s.energy.outputs.residual.mass_flow_rate
-    )
-    
-    # Work residual, mostly depended on turbine PR
-    d_work = Residual(
-        tag="Work",
-        get_value=lambda s: s.energy.outputs.residual.work
-    )
-    
-    # Thrust residual, mostly dependent on N
-    d_thrust = Residual(
-        tag="Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust
-    )
-
-    return (
-        d_Wc,
-        d_Wp,
-        d_mdot,
-        d_work,
-        d_thrust
-    )
-
 
 def TurbojetPerformance(
         network: TurbojetNetwork,
@@ -401,7 +316,6 @@ def TurbojetPerformance(
     return ResidualAnalysis(
         tag="Turbojet Performance",
         analyze=build_analysis_from_network(network),
-        solver=LevenbergMarquardt,
         controls=ctrls,
         residuals=res
     )

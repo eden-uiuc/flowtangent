@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TF39-GE-1",
+    "AB": false,
+    "Thrust (lbf)": 40805.0,
+    "TSFC": 0.315,
+    "Airflow (lbm/s)": 1549.0,
+    "OPR": 26.0,
+    "D (in)": 100.0,
+    "L (in)": 203.0,
+    "Weight (lbf)": 7186.0,
+    "TIT (F)": 2350.0,
+    "FPR": 1.56,
+    "BR": 8.0,
+    "Application": "C-5A",
+    "AET (F)": 3200.0
+}

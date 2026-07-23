@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TF33-P-7",
+    "AB": false,
+    "Thrust (lbf)": 21000.0,
+    "TSFC": 0.56,
+    "Airflow (lbm/s)": 498.0,
+    "OPR": 16.0,
+    "D (in)": 54.0,
+    "L (in)": 142.0,
+    "Weight (lbf)": 4650.0,
+    "TIT (F)": 1750.0,
+    "FPR": 1.9,
+    "BR": 1.21,
+    "Application": "C-141",
+    "AET (F)": 3200.0
+}

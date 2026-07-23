@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "PW4084",
+    "Manufacturer": "Pratt & Whitney",
+    "Takeoff Thrust (lbf)": 87900.0,
+    "Takeoff BR": 6.41,
+    "Takeoff OPR": 34.4,
+    "Takeoff Airflow (lbm/s)": 2550.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.83,
+    "Cruise Thrust (lbf)": 16200.0,
+    "Cruise TSFC": 0.557,
+    "Application": 777.0,
+    "TIT (F)": 2300.0
+}

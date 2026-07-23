@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F404-GE-F1D",
+    "AB": false,
+    "Thrust (lbf)": 10000.0,
+    "TSFC": null,
+    "Airflow (lbm/s)": null,
+    "OPR": 25.0,
+    "D (in)": 34.5,
+    "L (in)": 87.0,
+    "Weight (lbf)": 1730.0,
+    "TIT (F)": null,
+    "FPR": null,
+    "BR": null,
+    "Application": "F-117A",
+    "AET (F)": 3200.0
+}

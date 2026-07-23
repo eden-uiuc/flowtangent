@@ -9,12 +9,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
-
-
 if TYPE_CHECKING:
     from eden_trace.framework import Settings, State, System
     from eden_trace.framework.conditions.energy import TurbojetNetworkConditions
 
+import csv
+import json
+import os
 
 # package imports
 import equinox as eqx
@@ -24,12 +25,12 @@ import jax.numpy as jnp
 import eden_trace.utils as tu
 
 # Trace imports
-from eden_trace.utils import init_field, register
+from eden_trace.utils import init_field, register, get_trace_root
 
 from eden_trace.library import units
 
 from .maps import data as map_data
-from .maps.classes import CompressorMap, TurbineMap
+from ..maps.classes import CompressorMap, TurbineMap
 from eden_trace.library.components.energy.nodes import GraphInput, GraphNode, Splitter, FlowNode, FlowDesign, BleedFlow
 from eden_trace.library.gases import Air, BurnedJetA, IdealGas
 from eden_trace.library.propellants import JetA, Propellant
@@ -1511,3 +1512,4 @@ def TurbofanEngine(**kwargs):
         ),
         **kwargs
     )
+

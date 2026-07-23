@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "CFM56-3",
+    "Manufacturer": "CFM International",
+    "Takeoff Thrust (lbf)": 23500.0,
+    "Takeoff BR": 5.0,
+    "Takeoff OPR": 22.6,
+    "Takeoff Airflow (lbm/s)": 655.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.85,
+    "Cruise Thrust (lbf)": 4890.0,
+    "Cruise TSFC": 0.667,
+    "Application": "737-300, -400, -500",
+    "TIT (F)": 2300.0
+}

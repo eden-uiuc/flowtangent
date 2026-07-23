@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F404-GE-400",
+    "AB": true,
+    "Thrust (lbf)": 16000.0,
+    "TSFC": null,
+    "Airflow (lbm/s)": 142.0,
+    "OPR": 25.0,
+    "D (in)": 35.0,
+    "L (in)": 159.0,
+    "Weight (lbf)": null,
+    "TIT (F)": null,
+    "FPR": null,
+    "BR": 0.34,
+    "Application": "F-18, F-5G",
+    "AET (F)": 3200.0
+}

@@ -7,7 +7,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING, Optional, Callable, Literal
+from typing import TYPE_CHECKING, Optional, Any
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
     from eden_trace.framework.conditions import ControlsConditions
@@ -23,11 +23,9 @@ from collections import Counter
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+import optimistix as optx
 
 from jax.core import Tracer
-from jaxopt import GaussNewton, LevenbergMarquardt, Broyden
-
-from tqdm import tqdm
 
 jax.config.update("jax_enable_x64", True)
 
@@ -85,7 +83,7 @@ _last_static = None
 _last_shapes = None
 _trace_count = 0
 
-def check_what_changed(args):
+def diff_args(args):
     global _last_static, _last_shapes, _trace_count
     _trace_count += 1
     
@@ -182,8 +180,6 @@ def analyze_compute_graph(func, *args):
     print("="*60)
     print(f"Total Nodes Analyzed: {total_nodes}")
 
-    
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  Residual Analysis Class
 # ----------------------------------------------------------------------------------------------------------------------
@@ -193,8 +189,7 @@ class ResidualAnalysis(Process):
     tag: str = init_field("Residual Analysis")
 
     analyze: Process = init_field(Process)
-    solver: Callable = init_field(GaussNewton, as_value=True, static=True)
-    solver_type: Optional[Literal["min", "root"]] = init_field(None, static=True)
+    solver: Any = init_field(optx.LevenbergMarquardt, as_value=True, static=True)
     solver_kwargs: Optional[dict] = init_field(None, static=True)
 
     solution_tolerance: Optional[float] = None
@@ -202,23 +197,6 @@ class ResidualAnalysis(Process):
 
     controls: tuple[Control, ...] = init_field(tuple)
     residuals: tuple[Residual, ...] = init_field(tuple)
-
-    def __post_init__(self):
-        if self.solver_type is None:
-            if self.solver in [GaussNewton, LevenbergMarquardt]:
-                object.__setattr__(self, "solver_type", "min")
-            elif self.solver in [Broyden]:
-                object.__setattr__(self, "solver_type", "root")
-            else:
-                warnings.warn(f"{self.tag} intialized with unrecognized solver '{type(self.solver).__name__}'. "
-                              "Assuming solver is a residual minimizer. "
-                              "If it is a direct root finder, please restart with solver_type='root'.")
-                object.__setattr__(self, "solver_type", "min")
-        
-        if self.solver in [GaussNewton, LevenbergMarquardt]:
-            assert self.solver_type == "min"
-        elif self.solver in [Broyden]:
-            assert self.solver_type == "root"
 
     def _check_controls_balance(self, state: State, settings: Settings) -> bool:
         """
@@ -298,60 +276,30 @@ class ResidualAnalysis(Process):
     ):
         # Residual wrapper ---------------------------------------------------------------------------------------------
 
-        def _get_residuals(control_values, state: State, system: System, settings: Settings):
-            
+        def get_residuals(control_values, args):
+            state, system, settings = args
             if settings.DEBUG_MODE:
-                check_what_changed((control_values, state, system, settings))
+                diff_args((control_values, state, system, settings))
 
             analysis_state = state.update_controls(control_values)
             updated_state, _, _ = self.analyze(analysis_state, system, settings)
             residual_array = updated_state.get_residual_array()
             return residual_array
         
-        # Set up solver ------------------------------------------------------------------------------------------------
-
-        if self.solver_kwargs is None:
-            if self.solution_tolerance is not None:
-                tol = self.solution_tolerance
-            else:
-                tol = settings.numerical.solution_tolerance
-            if self.max_evaluations is not None:
-                maxiter=self.max_evaluations
-            else:
-                maxiter=settings.numerical.max_evaluations
-            
-            if self.solver_type == "min":
-                fun_kwarg = "residual_fun"
-            else:
-                fun_kwarg = 'fun'
-            
-            solver_kwargs = {
-                fun_kwarg: _get_residuals,
-                "tol": tol,
-                "maxiter": maxiter,
-                "jac_fun": jax.jacfwd(_get_residuals),
-                "unroll": False,
-                "implicit_diff": False,
-            }
-        else:
-            solver_kwargs = self.solver_kwargs
-
-        # Run solver ---------------------------------------------------------------------------------------------------
-
-        solver = self.solver(**solver_kwargs)
+        # Run solver w/ dev mode profiling -----------------------------------------------------------------------------
 
         if settings._DEV_MODE:
             print("Tracing Forward Pass...")
             t0 = time.time()
             # Use your objective wrapper from earlier
-            forward_func = jax.jit(lambda x: _get_residuals(x, state, system, settings))
+            forward_func = jax.jit(lambda x: get_residuals(x, (state, system, settings)))
             _ = forward_func(control_values) # Force compile
             print(f"Forward Pass Compile Time: {time.time() - t0:.2f} seconds")
 
             # 2. Profile the Jacobian
             print("\nTracing Jacobian...")
             t0 = time.time()
-            jac_func = jax.jit(jax.jacfwd(lambda x: _get_residuals(x, state, system, settings)))
+            jac_func = jax.jit(jax.jacfwd(lambda x: get_residuals(x, (state, system, settings))))
             _ = jac_func(control_values) # Force compile
             print(f"Jacobian Compile Time: {time.time() - t0:.2f} seconds")
 
@@ -362,7 +310,13 @@ class ResidualAnalysis(Process):
             # 1. Profile the JAX 'Lowering' Phase
             t0 = time.time()
             # We use a lambda to cleanly pass all arguments to the solver's run method
-            run_fn = lambda c, s, sys, set: solver.run(c, s, sys, set)
+            run_fn = lambda c, s, sys, set: optx.least_squares(
+                fn=get_residuals,
+                solver=self.solver(rtol=settings.numerical.relative_tolerance, atol=settings.numerical.absolute_tolerance),
+                y0=c,
+                args=(s, sys, set),
+                max_steps=settings.numerical.max_evaluations,
+            )
             lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
             t_lower = time.time() - t0
             print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
@@ -372,7 +326,7 @@ class ResidualAnalysis(Process):
             graph_length = len(hlo_text.splitlines())
             print(f"XLA HLO Graph Size (Lines of Code)     : {graph_length:,}")
 
-            if graph_length < 2e5:
+            if graph_length < settings.numerical.maximum_graph_complexity:
                 # 3. Profile the XLA 'Compiling' Phase
                 t0 = time.time()
                 compiled = lowered.compile()
@@ -380,27 +334,40 @@ class ResidualAnalysis(Process):
                 print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
                 print(f"{'='*60}\n")
             else:
-                sys.exit("Graph complexity too high to proceed. Terminating.")
+                sys.exit(f"Graph complexity ({graph_length:,}) higher than \
+                         settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity: ,}). \
+                        Terminating.")
         
-        results = solver.run(control_values, state, system, settings)
+        results = optx.least_squares(
+            fn=get_residuals,
+            solver=self.solver(rtol=settings.numerical.relative_tolerance, atol=settings.numerical.absolute_tolerance),
+            y0=control_values,
+            args=(state, system, settings),
+            max_steps=settings.numerical.max_evaluations,
+        )
+
+        final_control_values = results.value
+        opt_state = results.state
+
+        final_jacobian = jax.jacfwd(get_residuals)(final_control_values, (state, system, settings))
         
-        return results
+        return final_control_values, final_jacobian, opt_state
     
     def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
         # Set controls for current analysis
         analysis_state = self._activate_controls_and_dynamics(state, settings)
 
-        if settings.DEBUG_MODE:
+        if settings.DEBUG_MODE or settings._DEV_MODE:
             scan_for_invalid_JAX_types(analysis_state,  "Analysis State")
             scan_for_invalid_JAX_types(system,  "Analysis System")
-            print("\n")
 
         # Get analysis control values 
         initial_control_values = analysis_state.get_control_array()
-        with Spinner(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE,
+        with Spinner(enabled=not settings.DEBUG_MODE,
                      message=f"Compiling {self.tag}...") as spin_obj:
-            final_control_values, opt_state = self._run_solver(
+            
+            final_control_values, final_jacobian, opt_state = self._run_solver(
                 initial_control_values,
                 analysis_state,
                 system,
@@ -418,11 +385,11 @@ class ResidualAnalysis(Process):
             print(f"{'-'*70}")
             
             # Safely extract scalar values for iterations and objective
-            iter_num = np.asarray(opt_state.iter_num).item()
-            obj_val = np.mean(np.asarray(opt_state.value)).item()
+            iter_num = opt_state.num_steps.item()
+            obj_val = np.mean(np.asarray(opt_state.f_info.residual)).item()
             print(f"  Solver          : {self.solver.__name__}")
             print(f"  Num. Iterations : {iter_num}")
-            print(f"  Final Objective : {obj_val:.6e}")
+            print(f"  Final Residual  : {obj_val:.4e}")
                 
             # Determine the maximum tag length
             active_controls = f_st.controls.active_controls
@@ -444,21 +411,19 @@ class ResidualAnalysis(Process):
             for i, res in enumerate(f_st.dynamics.active_residuals):
                 print(f"    {res.tag:<{pad}}: {format_array(final_residuals[i])}")
 
-            if self.solver is GaussNewton or self.solver is LevenbergMarquardt:
-
-                print(f"\n Final Jacobian:")
-                grad_np = np.asarray(opt_state.gradient)
-                for i, ctrl in enumerate(active_controls):
-                    print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
+            print(f"\n Final Jacobian:")
+            grad_np = np.asarray(final_jacobian)
+            for i, ctrl in enumerate(active_controls):
+                print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
             
             print(f"{'='*70}\n")
         
-        if settings.DEBUG_MODE:
+        if settings._DEV_MODE:
             print(f"\n{'='*70}")
-            print(f"DEBUG: Full {self.tag} Solver State")
+            print(f"Full {self.tag} Solver State")
             print(f"{'-'*70}")
             from pprint import pprint
-            pprint(opt_state._asdict())
+            pprint(opt_state)
             print(f"\n{'='*70}")
         
         # Return control back to higher process

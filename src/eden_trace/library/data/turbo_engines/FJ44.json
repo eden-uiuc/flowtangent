@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "FJ44",
+    "Manufacturer": "Williams Rolls",
+    "Takeoff Thrust (lbf)": 1900.0,
+    "Takeoff BR": 3.28,
+    "Takeoff OPR": 12.8,
+    "Takeoff Airflow (lbm/s)": 63.3,
+    "Cruise Alt (kft)": 30.0,
+    "Cruise Mach": 0.7,
+    "Cruise Thrust (lbf)": 600.0,
+    "Cruise TSFC": 0.75,
+    "Application": null,
+    "TIT (F)": 2300.0
+}

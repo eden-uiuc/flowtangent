@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "JT9D-59A",
+    "Manufacturer": "Pratt & Whitney",
+    "Takeoff Thrust (lbf)": 53000.0,
+    "Takeoff BR": 4.9,
+    "Takeoff OPR": 24.5,
+    "Takeoff Airflow (lbm/s)": 1639.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.85,
+    "Cruise Thrust (lbf)": 11950.0,
+    "Cruise TSFC": 0.646,
+    "Application": "DC10-40, A300B, 747-200",
+    "TIT (F)": 2300.0
+}

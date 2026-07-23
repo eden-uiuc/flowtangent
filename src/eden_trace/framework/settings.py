@@ -6,15 +6,16 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import Literal, Optional
+from typing import Optional, Literal
 
+import os
+
+# package imports
 import equinox as eqx
 import jax
 
-# package imports
 # Trace imports
 from eden_trace.utils import init_field
-
 from eden_trace.framework import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -46,7 +47,7 @@ class MassAnalysisSettings(eqx.Module):
 # Energy Analysis --------------------------------------------------------------
 
 class EnergyAnalysisSettings(eqx.Module):
-    design_mode: bool = init_field(False, static=True)
+    report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
 
 class AnalysisSettings(eqx.Module):
@@ -61,18 +62,16 @@ class AnalysisSettings(eqx.Module):
 #  Mission Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-RootFinders = Literal["Broyden", "GaussNewton", "LevenbergMarquardt"]
-
 class NumericalSettings(eqx.Module):
     
-    root_finder: RootFinders = init_field("GaussNewton", static=True)
-    solution_tolerance: float = init_field(1e-6, static=True)
+    relative_tolerance: float = init_field(1e-5, static=True)
+    absolute_tolerance: float = init_field(1e-5, static=True)
     
-    max_evaluations: int = init_field(500, static=True)
+    max_evaluations: int = init_field(30, static=True)
     step_size: float | None = init_field(None, static=True)
 
     number_of_control_points: int = init_field(1, static=True)
+    maximum_graph_complexity: int = init_field(2e5, static=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -94,7 +93,8 @@ class Settings(eqx.Module):
 
     def __post_init__(self):
         if self._DEV_MODE:
-            pass
+            os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+            os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
         if self.DEBUG_MODE:
             jax.config.update("jax_disable_jit", True)
             jax.config.update("jax_debug_nans", True)

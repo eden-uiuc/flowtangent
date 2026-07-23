@@ -7,15 +7,15 @@ from typing import Any
 
 import pycycle.api as pyc
 
-from eden_trace.utils import get_Trace_root
+from eden_trace.utils import get_trace_root
 from eden_trace.library import units
 from .classes import CompressorMap, TurbineMap
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-_MAP_DIR = get_Trace_root() / "library/data/turbo_maps"
-STUB_FILE = get_Trace_root() / "library/components/energy/maps.pyi"
+_MAP_DIR = get_trace_root() / "library/data/turbo_maps"
+STUB_FILE = get_trace_root() / "library/components/energy/maps.pyi"
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):

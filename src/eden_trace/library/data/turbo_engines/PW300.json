@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "PW300",
+    "Manufacturer": "Pratt & Whitney Canada",
+    "Takeoff Thrust (lbf)": 4750.0,
+    "Takeoff BR": 4.5,
+    "Takeoff OPR": 23.0,
+    "Takeoff Airflow (lbm/s)": 180.0,
+    "Cruise Alt (kft)": 40.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 1113.0,
+    "Cruise TSFC": 0.675,
+    "Application": "BAe 1000",
+    "TIT (F)": 2300.0
+}

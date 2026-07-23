@@ -5,6 +5,7 @@ import logging
 
 import os
 os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 import jax
 import jax.numpy as jnp
@@ -21,12 +22,11 @@ from eden_trace.library.components.energy.nodes import FlowDesign
 from eden_trace.library.components.energy.nodes import Efficiencies as Eff
 
 from eden_trace.library.components.energy.networks import TurbofanNetwork, TurbofanDesign
-from eden_trace.library.components.energy.jets import TurbofanEngine, JetDesign
+from eden_trace.library.components.energy.jets.classes import TurbofanEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbofanLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.batched import JAXCompileFilter
-from eden_trace.framework.analyses.energy.turbojets import DesignTurbofan
+from eden_trace.framework.analyses.energy.jets import DesignTurbofan
 
 test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 
@@ -165,8 +165,8 @@ if __name__ == "__main__":
 
     # Control Board
     DEBUG = False
-    DEV_MODE = True
-    VERBOSE = False
+    DEV_MODE = False
+    VERBOSE = True
 
     DESIGN_POINT = True
 
@@ -236,32 +236,32 @@ if __name__ == "__main__":
                     for p in real_params:
                         print(f" - {p:<11}: {format_array(real_params[p])}")
         
-        print("LPC Map Scaling:")
-        c_map = sys.energy.line.engine.lpc.map
-        print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
-        print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
-        print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
-        print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
+        print("\nLPC Map Scaling:")
+        lpc_map = sys.energy.line.engine.lpc.map
+        print(f" - {'s_Wc':<11}: {format_array(lpc_map.s_Wc)}")
+        print(f" - {'s_PR':<11}: {format_array(lpc_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(lpc_map.s_eff)}")
+        print(f" - {'s_Nc':<11}: {format_array(lpc_map.s_Nc)}")
 
         print("HPC Map Scaling:")
-        c_map = sys.energy.line.engine.hpc.map
-        print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
-        print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
-        print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
-        print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
+        hpc_map = sys.energy.line.engine.hpc.map
+        print(f" - {'s_Wc':<11}: {format_array(hpc_map.s_Wc)}")
+        print(f" - {'s_PR':<11}: {format_array(hpc_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(hpc_map.s_eff)}")
+        print(f" - {'s_Nc':<11}: {format_array(hpc_map.s_Nc)}")
 
         print("HPT Map Scaling:")
-        t_map = sys.energy.line.engine.hpt.map
-        print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
-        print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
-        print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
-        print(f" - {'s_Np':<11}: {format_array(t_map.s_Np)}")
+        hpt_map = sys.energy.line.engine.hpt.map
+        print(f" - {'s_Wp':<11}: {format_array(hpt_map.s_Wp)}")
+        print(f" - {'s_PR':<11}: {format_array(hpt_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(hpt_map.s_eff)}")
+        print(f" - {'s_Np':<11}: {format_array(hpt_map.s_Np)}")
 
         print("LPT Map Scaling:")
-        t_map = sys.energy.line.engine.lpt.map
-        print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
-        print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
-        print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
-        print(f" - {'s_Np':<11}: {format_array(t_map.s_Np)}")
+        lpt_map = sys.energy.line.engine.lpt.map
+        print(f" - {'s_Wp':<11}: {format_array(lpt_map.s_Wp)}")
+        print(f" - {'s_PR':<11}: {format_array(lpt_map.s_PR)}")
+        print(f" - {'s_eff':<11}: {format_array(lpt_map.s_eff)}")
+        print(f" - {'s_Np':<11}: {format_array(lpt_map.s_Np)}")
         print("="*80)
         print ("\n\n")

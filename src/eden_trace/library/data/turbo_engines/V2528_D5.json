@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "V2528-D5",
+    "Manufacturer": "International Aero Engines",
+    "Takeoff Thrust (lbf)": 28000.0,
+    "Takeoff BR": 4.7,
+    "Takeoff OPR": 30.5,
+    "Takeoff Airflow (lbm/s)": 825.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 5773.0,
+    "Cruise TSFC": 0.574,
+    "Application": "MD-90",
+    "TIT (F)": 2300.0
+}

@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TF33-P-3",
+    "AB": false,
+    "Thrust (lbf)": 17000.0,
+    "TSFC": 0.52,
+    "Airflow (lbm/s)": 450.0,
+    "OPR": 13.0,
+    "D (in)": 53.0,
+    "L (in)": 136.0,
+    "Weight (lbf)": 3900.0,
+    "TIT (F)": 1600.0,
+    "FPR": 1.7,
+    "BR": 1.55,
+    "Application": "B-52H",
+    "AET (F)": 3200.0
+}

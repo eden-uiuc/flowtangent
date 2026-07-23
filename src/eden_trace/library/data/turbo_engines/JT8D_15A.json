@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "JT8D-15A",
+    "Manufacturer": "Pratt & Whitney",
+    "Takeoff Thrust (lbf)": 15500.0,
+    "Takeoff BR": 1.04,
+    "Takeoff OPR": 16.6,
+    "Takeoff Airflow (lbm/s)": 327.0,
+    "Cruise Alt (kft)": 30.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 4920.0,
+    "Cruise TSFC": 0.779,
+    "Application": "727, 737, DC9",
+    "TIT (F)": 2300.0
+}

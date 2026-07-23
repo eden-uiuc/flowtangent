@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "RB211-882",
+    "Manufacturer": "Rolls Royce",
+    "Takeoff Thrust (lbf)": 84700.0,
+    "Takeoff BR": 6.01,
+    "Takeoff OPR": 39.0,
+    "Takeoff Airflow (lbm/s)": 2640.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.83,
+    "Cruise Thrust (lbf)": 16200.0,
+    "Cruise TSFC": 0.557,
+    "Application": 777.0,
+    "TIT (F)": 2300.0
+}

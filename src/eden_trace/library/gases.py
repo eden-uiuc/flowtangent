@@ -15,7 +15,7 @@ import jax
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import empty_array, get_Trace_root, init_field
+from eden_trace.utils import empty_array, get_trace_root, init_field
 
 # Trace imports
 from eden_trace.library import units
@@ -516,7 +516,7 @@ def parse_chemkin_thermo(filepath: str, output_path: str):
 #  Thermo Database
 # ----------------------------------------------------------------------------------------------------------------------
 
-_DB_PATH = get_Trace_root() / "library/data/thermo_database.json"
+_DB_PATH = get_trace_root() / "library/data/thermo_database.json"
 
 
 @lru_cache(maxsize=1)

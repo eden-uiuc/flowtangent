@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "GE90-B4",
+    "Manufacturer": "General Electric",
+    "Takeoff Thrust (lbf)": 87400.0,
+    "Takeoff BR": 8.4,
+    "Takeoff OPR": 39.3,
+    "Takeoff Airflow (lbm/s)": 3037.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 17500.0,
+    "Cruise TSFC": null,
+    "Application": 777.0,
+    "TIT (F)": 2300.0
+}

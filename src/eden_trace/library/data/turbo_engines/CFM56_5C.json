@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "CFM56-5C",
+    "Manufacturer": "CFM International",
+    "Takeoff Thrust (lbf)": 31200.0,
+    "Takeoff BR": 6.6,
+    "Takeoff OPR": 31.5,
+    "Takeoff Airflow (lbm/s)": 1027.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 6600.0,
+    "Cruise TSFC": 0.545,
+    "Application": "A340",
+    "TIT (F)": 2300.0
+}

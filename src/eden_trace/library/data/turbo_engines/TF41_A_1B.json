@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TF41-A-1B",
+    "AB": false,
+    "Thrust (lbf)": 14500.0,
+    "TSFC": 0.647,
+    "Airflow (lbm/s)": 260.0,
+    "OPR": 20.0,
+    "D (in)": 40.0,
+    "L (in)": 114.5,
+    "Weight (lbf)": 3511.0,
+    "TIT (F)": 2165.0,
+    "FPR": 2.45,
+    "BR": 0.76,
+    "Application": "A-7D, K",
+    "AET (F)": 3200.0
+}

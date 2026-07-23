@@ -12,7 +12,7 @@ from eden_trace.utils import init_field, outputs, register
 from eden_trace.utils import inputs as func_inputs
 
 from .nodes import GraphInput, GraphNode, Splitter, EnergyStore, FuelTank
-from .jets import TurbojetEngine, TurbofanEngine
+from .jets.classes import TurbojetEngine, TurbofanEngine
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Line

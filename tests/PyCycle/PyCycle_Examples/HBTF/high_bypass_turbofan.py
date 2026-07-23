@@ -1,9 +1,13 @@
 import sys
+import json
+
+from pathlib import Path
+file_path = Path(__file__).resolve()
+file_dir = file_path.parent
 
 import numpy as np
 
 import openmdao.api as om
-
 import pycycle.api as pyc
 
 
@@ -375,6 +379,103 @@ class MPhbtf(pyc.MPCycle):
 
         super().setup()
 
+def export_pycycle_to_json(prob, pt, filename=file_dir / "hbtf.json"):
+    """
+    Extracts all thermodynamic and performance data from a PyCycle design point
+    and exports it to a structured JSON file for cross-validation.
+    """
+    
+    # Helper function to safely extract and convert JAX/Numpy arrays to standard Python floats
+    def get_val(var_name):
+        try:
+            val = prob[f"{pt}.{var_name}"]
+            # Extract scalar from numpy arrays so JSON doesn't crash
+            if hasattr(val, 'item'):
+                return val.item()
+            if hasattr(val, '__len__') and len(val) == 1:
+                return val[0]
+            return val
+        except KeyError:
+            return None
+
+    # 1. Initialize the structured dictionary
+    data = {
+        "summary": {
+            "Mach": get_val('fc.Fl_O:stat:MN'),
+            "Alt": get_val('fc.alt'),
+            "W_in": get_val('inlet.Fl_O:stat:W'),
+            "Fn": get_val('perf.Fn'),
+            "Fg": get_val('perf.Fg'),
+            "Fram": get_val('inlet.F_ram'),
+            "OPR": get_val('perf.OPR'),
+            "TSFC": get_val('perf.TSFC')
+        },
+        "flow_stations": {},
+        "components": {}
+    }
+
+    # 2. Extract Flow Station Thermodynamics
+    fs_names = ['fc.Fl_O', 'inlet.Fl_O', 'comp.Fl_O', 'burner.Fl_O', 'turb.Fl_O', 'nozz.Fl_O']
+    
+    for fs in fs_names:
+        data["flow_stations"][fs] = {
+            "W": get_val(f"{fs}:stat:W"),
+            "Pt": get_val(f"{fs}:tot:P"),
+            "Tt": get_val(f"{fs}:tot:T"),
+            "ht": get_val(f"{fs}:tot:h"),
+            "Ps": get_val(f"{fs}:stat:P"),
+            "Ts": get_val(f"{fs}:stat:T"),
+            "MN": get_val(f"{fs}:stat:MN"),
+            "V": get_val(f"{fs}:stat:V"),
+            "Area": get_val(f"{fs}:stat:area"),
+            "gamma": get_val(f"{fs}:tot:gamt"),
+            "Cp": get_val(f"{fs}:tot:Cp")
+        }
+
+    # 3. Extract Component specific data
+    data["components"]["comp"] = {
+        "PR": get_val("comp.PR"),
+        "eff": get_val("comp.eff"),
+        "power": get_val("comp.power"),
+        # Map parameters and scalars
+        "Rline": get_val("comp.Rline"),
+        "s_Wc": get_val("comp.s_Wc"),
+        "s_PR": get_val("comp.s_PR"),
+        "s_eff": get_val("comp.s_eff"),
+        "s_Nc": get_val("comp.s_Nc")
+    }
+    
+    data["components"]["burner"] = {
+        "Wfuel": get_val("burner.Wfuel"),
+        "FAR": get_val("burner.FAR"),
+        "dPqP": get_val("burner.dPqP")
+    }
+    
+    data["components"]["turb"] = {
+        "PR": get_val("turb.PR"),
+        "eff": get_val("turb.eff"),
+        "power": get_val("turb.power"),
+        # Map parameters and scalars
+        "PRmap": get_val("turb.PRmap"),
+        "s_Wp": get_val("turb.s_Wp"),
+        "s_PR": get_val("turb.s_PR"),
+        "s_eff": get_val("turb.s_eff"),
+        "s_Np": get_val("turb.s_Np")
+    }
+    
+    data["components"]["nozz"] = {
+        "PR": get_val("nozz.PR"),
+        "Cfg": get_val("nozz.Cv"), # Velocity coefficient
+        "A_throat": get_val("nozz.Throat:stat:area"),
+        "A_exit": get_val("nozz.Fl_O:stat:area")
+    }
+
+    # 4. Write to disk
+    with open(filename, 'w+') as f:
+        json.dump(data, f, indent=4)
+        
+    print(f"Successfully exported PyCycle design point to: {filename}", flush=True)
+    return data
 
 if __name__ == "__main__":
 
@@ -442,36 +543,35 @@ if __name__ == "__main__":
                   (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
                   (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)]
 
-    viewer_file = open('hbtf_view.out', 'w')
+    viewer_file = open(file_dir/'hbtf_view.out', 'w')
     first_pass = True
-    for MN, alt in flight_env:
 
-        # NOTE: You never change the MN,alt for the
-        # design point because that is a fixed reference condition.
+    MN = 0.8
+    alt = 35_000
 
-        print('***'*10)
-        print(f'* MN: {MN}, alt: {alt}')
-        print('***'*10)
-        prob['OD_full_pwr.fc.MN'] = MN
-        prob['OD_full_pwr.fc.alt'] = alt
+    print('***'*10)
+    print(f'* MN: {MN}, alt: {alt}')
+    print('***'*10)
+    prob['OD_full_pwr.fc.MN'] = MN
+    prob['OD_full_pwr.fc.alt'] = alt
 
-        prob['OD_part_pwr.fc.MN'] = MN
-        prob['OD_part_pwr.fc.alt'] = alt
+    prob['OD_part_pwr.fc.MN'] = MN
+    prob['OD_part_pwr.fc.alt'] = alt
 
-        for PC in [1, 0.9, 0.8, .7]:
-            print(f'## PC = {PC}')
-            prob['OD_part_pwr.PC'] = PC
-            prob.run_model()
+    for PC in [1, 0.9, 0.8, .7]:
+        print(f'## PC = {PC}')
+        prob['OD_part_pwr.PC'] = PC
+        prob.run_model()
 
-            if first_pass:
-                viewer(prob, 'DESIGN', file=viewer_file)
-                first_pass = False
-            viewer(prob, 'OD_part_pwr', file=viewer_file)
+        if first_pass:
+            viewer(prob, 'DESIGN', file=viewer_file)
+            first_pass = False
+        viewer(prob, 'OD_part_pwr', file=viewer_file)
 
-        # run throttle back up to full power
-        for PC in [1, 0.85]:
-            prob['OD_part_pwr.PC'] = PC
-            prob.run_model()
+    # run throttle back up to full power
+    for PC in [1, 0.85]:
+        prob['OD_part_pwr.PC'] = PC
+        prob.run_model()
 
 
 

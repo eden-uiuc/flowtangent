@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "PW2037",
+    "Manufacturer": "Pratt & Whitney",
+    "Takeoff Thrust (lbf)": 38250.0,
+    "Takeoff BR": 6.0,
+    "Takeoff OPR": 27.6,
+    "Takeoff Airflow (lbm/s)": 1210.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.85,
+    "Cruise Thrust (lbf)": 6500.0,
+    "Cruise TSFC": 0.582,
+    "Application": "757-200",
+    "TIT (F)": 2300.0
+}

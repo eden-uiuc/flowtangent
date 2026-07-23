@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "PW4052",
+    "Manufacturer": "Pratt & Whitney",
+    "Takeoff Thrust (lbf)": 52000.0,
+    "Takeoff BR": 5.0,
+    "Takeoff OPR": 27.5,
+    "Takeoff Airflow (lbm/s)": 1700.0,
+    "Cruise Alt (kft)": null,
+    "Cruise Mach": null,
+    "Cruise Thrust (lbf)": null,
+    "Cruise TSFC": null,
+    "Application": "767, A310-300",
+    "TIT (F)": 2300.0
+}

@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "CF6-50-C2",
+    "Manufacturer": "General Electric",
+    "Takeoff Thrust (lbf)": 52500.0,
+    "Takeoff BR": 4.31,
+    "Takeoff OPR": 30.4,
+    "Takeoff Airflow (lbm/s)": 1476.0,
+    "Cruise Alt (kft)": 35.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 11555.0,
+    "Cruise TSFC": 0.63,
+    "Application": "DC10-10, A300B, 747-200",
+    "TIT (F)": 2300.0
+}

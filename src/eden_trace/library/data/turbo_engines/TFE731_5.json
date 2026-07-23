@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "TFE731-5",
+    "Manufacturer": "Garrett",
+    "Takeoff Thrust (lbf)": 4500.0,
+    "Takeoff BR": 3.34,
+    "Takeoff OPR": 14.4,
+    "Takeoff Airflow (lbm/s)": 140.0,
+    "Cruise Alt (kft)": 40.0,
+    "Cruise Mach": 0.8,
+    "Cruise Thrust (lbf)": 986.0,
+    "Cruise TSFC": 0.771,
+    "Application": "BAe 125-800",
+    "TIT (F)": 2300.0
+}

@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "Olympus 593",
+    "Manufacturer": "Rolls Royce/SNECMA",
+    "Takeoff Thrust (lbf)": 38000.0,
+    "Takeoff BR": 0.0,
+    "Takeoff OPR": 11.3,
+    "Takeoff Airflow (lbm/s)": 410.0,
+    "Cruise Alt (kft)": 53.0,
+    "Cruise Mach": 2.0,
+    "Cruise Thrust (lbf)": 10030.0,
+    "Cruise TSFC": 1.19,
+    "Application": "Concorde",
+    "TIT (F)": 2300.0
+}

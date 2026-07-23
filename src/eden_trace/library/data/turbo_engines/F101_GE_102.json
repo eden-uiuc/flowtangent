@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F101-GE-102",
+    "AB": true,
+    "Thrust (lbf)": 30780.0,
+    "TSFC": 2.46,
+    "Airflow (lbm/s)": 356.0,
+    "OPR": 26.8,
+    "D (in)": 55.2,
+    "L (in)": 180.7,
+    "Weight (lbf)": 4448.0,
+    "TIT (F)": 2550.0,
+    "FPR": 2.31,
+    "BR": 1.91,
+    "Application": "B-1B",
+    "AET (F)": 3200.0
+}

@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F103-GE-101",
+    "AB": false,
+    "Thrust (lbf)": 51711.0,
+    "TSFC": 0.399,
+    "Airflow (lbm/s)": 1476.0,
+    "OPR": 30.2,
+    "D (in)": 86.4,
+    "L (in)": 173.0,
+    "Weight (lbf)": 8768.0,
+    "TIT (F)": 2490.0,
+    "FPR": null,
+    "BR": 4.31,
+    "Application": "KC-10A",
+    "AET (F)": 3200.0
+}

@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TF34-GE-100",
+    "AB": false,
+    "Thrust (lbf)": 9065.0,
+    "TSFC": 0.37,
+    "Airflow (lbm/s)": 333.0,
+    "OPR": 20.0,
+    "D (in)": 50.0,
+    "L (in)": 100.0,
+    "Weight (lbf)": 1421.0,
+    "TIT (F)": 2234.0,
+    "FPR": 1.5,
+    "BR": 6.42,
+    "Application": "A-10",
+    "AET (F)": 3200.0
+}

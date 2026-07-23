@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # Trace imports
-from eden_trace.utils import empty_array, get_Trace_root, init_field
+from eden_trace.utils import empty_array, get_trace_root, init_field
 
 from eden_trace.library import Component
 
@@ -264,7 +264,7 @@ class Airfoil(Component):
 #  Airfoil Directory
 # ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = get_Trace_root() / "/library/data/airfoil_files"
+_AF_DIR = get_trace_root() / "/library/data/airfoil_files"
 
 
 @lru_cache(maxsize=None)

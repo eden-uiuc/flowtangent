@@ -11,11 +11,11 @@ from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
 from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbojetDesign
-from eden_trace.library.components.energy.jets import TurbojetEngine, JetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, JetDesign
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.turbojets import DesignTurbojet, TurbojetPerformance
+from eden_trace.framework.analyses.energy.jets import DesignTurbojet, TurbojetPerformance
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 

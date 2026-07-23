@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "TFE731-2",
+    "AB": false,
+    "Thrust (lbf)": 3500.0,
+    "TSFC": 0.504,
+    "Airflow (lbm/s)": 113.0,
+    "OPR": 17.7,
+    "D (in)": 40.0,
+    "L (in)": 50.0,
+    "Weight (lbf)": 625.0,
+    "TIT (F)": null,
+    "FPR": 1.54,
+    "BR": 2.67,
+    "Application": "C-21A",
+    "AET (F)": 3200.0
+}

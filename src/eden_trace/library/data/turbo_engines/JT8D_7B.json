@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "JT8D-7B",
+    "AB": false,
+    "Thrust (lbf)": 14500.0,
+    "TSFC": 0.585,
+    "Airflow (lbm/s)": 318.0,
+    "OPR": 16.9,
+    "D (in)": 45.0,
+    "L (in)": 123.7,
+    "Weight (lbf)": 3252.0,
+    "TIT (F)": 1076.0,
+    "FPR": null,
+    "BR": 1.03,
+    "Application": "C-22, C-9, T-43A",
+    "AET (F)": 3200.0
+}

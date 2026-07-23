@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F107-WR-101",
+    "AB": false,
+    "Thrust (lbf)": 635.0,
+    "TSFC": 0.685,
+    "Airflow (lbm/s)": 13.6,
+    "OPR": 13.8,
+    "D (in)": 12.0,
+    "L (in)": 48.5,
+    "Weight (lbf)": 141.0,
+    "TIT (F)": null,
+    "FPR": 2.1,
+    "BR": 1.0,
+    "Application": "ALCM",
+    "AET (F)": 3200.0
+}

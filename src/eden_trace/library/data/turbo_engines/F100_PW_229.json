@@ -1,0 +1,18 @@
+{
+    "category": "Military",
+    "type": "Turbofan",
+    "Model no.": "F100-PW-229",
+    "AB": true,
+    "Thrust (lbf)": 29000.0,
+    "TSFC": 2.05,
+    "Airflow (lbm/s)": 248.0,
+    "OPR": 23.0,
+    "D (in)": 47.0,
+    "L (in)": 191.0,
+    "Weight (lbf)": 3036.0,
+    "TIT (F)": 2700.0,
+    "FPR": 3.8,
+    "BR": 0.4,
+    "Application": "F-15, F16",
+    "AET (F)": 3200.0
+}

@@ -1,0 +1,16 @@
+{
+    "category": "Civil",
+    "type": "Turbofan",
+    "Model no.": "ALF502R-5",
+    "Manufacturer": "Textron Lycoming",
+    "Takeoff Thrust (lbf)": 6970.0,
+    "Takeoff BR": 5.7,
+    "Takeoff OPR": 12.2,
+    "Takeoff Airflow (lbm/s)": null,
+    "Cruise Alt (kft)": 25.0,
+    "Cruise Mach": 0.7,
+    "Cruise Thrust (lbf)": 2250.0,
+    "Cruise TSFC": 0.72,
+    "Application": "BAe 146-200, -200",
+    "TIT (F)": 2300.0
+}
