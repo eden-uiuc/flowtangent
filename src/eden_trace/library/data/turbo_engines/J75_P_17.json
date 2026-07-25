@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J75-P-17",
+    "Type": "TJ",
+    "AB": true,
+    "Max thrust SLS (lbf)": 24500.0,
+    "SFC at max": 2.15,
+    "Airflow (lbm/s)": 252.0,
+    "OPR": 12.0,
+    "D (in)": 43.0,
+    "L (in)": 237.6,
+    "Weight (lbf)": 5875.0,
+    "TIT (F)": 1610.0,
+    "Application": "F-106A/B",
+    "AET (F)": 2600.0
+}

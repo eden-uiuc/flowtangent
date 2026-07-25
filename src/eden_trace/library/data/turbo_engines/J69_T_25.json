@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J69-T-25",
+    "Type": "TJ",
+    "AB": false,
+    "Max thrust SLS (lbf)": 1025.0,
+    "SFC at max": 1.14,
+    "Airflow (lbm/s)": 20.5,
+    "OPR": 3.9,
+    "D (in)": 22.3,
+    "L (in)": 43.3,
+    "Weight (lbf)": 364.0,
+    "TIT (F)": 1525.0,
+    "Application": "T-37B",
+    "AET (F)": 2600.0
+}

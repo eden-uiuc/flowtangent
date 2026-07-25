@@ -338,13 +338,22 @@ class ResidualAnalysis(Process):
                          settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity: ,}). \
                         Terminating.")
         
-        results = optx.least_squares(
-            fn=get_residuals,
-            solver=self.solver(rtol=settings.numerical.relative_tolerance, atol=settings.numerical.absolute_tolerance),
-            y0=control_values,
-            args=(state, system, settings),
-            max_steps=settings.numerical.max_evaluations,
-        )
+        solver = self.solver(rtol=settings.numerical.relative_tolerance, atol=settings.numerical.absolute_tolerance)
+        args = (state, system, settings)
+
+        if settings.DEBUG_MODE:
+            print(f"DEBUG MODE: Executing single forward pass...")
+            _ = get_residuals(control_values, (state, system, settings))
+            sys.exit("DEBUG MODE: Forward pass complete. Terminating.")
+        
+        else:
+            results = optx.least_squares(
+                fn=get_residuals,
+                solver=solver,
+                y0=control_values,
+                args=args,
+                max_steps=settings.numerical.max_evaluations,
+            )
 
         final_control_values = results.value
         opt_state = results.state

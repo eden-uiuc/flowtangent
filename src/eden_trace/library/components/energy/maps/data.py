@@ -9,13 +9,13 @@ import pycycle.api as pyc
 
 from eden_trace.utils import get_trace_root
 from eden_trace.library import units
-from .classes import CompressorMap, TurbineMap
+from eden_trace.library.components.energy.maps.classes import CompressorMap, TurbineMap
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
 _MAP_DIR = get_trace_root() / "library/data/turbo_maps"
-STUB_FILE = get_trace_root() / "library/components/energy/maps.pyi"
+STUB_FILE = get_trace_root() / "library/components/energy/maps/data.pyi"
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):
@@ -137,10 +137,38 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             if val is not None:
                 json_data[json_key] = val
 
-        # Write to disk
+        # Initial Write to Disk
         file_path = os.path.join(output_dir, f"{map_name}.json")
         with open(file_path, "w") as f:
             json.dump(json_data, f, indent=4)
+        
+        # Update design values
+        test_map = _load_map_from_disk(map_name)
+        if isinstance(test_map, CompressorMap):
+            PR_map, Wc_map, eff_map = test_map.evaluate(
+                alpha=test_map.alpha_des,
+                Nc=test_map.Nc_des,
+                Rline=test_map.Rline_des
+            )
+            json_data["PR_des"] = PR_map.item()
+            json_data["Wc_des"] = Wc_map.item()
+            json_data["eff_des"] = eff_map.item()
+        
+        if isinstance(test_map, TurbineMap):
+            Wp_map, eff_map = test_map.evaluate(
+                alpha=test_map.alpha_des,
+                Np=test_map.Np_des,
+                PR=test_map.PR_des)
+            
+            json_data["Wp_des"] = Wp_map.item()
+            json_data["eff_des"] = eff_map.item()
+        
+        #Final Write
+        with open(file_path, "w") as f:
+            json.dump(json_data, f, indent=4)
+        
+
+
 
         print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
 

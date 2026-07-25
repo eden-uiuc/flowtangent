@@ -240,7 +240,7 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
 #  Turbojet Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
 
-class _JetNetwork[DesignType: TurbojetDesign | TurbofanDesign](GraphNetwork[DesignType]):
+class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
     """
     Jet network shell without design parameters.
     """
@@ -291,36 +291,22 @@ def _TurbojetNetworkSetup():
     return (TurbojetLine(tag="Line"),)
 
 @register
-class TurbojetDesign(NetworkDesign):
+class JetNetDesign(NetworkDesign):
 
-    initial_MFR: float = 100.0 * units.kg / units.s
-    initial_turb_PR: float = 5.0
-
-    mass_flow_rate: float = 100 * units.kg / units.s
-    power: float = 2e7 * units.W
+    number_of_engines: int = init_field(1, static=True)
 
 @register
-class TurbojetNetwork(_JetNetwork[TurbojetDesign]):
+class TurbojetNetwork(_JetNetwork[JetNetDesign]):
     subcomponents: tuple = init_field(_TurbojetNetworkSetup)
-    design_parameters: TurbojetDesign = init_field(TurbojetDesign)
+    design_parameters: JetNetDesign = init_field(JetNetDesign)
 
 
 # Turbofan ---------------------------------------------------------------------
 
 def _TurbofanNetworkSetup():
-    return TurbofanLine()
+    return (TurbofanLine(),)
+
 
 @register
-class TurbofanDesign(NetworkDesign):
-
-    initial_MFR:    float = 100.0 * units.kg / units.s
-    initial_LPT_PR: float = 3.0
-    initial_HPT_PR: float = 5.0
-
-    mass_flow_rate: float = 100 * units.kg / units.s
-    power: float = 2e7 * units.W
-
-@register
-class TurbofanNetwork(_JetNetwork[TurbofanDesign]):
+class TurbofanNetwork(_JetNetwork[JetNetDesign]):
     subcomponents: tuple = init_field(_TurbofanNetworkSetup)
-    design_parameters: TurbofanDesign = init_field(TurbofanDesign)

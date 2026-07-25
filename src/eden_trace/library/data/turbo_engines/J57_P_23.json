@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J57-P-23",
+    "Type": "TJ",
+    "AB": true,
+    "Max thrust SLS (lbf)": 16000.0,
+    "SFC at max": 2.1,
+    "Airflow (lbm/s)": 165.0,
+    "OPR": 11.5,
+    "D (in)": 40.0,
+    "L (in)": 246.0,
+    "Weight (lbf)": 5169.0,
+    "TIT (F)": 1600.0,
+    "Application": "F-102A, F-100D",
+    "AET (F)": 2600.0
+}

@@ -50,9 +50,11 @@ class EnergyAnalysisSettings(eqx.Module):
     report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
 
-class AnalysisSettings(eqx.Module):
+class AnalysisSettings[
+    E_Type: EnergyAnalysisSettings
+    ](eqx.Module):
     aerodynamics: Optional[eqx.Module] = None
-    energy: EnergyAnalysisSettings = init_field(EnergyAnalysisSettings)
+    energy: E_Type = init_field(EnergyAnalysisSettings)
     mass: MassAnalysisSettings = init_field(MassAnalysisSettings)
 
     gradient_map: Optional[GradientMap] = init_field(None, static=True)

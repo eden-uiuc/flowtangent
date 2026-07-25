@@ -134,7 +134,7 @@ class Component(eqx.Module):
     _bookkeeping: dict[str, Any] = init_field(dict, static=True)
 
     def __repr__(self):
-        repr_str = self.tag + " - Subcomponents: ()" + ", ".join([sc.tag for sc in self.subcomponents]) + ")"
+        repr_str = self.tag + " - Subcomponents: (" + ", ".join([sc.tag for sc in self.subcomponents]) + ")"
         return repr_str
 
     def __getitem__(self, item):

@@ -86,8 +86,10 @@ class CompressorMap(eqx.Module):
     s_Nc: float = 1.0
 
     Nc_des: float = 1.0
-    PR_des: float = 5.0
     alpha_des: float = 0.0
+    PR_des: float = 5.0
+    Wc_des: float = 25.0
+    eff_des: float = 0.85
     Rline_des: float = 2.0
     Rline_stall: float = 1.0
 
@@ -133,13 +135,6 @@ class CompressorMap(eqx.Module):
         with open(filepath, "r") as f:
             data = json.load(f)
 
-        # Extract Scalars
-        Nc_des = float(data["Nc_des"])
-        PR_des = float(data["PR_des"])
-        alpha_des = float(data["alpha_des"])
-        Rline_des = float(data["Rline_des"])
-        Rline_stall = float(data["Rline_stall"])
-
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
         Nc_grid = jnp.array(data["Nc"])
@@ -155,11 +150,13 @@ class CompressorMap(eqx.Module):
 
         return cls(
             tag=Path(filepath).stem,
-            Nc_des=Nc_des,
-            PR_des=PR_des,
-            alpha_des=alpha_des,
-            Rline_des=Rline_des,
-            Rline_stall=Rline_stall,
+            Nc_des=float(data["Nc_des"]),
+            alpha_des=float(data["alpha_des"]),
+            PR_des=float(data.get("PR_des", 10.0)),
+            Wc_des=float(data.get("Wc_des", 25.0)),
+            eff_des=float(data.get("eff_des", 0.85)),
+            Rline_des=float(data["Rline_des"]),
+            Rline_stall=float(data["Rline_stall"]),
             alpha_grid=alpha_grid,
             Nc_grid=Nc_grid,
             Rline_grid=Rline_grid,
@@ -191,6 +188,8 @@ class TurbineMap(eqx.Module):
     alpha_des: float = 0.0
     Np_des: float = 100.0
     PR_des: float = 5.0
+    Wp_des: float = 5.0
+    eff_des: float = 0.85
 
     def evaluate(self, alpha, Np, PR):
         # Un-scale the inputs to read the base map
@@ -226,11 +225,6 @@ class TurbineMap(eqx.Module):
         with open(filepath, "r") as f:
             data = json.load(f)
 
-        # Extract Scalars
-        alpha_des = float(data["alpha_des"])
-        Np_des = float(data["Np_des"])
-        PR_des = float(data["PR_des"])
-
         # Extract 1D grids
         alpha_grid = jnp.array(data["alpha"])
         Np_grid = jnp.array(data["Np"])
@@ -245,12 +239,13 @@ class TurbineMap(eqx.Module):
 
         return cls(
             tag=Path(filepath).stem,
-            alpha_des=alpha_des,
-            Np_des=Np_des,
-            PR_des=PR_des,
+            alpha_des=float(data["alpha_des"]),
+            Np_des=float(data["Np_des"]),
+            PR_des=float(data["PR_des"]),
+            Wp_des=float(data.get("Wp_des", 5.0)),
+            eff_des=float(data.get("Wp_des", 0.85)),
             alpha_grid=alpha_grid,
             Np_grid=Np_grid,
             PR_grid=PR_grid,
             Wp_table=Wp_table,
-            eff_table=eff_table,
-        )
+            eff_table=eff_table,)

@@ -2,13 +2,17 @@ import csv
 import json
 import os
 
+from functools import lru_cache
+from typing import Any
+
 from eden_trace.utils import get_trace_root
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine
 
 #-----------------------------------------------------------------------------------------------------------------------
-# Data Collection
+# Data Collection (Sourced from Mattingly)
 #-----------------------------------------------------------------------------------------------------------------------
 
-DATA_DIR=get_trace_root()/"library/data/turbo_engines"
+_DATA_DIR = get_trace_root() / "library/data/turbo_engines"
 
 def load_csv_as_dicts(filepath):
     """Loads a standard CSV into a list of dictionaries."""
@@ -31,7 +35,7 @@ def parse_value(val):
     except ValueError:
         return val
 
-def process_station_data(data_dir=DATA_DIR):
+def process_station_data(data_dir=_DATA_DIR):
     """
     Processes engine-specific station thermal data into JSONs
     Source: Mattingly, 2nd Ed.
@@ -79,7 +83,7 @@ def process_design_data(csv_file):
     
     category = csv_file.stem.split('_')[0].title()
     
-    out_dir = DATA_DIR
+    out_dir = _DATA_DIR
     os.makedirs(out_dir, exist_ok=True)
     
     with open(csv_file, mode='r', encoding='utf-8') as f:
@@ -99,22 +103,76 @@ def process_design_data(csv_file):
             # Clean up the dictionary values
             clean_data = header_data | {k: parse_value(v) for k, v in row.items()}
 
+            #Assumed values for afterburner exit temperature
             if row.get('AB', False):
                 if engine_type == "Turbojet":
                     clean_data['AET (F)'] = 2600.0
                 elif engine_type == "Turbofan":
                     clean_data['AET (F)'] = 3200.0
-            elif category == "Civil":
-                clean_data['TIT (F)'] = 2300.
+            
+            if category == "Civil":
+                clean_data['TIT (F)'] = 2300.0
+            
+            # Concorde overrides for afterburning civil engine
+            if "Olympus" in engine_name:
+                clean_data['AB'] = True
+                clean_data['AET (F)'] = 2600.0
+                clean_data['TIT (F)'] = 2200.0
+
             
             # Write to JSON
             filepath = os.path.join(out_dir, f"{safe_name}.json")
             with open(filepath, 'w') as out_f:
                 json.dump(clean_data, out_f, indent=4)
 
+# -----------------------------------------------------------------------------------------------------------------------
+# Engine Loading
+# -----------------------------------------------------------------------------------------------------------------------
+
+STUB_FILE = get_trace_root() / "library/components/energy/jets/data.pyi"
+
+@lru_cache(maxsize=None)
+def _load_engine_from_disk(name: str):
+    file_path = _DATA_DIR / f"{name}.json"
+    if not file_path.exists():
+        raise AttributeError(f"Engine {name} not found in Trace library ({_DATA_DIR}).")
+
+    return TurbojetEngine.from_json(filepath=file_path)
+
+def __getattr__(name: str) -> Any:
+    """Intercepts module-level attribute access."""
+    # Ignore private attributes to prevent messing with Python internals
+    if name.startswith("_"):
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+    return _load_engine_from_disk(name)
+
+
+def __dir__():
+    """Allows IDEs and the `dir()` command to see the available maps."""
+    # List all .json files in the directory without their extensions
+    if _DATA_DIR.exists():
+        return [f.stem for f in _DATA_DIR.glob("*.json")]
+    return []
+
+def generate_stub():
+    lines = [
+        "from .classes import TurbojetEngine",  # Update import path
+        "",
+    ]
+    
+    for eng_file in _DATA_DIR.glob("*.json"):
+        # Write the attribute to the stub file
+        lines.append(f"{eng_file.stem}: {"TurbojetEngine"}")
+
+    STUB_FILE.write_text("\n".join(lines))
+    print(f"Generated {STUB_FILE.name} with {len(lines) - 3} engines.")      
+
+
 if __name__ == "__main__":
     print("="*50 + "\nBuilding Engine Library from Mattingly Data...\n" + "-"*50)
-    process_design_data(DATA_DIR/"CSVs/civil_turbofans.csv")
-    process_design_data(DATA_DIR/"CSVs/military_turbofans.csv")
-    process_design_data(DATA_DIR/"CSVs/military_turbofans.csv")
+    process_design_data(_DATA_DIR/"CSVs/civil_turbofans.csv")
+    process_design_data(_DATA_DIR/"CSVs/military_turbofans.csv")
+    process_design_data(_DATA_DIR/"CSVs/military_turbojets.csv")
     print("Library Build Complete.")
+    generate_stub()

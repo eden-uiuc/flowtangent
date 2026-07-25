@@ -21,8 +21,8 @@ from eden_trace.library import units
 from eden_trace.library.components.energy.nodes import FlowDesign
 from eden_trace.library.components.energy.nodes import Efficiencies as Eff
 
-from eden_trace.library.components.energy.networks import TurbofanNetwork, TurbofanDesign
-from eden_trace.library.components.energy.jets.classes import TurbofanEngine, JetDesign
+from eden_trace.library.components.energy.networks import TurbofanNetwork
+from eden_trace.library.components.energy.jets.classes import TurbofanEngine, TurbofanDesign
 from eden_trace.library.components.energy.lines import TurbofanLine
 
 from eden_trace.framework import State, Aircraft, Settings
@@ -35,7 +35,7 @@ def system_setup():
     # Design Parameters --------------------------------------------------------
 
     engine = TurbofanEngine(
-        design_parameters=JetDesign(
+        design_parameters=TurbofanDesign(
             thrust=5900 * units.lbf,
             bypass_ratio=5.105))
     

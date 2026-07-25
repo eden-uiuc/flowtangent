@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbofanNetwork, TurbojetDesign, TurbofanDesign
+    from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbofanNetwork
     from eden_trace.library.components.energy.maps.classes import CompressorMap, TurbineMap
-
+    
 import jax.numpy as jnp
 import equinox as eqx
 import optimistix as optx
@@ -24,7 +24,7 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.jets.classes import VariableNozzle
+from eden_trace.library.components.energy.jets.classes import VariableNozzle, TurbojetEngine, TurbofanEngine, TurbofanDesign, TurbojetDesign
 
 from eden_trace.framework import State, System, Aircraft, Settings, Process
 from eden_trace.framework.settings import EnergyAnalysisSettings
@@ -41,9 +41,7 @@ from eden_trace.framework.simulation.update import update_freestream
 class JetSettings(EnergyAnalysisSettings):
 
     design_mode: bool = init_field(False, static=True)
-
-    kinematics: bool = init_field(False, static=True)
-
+    statics: bool = init_field(False, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Point Analysis
@@ -52,12 +50,71 @@ class JetSettings(EnergyAnalysisSettings):
 def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[State, System, Settings, Process]:
 
     network: TurbojetNetwork | TurbofanNetwork = system.energy
-    des: TurbojetDesign | TurbofanDesign = network.design_parameters
+    engine: TurbojetEngine = network.line.engine
+    des: TurbojetDesign | TurbofanDesign = engine.design_parameters
+    
+    statics = settings.analysis.energy.statics
+    if statics:
+        MN_dict = des.exit_mach_numbers.as_dict()
+        for node in MN_dict:
+            engine = eqx.tree_at(
+                lambda e: getattr(e, node).design_parameters.exit_mach_number,
+                engine,
+                MN_dict[node])
+    
+    # Approximate 20:4:3 pressure ratio stage split
+    OPR = des.overall_pressure_ratio
+    if isinstance(des, TurbofanDesign):
+        k = (OPR / 240.0 ) ** (1.0 / 3.0)
+        fan_PR = 3.0 * k
+        LPC_PR = 4.0 * k
+        HPC_PR = 20.0 * k
+        
+        engine = eqx.tree_at(lambda e: (
+            e.fan.design_parameters.rotation_speed,
+            e.fan.design_parameters.pressure_ratio,
+            e.lpc.design_parameters.rotation_speed,
+            e.lpc.design_parameters.pressure_ratio,
+            e.hpc.design_parameters.rotation_speed,
+            e.hpc.design_parameters.pressure_ratio,
+            e.burner.design_parameters.pressure_ratio,
+            e.burner.design_parameters.output_temperature,
+            e.hpt.design_parameters.rotation_speed,
+            e.lpt.design_parameters.rotation_speed,
+        ),
+        engine,(
+            des.lp_rotation_speed,
+            fan_PR,
+            des.lp_rotation_speed,
+            LPC_PR,
+            des.hp_rotation_speed,
+            HPC_PR,
+            des.burner_pressure_ratio,
+            des.turbine_intake_temperature,
+            des.hp_rotation_speed,
+            des.lp_rotation_speed,
+        ))
+    else:
+        engine = eqx.tree_at(lambda e: (
+            e.compressor.design_parameters.rotation_speed,
+            e.compressor.design_parameters.pressure_ratio,
+            e.burner.pressure_ratio,
+            e.burner.output_temperature,
+            e.turbine.design_parameters.rotation_speed,
+        ),
+        engine,(
+            des.inlet_pressure_recovery,
+            des.rotation_speed,
+            OPR,
+            des.burner_pressure_ratio,
+            des.turbine_intake_temperature,
+            des.rotation_speed,
+        ))
 
     alt = des.altitude
     M0 = des.mach_number
 
-    atmo = des.atmosphere_model
+    atmo = state.freestream.atmosphere
     a0 = atmo.compute_speed_of_sound(alt).squeeze()
 
     des_state = eqx.tree_at(
@@ -71,8 +128,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             jnp.array([[0., 0., -alt]]),
             jnp.atleast_2d(M0),
             jnp.atleast_2d(jnp.array([[a0 * M0, 0.0, 0.0]])),
-        ),
-    )
+        ))
 
     des_e_settings = JetSettings(design_mode=True)
     des_settings = eqx.tree_at(lambda s: s.analysis.energy, settings, des_e_settings)
@@ -134,11 +190,10 @@ def DesignTurbojet(state: State, system: Aircraft, settings: Settings) -> tuple[
 def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
 
     # Setup test state according to design parameters
-
     des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
 
-    des: TurbofanDesign = des_system.energy.design_parameters
-    
+    des: TurbofanDesign = des_system.energy.line.engine.design_parameters
+
     # Set Design Bypass Ratio
     des_state = eqx.tree_at(
         lambda s: s.energy.bypass_ratio,
@@ -150,7 +205,7 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     mass_ctrl = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
-        initial_value=des.initial_MFR,
+        initial_value=des.mass_flow_rate,
         bounds=(
             1e-3 * units.kg / units.s,
             5e3  * units.kg / units.s,
@@ -160,19 +215,18 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     LPT_ctrl = Control(
         tag="LPT Pressure Ratio",
         state_path=DataPath(("energy", "LPT_PR")),
-        initial_value=des.initial_LPT_PR,
+        initial_value=des.LPT_PR,
         bounds=(1.001, 1e2),
     )
 
     HPT_ctrl = Control(
         tag="HPT Pressure Ratio",
         state_path=DataPath(("energy", "HPT_PR")),
-        initial_value=des.initial_HPT_PR,
+        initial_value=des.HPT_PR,
         bounds=(1.001, 1e2),
     )
 
     # Residuals Setup
-
     d_thrust = Residual(
         tag="Design Thrust",
         get_value=lambda s: s.energy.outputs.residual.thrust

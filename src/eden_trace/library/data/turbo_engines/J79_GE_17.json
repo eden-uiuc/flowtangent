@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J79-GE-17",
+    "Type": "TJ",
+    "AB": true,
+    "Max thrust SLS (lbf)": 17820.0,
+    "SFC at max": 1.965,
+    "Airflow (lbm/s)": 170.0,
+    "OPR": 13.5,
+    "D (in)": 39.1,
+    "L (in)": 208.7,
+    "Weight (lbf)": 3855.0,
+    "TIT (F)": 1210.0,
+    "Application": "F-4E/G",
+    "AET (F)": 2600.0
+}

@@ -12,5 +12,7 @@
     "Cruise Thrust (lbf)": 10030.0,
     "Cruise TSFC": 1.19,
     "Application": "Concorde",
-    "TIT (F)": 2300.0
+    "TIT (F)": 2200.0,
+    "AB": true,
+    "AET (F)": 2600.0
 }

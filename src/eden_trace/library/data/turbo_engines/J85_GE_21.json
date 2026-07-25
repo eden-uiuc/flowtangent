@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J85-GE-21",
+    "Type": "TJ",
+    "AB": true,
+    "Max thrust SLS (lbf)": 5000.0,
+    "SFC at max": 2.13,
+    "Airflow (lbm/s)": 51.9,
+    "OPR": 8.0,
+    "D (in)": 20.0,
+    "L (in)": 116.0,
+    "Weight (lbf)": 667.0,
+    "TIT (F)": 1790.0,
+    "Application": "F-5E/F",
+    "AET (F)": 2600.0
+}

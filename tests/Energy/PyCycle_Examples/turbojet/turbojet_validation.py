@@ -10,8 +10,8 @@ from pathlib import Path
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbojetDesign
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine, JetDesign
+from eden_trace.library.components.energy.networks import TurbojetNetwork, JetNetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbojetDesign
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
@@ -21,7 +21,7 @@ from eden_trace.framework.simulation.update import update_freestream
 
 def system_setup(variable_nozzle: bool = False):
 
-    engine_design = JetDesign(
+    engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
     )
     engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
@@ -101,7 +101,7 @@ def system_setup(variable_nozzle: bool = False):
 
     line = TurbojetLine(tag="Line", subcomponents=(engine,),)
     
-    net_design = TurbojetDesign(
+    net_design = JetNetDesign(
         altitude=0.0,
         mach_number=1e-6,
         thrust=11_800 * units.lbf,
@@ -129,7 +129,7 @@ def off_design_point(
 ):
 
     network: TurbojetNetwork = system.energy
-    des: TurbojetDesign = network.design_parameters
+    des: JetNetDesign = network.design_parameters
 
     atmo = des.atmosphere_model
     a0 = atmo.compute_speed_of_sound(alt)

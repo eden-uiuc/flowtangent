@@ -210,8 +210,8 @@ class Splitter(GraphNode):
 # ----------------------------------------------------------------------------------------------------------------------
 @register
 class FlowDesign(eqx.Module):
-    pressure_ratio: float = 1.0
-    pressure_recovery: float = 1.0
+    pressure_ratio: float = 0.99
+    pressure_recovery: float = 0.999
     
     intake_temperature: float = 298.15
     output_temperature: float = 298.15
@@ -351,7 +351,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             return jnp.atleast_2d(0.0)
     
     @staticmethod
-    def kinematics(gas: IdealGas, T_t_out, P_t_out, M_out, mdot):
+    def kinematic_design(gas: IdealGas, T_t_out, P_t_out, M_out, mdot):
 
         # Unpack boundary stagnation properties
         R       = gas.R_specific
@@ -384,7 +384,6 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_rec: jnp.ndarray | float = 1.0
     ):
         gamma_in = gas.compute_gamma(T_t)
-        gamma_avg = gamma_in
         T_t_out_ideal = T_t * (PR ** ((gamma_in - 1.0) / gamma_in))
         P_t_out_ideal = P_t * PR * P_rec
 
@@ -467,12 +466,13 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         n_isn = jnp.atleast_2d(self.design_parameters.eff.flow)
 
         T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR, n_isn, M, P_rec)
+        h_t_out = gas.compute_enthalpy(T_t_out)
 
         if settings.analysis.energy.design_mode:
 
             M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
 
-            A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematics(
+            A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(
                 gas=gas,
                 T_t_out=T_t_out,
                 P_t_out=P_t_out,

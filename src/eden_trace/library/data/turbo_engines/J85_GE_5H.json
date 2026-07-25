@@ -1,0 +1,17 @@
+{
+    "category": "Military",
+    "type": "Turbojet",
+    "Model no.": "J85-GE-5H",
+    "Type": "TJ",
+    "AB": true,
+    "Max thrust SLS (lbf)": 3850.0,
+    "SFC at max": 2.2,
+    "Airflow (lbm/s)": 44.0,
+    "OPR": 7.0,
+    "D (in)": 20.4,
+    "L (in)": 109.1,
+    "Weight (lbf)": 584.0,
+    "TIT (F)": 1640.0,
+    "Application": "T-38A/B",
+    "AET (F)": 2600.0
+}
