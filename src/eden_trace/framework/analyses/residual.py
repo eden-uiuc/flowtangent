@@ -23,6 +23,7 @@ from collections import Counter
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+import numpy as np
 import optimistix as optx
 
 from jax.core import Tracer
@@ -266,6 +267,51 @@ class ResidualAnalysis(Process):
 
         return analysis_state
     
+    def _report_results(self, f_st, settings: Settings, f_jac=None, opt_state=None, f_res=None):
+
+        print(f"\n{'='*70}")
+        print(f"Final {self.tag} Solver State")
+        print(f"{'-'*70}")
+        
+        if opt_state is not None:
+            # Safely extract scalar values for iterations and objective
+            iter_num = opt_state.num_steps.item()
+            obj_val = np.mean(np.asarray(opt_state.f_info.residual)).item()
+            print(f"  Solver          : {self.solver.__name__}")
+            print(f"  Num. Iterations : {iter_num}")
+            print(f"  Final Residual  : {obj_val:.4e}")
+            
+        # Determine the maximum tag length
+        active_controls = f_st.controls.active_controls
+        active_residuals = f_st.dynamics.active_residuals
+        
+        all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
+        # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
+        pad = max((len(t) for t in all_tags), default=20) + 2
+        
+        # Run the forward pass one last time
+        if f_res is None:
+            final_residuals = np.asarray(f_st.get_residual_array().flatten())
+        else:
+            final_residuals = f_res
+
+        print(f"\n  Final Control Values:")
+        for ctrl in active_controls:
+            val = get_target(f_st, ctrl.state_path)
+            print(f"    {ctrl.tag:<{pad}}: {format_array(val)}")
+
+        print(f"\n  Final Residual Values:")
+        for i, res in enumerate(f_st.dynamics.active_residuals):
+            print(f"    {res.tag:<{pad}}: {format_array(final_residuals[i])}")
+
+        if f_jac is not None:
+            print(f"\n Final Jacobian:")
+            grad_np = np.asarray(f_jac)
+            for i, ctrl in enumerate(active_controls):
+                print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
+        
+        print(f"{'='*70}\n")
+
     @eqx.filter_jit
     def _run_solver(
         self,
@@ -343,7 +389,8 @@ class ResidualAnalysis(Process):
 
         if settings.DEBUG_MODE:
             print(f"DEBUG MODE: Executing single forward pass...")
-            _ = get_residuals(control_values, (state, system, settings))
+            f_res = get_residuals(control_values, (state, system, settings))
+            self._report_results(state, settings, None, None, f_res)
             sys.exit("DEBUG MODE: Forward pass complete. Terminating.")
         
         else:
@@ -387,45 +434,7 @@ class ResidualAnalysis(Process):
         f_st, f_sys, f_set = self.analyze(analysis_state, system, settings)
 
         if settings.verbose:
-            import numpy as np
-            
-            print(f"\n{'='*70}")
-            print(f"Final {self.tag} Solver State")
-            print(f"{'-'*70}")
-            
-            # Safely extract scalar values for iterations and objective
-            iter_num = opt_state.num_steps.item()
-            obj_val = np.mean(np.asarray(opt_state.f_info.residual)).item()
-            print(f"  Solver          : {self.solver.__name__}")
-            print(f"  Num. Iterations : {iter_num}")
-            print(f"  Final Residual  : {obj_val:.4e}")
-                
-            # Determine the maximum tag length
-            active_controls = f_st.controls.active_controls
-            active_residuals = f_st.dynamics.active_residuals
-            
-            all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
-            # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
-            pad = max((len(t) for t in all_tags), default=20) + 2
-            
-            # Run the forward pass one last time
-            final_residuals = np.asarray(f_st.get_residual_array().flatten())
-
-            print(f"\n  Final Control Values:")
-            for ctrl in active_controls:
-                val = get_target(f_st, ctrl.state_path)
-                print(f"    {ctrl.tag:<{pad}}: {format_array(val)}")
-
-            print(f"\n  Final Residual Values:")
-            for i, res in enumerate(f_st.dynamics.active_residuals):
-                print(f"    {res.tag:<{pad}}: {format_array(final_residuals[i])}")
-
-            print(f"\n Final Jacobian:")
-            grad_np = np.asarray(final_jacobian)
-            for i, ctrl in enumerate(active_controls):
-                print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
-            
-            print(f"{'='*70}\n")
+            self._report_results(f_st, f_set, final_jacobian, opt_state)
         
         if settings._DEV_MODE:
             print(f"\n{'='*70}")

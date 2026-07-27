@@ -13,6 +13,7 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine
 #-----------------------------------------------------------------------------------------------------------------------
 
 _DATA_DIR = get_trace_root() / "library/data/turbo_engines"
+_JSON_DIR = _DATA_DIR / "JSONs"
 
 def load_csv_as_dicts(filepath):
     """Loads a standard CSV into a list of dictionaries."""
@@ -83,7 +84,7 @@ def process_design_data(csv_file):
     
     category = csv_file.stem.split('_')[0].title()
     
-    out_dir = _DATA_DIR
+    out_dir = _JSON_DIR
     os.makedirs(out_dir, exist_ok=True)
     
     with open(csv_file, mode='r', encoding='utf-8') as f:
@@ -133,7 +134,7 @@ STUB_FILE = get_trace_root() / "library/components/energy/jets/data.pyi"
 
 @lru_cache(maxsize=None)
 def _load_engine_from_disk(name: str):
-    file_path = _DATA_DIR / f"{name}.json"
+    file_path = _JSON_DIR / f"{name}.json"
     if not file_path.exists():
         raise AttributeError(f"Engine {name} not found in Trace library ({_DATA_DIR}).")
 

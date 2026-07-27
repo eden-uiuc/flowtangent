@@ -10,16 +10,11 @@ from eden_trace.framework.analyses.energy.jets import DesignTurbofan, JetSetting
 
 if __name__ == "__main__":
     
-    results = pd.DataFrame(columns=[
-        "Thrust",
-        "Thrust Rel. Error",
-        "TSFC"
-        "TSFC Rel. Error"
-    ])
+    records = []
 
     e_st = State()
     sys = Aircraft(subcomponents=(TurbofanNetwork(),))
-    setts = Settings(verbose=True, DEBUG_MODE=True)
+    setts = Settings(verbose=True, DEBUG_MODE=False)
     e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
 
     for e_name in [
@@ -45,6 +40,38 @@ if __name__ == "__main__":
         if not engine:
             print(f"Failed to import '{e_name}'. Skipping...")
         else:
-            print(f"Designing '{e_name}'...")
+            print("="*70)
+            print(f"Designing {e_name.replace('_','-')}")
+            print("-"*70)
             e_sys = eqx.tree_at(lambda n: n.energy.line.engine, sys, engine)
             d_st, d_sys, d_setts = DesignTurbofan(e_st, e_sys, e_setts)
+
+            thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
+            fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()
+            lpc_MFR = d_st.energy.nodes['network.line.engine.lpc'].outputs.flow.mass_flow_rate.item()
+
+            print(f"Fan MFR: {fan_MFR:.2e}")
+            print(f"LPC MFR: {lpc_MFR:.2e}")
+
+            MFR = d_st.energy.mass_flow_rate.item()
+            dMFR = d_sys.energy.line.engine.design_parameters.mass_flow_rate
+            eMFR = (MFR - dMFR)/dMFR
+
+            records.append({
+                "MFR": MFR,
+                "Tgt. MFR": dMFR,
+                "MFR Err.": eMFR,
+            })
+    
+    df = pd.DataFrame(records)
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.float_format', '{:.2e}'.format)
+
+    print("\n" + "="*80)
+    print(f" Civil HBTF Design Validation")
+    print("-"*80)
+    print(df.to_string(index=False))
+
+
+            
+

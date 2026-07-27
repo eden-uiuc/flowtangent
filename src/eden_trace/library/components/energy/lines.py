@@ -114,9 +114,15 @@ class TurbojetLine(EnergyLine):
         # Total Thrust ---------------------------------------------------------
 
         updated_state = eqx.tree_at(
-            lambda s: s.energy.nodes[self.network_ID].outputs.force.thrust,
+            lambda s: (
+                s.energy.nodes[self.network_ID].outputs.force.thrust,
+                s.energy.nodes[self.network_ID].outputs.residual.thrust,
+            ),
             updated_state,
-            self.apply_domain_op(jnp.sum, updated_state, "force", "thrust")
+            (
+                self.apply_domain_op(jnp.sum, updated_state, "force", "thrust"),
+                self.apply_domain_op(jnp.sum, updated_state, "residual", "thrust"),
+            )
         )
 
         # Power Imbalance ------------------------------------------------------

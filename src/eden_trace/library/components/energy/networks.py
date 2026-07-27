@@ -259,12 +259,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
         # Total Thrust----------------------------------------------------------
 
         total_thrust = jnp.atleast_2d(self.apply_domain_op(jnp.sum, state, "force", "thrust"))
-
         total_force_vector = jnp.hstack((total_thrust, jnp.zeros((total_thrust.shape[0], 2))))
-        if settings.analysis.energy.design_mode:
-            target_thrust = self.design_parameters.thrust
-        else:
-            target_thrust = state.energy.target_thrust
         
         updated_state = eqx.tree_at(
             lambda s: (
@@ -273,11 +268,9 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
             ),
             updated_state,(
                 total_force_vector,
-                (total_thrust - target_thrust)/target_thrust,
-            )
-        )
+                self.apply_domain_op(jnp.sum, state, "residual", "thrust")))
 
-        # Power Imbalance (Single Shaft Only) ----------------------------------
+        # Power Imbalance (Single Spool Only) ----------------------------------
 
         total_d_power = self.apply_domain_op(jnp.sum, updated_state, "residual", "power")
 

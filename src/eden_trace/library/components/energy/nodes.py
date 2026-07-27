@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Literal, Callable, Iterable, get_args, ca
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
+    from eden_trace.framework.analyses.energy.jets import JetSettings
 
 import warnings
 import equinox as eqx
@@ -211,7 +212,7 @@ class Splitter(GraphNode):
 @register
 class FlowDesign(eqx.Module):
     pressure_ratio: float = 0.99
-    pressure_recovery: float = 0.999
+    pressure_recovery: float = 1.0
     
     intake_temperature: float = 298.15
     output_temperature: float = 298.15
@@ -286,12 +287,15 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
 
     output_bleeds: tuple[BleedFlow,...] = init_field(tuple)
 
+    _bookkeeping: dict = init_field(lambda: {"bleeds": BleedFlow}, static=True)
+
     def __post_init__(self):
         super(FlowNode, self).__post_init__()
 
         if len(self.output_bleeds) > 0:
             add_mixer = not hasattr(self, "mixer")
             self_bleeds = tuple(replace(b, inputs=GraphInput("flow", "parent")) for b in self.output_bleeds)
+            # BleedFlow Parent ID and Grandparent ID set in GraphNetwork.assign_network_IDs
             object.__setattr__(self, "subcomponents", self.subcomponents + self_bleeds)
             object.__setattr__(self, "output_bleeds", tuple())
         else:
@@ -299,7 +303,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
 
         if add_mixer:
             parent_inputs = tuple(replace(i, network_ID="parent."+i.network_ID) for i in self.flow_inputs)
-            mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False)
+            mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False, design_parameters=FlowDesign(pressure_ratio=1.0))
             
             other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
             object.__setattr__(self, "inputs", other_inputs + (GraphInput(domain="flow", network_ID="self.mixer", primary=True),))
@@ -343,8 +347,8 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         return mixed_fluid, T_t, P_t, W_mix, FAR, M
     
     def bleed_MFR_frac(self, state:State):
-        if len(self.output_bleeds) > 0:
-            bleed_fracs = [b.fractions_dict.get("mass_flow_rate", 0.0) for b in self.output_bleeds]
+        if len(self.bleeds) > 0:
+            bleed_fracs = [b.fractions_dict.get("mass_flow_rate", 0.0) for b in self.bleeds]
             actual_fracs = jnp.array([f(state) if callable(f) else f for f in bleed_fracs])
             return jnp.atleast_2d(jnp.sum(actual_fracs))
         else:
@@ -458,57 +462,69 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         updated_state = state
         updated_system = system
 
+        analysis_settings: JetSettings = settings.analysis.energy
+        design_mode = analysis_settings.design_mode
+        statics = analysis_settings.statics
+
         gas, T_t, P_t, W_in, FAR, M = self.mix_inputs(state)
         W_out = W_in * (1.0 - self.bleed_MFR_frac(state))
         
         PR    = jnp.atleast_2d(self.design_parameters.pressure_ratio)
         P_rec = jnp.atleast_2d(self.design_parameters.pressure_recovery)
         n_isn = jnp.atleast_2d(self.design_parameters.eff.flow)
+        
+        if not statics:
+            M = jnp.atleast_2d(0.0)
 
         T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR, n_isn, M, P_rec)
         h_t_out = gas.compute_enthalpy(T_t_out)
 
-        if settings.analysis.energy.design_mode:
+        if design_mode:
+            if statics:
+                M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
 
-            M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
+                A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(
+                    gas=gas,
+                    T_t_out=T_t_out,
+                    P_t_out=P_t_out,
+                    M_out=M_out,
+                    mdot=W_out
+                )
 
-            A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(
-                gas=gas,
-                T_t_out=T_t_out,
-                P_t_out=P_t_out,
-                M_out=M_out,
-                mdot=W_out
-            )
+                updated_design_parameters = eqx.tree_at(
+                    lambda d: d.A_exit,
+                    self.design_parameters,
+                    A_out.squeeze()
+                )
 
-            updated_design_parameters = eqx.tree_at(
-                lambda d: d.A_exit,
-                self.design_parameters,
-                A_out.squeeze()
-            )
-
-            updated_system = eqx.tree_at(
-                lambda s: s.energy.nodes[self.network_ID].design_parameters,
-                updated_system,
-                updated_design_parameters
-            )
+                updated_system = eqx.tree_at(
+                    lambda s: s.energy.nodes[self.network_ID].design_parameters,
+                    updated_system,
+                    updated_design_parameters
+                )
         
         else:
-            A_out = jnp.atleast_2d(self.design_parameters.A_exit)
-            T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(gas, T_t_out, P_t_out, W_out, A_out)
+            if statics:
+                A_out = jnp.atleast_2d(self.design_parameters.A_exit)
+                T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(gas, T_t_out, P_t_out, W_out, A_out)
 
         outputs = state.energy.nodes[self.network_ID].outputs.flow
 
         outputs = eqx.tree_at(lambda o: o.mass_flow_rate, outputs,          jnp.atleast_2d(W_out))
-        outputs = eqx.tree_at(lambda o: o.mach_number, outputs,             jnp.atleast_2d(M_out))
-        outputs = eqx.tree_at(lambda o: o.speed, outputs,                   jnp.atleast_2d(u_out))
         outputs = eqx.tree_at(lambda o: o.stagnation_pressure, outputs,     jnp.atleast_2d(P_t_out))
         outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs,  jnp.atleast_2d(T_t_out))
-        outputs = eqx.tree_at(lambda o: o.temperature, outputs,             jnp.atleast_2d(T_out))
-        outputs = eqx.tree_at(lambda o: o.pressure, outputs,                jnp.atleast_2d(P_out))
         outputs = eqx.tree_at(lambda o: o.stagnation_enthalpy, outputs,     jnp.atleast_2d(h_t_out))
-        outputs = eqx.tree_at(lambda o: o.enthalpy, outputs,                jnp.atleast_2d(h_out))
-        outputs = eqx.tree_at(lambda o: o.area, outputs,                    jnp.atleast_2d(A_out))
         outputs = eqx.tree_at(lambda o: o.fuel_air_ratio, outputs,          jnp.atleast_2d(FAR))
+
+        if statics:
+
+            outputs = eqx.tree_at(lambda o: o.temperature, outputs,         jnp.atleast_2d(T_out))
+            outputs = eqx.tree_at(lambda o: o.pressure, outputs,            jnp.atleast_2d(P_out))
+            outputs = eqx.tree_at(lambda o: o.speed, outputs,               jnp.atleast_2d(u_out))
+            outputs = eqx.tree_at(lambda o: o.mach_number, outputs,         jnp.atleast_2d(M_out))
+            outputs = eqx.tree_at(lambda o: o.enthalpy, outputs,            jnp.atleast_2d(h_out))
+            outputs = eqx.tree_at(lambda o: o.area, outputs,                jnp.atleast_2d(A_out))
+
 
 
         updated_state = eqx.tree_at(lambda s:

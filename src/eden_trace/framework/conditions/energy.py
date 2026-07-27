@@ -24,7 +24,6 @@ class MechanicalOutputs(Condition):
     tag = "Mechanical Outputs"
 
     work: jnp.ndarray = empty_array(0)
-    
     power: jnp.ndarray = empty_array(0)
 
 
@@ -113,6 +112,8 @@ class NodeConditions(Condition):
 
     outputs: OutputConditions = init_field(OutputConditions)
 
+    mass: jnp.ndarray = empty_array()
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Stores
 # ----------------------------------------------------------------------------------------------------------------------
@@ -125,7 +126,6 @@ class BatteryCellConditions(NodeConditions):
     resistance_growth_factor: float = init_field(0.0, static=True)
     capacity_fade_factor: float = init_field(0.0, static=True)
 
-    mass: jnp.ndarray = empty_array(0)
     temperature: jnp.ndarray = empty_array(0)
     charge_throughput: jnp.ndarray = empty_array(0)
     state_of_charge: jnp.ndarray = empty_array(0)
@@ -139,7 +139,6 @@ class BatteryPackConditions(NodeConditions):
 
     cell: BatteryCellConditions = init_field(BatteryCellConditions)
 
-    mass: jnp.ndarray = empty_array(0)
     temperature: jnp.ndarray = empty_array(0)
 
 

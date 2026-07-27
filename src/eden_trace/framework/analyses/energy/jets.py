@@ -52,64 +52,8 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
     network: TurbojetNetwork | TurbofanNetwork = system.energy
     engine: TurbojetEngine = network.line.engine
     des: TurbojetDesign | TurbofanDesign = engine.design_parameters
-    
-    statics = settings.analysis.energy.statics
-    if statics:
-        MN_dict = des.exit_mach_numbers.as_dict()
-        for node in MN_dict:
-            engine = eqx.tree_at(
-                lambda e: getattr(e, node).design_parameters.exit_mach_number,
-                engine,
-                MN_dict[node])
-    
-    # Approximate 20:4:3 pressure ratio stage split
-    OPR = des.overall_pressure_ratio
-    if isinstance(des, TurbofanDesign):
-        k = (OPR / 240.0 ) ** (1.0 / 3.0)
-        fan_PR = 3.0 * k
-        LPC_PR = 4.0 * k
-        HPC_PR = 20.0 * k
-        
-        engine = eqx.tree_at(lambda e: (
-            e.fan.design_parameters.rotation_speed,
-            e.fan.design_parameters.pressure_ratio,
-            e.lpc.design_parameters.rotation_speed,
-            e.lpc.design_parameters.pressure_ratio,
-            e.hpc.design_parameters.rotation_speed,
-            e.hpc.design_parameters.pressure_ratio,
-            e.burner.design_parameters.pressure_ratio,
-            e.burner.design_parameters.output_temperature,
-            e.hpt.design_parameters.rotation_speed,
-            e.lpt.design_parameters.rotation_speed,
-        ),
-        engine,(
-            des.lp_rotation_speed,
-            fan_PR,
-            des.lp_rotation_speed,
-            LPC_PR,
-            des.hp_rotation_speed,
-            HPC_PR,
-            des.burner_pressure_ratio,
-            des.turbine_intake_temperature,
-            des.hp_rotation_speed,
-            des.lp_rotation_speed,
-        ))
-    else:
-        engine = eqx.tree_at(lambda e: (
-            e.compressor.design_parameters.rotation_speed,
-            e.compressor.design_parameters.pressure_ratio,
-            e.burner.pressure_ratio,
-            e.burner.output_temperature,
-            e.turbine.design_parameters.rotation_speed,
-        ),
-        engine,(
-            des.inlet_pressure_recovery,
-            des.rotation_speed,
-            OPR,
-            des.burner_pressure_ratio,
-            des.turbine_intake_temperature,
-            des.rotation_speed,
-        ))
+
+    # State Setup --------------------------------------------------------------
 
     alt = des.altitude
     M0 = des.mach_number
@@ -130,12 +74,78 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             jnp.atleast_2d(jnp.array([[a0 * M0, 0.0, 0.0]])),
         ))
 
+    # System Setup -------------------------------------------------------------
+
+    statics = settings.analysis.energy.statics
+    if statics:
+        MN_dict = des.exit_mach_numbers.as_dict()
+        for node in MN_dict:
+            engine = eqx.tree_at(
+                lambda e: getattr(e, node).design_parameters.exit_mach_number,
+                engine,
+                MN_dict[node])
+    
+    # Approximate 20:4:3 pressure ratio stage split
+    OPR = des.overall_pressure_ratio
+    if isinstance(des, TurbofanDesign):
+        k = (OPR / 240.0 ) ** (1.0 / 3.0)
+        fan_PR = 3.0 * k
+        LPC_PR = 4.0 * k
+        HPC_PR = 20.0 * k
+        
+        des_engine = eqx.tree_at(lambda e: (
+            e.inlet.design_parameters.pressure_recovery,
+            e.fan.design_parameters.rotation_speed,
+            e.fan.design_parameters.pressure_ratio,
+            e.lpc.design_parameters.rotation_speed,
+            e.lpc.design_parameters.pressure_ratio,
+            e.hpc.design_parameters.rotation_speed,
+            e.hpc.design_parameters.pressure_ratio,
+            e.burner.design_parameters.pressure_ratio,
+            e.burner.design_parameters.output_temperature,
+            e.hpt.design_parameters.rotation_speed,
+            e.lpt.design_parameters.rotation_speed,
+        ),
+        engine,(
+            des.inlet_pressure_recovery,
+            des.lp_rotation_speed,
+            fan_PR,
+            des.lp_rotation_speed,
+            LPC_PR,
+            des.hp_rotation_speed,
+            HPC_PR,
+            des.burner_pressure_ratio,
+            des.turbine_intake_temperature,
+            des.hp_rotation_speed,
+            des.lp_rotation_speed,
+        ))
+    else:
+        des_engine = eqx.tree_at(lambda e: (
+            e.compressor.design_parameters.rotation_speed,
+            e.compressor.design_parameters.pressure_ratio,
+            e.burner.pressure_ratio,
+            e.burner.output_temperature,
+            e.turbine.design_parameters.rotation_speed,
+        ),
+        engine,(
+            des.inlet_pressure_recovery,
+            des.rotation_speed,
+            OPR,
+            des.burner_pressure_ratio,
+            des.turbine_intake_temperature,
+            des.rotation_speed,
+        ))
+
+    des_system = eqx.tree_at(
+        lambda s: s.energy.line.engine,
+        system,
+        des_engine)
+
+    # Intialize and build analysis
     des_e_settings = JetSettings(design_mode=True)
     des_settings = eqx.tree_at(lambda s: s.analysis.energy, settings, des_e_settings)
-    des_state, des_system, des_settings = initialize_energy(des_state, system, des_settings)
+    des_state, des_system, des_settings = initialize_energy(des_state, des_system, des_settings)
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
-
-    # Build design analysis
     base_analysis = build_analysis_from_network(des_system.energy)
 
     return des_state, des_system, des_settings, base_analysis
@@ -243,7 +253,7 @@ def DesignTurbofan(state: State, system: Aircraft, settings: Settings) -> tuple[
     )
 
     design_analysis = ResidualAnalysis(
-        tag="Turbofan Design",
+        tag=f"Turbofan Design",
         analyze=base_analysis,
         controls=(mass_ctrl, LPT_ctrl, HPT_ctrl),
         residuals=(d_thrust, d_LP_power, d_HP_power)

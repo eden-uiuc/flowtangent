@@ -50,9 +50,7 @@ class EnergyAnalysisSettings(eqx.Module):
     report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
 
-class AnalysisSettings[
-    E_Type: EnergyAnalysisSettings
-    ](eqx.Module):
+class AnalysisSettings[E_Type: EnergyAnalysisSettings](eqx.Module):
     aerodynamics: Optional[eqx.Module] = None
     energy: E_Type = init_field(EnergyAnalysisSettings)
     mass: MassAnalysisSettings = init_field(MassAnalysisSettings)
@@ -83,6 +81,8 @@ class NumericalSettings(eqx.Module):
 
 class Settings(eqx.Module):
     tag: str = init_field("Settings", static=True)
+
+    report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
     analysis: AnalysisSettings = init_field(AnalysisSettings)
     numerical: NumericalSettings = init_field(NumericalSettings)

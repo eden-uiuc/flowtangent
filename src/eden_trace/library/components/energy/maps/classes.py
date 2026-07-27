@@ -243,7 +243,7 @@ class TurbineMap(eqx.Module):
             Np_des=float(data["Np_des"]),
             PR_des=float(data["PR_des"]),
             Wp_des=float(data.get("Wp_des", 5.0)),
-            eff_des=float(data.get("Wp_des", 0.85)),
+            eff_des=float(data.get("eff_des", 0.85)),
             alpha_grid=alpha_grid,
             Np_grid=Np_grid,
             PR_grid=PR_grid,
