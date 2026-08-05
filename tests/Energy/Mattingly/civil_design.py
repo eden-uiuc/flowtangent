@@ -6,7 +6,7 @@ from eden_trace.library.components.energy.jets import data as jet_data
 from eden_trace.library.components.energy.networks import TurbofanNetwork
 
 from eden_trace.framework import State, Settings, Aircraft
-from eden_trace.framework.analyses.energy.jets import DesignTurbofan, JetSettings
+from eden_trace.framework.analyses.energy.jets import design_turbofan_mp, JetSettings
 
 if __name__ == "__main__":
     
@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     e_st = State()
     sys = Aircraft(subcomponents=(TurbofanNetwork(),))
-    setts = Settings(verbose=True, DEBUG_MODE=False)
+    setts = Settings(verbose=True, DEBUG_MODE=True)
     e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
 
     for e_name in [
@@ -44,7 +44,7 @@ if __name__ == "__main__":
             print(f"Designing {e_name.replace('_','-')}")
             print("-"*70)
             e_sys = eqx.tree_at(lambda n: n.energy.line.engine, sys, engine)
-            d_st, d_sys, d_setts = DesignTurbofan(e_st, e_sys, e_setts)
+            d_st, d_sys, d_setts = design_turbofan_mp(e_st, e_sys, e_setts)
 
             thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
             fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()

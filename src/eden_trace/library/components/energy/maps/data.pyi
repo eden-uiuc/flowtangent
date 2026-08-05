@@ -1,5 +1,5 @@
 from typing import Any
-from .maps import CompressorMap, TurbineMap
+from .classes import CompressorMap, TurbineMap
 
 LPT: TurbineMap
 HPT1269: TurbineMap

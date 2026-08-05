@@ -83,9 +83,17 @@ class ResidualOutputs(Condition):
     thrust: jnp.ndarray = empty_array(0)
     area: jnp.ndarray = empty_array(0)
 
-    # Fixed Nozzle Turbofan Residuals
-    Wc: jnp.ndarray = empty_array(0)
-    Wp: jnp.ndarray = empty_array(0)
+    # Single Spool Turbojet Residuals
+    compressor_Wc: jnp.ndarray = empty_array(0)
+    turbine_Wp: jnp.ndarray = empty_array(0)
+
+    # Dual Spool Turbofan Residuals
+    fan_Wc: jnp.ndarray = empty_array(0)
+    lpc_Wc: jnp.ndarray = empty_array(0)
+    hpc_Wc: jnp.ndarray = empty_array(0)
+
+    lpt_Wp: jnp.ndarray = empty_array(0)
+    hpt_Wp: jnp.ndarray = empty_array(0)
 
 class ForceOutputs(Condition):
     tag = "Force Outputs"
@@ -170,10 +178,11 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     fuel_air_ratio: jnp.ndarray = empty_array(0)
     mass_flow_rate: jnp.ndarray = empty_array(0)
     rotation_speed: jnp.ndarray = empty_array(0)
-    Rline: jnp.ndarray = empty_array(0)
+    compressor_Rline: jnp.ndarray = empty_array(0)
     turbine_PR: jnp.ndarray = empty_array(0)
 
     target_thrust: jnp.ndarray = empty_array(0)
+    target_temperature: jnp.ndarray = empty_array(0)
 
 class TurbofanNetworkConditions(EnergyNetworkConditions):
 
@@ -186,12 +195,14 @@ class TurbofanNetworkConditions(EnergyNetworkConditions):
     LP_speed: jnp.ndarray = empty_array(0)
     HP_speed: jnp.ndarray = empty_array(0)
 
-    LP_Rline: jnp.ndarray = empty_array(0)
-    HP_Rline: jnp.ndarray = empty_array(0)
+    fan_Rline: jnp.ndarray = empty_array(0)
+    lpc_Rline: jnp.ndarray = empty_array(0)
+    hpc_Rline: jnp.ndarray = empty_array(0)
     
-    LPT_PR: jnp.ndarray = empty_array(0)
-    HPT_PR: jnp.ndarray = empty_array(0)
+    lpt_PR: jnp.ndarray = empty_array(0)
+    hpt_PR: jnp.ndarray = empty_array(0)
 
     bypass_ratio: jnp.ndarray = empty_array(0)
     target_thrust: jnp.ndarray = empty_array(0)
+    target_temperature: jnp.ndarray = empty_array(0)
 

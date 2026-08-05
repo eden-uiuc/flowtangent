@@ -537,43 +537,42 @@ if __name__ == "__main__":
     prob.set_solver_print(level=-1)
     prob.set_solver_print(level=2, depth=1)
 
-    flight_env = [(0.8, 35000), (0.7, 35000), (0.55, 35000), (0.46, 35000), (0.4, 35000),
-                  (0.4, 20000), (0.6, 20000), (0.8, 20000),
-                  (0.8, 10000), (0.6, 10000), (0.4, 10000), (0.2, 10000), (0.001, 10000),
-                  (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
-                  (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)]
+    flight_env = [(0.8, 35000),
+                #   (0.7, 35000), (0.55, 35000), (0.46, 35000), (0.4, 35000),
+                #   (0.4, 20000), (0.6, 20000), (0.8, 20000),
+                #   (0.8, 10000), (0.6, 10000), (0.4, 10000), (0.2, 10000), (0.001, 10000),
+                #   (.001, 1000), (0.2, 1000), (0.4, 1000), (0.6, 1000),
+                #   (0.6, 0), (0.4, 0), (0.2, 0), (0.001, 0)
+                  ]
 
     viewer_file = open(file_dir/'hbtf_view.out', 'w')
     first_pass = True
 
-    MN = 0.8
-    alt = 35_000
+    for MN, alt in flight_env:
 
-    print('***'*10)
-    print(f'* MN: {MN}, alt: {alt}')
-    print('***'*10)
-    prob['OD_full_pwr.fc.MN'] = MN
-    prob['OD_full_pwr.fc.alt'] = alt
+        print('***'*10)
+        print(f'* MN: {MN}, alt: {alt}')
+        print('***'*10)
+        prob['OD_full_pwr.fc.MN'] = MN
+        prob['OD_full_pwr.fc.alt'] = alt
 
-    prob['OD_part_pwr.fc.MN'] = MN
-    prob['OD_part_pwr.fc.alt'] = alt
+        prob['OD_part_pwr.fc.MN'] = MN
+        prob['OD_part_pwr.fc.alt'] = alt
 
-    for PC in [1, 0.9, 0.8, .7]:
-        print(f'## PC = {PC}')
-        prob['OD_part_pwr.PC'] = PC
-        prob.run_model()
+        for PC in [1, 0.9, 0.8, .7]:
+            print(f'## PC = {PC}')
+            prob['OD_part_pwr.PC'] = PC
+            prob.run_model()
 
-        if first_pass:
-            viewer(prob, 'DESIGN', file=viewer_file)
-            first_pass = False
-        viewer(prob, 'OD_part_pwr', file=viewer_file)
+            if first_pass:
+                viewer(prob, 'DESIGN', file=viewer_file)
+                first_pass = False
+            viewer(prob, 'OD_part_pwr', file=viewer_file)
 
-    # run throttle back up to full power
-    for PC in [1, 0.85]:
-        prob['OD_part_pwr.PC'] = PC
-        prob.run_model()
-
-
+        # run throttle back up to full power
+        for PC in [1, 0.85]:
+            prob['OD_part_pwr.PC'] = PC
+            prob.run_model()
 
     print()
     print("Run time", time.time() - st)

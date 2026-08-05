@@ -111,10 +111,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
                 val_units = map_obj.units.get(pyc_attr, None)
                 if val_units is not None:
                     if val_units == "rpm":
-                        if map_type == "compressor":
-                            val = val * units.rev / units.mins
-                        else:
-                            val = val
+                       val = val
                     else:
                         val = val * units.parse(val_units)
                 if hasattr(val, "tolist"):
@@ -128,9 +125,6 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             val_units = map_obj.units.get(pyc_attr, None)
             if val_units is not None:
                 if val_units == "rpm":
-                    if map_type == "compressor":
-                        val = val * units.rev / units.mins
-                    else:
                         val = val
                 else:
                     val = val * units.parse(val_units)
@@ -175,13 +169,11 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
 def generate_stub():
     lines = [
         "from typing import Any",
-        "from .maps import CompressorMap, TurbineMap",  # Update import path
+        "from .classes import CompressorMap, TurbineMap", 
         "",
     ]
     
     for map_file in _MAP_DIR.glob("*.json"):
-        # Optional: You can actually read the JSON here during generation 
-        # to give Pylance the EXACT type instead of Any!
         with open(map_file, "r") as f:
             data = json.load(f)
         

@@ -170,7 +170,7 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
             lambda n: n.subcomponents,
             updated_network,
             tuple(resolved_lines)
-        ).sort_network_topology()
+        ).update_node_topology()
 
         return updated_network
 
@@ -188,7 +188,7 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
         _recurse(self.subcomponents)
         return eqx.tree_at(lambda n: n.nodes, self, nodes_dict)
 
-    def sort_network_topology(self) -> "GraphNetwork":
+    def update_node_topology(self) -> "GraphNetwork":
         """The single entry point to finalize the network for execution.
         Use after running initialize_energy so parts are properly ID'd."""
 
@@ -268,7 +268,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
             ),
             updated_state,(
                 total_force_vector,
-                self.apply_domain_op(jnp.sum, state, "residual", "thrust")))
+                (total_thrust - state.energy.target_thrust)/state.energy.target_thrust))
 
         # Power Imbalance (Single Spool Only) ----------------------------------
 

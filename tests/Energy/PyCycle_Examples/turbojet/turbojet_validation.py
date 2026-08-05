@@ -15,7 +15,7 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine, Tu
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import DesignTurbojet, TurbojetPerformance
+from eden_trace.framework.analyses.energy.jets import design_turbojet, turbojet_performance
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
@@ -148,7 +148,7 @@ def off_design_point(
         ),
     )
 
-    od_analysis = TurbojetPerformance(
+    od_analysis = turbojet_performance(
         network,
         initial_Rline,
         initial_turb_PR,
@@ -328,7 +328,7 @@ if __name__ == "__main__":
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
-        st, sys, set = DesignTurbojet(
+        st, sys, set = design_turbojet(
             state=State(),
             system=system,
             settings=settings,
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     else:
         sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
     
-    sys = sys.sort_network_topology()
+    sys = sys.update_network_topology()
 
     print("="*80)
     print(" System Validation")

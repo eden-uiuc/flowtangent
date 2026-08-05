@@ -26,7 +26,7 @@ from eden_trace.library.components.energy.jets.classes import TurbofanEngine, Tu
 from eden_trace.library.components.energy.lines import TurbofanLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import DesignTurbofan
+from eden_trace.framework.analyses.energy.jets import design_turbofan
 
 test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         print(" Design Point Analysis")
         print("-"*80)
         
-        st, sys, set = DesignTurbofan(
+        st, sys, set = design_turbofan(
             state=State(),
             system=system,
             settings=settings,

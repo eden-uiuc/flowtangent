@@ -217,7 +217,6 @@ class FlowDesign(eqx.Module):
     intake_temperature: float = 298.15
     output_temperature: float = 298.15
     
-    A_ratio: float = 1.0
     A_intake: float = 1.0
     A_throat: float = 1.0
     A_exit: float = 1.0
@@ -279,7 +278,7 @@ class BleedFlow(GraphNode):
 
 
 @register
-class FlowNode[DesignType: FlowDesign](GraphNode):
+class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
     
     design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
@@ -318,7 +317,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         
         # Calculate mixed baseline
         W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
-        h_t_mix = jnp.dot(W_fracs, h_t_fracs.T) / W_mix
+        h_t_mix = jnp.sum(W_fracs * h_t_fracs, axis=-1, keepdims=True) / W_mix
 
         # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
         elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
@@ -330,7 +329,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             fractions)
         
         # Invert temperature from enthalpy
-        T_t_guess = jnp.dot(W_fracs, T_t_fracs.T) / W_mix
+        T_t_guess = jnp.sum(W_fracs * T_t_fracs, axis=-1, keepdims=True) / W_mix
         T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
         P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
 
@@ -402,6 +401,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_t_out = jnp.where(M > 1.0, ns_P_t, P_t_out_ideal)
         PR_actual = P_t_out / P_t
 
+        # Newton-Raphson step to average T_t_out over gamma change
         def step(T_t_out_ideal, _):
             gamma_out = gas.compute_gamma(T_t_out_ideal)
             gamma_avg = 0.5 * (gamma_in + gamma_out)

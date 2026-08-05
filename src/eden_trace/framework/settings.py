@@ -49,6 +49,9 @@ class MassAnalysisSettings(eqx.Module):
 class EnergyAnalysisSettings(eqx.Module):
     report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
+    build_network: bool = init_field(True)
+    clear_nodes: bool = init_field(True)
+
 
 class AnalysisSettings[E_Type: EnergyAnalysisSettings](eqx.Module):
     aerodynamics: Optional[eqx.Module] = None

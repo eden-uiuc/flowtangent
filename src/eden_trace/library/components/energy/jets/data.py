@@ -152,8 +152,8 @@ def __getattr__(name: str) -> Any:
 def __dir__():
     """Allows IDEs and the `dir()` command to see the available maps."""
     # List all .json files in the directory without their extensions
-    if _DATA_DIR.exists():
-        return [f.stem for f in _DATA_DIR.glob("*.json")]
+    if _JSON_DIR.exists():
+        return [f.stem for f in _JSON_DIR.glob("*.json")]
     return []
 
 def generate_stub():
@@ -162,7 +162,7 @@ def generate_stub():
         "",
     ]
     
-    for eng_file in _DATA_DIR.glob("*.json"):
+    for eng_file in _JSON_DIR.glob("*.json"):
         # Write the attribute to the stub file
         lines.append(f"{eng_file.stem}: {"TurbojetEngine"}")
 

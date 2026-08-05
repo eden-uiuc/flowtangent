@@ -52,7 +52,7 @@ class State[EnergyType: EnergyNetworkConditions](Condition):
         control_values = []
 
         for ctrl in self.controls.active_controls:
-            n_cp = int(self.time.n_cp)
+            n_cp = int(self.time.N)
 
             # All control values are normalized by their initial value, so set initial control value to 1.0
             # Values are rescaled in update_controls when actually added to state
@@ -70,7 +70,7 @@ class State[EnergyType: EnergyNetworkConditions](Condition):
     def update_controls(self, control_values: jnp.ndarray):
 
         updated_state = self
-        n_points = int(self.time.n_cp)
+        n_points = int(self.time.N)
         control_idx = 0
 
         # Slice and set (Step through by n_cp to accomodate solvers which return 1D arrays)
@@ -80,7 +80,7 @@ class State[EnergyType: EnergyNetworkConditions](Condition):
             
             new_values = ctrl.scale(solver_logit)
             
-            updated_state = eqx.tree_at(lambda s: get_target(s, ctrl.state_path), updated_state, new_values)
+            updated_state = eqx.tree_at(lambda s: get_target(s, ctrl.state_path), updated_state, jnp.atleast_2d(new_values).reshape(-1, 1))
             control_idx += n_points
 
         return updated_state

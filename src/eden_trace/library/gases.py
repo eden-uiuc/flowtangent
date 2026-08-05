@@ -128,7 +128,8 @@ class IdealGas(eqx.Module):
 
     def compute_gamma(self, T: float | jnp.ndarray = 298.15):
         cp = self.compute_Cp(T)
-        return cp / (cp - self.R_specific)
+        gamma = cp / (cp - self.R_specific)
+        return gamma
 
     def compute_thermal_conductivity(self, T: float | jnp.ndarray = 298.0):
         return jnp.polyval(jnp.array(self.thermal_coefficients), T)
@@ -249,31 +250,31 @@ class MixedGas(IdealGas):
 
     @property
     def R_specific(self):
-        R_arr = jnp.stack([jnp.atleast_1d(elem.R_specific).squeeze() for elem in self.composition.elements], axis=-1)
+        R_arr = jnp.stack([jnp.atleast_1d(elem.R_specific).squeeze() for elem in self.composition.elements], axis=-1).squeeze()
 
         R_mixed = jnp.sum(R_arr * self.composition.mass_fractions, axis=-1)
-        return R_mixed
+        return R_mixed.reshape((-1, 1))
 
     def compute_Cp(self, T: float | jnp.ndarray = 298.15):
-        Cp_arr = jnp.stack([elem.compute_Cp(T) for elem in self.composition.elements], axis=-1)
+        Cp_arr = jnp.stack([elem.compute_Cp(T) for elem in self.composition.elements], axis=-1).squeeze()
 
         # Mass-weighted sum
         Cp_mixed = jnp.sum(Cp_arr * self.composition.mass_fractions, axis=-1)
-        return Cp_mixed
+        return Cp_mixed.reshape((-1, 1))
 
     def compute_absolute_enthalpy(self, T: float | jnp.ndarray = 298.15):
-        h_arr = jnp.stack([elem.compute_absolute_enthalpy(T) for elem in self.composition.elements], axis=-1)
+        h_arr = jnp.stack([elem.compute_absolute_enthalpy(T) for elem in self.composition.elements], axis=-1).squeeze()
 
         # Mass-weighted sum
         h_mixed = jnp.sum(h_arr * self.composition.mass_fractions, axis=-1)
-        return h_mixed
+        return h_mixed.reshape((-1, 1))
     
     def compute_enthalpy(self, T: float | jnp.ndarray = 298.15):
-        h_arr = jnp.stack([jnp.atleast_1d(elem.compute_enthalpy(T)).squeeze() for elem in self.composition.elements], axis=-1)
+        h_arr = jnp.stack([jnp.atleast_1d(elem.compute_enthalpy(T)).squeeze() for elem in self.composition.elements], axis=-1).squeeze()
 
         # Mass-weighted sum
         h_mixed = jnp.sum(h_arr * self.composition.mass_fractions, axis=-1)
-        return h_mixed
+        return h_mixed.reshape((-1, 1))
 
     def compute_partial_pressures(self, P: float | jnp.ndarray = 101325.0):
         return P * jnp.asarray(self.composition.mole_fractions)[None, :]
@@ -282,11 +283,11 @@ class MixedGas(IdealGas):
         X_arr = jnp.stack(self.composition.mole_fractions, axis=-1)
         S_arr = jnp.stack(
             [elem.compute_entropy(T, P * X_arr[..., i]) for i, elem in enumerate(self.composition.elements)], axis=-1
-        )
+        ).squeeze()
 
         # Mass-weighted sum
         S_mixed = jnp.sum(S_arr * self.composition.mass_fractions, axis=-1)
-        return S_mixed
+        return S_mixed.reshape((-1, 1))
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Custom Mixes

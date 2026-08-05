@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 import sys
 import time
-import warnings
 import threading
 
 from dataclasses import replace
@@ -34,11 +33,11 @@ from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types,
 from eden_trace.framework import Process, Settings, State, System
 from eden_trace.framework.conditions.controls import Control, Residual, ControlsConditions, DynamicsConditions
 # ----------------------------------------------------------------------------------------------------------------------
-#  Residual Minimization Analysis
+#  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
 class Spinner:
-    def __init__(self, message="Compiling ...", enabled=True):
+    def __init__(self, message="Tracing ...", enabled=True):
         self.spinner_chars = "|/-\\"
         self.message = message
         self.enabled = enabled
@@ -76,17 +75,17 @@ class Spinner:
             sys.stdout.write(f"\nAnalysis complete.\n")
             sys.stdout.flush()
 
-# ----------------------------------------------------------------------------------------------------------------------
-#  Helper/Diagnostic Functions
-# ----------------------------------------------------------------------------------------------------------------------
 
 _last_static = None
 _last_shapes = None
-_trace_count = 0
+_trace_count = [0]
+_analysis_stack = []
 
 def diff_args(args):
-    global _last_static, _last_shapes, _trace_count
-    _trace_count += 1
+    global _last_static, _last_shapes, _trace_count, _analysis_stack
+    if len(_analysis_stack) > len(_trace_count):
+        _trace_count.append(0)
+    _trace_count[len(_analysis_stack) - 1] += 1
     
     dynamic, static = eqx.partition(args, eqx.is_array)
 
@@ -102,7 +101,7 @@ def diff_args(args):
         dynamic
     )
     
-    print(f"\n--- TRACE PASS {_trace_count} ---")
+    print(f"\n--- TRACE PASS {_trace_count[len(_analysis_stack) -1]} ---")
     
     if _last_static is not None:
         differences_found = False
@@ -120,7 +119,7 @@ def diff_args(args):
         new_stat, new_treedef = jax.tree_util.tree_flatten_with_path(static)
         
         if old_treedef != new_treedef:
-            print(f"  [TREEDEF CHANGED] The fundamental static PyTree structure mutated!")
+            print(f"  [TREEDEF CHANGED] Input PyTree structure mutated.")
             differences_found = True
         else:
             for (path, old_val), (_, new_val) in zip(old_stat, new_stat):
@@ -131,7 +130,7 @@ def diff_args(args):
                     differences_found = True
                     
         if not differences_found:
-            print("  [IDENTICAL INPUTS] JAX retraced despite identical inputs!")
+            print("  [IDENTICAL INPUTS] PyTree structure is identical.")
             
     _last_static = static
     _last_shapes = shapes
@@ -222,7 +221,7 @@ class ResidualAnalysis(Process):
             print(f"\n{'Active Controls':<{pad+2}}| {'Init. Values':<13}| Bounds")
             print("-"*65)
             for control in state.controls.active_controls:
-                print(f"- {control.tag:<{pad}}| {format_array(control.initial_value, width=12)} | {format_array(jnp.asarray(control.bounds))}")
+                print(f"- {control.tag:<{pad}}| {format_array(control.initial_value, width=12):>12} | {format_array(jnp.asarray(control.bounds))}")
 
             print("\nActive Residuals")
             print("-"*65)
@@ -260,14 +259,15 @@ class ResidualAnalysis(Process):
                 analysis_dynamics
             )
         )
-
-        assert self._check_controls_balance(analysis_state, settings), "Number of active controls does not match number of active dynamics residuals."
+        
+        if settings.DEBUG_MODE:
+            assert self._check_controls_balance(analysis_state, settings), "Number of active controls does not match number of active dynamics residuals."
         
         analysis_state = analysis_state.initialize_controls()
 
         return analysis_state
     
-    def _report_results(self, f_st, settings: Settings, f_jac=None, opt_state=None, f_res=None):
+    def _report_results(self, f_st: State, f_set: Settings, f_jac=None, opt_state=None, f_res=None):
 
         print(f"\n{'='*70}")
         print(f"Final {self.tag} Solver State")
@@ -325,7 +325,9 @@ class ResidualAnalysis(Process):
         def get_residuals(control_values, args):
             state, system, settings = args
             if settings.DEBUG_MODE:
-                diff_args((control_values, state, system, settings))
+                global _analysis_stack
+                if len(_analysis_stack ) > 0 and _analysis_stack[-1] == self.tag:
+                    diff_args((control_values, state, system, settings))
 
             analysis_state = state.update_controls(control_values)
             updated_state, _, _ = self.analyze(analysis_state, system, settings)
@@ -386,12 +388,14 @@ class ResidualAnalysis(Process):
         
         solver = self.solver(rtol=settings.numerical.relative_tolerance, atol=settings.numerical.absolute_tolerance)
         args = (state, system, settings)
+        
+        if settings.DEBUG_MODE:    
 
-        if settings.DEBUG_MODE:
             print(f"DEBUG MODE: Executing single forward pass...")
-            f_res = get_residuals(control_values, (state, system, settings))
-            self._report_results(state, settings, None, None, f_res)
-            sys.exit("DEBUG MODE: Forward pass complete. Terminating.")
+            _ = get_residuals(control_values, (state, system, settings))
+            
+            final_control_values = control_values
+            opt_state = None
         
         else:
             results = optx.least_squares(
@@ -402,14 +406,19 @@ class ResidualAnalysis(Process):
                 max_steps=settings.numerical.max_evaluations,
             )
 
-        final_control_values = results.value
-        opt_state = results.state
+            final_control_values = results.value
+            opt_state = results.state
 
         final_jacobian = jax.jacfwd(get_residuals)(final_control_values, (state, system, settings))
         
         return final_control_values, final_jacobian, opt_state
     
     def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
+
+        global _analysis_stack, _last_static, _last_shapes
+        _analysis_stack.append(self.tag)
+        _last_static = None
+        _last_shapes = None
 
         # Set controls for current analysis
         analysis_state = self._activate_controls_and_dynamics(state, settings)
@@ -420,8 +429,8 @@ class ResidualAnalysis(Process):
 
         # Get analysis control values 
         initial_control_values = analysis_state.get_control_array()
-        with Spinner(enabled=not settings.DEBUG_MODE,
-                     message=f"Compiling {self.tag}...") as spin_obj:
+        with Spinner(enabled=not settings.DEBUG_MODE and len(_analysis_stack) == 1,
+                     message=f"Tracing {self.tag}..."):
             
             final_control_values, final_jacobian, opt_state = self._run_solver(
                 initial_control_values,
@@ -433,7 +442,7 @@ class ResidualAnalysis(Process):
         analysis_state = analysis_state.update_controls(final_control_values)
         f_st, f_sys, f_set = self.analyze(analysis_state, system, settings)
 
-        if settings.verbose:
+        if settings.verbose and len(_analysis_stack) == 1:
             self._report_results(f_st, f_set, final_jacobian, opt_state)
         
         if settings._DEV_MODE:
@@ -446,5 +455,7 @@ class ResidualAnalysis(Process):
         
         # Return control back to higher process
         final_state = eqx.tree_at(lambda s: s.controls, f_st, state.controls)
+
+        del _analysis_stack[-1]
 
         return final_state, f_sys, settings

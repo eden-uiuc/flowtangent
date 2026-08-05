@@ -37,7 +37,7 @@ class NumericalTime(Condition):
 class Time(Condition):
     tag: str = init_field("Time", static=True)
 
-    n_cp: int = init_field(1, static=True)
+    N: int = 1
     
     dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
     dimensional: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensional Time"))
@@ -100,5 +100,5 @@ class Time(Condition):
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
-        if self.n_cp <= 1:
+        if self.N <= 1:
             return
