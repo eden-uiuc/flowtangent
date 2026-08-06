@@ -309,40 +309,48 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
             object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
     
     def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-        
-        # Get incoming flow values
-        W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
-        T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
-        h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
-        
-        # Calculate mixed baseline
-        W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
-        h_t_mix = jnp.sum(W_fracs * h_t_fracs, axis=-1, keepdims=True) / W_mix
 
-        # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
-        elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
-        template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
-        
-        mixed_fluid = eqx.tree_at(
-            lambda t: t.composition.mass_fractions,
-            template_fluid,
-            fractions)
-        
-        # Invert temperature from enthalpy
-        T_t_guess = jnp.sum(W_fracs * T_t_fracs, axis=-1, keepdims=True) / W_mix
-        T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
-        P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
-
-        # Check for fuel in mixture and dilute
-        try:
-            p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
-            p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
-            FAR = p_FAR * p_W / W_mix
-        except:
-            FAR = jnp.atleast_2d(0.0)
-        
         M = self.get_primary_input_state(state, "flow", "mach_number")
 
+        if len(self.flow_inputs) == 1:
+            mixed_fluid = self.get_primary_input_state(state, "flow", "fluid")
+            T_t         = self.get_primary_input_state(state, "flow", "stagnation_temperature")
+            P_t         = self.get_primary_input_state(state, "flow", "stagnation_pressure")
+            W_mix       = self.get_primary_input_state(state, "flow", "mass_flow_rate")
+            FAR         = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
+
+        else:
+            # Get incoming flow values
+            W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
+            T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
+            h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
+            
+            # Calculate mixed baseline
+            W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
+            h_t_mix = jnp.sum(W_fracs * h_t_fracs, axis=-1, keepdims=True) / W_mix
+
+            # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
+            elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
+            template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
+            
+            mixed_fluid = eqx.tree_at(
+                lambda t: t.composition.mass_fractions,
+                template_fluid,
+                fractions)
+            
+            # Invert temperature from enthalpy
+            T_t_guess = jnp.sum(W_fracs * T_t_fracs, axis=-1, keepdims=True) / W_mix
+            T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
+            P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
+
+            # Check for fuel in mixture and dilute
+            try:
+                p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
+                p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
+                FAR = p_FAR * p_W / W_mix
+            except:
+                FAR = jnp.atleast_2d(0.0)
+        
         return mixed_fluid, T_t, P_t, W_mix, FAR, M
     
     def bleed_MFR_frac(self, state:State):

@@ -52,6 +52,7 @@ class ProcessStep(eqx.Module):
 
     def _profile_complexity(self, state: State, system: System, settings: Settings, top_n=5):
         try:
+            assert(isinstance(self.function, Callable))
             jaxpr_obj = jax.make_jaxpr(self.function)(state, system, settings)
         except Exception as e:
             return f" - {self.tag} | Could not trace ({e})"
@@ -171,11 +172,11 @@ class GradientMap:
 
         inputs = []
         if len(self.state_inputs) > 0:
-            inputs.extend(ru.get_all_targets(base_state, self.state_inputs))
+            inputs.extend(tu.get_all_targets(base_state, self.state_inputs))
         if len(self.system_inputs) > 0:
-            inputs.extend(ru.get_all_targets(base_system, self.system_inputs))
+            inputs.extend(tu.get_all_targets(base_system, self.system_inputs))
         if len(self.settings_inputs) > 0:
-            inputs.extend(ru.get_all_targets(base_settings, self.settings_inputs))
+            inputs.extend(tu.get_all_targets(base_settings, self.settings_inputs))
 
         # 1. Dynamically read the batch size from the first array
         B = inputs[0].shape[0]
@@ -214,7 +215,7 @@ class GradientMap:
         reshaped_inputs = self.unravel_function(input_array)
 
         def stitch_parents(base_tree, paths, new_slices):
-            parents = ru.get_all_parents(base_tree, paths)
+            parents = tu.get_all_parents(base_tree, paths)
             updated_parents = []
 
             for parent, new_val, path in zip(parents, new_slices, paths):
@@ -233,30 +234,30 @@ class GradientMap:
             st_slices = reshaped_inputs[: self._n_st]
             updated_st_parents = stitch_parents(st, self.state_inputs, st_slices)
 
-            st = eqx.tree_at(lambda t: ru.get_all_parents(t, self.state_inputs), st, updated_st_parents)
+            st = eqx.tree_at(lambda t: tu.get_all_parents(t, self.state_inputs), st, updated_st_parents)
 
         if self._n_sys > 0:
             sys_slices = reshaped_inputs[self._n_st : self._n_st + self._n_sys]
             updated_sys_parents = stitch_parents(sys, self.system_inputs, sys_slices)
 
-            sys = eqx.tree_at(lambda t: ru.get_all_parents(t, self.system_inputs), sys, updated_sys_parents)
+            sys = eqx.tree_at(lambda t: tu.get_all_parents(t, self.system_inputs), sys, updated_sys_parents)
 
         if self._n_setts > 0:
             setts_slices = reshaped_inputs[self._n_st + self._n_sys :]
             updated_setts_parents = stitch_parents(setts, self.settings_inputs, setts_slices)
 
-            setts = eqx.tree_at(lambda t: ru.get_all_parents(t, self.settings_inputs), setts, updated_setts_parents)
+            setts = eqx.tree_at(lambda t: tu.get_all_parents(t, self.settings_inputs), setts, updated_setts_parents)
 
         return st, sys, setts
 
     def flatten_outputs(self, f_st, f_sys, f_setts):
         outputs = []
         if self.state_outputs:
-            outputs.extend(ru.get_all_targets(f_st, self.state_outputs))
+            outputs.extend(tu.get_all_targets(f_st, self.state_outputs))
         if self.system_outputs:
-            outputs.extend(ru.get_all_targets(f_sys, self.system_outputs))
+            outputs.extend(tu.get_all_targets(f_sys, self.system_outputs))
         if self.settings_outputs:
-            outputs.extend(ru.get_all_targets(f_setts, self.settings_outputs))
+            outputs.extend(tu.get_all_targets(f_setts, self.settings_outputs))
 
         # Preserve Batch, flatten the inner features
         B = outputs[0].shape[0]
@@ -914,10 +915,10 @@ class OptimizerInterface:
             state, system, settings = self.grad_map.update_inputs(
                 x, self.base_state, self.base_system, self.base_settings
             )
-            f_st, f_sys, f_setts, jac = self.process.run(state, system, settings, grad_map=self.grad_map)
+            f_st, f_sys, f_setts, jac = self.process.run(state, system, settings)
             token = Token(state=f_st, system=f_sys, settings=f_setts)
 
-            self.last_val = ru.get_target(token, self.objective_path)
+            self.last_val = tu.get_target(token, self.objective_path)
             self.last_jac = np.array(jac)
             self.last_x = x
 

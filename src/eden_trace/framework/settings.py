@@ -16,7 +16,7 @@ import jax
 
 # Trace imports
 from eden_trace.utils import init_field
-from eden_trace.framework import GradientMap
+from eden_trace.framework.processes import GradientMap
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings
@@ -70,11 +70,13 @@ class NumericalSettings(eqx.Module):
     relative_tolerance: float = init_field(1e-5, static=True)
     absolute_tolerance: float = init_field(1e-5, static=True)
     
-    max_evaluations: int = init_field(30, static=True)
+    max_evaluations: int = init_field(100, static=True)
     step_size: float | None = init_field(None, static=True)
 
     number_of_control_points: int = init_field(1, static=True)
     maximum_graph_complexity: int = init_field(2e5, static=True)
+
+    sum_residuals: bool = init_field(False, static=True)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

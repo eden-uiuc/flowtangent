@@ -28,7 +28,7 @@ from eden_trace.library.components.energy.jets.classes import Nozzle, TurbojetEn
 
 from ..residual import ResidualAnalysis
 from ... import State, System, Aircraft, Settings, Process, ProcessStep
-from ...settings import EnergyAnalysisSettings
+from ...settings import EnergyAnalysisSettings, NumericalSettings
 from ...conditions.controls import Control, Residual
 from ...simulation.initialize import initialize_energy
 from ...simulation.update import update_freestream
@@ -496,16 +496,14 @@ def turbofan_performance(
         tag="LP Rotation Speed",
         state_path=DataPath(("energy", "LP_speed")),
         initial_value=OD_array("lp_rotation_speed"),
-        # bounds=lpc_Nc_bnds,
-        scaling='linear'
+        bounds=(1000 * units.rev / units.mins, 10000 * units.rev / units.mins),
     )
 
     HPN = Control(
         tag="HP Rotation Speed",
         state_path=DataPath(("energy", "HP_speed")),
         initial_value=OD_array("hp_rotation_speed"),
-        # bounds=hpc_Nc_bnds,
-        scaling='linear'
+        bounds=(3000 * units.rev / units.mins, 20000 * units.rev / units.mins),
     )
 
     W = Control(
@@ -596,6 +594,9 @@ def _design_update_OD(state: State, system: Aircraft, settings: Settings) -> tup
 
     des_state, des_system, des_settings, _ = _design_update(state, system, updated_settings)
     des_system = eqx.tree_at(lambda s: s.energy.line.engine.design_parameters, des_system, design_points[0])
+    des_e_setts  = replace(des_settings.analysis.energy, design_mode=True)
+    des_a_setts  = replace(des_settings.analysis, energy=des_e_setts)
+    des_settings = replace(settings, analysis=des_a_setts)
     
     # Off-Design Setup
     OD_points = design_points[1:]
@@ -637,16 +638,7 @@ def _design_update_OD(state: State, system: Aircraft, settings: Settings) -> tup
 def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
 
     des_state, OD_state, des_system, des_settings, OD_analysis = _design_update_OD(state, system, settings)
-    des_settings = eqx.tree_at(lambda s: (
-        s.analysis.energy.build_network,
-        # s.analysis.energy.clear_nodes,
-    ), 
-        des_settings,
-        (
-            False,
-            # False
-        )
-    )
+    des_settings = eqx.tree_at(lambda s: s.analysis.energy.build_network, des_settings, False)
 
     engine = system.energy.line.engine
     design_points = engine.design_parameters
@@ -667,11 +659,12 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
         initial_value=design_guess.turbine_intake_temperature,
         bounds=(1.0, 3e3))
 
+    OD_F = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1)).at[0,0].set(0.0)
     d_F = Residual(
         "Off-Design Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust)
+        get_value=lambda s: jnp.where(OD_F, s.energy.outputs.residual.thrust, OD_F))
 
-    OD_TSFC = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1))
+    OD_TSFC = jnp.array([d.TSFC for d in OD_points]).reshape((-1, 1))
     d_TSFC = Residual(
         tag="Off-Design TSFC",
         get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].outputs.fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
@@ -693,19 +686,45 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
                 len(OD_points)))
         
         updated_settings = eqx.tree_at(
-            lambda s: s.analysis.energy,
+            lambda s: (
+                s.analysis.energy,
+            ),
             updated_settings,
-            JetSettings(statics=updated_settings.analysis.energy.statics) # Turn off design mode by instatiating new settings
+            (
+                # Turn off design mode, turn on residual summing
+                JetSettings(statics=updated_settings.analysis.energy.statics),
+            )
         )
         
         return updated_state, updated_system, updated_settings
+
+    def settings_swap(swap_state, swap_system, swap_settings):
+
+        updated_settings = eqx.tree_at(
+                    lambda s: (
+                        s.numerical
+                    ),
+                    swap_settings,
+                    (
+                        # Turn on residual summing
+                        NumericalSettings(
+                            relative_tolerance=swap_settings.numerical.relative_tolerance,
+                            absolute_tolerance=swap_settings.numerical.absolute_tolerance,
+                            max_evaluations=swap_settings.numerical.max_evaluations,
+                            sum_residuals=True
+                        )
+                    )
+                )
+
+        return swap_state, swap_system, updated_settings
 
     MP_inner_loop = Process(
         tag="Multi-Point Turbofan Analysis",
         steps=(
             ProcessStep(tag="Initial Design", function=design_turbofan),
             ProcessStep(tag="State Swap", function=state_swap),
-            OD_analysis
+            OD_analysis,
+            ProcessStep(tag="Settings Swap", function=settings_swap),
         )
     )
 
@@ -713,13 +732,12 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
         tag="Multi-Point Turbofan Design",
         analyze=MP_inner_loop,
         controls=(F_ctrl, T_ctrl),
-        residuals=(d_F, d_TSFC)
+        residuals=(d_F, d_TSFC),
+        solver='hybr'
     )
 
     final_state, final_system, final_settings = MP_outer_loop(des_state, des_system, des_settings)
     final_net = final_system.energy.sync_and_clear_nodes()
     final_system = final_system.replace_subcomponent(final_net)
-
-    final_settings = eqx.tree_at(lambda s: s.analysis.energy.design_mode, final_settings, False)
 
     return final_state, final_system, final_settings
