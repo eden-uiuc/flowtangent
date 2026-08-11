@@ -320,7 +320,7 @@ class Process(ProcessStep):
 
         raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
-    def __call__(self, state, system, settings) -> tuple[State, System, Settings]:
+    def __call__(self, state:State, system:System, settings:Settings) -> tuple[State, System, Settings]:
         if settings.DEBUG_MODE or settings._DEV_MODE:
             start_time = datetime.fromtimestamp(time.time()).strftime("%Y-%m-%d %H:%M:%S")
             print(f"Beginning Process: '{self.tag}' | {start_time}")

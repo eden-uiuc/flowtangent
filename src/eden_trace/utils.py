@@ -16,7 +16,7 @@ import warnings
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Self, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Self, Sequence, Optional
 
 import equinox as eqx
 import jax
@@ -141,28 +141,47 @@ class Token(eqx.Module):
 @dataclass(frozen=True)
 class DataPath:
     path: tuple
-    slice_obj: slice
-    tag: str = "Variable Path"
+    path_slice: slice
+    value: Any
+    tag: str
 
-    def __init__(self, path: tuple | Self = (slice(None),), tag="Variable Path"):
+    def __init__(
+            self,
+            path: tuple | str | Self = ('state',),
+            path_slice: slice = slice(None),
+            value: Optional[Any] = None,
+            tag: Optional[str] = None,
+        ):
 
         if isinstance(path, DataPath):
             object.__setattr__(self, "path", path.path)
-            object.__setattr__(self, "slice_obj", path.slice_obj)
+            object.__setattr__(self, "path_slice", path.path_slice)
+            object.__setattr__(self, "value", path.value)
             object.__setattr__(self, "tag", path.tag)
 
         else:
-            if isinstance(path[-1], slice):
-                object.__setattr__(self, "path", path[:-1])
-                object.__setattr__(self, "slice_obj", path[-1])
+            if isinstance(path, tuple):
+                path_tuple = path
+            elif isinstance(path, str):
+                path_tuple = tuple(path.split('.'))
             else:
-                object.__setattr__(self, "path", path)
-                object.__setattr__(self, "slice_obj", slice(None))
+                raise ValueError(f"DataPath path must be a tuple or string.")
+            object.__setattr__(self, "path", path_tuple)
+            object.__setattr__(self, "path_slice", path_slice)
 
-            object.__setattr__(self, "tag", tag)
+            object.__setattr__(self, "value", value)
+
+            if tag is None:
+                path_tag = '.'.join(self.path)
+            else:
+                path_tag = tag
+            object.__setattr__(self, "tag", path_tag)
 
     def __len__(self):
         return len(self.path)
+
+    def _snip_lead(self):
+        return eqx.tree_at(lambda p: p.path, self, self.path[1:])
 
 
 def get_parent_target(obj, path_tuple: DataPath):
@@ -182,10 +201,8 @@ def get_target(obj, path_tuple: DataPath):
         return parent[path_tuple.slice_obj]
     return parent
 
-
 def get_all_parents(s, input_map: Sequence[DataPath]):
     return tuple(get_parent_target(s, path) for path in input_map)
-
 
 def get_all_targets(s, input_map: Sequence[DataPath]):
     return tuple(get_target(s, path) for path in input_map)
