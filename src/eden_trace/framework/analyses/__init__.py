@@ -7,5 +7,5 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from .batched import BatchAnalysis, ShardedDatasetGenerator
+from .batched import BatchedAnalysis
 # from . import aero, energy, Mass

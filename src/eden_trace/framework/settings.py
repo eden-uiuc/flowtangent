@@ -125,7 +125,8 @@ class LoggingSettings(eqx.Module):
     handle: Optional[str] = init_field(None, static=True)
     logfile: Optional[str | Path] = init_field(None, static=True)
 
-    format_string: str = init_field("[%(asctime)s] - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S", static=True)
+    format_string: str = init_field("[%(asctime)s] - %(levelname)s - %(message)s", static=True)
+    date_format: str = init_field("%Y-%m-%d %H:%M:%S", static=True)
     stream_ouput: bool = init_field(False, static=True)
     jax_logging: bool = init_field(False, static=True)
     jax_compile_whitelist: Optional[tuple[str]] = init_field(None, static=True)

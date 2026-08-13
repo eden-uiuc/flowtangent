@@ -275,6 +275,7 @@ class Process(ProcessStep):
     tag: str = init_field("Process", static=True)
 
     steps: tuple[ProcessStep, ...] = init_field(tuple)
+    initialize: Optional[Process] = init_field(None)
 
     initial_step: int = init_field(0, static=True)
 
@@ -397,7 +398,7 @@ class Process(ProcessStep):
         return jax.tree_util.tree_map(_to_array, tree)
 
     def run(
-        self, state, system, settings, track_history: bool = False
+        self, state, system, settings, initialize=False, track_history: bool = False
     ) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
 
         # Sanitize inputs (map floats/ints to JAX arrays)
@@ -406,9 +407,10 @@ class Process(ProcessStep):
         settings = self._sanitize_inputs(settings)
 
         # Save original/intial state
-        initial_state = state
-        initial_system = system
-        initial_settings = settings
+        if self.initialize is not None and initialize:
+            i_st, i_sys, i_setts = self.initialize(state, system, settings)
+        else:
+            i_st, i_sys, i_setts = state, system, settings
 
         # Prep for gradient calcuation/history tracking
         jacobian_matrix = None
@@ -418,21 +420,21 @@ class Process(ProcessStep):
         grad_map = settings.analysis.gradient_map
         if grad_map is not None:
             # Flatten inputs for Jacobian calculation
-            flat_input_array = grad_map.flatten_inputs(state, system, settings)
+            flat_input_array = grad_map.flatten_inputs(i_st, i_sys, i_setts)
 
             # Build Value and Jacobian function only if it doesn't exist or the cached grad_map is outdated
             if self._val_and_jac_fn is None or self._cached_grad_map != grad_map:
                 object.__setattr__(self, "_val_and_jac_fn", self._build_value_and_jacobian(grad_map, track_history))
                 object.__setattr__(self, "_cached_grad_map", grad_map)
 
-            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, state, system, settings)  # type: ignore
+            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, i_st, i_sys, i_setts)  # type: ignore
             f_st, f_sys, f_setts, raw_hist = aux
 
         else:
             if track_history:
-                f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(state, system, settings)
+                f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(i_st, i_sys, i_setts)
             else:
-                f_st, f_sys, f_setts = self(state, system, settings)
+                f_st, f_sys, f_setts = self(i_st, i_sys, i_setts)
 
         logged_process = None
         if track_history and raw_hist is not None:
@@ -462,12 +464,12 @@ class Process(ProcessStep):
                 self,
                 (
                     tuple(logged_steps),
-                    initial_state,
-                    initial_system,
-                    initial_settings,
-                    tu.compute_tree_delta(state, initial_state),
-                    tu.compute_tree_delta(system, initial_system),
-                    tu.compute_tree_delta(settings, initial_settings),
+                    i_st,
+                    i_sys,
+                    i_setts,
+                    tu.compute_tree_delta(f_st, i_st),
+                    tu.compute_tree_delta(f_sys, i_sys),
+                    tu.compute_tree_delta(f_setts, i_setts),
                 ),
                 is_leaf=lambda x: x is None,
             )

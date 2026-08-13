@@ -22,6 +22,6 @@ if TYPE_CHECKING:
 
 def expand_state(state: "State", system: "System", settings: "Settings"):
 
-    updated_state = state.expand_rows(state.time.number_of_control_points)
+    updated_state = state.expand_time(state.time.number_of_control_points)
 
     return updated_state, system, settings

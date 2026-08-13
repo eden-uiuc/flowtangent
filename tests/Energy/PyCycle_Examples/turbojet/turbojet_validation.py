@@ -15,7 +15,7 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine, Tu
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import design_turbojet, turbojet_performance
+from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
@@ -140,7 +140,7 @@ def off_design_point(
             s.freestream.mach_number,
             s.frames.inertial.velocity_vector,
         ),
-        State().expand_rows(1),
+        State().expand_time(1),
         (
             jnp.array([[0., 0., -alt]]),
             jnp.atleast_2d(M0),
@@ -328,7 +328,7 @@ if __name__ == "__main__":
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
-        st, sys, set = design_turbojet(
+        st, sys, set = setup_TJ_design(
             state=State(),
             system=system,
             settings=settings,

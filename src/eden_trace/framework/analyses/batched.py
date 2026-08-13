@@ -44,16 +44,16 @@ class BatchedAnalysis(Process):
 
     tag: str = init_field("Batched Analysis")
 
-    initialize: Process = init_field(Process)
     analyze: Process = init_field(Process)
-
-    input_paths: Sequence[DataPath] = init_field(())
-    output_paths: Sequence[DataPath] = init_field(())
+    state_inputs: Sequence[DataPath] = init_field(())
 
     def _batch_inputs(self, mode='mesh'):
-        raw_arrays = [jnp.atleast_1d(jnp.array(p.value)) for p in self.input_paths]
-        batch_arrays = []
 
+        batch_arrays = []
+        N = 0
+
+        raw_arrays = [jnp.atleast_1d(jnp.array(p.value)) for p in self.state_inputs]
+        
         if mode == "zip":
             input_size = raw_arrays[0].shape[0]
             for arr in raw_arrays:
@@ -80,52 +80,81 @@ class BatchedAnalysis(Process):
                 final_arr = broadcasted_arr.reshape(final_shape)
 
                 batch_arrays.append(final_arr)
-
+        
         else:
             raise ValueError("Batch mode must be 'zip' or 'mesh'.")
 
-        return batch_arrays
+        total_states = batch_arrays[0].shape[0]
+        tag_groups = [p.tag.split('.') for p in self.state_inputs]
+        leading_state = [int(g[0] == "state") for g in tag_groups]
+        state_tags = ['.'.join(g[i][slice(leading_state[i], None)]) for i, g in enumerate(tag_groups)]
+
+        state_inputs = tuple(
+            DataPath(
+                tag=state_tags[idx],
+                path = p.path,
+                path_slice=p.path_slice,
+                value=batch_arrays[idx]
+            )
+            for idx, p in enumerate(self.state_inputs)
+        )
+
+        return state_inputs, total_states
 
     @staticmethod
     def _batch_PyTree(pytree, N_b):
-        return jax.tree.map(
+        batched_tree = jax.tree.map(
             lambda x: jnp.repeat(jnp.expand_dims(x, axis=0), N_b, axis=0),
             pytree
         )
 
+        return batched_tree
 
+    @staticmethod
+    def _update_inputs(pytree: State | System, idx: int, batch_size: int, inputs:Sequence[DataPath]):
+        input_arrays = tuple(si.value[idx:idx+batch_size] for si in inputs)
+        actual_size = input_arrays[0].shape[0]
+
+        if actual_size < batch_size:
+            pads = [((0, batch_size - actual_size),) + ((0, 0),) * (arr.ndim - 1) for arr in input_arrays]
+            padded_arrays = [jnp.pad(arr, pads[i], mode="edge") for i, arr in enumerate(input_arrays)]
+        else:
+            padded_arrays = input_arrays
+
+        return eqx.tree_at(lambda p: get_all_targets(p, inputs), pytree, padded_arrays)
 
     def __call__(self, state:State, system:System, settings:Settings) -> Tuple[State, System, Settings]:
 
         batch_size = settings.numerical.batch_size
         batch_mode = settings.numerical.batch_mode
 
-        batch_arrays = self._batch_inputs(batch_mode)
+        state_inputs, total_states = self._batch_inputs(batch_mode)
 
-        batch_state = self._batch_PyTree(state, batch_size)
-        batch_system = self._batch_PyTree(system, batch_size)
+        batch_state = state.expand_batch(batch_size)
+        batch_axes = batch_state.get_vmap_axes()
 
-        state_inputs = tuple(
-            DataPath(
-                tag=p.tag,
-                path = p.path,
-                path_slice=p.path_slice,
-                value=batch_arrays[idx]
-            )
-            for idx, p in enumerate(self.input_paths) if p.path[0].lower() == "state"
-        )
+        batch_initialize = jax.vmap(self.initialize.run, in_axes=(batch_axes, None, None))
+        batch_analyze = eqx.filter_jit(jax.vmap(self.analyze.run, in_axes=(batch_axes, None, None)))
 
-        system_inputs = tuple(
-            DataPath(
-                tag=p.tag,
-                path = p.path,
-                path_slice=p.path_slice,
-                value=batch_arrays[idx]
-            )
-            for idx, p in enumerate(self.input_paths) if p.path[0].lower() == "system"
-        )
+        i_st, i_sys, i_setts = batch_initialize(batch_state, system, settings)
 
+        if settings.logging.handle is not None:
+            pbar = range(0, total_states, batch_size)
+        else:
+            pbar = trange(0, total_states, batch_size, desc=self.tag)
 
+        batch_states = []
+        for batch_idx in pbar:
+            updated_state = self._update_inputs(i_st, batch_idx, batch_size, state_inputs)
+            b_st,  _ ,  _ = batch_analyze(updated_state, i_sys, i_setts)
+            actual_size = min(batch_size, total_states - batch_idx)
+            if actual_size < batch_size:
+                b_st = b_st.truncate(actual_size)
+            batch_states.append(b_st)
+
+        f_st = State.concatenate(batch_states)
+
+        return f_st, i_sys, i_setts
 
 class BatchAnalysis:
     def __init__(

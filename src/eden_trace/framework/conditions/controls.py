@@ -85,7 +85,7 @@ class Control(Condition):
 
     state_path: DataPath = init_field(DataPath, static=True)
     
-    # Inital values aren't actually optional, but an unset one will be flagged in State.initialize_controls
+    # Inital values aren't actually optional, but an unset one will be flagged in initialize_controls
     initial_value: Optional[float | jnp.ndarray] = None
     bounds: tuple[float, ...] = init_field(tuple((-1e6, 1e6)), static=True)
     scaling: Literal["linear", "logistic"] = init_field("logistic", static=True)

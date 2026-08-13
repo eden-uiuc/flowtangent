@@ -7,13 +7,16 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING, Optional, Any, Callable
+from typing import TYPE_CHECKING, Optional, Any, Callable, Self, Tuple
+
+from jax.numpy import ndarray
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
     from eden_trace.framework.conditions import ControlsConditions
 
 import sys
 import time
+import warnings
 import threading
 
 from dataclasses import replace
@@ -31,8 +34,8 @@ from scipy.optimize import root
 jax.config.update("jax_enable_x64", True)
 
 from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
-from eden_trace.framework import Process, Settings, State, System
-from eden_trace.framework.conditions.controls import Control, Residual, ControlsConditions, DynamicsConditions
+from eden_trace.framework import Process, ProcessStep, Settings, State, System
+from eden_trace.framework.conditions.controls import Control, Residual
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
@@ -75,7 +78,6 @@ class Spinner:
                 self.thread.join()
             sys.stdout.write(f"\nAnalysis complete.\n")
             sys.stdout.flush()
-
 
 _last_static = None
 _last_shapes = None
@@ -192,7 +194,18 @@ class ResidualAnalysis(Process):
     max_evaluations: Optional[int] = None
 
     controls: tuple[Control, ...] = init_field(tuple)
-    residuals: tuple[Residual, ...] = init_field(tuple)      
+    residuals: tuple[Residual, ...] = init_field(tuple)
+
+    def __post_init__(self):
+        if self.initialize is not None:
+            init_steps = self.initialize.steps +(
+                ProcessStep(
+                    tag=f"{self.tag} Controls Initialization",
+                    function=self._initialize_controls
+                ),
+            )
+            object.__setattr__(self, "initialize", eqx.tree_at(lambda i: i.steps, self.initialize, init_steps))
+
 
     def _check_controls_balance(self, settings: Settings) -> bool:
         """
@@ -230,38 +243,6 @@ class ResidualAnalysis(Process):
             print("\n")
 
         return valid_controls
-
-    def _activate_controls_and_dynamics(self, state: State, settings:Settings):
-        
-        analysis_controls = ControlsConditions(tag="Analysis Controls")
-        analysis_dynamics = DynamicsConditions(tag="Analysis Dynamics")
-        
-        for ctrl in self.controls:
-            active_ctrl = replace(ctrl, _active=True)
-            analysis_controls = analysis_controls.add_subcondition(active_ctrl)
-        
-        for res in self.residuals:
-            active_res = replace(res, _active=True)
-            analysis_dynamics = analysis_dynamics.add_subcondition(active_res)
-
-        
-        analysis_state = eqx.tree_at(lambda s: (
-                s.controls,
-                s.dynamics
-            ),
-            state,
-            (
-                analysis_controls,
-                analysis_dynamics
-            )
-        )
-        
-        if settings.DEBUG_MODE:
-            assert self._check_controls_balance(settings), "Number of active controls does not match number of active dynamics residuals."
-        
-        analysis_state = analysis_state.initialize_controls()
-
-        return analysis_state
 
     def _report_results(self, f_ctrls: jnp.ndarray | np.ndarray, f_st: State, opt_state=None):
 
@@ -316,7 +297,7 @@ class ResidualAnalysis(Process):
         
         print(f"{'='*70}\n")
 
-    def _update_state_controls(self, state: State, control_values:jnp.ndarray, settings:Settings) -> State:
+    def _update_controls(self, state: State, control_values:jnp.ndarray, settings:Settings) -> State:
     
             control_state = state
             if settings.numerical.sum_residuals:
@@ -337,7 +318,7 @@ class ResidualAnalysis(Process):
     
             return control_state
 
-    def _initialize_state_controls(self, state: State, settings: Settings) -> State:
+    def _initialize_controls(self, state: State, system: System, settings: Settings) -> State:
         control_values = []
         
         for ctrl in self.controls:
@@ -354,7 +335,7 @@ class ResidualAnalysis(Process):
                 raise ValueError(f"Control {ctrl.tag} has no initial value: {ctrl.initial_value}."
                                 "Initial value must be a float or an array of size matching the number of analysis control points.")
         
-        return self._update_state_controls(state, jnp.concatenate(control_values, axis=0), settings)
+        return self._update_controls(state, jnp.concatenate(control_values, axis=0), settings)
 
     def _get_control_array(self, state: State, settings:Settings) -> jnp.ndarray:
         ctrl_vals = []
@@ -457,7 +438,7 @@ class ResidualAnalysis(Process):
                 _trace_count[_analysis_stack.index(self.tag)] += 1
                 print(f"\n--- {self.tag.upper()} PASS {_trace_count[_analysis_stack.index(self.tag)]} ---")
 
-            control_state = self._update_state_controls(state, control_values, settings)
+            control_state = self._update_controls(state, control_values, settings)
             analysis_state, analysis_system, analysis_settings = self.analyze(control_state, system, settings)
             
             return self._get_residual_array(analysis_state, analysis_settings), (analysis_state, analysis_system, analysis_settings)
@@ -570,8 +551,7 @@ class ResidualAnalysis(Process):
             scan_for_invalid_JAX_types(system,  "Analysis System")
 
         # Get analysis control values 
-        analysis_state = self._initialize_state_controls(state, settings)
-        initial_control_values = self._get_control_array(analysis_state, settings)
+        initial_control_values = self._get_control_array(state, settings)
 
         # Run Solver
         with Spinner(enabled=not settings.DEBUG_MODE and len(_analysis_stack) == 1,
@@ -579,7 +559,7 @@ class ResidualAnalysis(Process):
             
             f_ctrls, opt_state, f_st, f_sys, f_set = self._run_solver(
                 initial_control_values,
-                analysis_state,
+                state,
                 system,
                 settings,
             )
@@ -600,3 +580,12 @@ class ResidualAnalysis(Process):
         del _trace_count[-1]
 
         return f_st, f_sys, f_set
+
+    def run(self, state, system, settings, initialize=False, track_history: bool = False) -> Tuple[State, System, Settings, jax.Array | None, Self | None]:
+        if track_history:
+            warnings.warn(f"Track history unavailable for residual analyses. "
+                          "You can track the history of a single forward pass by calling ResidualAnalysis.analyze.run.")
+        if initialize and self.initialize is not None:
+            state, system, settings = self.initialize(state, system, settings)
+
+        return self(state, system, settings)

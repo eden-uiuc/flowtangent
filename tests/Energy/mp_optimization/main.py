@@ -87,7 +87,7 @@ def run_openmdao_benchmark(N_points):
     Builds the PyCycle problem, converges it, and times the global adjoint solve.
     """
     gc.collect()
-    # tracemalloc.start()
+    tracemalloc.start()
     
     prob = om.Problem()
     
@@ -158,11 +158,57 @@ def run_openmdao_benchmark(N_points):
         mem_mb = 0.0
         shape = (0,0)
     
-    # # 3. Extract Memory
-    # current_mem, peak_mem = tracemalloc.get_traced_memory()
-    # tracemalloc.stop()
+    # 3. Extract Memory
+    current_mem, peak_mem = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
     
-    return shape, mem_mb, end_time - start_time
+    return peak_mem / (1024 * 1024), shape, mem_mb, end_time - start_time
+
+def MAUD_Scaling(N_array: list[int], fig_filename: str | Path):
+        total_mem_results = []
+        jac_mem_results = []
+        time_results = []
+        
+        print(f"{'N Points':<10} | {'Total Memory (MB)':<20} | {'Jac. Shape':<20} | {'Jac. Memory (MB)':<20} | {'Gradient Time (s)':<20}")
+        print("-" * 110)
+        
+        for N in N_array:
+            total_mem, shape, jac_mem, t = run_openmdao_benchmark(N)
+            total_mem_results.append(total_mem)
+            jac_mem_results.append(jac_mem)
+            time_results.append(t)
+            print(f"{N:<10} | {total_mem:<20.2f} | {str(shape):<20} | {jac_mem:<20.2f} | {t:<20.4f}")
+    
+        # Generate the Money Shot plots
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+        
+        # Figure A: The O(N^2) Memory Explosion
+        ax1.plot(N_array, jac_mem_results, 'r-o', linewidth=2, label='OpenMDAO/MAUD')
+        ax1.set_title('Adjoint Memory Scaling')
+        ax1.set_xlabel('Number of Nested Solvers (N)')
+        ax1.set_ylabel('Peak Memory Allocated (MB)')
+        ax1.grid(True)
+        ax1.legend()
+    
+        ax2.plot(N_array, total_mem_results, 'g-o', linewidth=2, label='OpenMDAO/MAUD')
+        ax2.set_title('Total Memory Scaling')
+        ax2.set_xlabel('Number of Nested Solvers (N)')
+        ax2.set_ylabel('Peak Memory Allocated (MB)')
+        ax2.grid(True)
+        ax2.legend()
+        
+        # Figure B: The Execution Time Bottleneck
+        ax3.plot(N_array, time_results, 'b-o', linewidth=2, label='OpenMDAO/MAUD')
+        ax3.set_title('Adjoint Extraction Time')
+        ax3.set_xlabel('Number of Nested Solvers (N)')
+        ax3.set_ylabel('Wall-clock Time (s)')
+        ax3.grid(True)
+        ax3.legend()
+        
+        plt.tight_layout()
+        plt.savefig(fig_filename, dpi=300)
+        print("\nBenchmark complete. Saved plots to maud_scaling_benchmark.png")
+
 
 if __name__ == "__main__":
     test_dir = Path("./tests/Energy/mp_optimization")
@@ -172,37 +218,6 @@ if __name__ == "__main__":
         20, 30, 40, 50
         ]
 
-    memory_results = []
-    time_results = []
-    
-    print(f"{'N Points':<10} | {'Jac. Shape':<20} | {'Jac. Memory (MB)':<20} | {'Gradient Time (s)':<20}")
-    print("-" * 80)
-    
-    for N in N_array:
-        shape, mem, t = run_openmdao_benchmark(N)
-        memory_results.append(mem)
-        time_results.append(t)
-        print(f"{N:<10} | {str(shape):<20} | {mem:<20.2f} | {t:<20.4f}")
+    MAUD_fig_fn = test_dir / 'maud_scaling_benchmark.png'
 
-    # Generate the Money Shot plots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    
-    # Figure A: The O(N^2) Memory Explosion
-    ax1.plot(N_array, memory_results, 'r-o', linewidth=2, label='OpenMDAO/MAUD')
-    ax1.set_title('Adjoint Memory Scaling')
-    ax1.set_xlabel('Number of Nested Solvers (N)')
-    ax1.set_ylabel('Peak Memory Allocated (MB)')
-    ax1.grid(True)
-    ax1.legend()
-    
-    # Figure B: The Execution Time Bottleneck
-    ax2.plot(N_array, time_results, 'b-o', linewidth=2, label='OpenMDAO/MAUD')
-    ax2.set_title('Adjoint Extraction Time')
-    ax2.set_xlabel('Number of Nested Solvers (N)')
-    ax2.set_ylabel('Wall-clock Time (s)')
-    ax2.grid(True)
-    ax2.legend()
-    
-    plt.tight_layout()
-    plt.savefig(test_dir / 'maud_scaling_benchmark.png', dpi=300)
-    print("\nBenchmark complete. Saved plots to maud_scaling_benchmark.png")
+    MAUD_Scaling(N_array, MAUD_fig_fn)
