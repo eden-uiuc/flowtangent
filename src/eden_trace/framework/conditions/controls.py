@@ -101,7 +101,7 @@ class Control(Condition):
             ub = self.bounds[1]
             return lb + (ub - lb) * jax.nn.sigmoid(val)
         else:
-            return jnp.reshape(val, self.initial_value.shape) * self.initial_value
+            return val * self.initial_value
     
     def normalize(self, val):
         if self.scaling == "logistic":
@@ -110,7 +110,7 @@ class Control(Condition):
             norm = jnp.clip((val - lb) / (ub - lb), 1e-6, 1.0 - 1e-6)
             return jnp.log(norm / (1.0 - norm))
         else:
-            return jnp.reshape(val, self.initial_value.shape) / self.initial_value
+            return val / self.initial_value
     
     def __post_init__(self):
         if self.bounds[0] > self.bounds[1]:
@@ -160,20 +160,20 @@ class ControlsConditions(Condition):
     tag: str = init_field("Controls", static=True)
 
     _default_paths: dict = init_field(lambda: {
-        "bank_angle": ("frames", "body", "inertial_rotations"),
-        "body_angle": ("frames", "body", "inertial_rotations"),
-        "velocity": ("frames", "inertial", "velocity_vector"),
-        "altitude": ("frames", "inertial", "position_vector", slice(None, 2)),
+        "bank_angle": (("frames", "body", "inertial_rotations"), slice(None)),
+        "body_angle": (("frames", "body", "inertial_rotations"), slice(None)),
+        "velocity": (("frames", "inertial", "velocity_vector"), slice(None)),
+        "altitude": (("frames", "inertial", "position_vector") , slice(None, 2)),
     }, static=True)
 
     def __post_init__(self):
-        for ctrl, ctrl_path in self._default_paths.items():
+        for ctrl, (ctrl_path, path_slice) in self._default_paths.items():
             object.__setattr__(
                 self,
                 ctrl,
                 Control(
                     tag=ctrl.replace('_', " ").title(),
-                    state_path=DataPath(ctrl_path),
+                    state_path=DataPath(path=ctrl_path, path_slice=path_slice),
                 ),
             )
         return super().__post_init__()

@@ -36,6 +36,8 @@ from tqdm import tqdm, trange
 from eden_trace.utils import init_field, get_all_targets, DataPath
 from eden_trace.framework import Process, Settings, State, System
 
+from .residual import ResidualAnalysis
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Batch Analysis
 # ----------------------------------------------------------------------------------------------------------------------
@@ -45,7 +47,7 @@ class BatchedAnalysis(Process):
     tag: str = init_field("Batched Analysis")
 
     analyze: Process = init_field(Process)
-    state_inputs: Sequence[DataPath] = init_field(())
+    state_inputs: tuple[DataPath, ...] = init_field(())
 
     def _batch_inputs(self, mode='mesh'):
 
@@ -87,12 +89,12 @@ class BatchedAnalysis(Process):
         total_states = batch_arrays[0].shape[0]
         tag_groups = [p.tag.split('.') for p in self.state_inputs]
         leading_state = [int(g[0] == "state") for g in tag_groups]
-        state_tags = ['.'.join(g[i][slice(leading_state[i], None)]) for i, g in enumerate(tag_groups)]
+        state_tags = ['.'.join(g[slice(leading_state[i], None)]) for i, g in enumerate(tag_groups)]
 
         state_inputs = tuple(
             DataPath(
-                tag=state_tags[idx],
-                path = p.path,
+                tag=p.tag,
+                path=state_tags[idx],
                 path_slice=p.path_slice,
                 value=batch_arrays[idx]
             )
@@ -101,15 +103,14 @@ class BatchedAnalysis(Process):
 
         return state_inputs, total_states
 
-    @staticmethod
-    def _batch_PyTree(pytree, N_b):
-        batched_tree = jax.tree.map(
-            lambda x: jnp.repeat(jnp.expand_dims(x, axis=0), N_b, axis=0),
-            pytree
-        )
-
-        return batched_tree
-
+    def __post_init__(self):
+        if not isinstance(self.analyze, ResidualAnalysis):
+            pass
+        else:
+            ctrls = self.analyze.controls
+            ctrl_inputs = tuple(DataPath(path=c.state_path, value=c.initial_value) for c in ctrls)
+            object.__setattr__(self, "state_inputs", self.state_inputs + ctrl_inputs)
+    
     @staticmethod
     def _update_inputs(pytree: State | System, idx: int, batch_size: int, inputs:Sequence[DataPath]):
         input_arrays = tuple(si.value[idx:idx+batch_size] for si in inputs)
@@ -133,10 +134,7 @@ class BatchedAnalysis(Process):
         batch_state = state.expand_batch(batch_size)
         batch_axes = batch_state.get_vmap_axes()
 
-        batch_initialize = jax.vmap(self.initialize.run, in_axes=(batch_axes, None, None))
-        batch_analyze = eqx.filter_jit(jax.vmap(self.analyze.run, in_axes=(batch_axes, None, None)))
-
-        i_st, i_sys, i_setts = batch_initialize(batch_state, system, settings)
+        batch_analyze = eqx.filter_jit(eqx.filter_vmap(self.analyze.__call__, in_axes=(batch_axes, None, None)))
 
         if settings.logging.handle is not None:
             pbar = range(0, total_states, batch_size)
@@ -145,8 +143,8 @@ class BatchedAnalysis(Process):
 
         batch_states = []
         for batch_idx in pbar:
-            updated_state = self._update_inputs(i_st, batch_idx, batch_size, state_inputs)
-            b_st,  _ ,  _ = batch_analyze(updated_state, i_sys, i_setts)
+            updated_state = self._update_inputs(batch_state, batch_idx, batch_size, state_inputs)
+            b_st,  _ ,  _ = batch_analyze(updated_state, system, settings)
             actual_size = min(batch_size, total_states - batch_idx)
             if actual_size < batch_size:
                 b_st = b_st.truncate(actual_size)
@@ -154,7 +152,7 @@ class BatchedAnalysis(Process):
 
         f_st = State.concatenate(batch_states)
 
-        return f_st, i_sys, i_setts
+        return f_st, system, settings
 
 class BatchAnalysis:
     def __init__(

@@ -15,7 +15,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 from eden_trace.framework.conditions import AerodynamicsConditions, Condition, ControlsConditions, DynamicsConditions, EnergyNetworkConditions, FreestreamConditions, MassConditions, StabilityConditions, Time
-from eden_trace.utils import init_field, get_target
+from eden_trace.utils import init_field, get_target, empty_array
 
 from eden_trace.framework.conditions import (
     Frames,
@@ -42,6 +42,8 @@ class State[EnergyType: EnergyNetworkConditions](Condition):
 
     controls: ControlsConditions = init_field(ControlsConditions)
     dynamics: DynamicsConditions = init_field(DynamicsConditions)
+
+    process_jacobian: jnp.ndarray = empty_array()
 
     def __post_init__(self):
         frozen_initials = eqx.tree_at(lambda s: s.initials, self, None, is_leaf=lambda x: x is None)

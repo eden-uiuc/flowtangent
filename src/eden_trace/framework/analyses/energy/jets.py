@@ -212,16 +212,9 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
 def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> ResidualAnalysis:
 
     # Setup test state according to design parameters
-    des_state, des_system, _, base_analysis = _design_update(state, system, settings)
+    _, des_system, _, base_analysis = _design_update(state, system, settings)
 
     des: TurbofanDesign = des_system.energy.line.engine.design_parameters
-
-    # Set Design Bypass Ratio
-    des_state = eqx.tree_at(
-        lambda s: s.energy.bypass_ratio,
-        des_state,
-        des_system.energy.line.engine.design_parameters.bypass_ratio
-    )
 
     # Controls Setup
     mass_ctrl = Control(
@@ -581,10 +574,15 @@ def _design_update_batched(state: State, system: Aircraft, settings: Settings) -
 
     des_state, des_system, des_settings, _ = _design_update(state, system, updated_settings)
     des_system = eqx.tree_at(lambda s: s.energy.line.engine.design_parameters, des_system, design_points[0])
-    des_e_setts  = replace(des_settings.analysis.energy, design_mode=True)
-    des_a_setts  = replace(des_settings.analysis, energy=des_e_setts)
-    des_n_setts  = replace(des_settings.numerical, sum_residuals=True)
-    des_settings = replace(settings, analysis=des_a_setts, numerical=des_n_setts)
+    des_e_setts = replace(des_settings.analysis.energy, design_mode=True)
+    des_n_setts = replace(des_settings.numerical, sum_residuals=True)
+    des_settings = eqx.tree_at(lambda s:(
+        s.numerical,
+        s.analysis.energy,
+    ), des_settings, (
+        des_n_setts,
+        des_e_setts
+    ))
 
     # Set Up State Inputs
     OD_points = design_points[1:]
@@ -594,21 +592,25 @@ def _design_update_batched(state: State, system: Aircraft, settings: Settings) -
     a0_val  = des_state.freestream.atmosphere.compute_speed_of_sound(alt_val)
     M0_val  = jnp.array([d.mach_number for d in OD_points]).reshape((-1, 1))
     x_val   = -jnp.zeros((n_OD, 3)).at[:,-1].set(alt_val.reshape(-1))
-    v_val   = jnp.zeros((1, 3)).at[:,0].set((a0_val * M0_val).reshape(-1))
+    v_val   = jnp.zeros((n_OD, 3)).at[:,0].set((a0_val * M0_val).reshape(-1))
     F_val   = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1))
     T_val   = jnp.array([d.turbine_intake_temperature for d in OD_points]).reshape((-1, 1))
+    BPR_val = jnp.array([d.bypass_ratio for d in OD_points]).reshape((-1, 1))
 
+    # State Values
     alt     = DataPath("state.freestream.altitude", value=alt_val)
     M0      = DataPath("state.freestream.mach_number", value=M0_val)
     x       = DataPath("state.frames.inertial.position_vector", value=x_val)
     v       = DataPath("state.frames.inertial.velocity_vector", value=v_val)
+
+    # Outer Loop Controls
     F       = DataPath("state.energy.target_thrust", value=F_val)
-    T       = DataPath("state.energy.target_temperaure", value=T_val)
+    T       = DataPath("state.energy.target_temperature", value=T_val)
 
     OD_analysis = BatchedAnalysis(
         tag="Off-Design Analysis",
         analyze=turbofan_performance(des_system.energy),
-        state_inputs=(alt, M0, x, v, F, T)
+        state_inputs=(alt, M0, x, v, F, T,)
     )
     
     return des_state, des_system, des_settings, OD_analysis
@@ -620,6 +622,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
 
     des_state, des_system, des_settings, OD_analysis = _design_update_batched(state, system, settings)
     des_analysis = setup_TF_design(des_state, des_system, des_settings)
+    des_state, des_system, des_settings = des_analysis.initialize(des_state, des_system, des_settings)
 
     engine = system.energy.line.engine
     design_points = engine.design_parameters
@@ -659,6 +662,8 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
             swap_settings,
             replace(swap_settings.numerical, sum_residuals=False)
         )
+
+        return swap_state, swap_system, updated_settings
     
     def design_handover(swap_state, swap_system, swap_settings):
 
@@ -689,10 +694,10 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
         analyze=MP_inner_loop,
         controls=(F_ctrl, T_ctrl),
         residuals=(d_F, d_TSFC),
-        solver='hybr'
+        # solver='hybr'
     )
 
-    final_state, final_system, final_settings = MP_outer_loop(des_state, des_system, des_settings)
+    final_state, final_system, final_settings = MP_outer_loop.run(des_state, des_system, des_settings, initialize=True)
     final_net = final_system.energy.sync_and_clear_nodes()
     final_system = final_system.replace_subcomponent(final_net)
 

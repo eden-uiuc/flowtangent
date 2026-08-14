@@ -6,7 +6,10 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import Optional, Literal
+from __future__ import annotations
+from typing import Optional, Literal, TYPE_CHECKING
+if TYPE_CHECKING:
+    from . import State, System, Settings
 
 import os
 import logging
@@ -16,10 +19,13 @@ from pathlib import Path
 # package imports
 import equinox as eqx
 import jax
+import jax.numpy as jnp
+import numpy as np # For calculating Jacobian shape on JAX array metadata
 
 # Trace imports
-from eden_trace.utils import init_field
-from eden_trace.framework.processes import GradientMap
+from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_parents
+
+from .processes import null_step
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings
@@ -61,10 +67,111 @@ class AnalysisSettings[E_Type: EnergyAnalysisSettings](eqx.Module):
     energy: E_Type = init_field(EnergyAnalysisSettings)
     mass: MassAnalysisSettings = init_field(MassAnalysisSettings)
 
-    gradient_map: Optional[GradientMap] = init_field(None, static=True)
-
 
 #  Numerical Settings --------------------------------------------------------------------------------------------------
+
+class JacobianMap(eqx.Module):
+    inputs: tuple[DataPath, ...] = eqx.field(static=True)
+    outputs: tuple[DataPath, ...] = eqx.field(static=True)
+
+    state_inputs: tuple[DataPath, ...] = eqx.field(static=True)
+    state_outputs: tuple[DataPath, ...] = eqx.field(static=True)
+
+    system_inputs: tuple[DataPath, ...] = eqx.field(static=True)
+    system_outputs: tuple[DataPath, ...] = eqx.field(static=True)
+
+    _n_st: int = eqx.field(static=True)
+    _n_sys: int = eqx.field(static=True)
+
+    def __init__(
+        self,
+        inputs: tuple[DataPath | str | tuple, ...] = (),
+        outputs: tuple[DataPath | str | tuple, ...] = (),
+        state_inputs: Optional[tuple] = None,
+        state_outputs: Optional[tuple] = None,
+        system_inputs: Optional[tuple] = None,
+        system_outputs: Optional[tuple] = None,
+    ):
+        self.inputs = tuple(DataPath(i) for i in inputs)
+        self.outputs = tuple(DataPath(o) for o in outputs)
+
+        self.state_inputs = tuple(p for p in self.inputs if p.path[0].lower()=="state") if state_inputs is None else state_inputs
+        self.system_inputs = tuple(p for p in self.inputs if p.path[0].lower()=="system") if system_inputs is None else system_inputs
+        self.state_outputs = tuple(p for p in self.outputs if p.path[0].lower()=="state") if state_outputs is None else state_outputs
+        self.system_outputs = tuple(p for p in self.outputs if p.path[0].lower()=="system") if system_outputs is None else system_outputs
+
+        self._n_st = len(self.state_inputs)
+        self._n_sys = len(self.system_inputs)
+
+    def flatten_inputs(self, base_state, base_system):
+        # Dynamically detect B from the base state (if any arrays are 3D)
+        arr = next((l for l in jax.tree_util.tree_leaves(base_state) if isinstance(l, (jax.Array, np.ndarray))), None)
+        has_B = (arr is not None and arr.ndim == 3)
+        B = arr.shape[0] if has_B else None
+
+        flat_st = []
+        if self._n_st > 0:
+            st_in = get_all_targets(base_state, self.state_inputs)
+            flat_st = [x.reshape(B, -1) if has_B else x.reshape(-1) for x in st_in]
+        flat_st_array = jnp.concatenate(flat_st, axis=-1) if flat_st else jnp.empty((B, 0) if has_B else (0,))
+
+        flat_sys = []
+        if self._n_sys > 0:
+            sys_in = get_all_targets(base_system, self.system_inputs)
+            flat_sys = [x.reshape(-1) for x in sys_in]
+        flat_sys_array = jnp.concatenate(flat_sys, axis=-1) if flat_sys else jnp.empty((0,))
+
+        return flat_st_array, flat_sys_array
+
+    def update_inputs(self, flat_st, flat_sys, base_state, base_system):
+        has_B = (flat_st.ndim == 2)
+        B = flat_st.shape[0] if has_B else None
+
+        st, sys = base_state, base_system
+
+        # Update State
+        if self._n_st > 0:
+            st_in = get_all_targets(st, self.state_inputs)
+            shapes = [x.shape[1:] if has_B else x.shape for x in st_in]
+            sizes = [int(np.prod(s)) if s else 1 for s in shapes]
+            
+            splits = jnp.split(flat_st, np.cumsum(sizes)[:-1], axis=-1)
+            new_slices = [s.reshape((B,) + shp) if has_B else s.reshape(shp) for s, shp in zip(splits, shapes)]
+            
+            parents = get_all_parents(st, self.state_inputs)
+            updated = [p.at[pth.path_slice].set(n) if pth.path_slice != slice(None) else n for p, n, pth in zip(parents, new_slices, self.state_inputs)]
+            st = eqx.tree_at(lambda t: get_all_parents(t, self.state_inputs), st, tuple(updated))
+
+        # Update System
+        if self._n_sys > 0:
+            sys_in = get_all_targets(sys, self.system_inputs)
+            shapes = [x.shape for x in sys_in]
+            sizes = [int(np.prod(s)) if s else 1 for s in shapes]
+            
+            splits = jnp.split(flat_sys, np.cumsum(sizes)[:-1], axis=-1)
+            new_slices = [s.reshape(shp) for s, shp in zip(splits, shapes)]
+            
+            parents = get_all_parents(sys, self.system_inputs)
+            updated = [p.at[pth.path_slice].set(n) if pth.path_slice != slice(None) else n for p, n, pth in zip(parents, new_slices, self.system_inputs)]
+            sys = eqx.tree_at(lambda t: get_all_parents(t, self.system_inputs), sys, tuple(updated))
+
+        return st, sys
+
+    def flatten_outputs(self, f_st, f_sys, f_setts):
+        outputs = []
+        if self.state_outputs:
+            outputs.extend(get_all_targets(f_st, self.state_outputs))
+        if self.system_outputs:
+            outputs.extend(get_all_targets(f_sys, self.system_outputs))
+            
+        has_B = (outputs[0].ndim == 3)
+        B = outputs[0].shape[0] if has_B else None
+        
+        if has_B:
+            return jnp.concatenate([out.reshape(B, -1) for out in outputs], axis=-1)
+        else:
+            return jnp.concatenate([out.reshape(-1) for out in outputs], axis=-1)
+
 
 class NumericalSettings(eqx.Module):
     
@@ -81,6 +188,8 @@ class NumericalSettings(eqx.Module):
     maximum_graph_complexity: int = init_field(2e5, static=True)
 
     sum_residuals: bool = init_field(False, static=True)
+    calculate_jacobian: bool = init_field(False, static=True)
+    jacobian_map: Optional[JacobianMap] = init_field(None, static=True)
 
 #  Numerical Settings --------------------------------------------------------------------------------------------------
 
@@ -174,8 +283,6 @@ class LoggingSettings(eqx.Module):
 
 #  Full Settings -------------------------------------------------------------------------------------------------------
 
-
-
 class Settings(eqx.Module):
     tag: str = init_field("Settings", static=True)
 
@@ -191,16 +298,3 @@ class Settings(eqx.Module):
     JAX_device_index: int = init_field(0, static=True)
 
     _DEV_MODE: bool = init_field(False, static=True)
-
-    def __post_init__(self):
-        if self._DEV_MODE:
-            os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
-            os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-        if self.DEBUG_MODE:
-            jax.config.update("jax_disable_jit", True)
-            jax.config.update("jax_debug_nans", True)
-            object.__setattr__(self, "verbose", True)
-        else:
-            # Manually reset flags
-            jax.config.update("jax_disable_jit", False)
-            jax.config.update("jax_debug_nans", False)

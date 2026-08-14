@@ -197,15 +197,20 @@ class ResidualAnalysis(Process):
     residuals: tuple[Residual, ...] = init_field(tuple)
 
     def __post_init__(self):
-        if self.initialize is not None:
-            init_steps = self.initialize.steps +(
-                ProcessStep(
-                    tag=f"{self.tag} Controls Initialization",
-                    function=self._initialize_controls
-                ),
-            )
-            object.__setattr__(self, "initialize", eqx.tree_at(lambda i: i.steps, self.initialize, init_steps))
+        init_controls = ProcessStep(
+                            tag=f"Controls Initialization",
+                            function=lambda st, sys, setts: self._initialize_controls(st, sys, setts)
+                        )
 
+        if self.initialize is not None:
+            init_steps = self.initialize.steps +(init_controls,)
+            object.__setattr__(self, "initialize", eqx.tree_at(lambda i: i.steps, self.initialize, init_steps))
+        else:
+            object.__setattr__(
+                self,
+                "initialize",
+                Process(tag=f"{self.tag} Initialization", steps=(init_controls,))
+            )
 
     def _check_controls_balance(self, settings: Settings) -> bool:
         """
@@ -318,7 +323,7 @@ class ResidualAnalysis(Process):
     
             return control_state
 
-    def _initialize_controls(self, state: State, system: System, settings: Settings) -> State:
+    def _initialize_controls(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
         control_values = []
         
         for ctrl in self.controls:
@@ -334,8 +339,10 @@ class ResidualAnalysis(Process):
             else:
                 raise ValueError(f"Control {ctrl.tag} has no initial value: {ctrl.initial_value}."
                                 "Initial value must be a float or an array of size matching the number of analysis control points.")
-        
-        return self._update_controls(state, jnp.concatenate(control_values, axis=0), settings)
+
+        ctrl_state = self._update_controls(state, jnp.concatenate(control_values, axis=0), settings)
+
+        return ctrl_state, system, settings
 
     def _get_control_array(self, state: State, settings:Settings) -> jnp.ndarray:
         ctrl_vals = []

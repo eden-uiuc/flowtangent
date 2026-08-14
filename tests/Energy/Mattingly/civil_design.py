@@ -46,12 +46,12 @@ if __name__ == "__main__":
             e_sys = eqx.tree_at(lambda n: n.energy.line.engine, sys, engine)
             d_st, d_sys, d_setts = design_turbofan_mp(e_st, e_sys, e_setts)
 
-            thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
-            fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()
-            lpc_MFR = d_st.energy.nodes['network.line.engine.lpc'].outputs.flow.mass_flow_rate.item()
+            # thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
+            # fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()
+            # lpc_MFR = d_st.energy.nodes['network.line.engine.lpc'].outputs.flow.mass_flow_rate.item()
 
-            print(f"Fan MFR: {fan_MFR:.2e}")
-            print(f"LPC MFR: {lpc_MFR:.2e}")
+            # print(f"Fan MFR: {fan_MFR:.2e}")
+            # print(f"LPC MFR: {lpc_MFR:.2e}")
 
             MFR = d_st.energy.mass_flow_rate.item()
             dMFR = d_sys.energy.line.engine.design_parameters.mass_flow_rate

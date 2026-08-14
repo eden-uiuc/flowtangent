@@ -477,9 +477,9 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
         gas, T_t, P_t, W_in, FAR, M = self.mix_inputs(state)
         W_out = W_in * (1.0 - self.bleed_MFR_frac(state))
         
-        PR    = jnp.atleast_2d(self.design_parameters.pressure_ratio)
-        P_rec = jnp.atleast_2d(self.design_parameters.pressure_recovery)
-        n_isn = jnp.atleast_2d(self.design_parameters.eff.flow)
+        PR    = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.pressure_ratio)
+        P_rec = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.pressure_recovery)
+        n_isn = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.eff.flow)
         
         if not statics:
             M = jnp.atleast_2d(0.0)
@@ -489,7 +489,7 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
 
         if design_mode:
             if statics:
-                M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
+                M_out = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.exit_mach_number)
 
                 A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(
                     gas=gas,
@@ -532,8 +532,6 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
             outputs = eqx.tree_at(lambda o: o.mach_number, outputs,         jnp.atleast_2d(M_out))
             outputs = eqx.tree_at(lambda o: o.enthalpy, outputs,            jnp.atleast_2d(h_out))
             outputs = eqx.tree_at(lambda o: o.area, outputs,                jnp.atleast_2d(A_out))
-
-
 
         updated_state = eqx.tree_at(lambda s:
             s.energy.nodes[self.network_ID].outputs.flow,

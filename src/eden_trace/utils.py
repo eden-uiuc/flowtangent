@@ -25,7 +25,7 @@ import numpy as np
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    pass
+    from .framework.settings import Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Utility Functions
@@ -131,13 +131,6 @@ MERMAID_STYLES = {
 # Find Targets from Path in PyTrees
 # ---------------------------------------------------------
 
-
-class Token(eqx.Module):
-    state: eqx.Module
-    system: eqx.Module
-    settings: eqx.Module
-
-
 @dataclass(frozen=True)
 class DataPath:
     path: tuple
@@ -197,8 +190,8 @@ def get_parent_target(obj, path_tuple: DataPath):
 def get_target(obj, path_tuple: DataPath):
     """Gets the target and applies the slice if one exists."""
     parent = get_parent_target(obj, path_tuple)
-    if hasattr(parent, "__getitem__") and path_tuple.slice_obj != slice(None):
-        return parent[path_tuple.slice_obj]
+    if hasattr(parent, "__getitem__") and path_tuple.path_slice != slice(None):
+        return parent[path_tuple.path_slice]
     return parent
 
 def get_all_parents(s, input_map: Sequence[DataPath]):
@@ -443,6 +436,26 @@ def load_data(filename: str | Path) -> Any:
 # Debugging Tools
 # ---------------------------------------------------------
 
+def configure_environment(settings: Settings):
+    """
+    Configures global JAX and XLA compiler flags. 
+    MUST be called at the very top of your script before any arrays are created.
+    """
+
+    dev_mode = settings._DEV_MODE
+    debug_mode = settings.DEBUG_MODE
+
+    if dev_mode:
+        os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        
+    if debug_mode:
+        jax.config.update("jax_disable_jit", True)
+        jax.config.update("jax_debug_nans", True)
+        print("TRACE WARNING: JIT disabled and NaN debugging enabled. Performance will drop.")
+    else:
+        jax.config.update("jax_disable_jit", False)
+        jax.config.update("jax_debug_nans", False)
 
 def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
     print(f"--- Scanning {name} for invalid dynamic leaves ---")

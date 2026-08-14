@@ -1475,12 +1475,17 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
         P_fan = self.get_input_state(state, fan_flow, "pressure") if fan_flow is not None else 0.0
 
         BPR = getattr(state.energy, "bypass_ratio", 0.0)
+        des = system.energy.nodes[self.network_ID].design_parameters
+        if isinstance(des, tuple):
+            des = des[0]
+        else:
+            des = des
 
         F, F_sp, I_sp, TSFC, p, ff = _engine_performance(
             u0=fs.speed,
             P0=fs.pressure,
             g=fs.gravity,
-            delta_SFC=system.energy.nodes[self.network_ID].design_parameters.delta_SFC,
+            delta_SFC=des.delta_SFC,
             v_fan_nozzle=v_fan,
             A_fan_nozzle=A_fan,
             P_fan_nozzle=P_fan,
@@ -1502,7 +1507,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
         outputs = eqx.tree_at(lambda o: o.flow.mass_flow_rate, outputs, mdot_core)
         outputs = eqx.tree_at(lambda o: o.mechanical.power, outputs, p)
         
-        outputs = eqx.tree_at(lambda o: o.residual.thrust, outputs, (F - system.energy.nodes[self.network_ID].design_parameters.thrust)/system.energy.nodes[self.network_ID].design_parameters.thrust)
+        outputs = eqx.tree_at(lambda o: o.residual.thrust, outputs, (F - des.thrust)/des.thrust)
         outputs = eqx.tree_at(
             lambda o: o.residual.power, outputs, self.apply_domain_op(jnp.sum, state, "residual", "power"))
 

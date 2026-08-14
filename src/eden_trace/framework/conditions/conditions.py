@@ -57,16 +57,6 @@ class Condition(eqx.Module):
 
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray)):
-                # Intercept the empty placeholders
-                if leaf.size == 0:
-                    if leaf.ndim == 1:
-                        # Create a single zero, then broadcast it to (n, 1)
-                        base = jnp.zeros((1, 1), dtype=leaf.dtype)
-                        return jnp.broadcast_to(base, (n, 1))
-                    elif leaf.ndim == 2:
-                        base = jnp.zeros((1, leaf.shape[1]), dtype=leaf.dtype)
-                        return jnp.broadcast_to(base, (n, leaf.shape[1]))
-
                 # Zero-copy expansion for actual data
                 if leaf.ndim == 1:
                     # e.g., Shape (X,) -> Shape (n, X)
@@ -84,11 +74,11 @@ class Condition(eqx.Module):
             if _is_static_node(leaf):
                 return leaf
             if isinstance(leaf, jnp.ndarray):
-                # Intercept the empty placeholders
-                if leaf.size==0:
-                    trailing_dims = (1,) if leaf.ndim==1 else leaf.shape[1:]
-                    return jnp.zeros((batch_size,) + trailing_dims, dtype=leaf.dtype)
-                # Zero-copy expansion prepending batch dim
+                # # Intercept the empty placeholders
+                # if leaf.size==0:
+                #     trailing_dims = (1,) if leaf.ndim==1 else leaf.shape[1:]
+                #     return jnp.zeros((batch_size,) + trailing_dims, dtype=leaf.dtype)
+                # # Zero-copy expansion prepending batch dim
                 return jnp.broadcast_to(leaf, (batch_size,) + leaf.shape)
             return leaf
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
