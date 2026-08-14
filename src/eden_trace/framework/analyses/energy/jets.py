@@ -595,7 +595,6 @@ def _design_update_batched(state: State, system: Aircraft, settings: Settings) -
     v_val   = jnp.zeros((n_OD, 3)).at[:,0].set((a0_val * M0_val).reshape(-1))
     F_val   = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1))
     T_val   = jnp.array([d.turbine_intake_temperature for d in OD_points]).reshape((-1, 1))
-    BPR_val = jnp.array([d.bypass_ratio for d in OD_points]).reshape((-1, 1))
 
     # State Values
     alt     = DataPath("state.freestream.altitude", value=alt_val)

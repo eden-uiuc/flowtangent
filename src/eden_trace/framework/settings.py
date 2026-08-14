@@ -11,7 +11,6 @@ from typing import Optional, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from . import State, System, Settings
 
-import os
 import logging
 
 from pathlib import Path
@@ -23,9 +22,7 @@ import jax.numpy as jnp
 import numpy as np # For calculating Jacobian shape on JAX array metadata
 
 # Trace imports
-from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_parents
-
-from .processes import null_step
+from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_parents, null_step
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings

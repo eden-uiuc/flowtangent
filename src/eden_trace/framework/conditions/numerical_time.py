@@ -25,8 +25,8 @@ from eden_trace.framework.conditions import Condition
 
 @register
 class NumericalTime(Condition):
-    control_points: jnp.ndarray = empty_array(0)
-    differentiate: jnp.ndarray = empty_array(0)
+    control_points: jnp.ndarray = empty_array()
+    differentiate: jnp.ndarray = empty_array()
     integrate: jnp.ndarray | None = None
 
     def __repr__(self):

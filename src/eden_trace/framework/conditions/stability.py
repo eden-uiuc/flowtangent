@@ -60,18 +60,18 @@ class StaticCoefficients(Condition):
     # Attribute     Type        Default Value
     tag: str = init_field("Static Stability Coefficients", static=True)
 
-    lift: jnp.ndarray = empty_array(0)
-    drag: jnp.ndarray = empty_array(0)
+    lift: jnp.ndarray = empty_array()
+    drag: jnp.ndarray = empty_array()
 
-    X: jnp.ndarray = empty_array(0)
-    Y: jnp.ndarray = empty_array(0)
-    Z: jnp.ndarray = empty_array(0)
+    X: jnp.ndarray = empty_array()
+    Y: jnp.ndarray = empty_array()
+    Z: jnp.ndarray = empty_array()
 
-    L: jnp.ndarray = empty_array(0)
-    M: jnp.ndarray = empty_array(0)
-    N: jnp.ndarray = empty_array(0)
+    L: jnp.ndarray = empty_array()
+    M: jnp.ndarray = empty_array()
+    N: jnp.ndarray = empty_array()
 
-    e: jnp.ndarray = empty_array(0)
+    e: jnp.ndarray = empty_array()
 
 
 class StaticForces(Condition):
@@ -105,12 +105,12 @@ class StaticForces(Condition):
     # Attribute     Type        Default Value
     tag: str = init_field("Static Stability Forces", static=True)
 
-    lift: jnp.ndarray = empty_array(0)
-    drag: jnp.ndarray = empty_array(0)
+    lift: jnp.ndarray = empty_array()
+    drag: jnp.ndarray = empty_array()
 
-    X: jnp.ndarray = empty_array(0)
-    Y: jnp.ndarray = empty_array(0)
-    Z: jnp.ndarray = empty_array(0)
+    X: jnp.ndarray = empty_array()
+    Y: jnp.ndarray = empty_array()
+    Z: jnp.ndarray = empty_array()
 
 
 class StaticMoments(Condition):
@@ -140,9 +140,9 @@ class StaticMoments(Condition):
     # Attribute     Type        Default Value
     tag: str = init_field("Static Stability Moments", static=True)
 
-    L: jnp.ndarray = empty_array(0)
-    M: jnp.ndarray = empty_array(0)
-    N: jnp.ndarray = empty_array(0)
+    L: jnp.ndarray = empty_array()
+    M: jnp.ndarray = empty_array()
+    N: jnp.ndarray = empty_array()
 
 
 class CoefficientDerivatives(Condition):
@@ -198,27 +198,27 @@ class CoefficientDerivatives(Condition):
     tag: str = init_field("Coefficient Static Stability Derivatives", static=True)
 
     # Throttle Derivative
-    throttle: jnp.ndarray = empty_array(0)
+    throttle: jnp.ndarray = empty_array()
 
     # Stability Axis Derivatives
-    beta: jnp.ndarray = empty_array(0)
-    alpha: jnp.ndarray = empty_array(0)
+    beta: jnp.ndarray = empty_array()
+    alpha: jnp.ndarray = empty_array()
 
-    delta_a: jnp.ndarray = empty_array(0)
-    delta_e: jnp.ndarray = empty_array(0)
-    delta_r: jnp.ndarray = empty_array(0)
-    delta_f: jnp.ndarray = empty_array(0)
-    delta_s: jnp.ndarray = empty_array(0)
+    delta_a: jnp.ndarray = empty_array()
+    delta_e: jnp.ndarray = empty_array()
+    delta_r: jnp.ndarray = empty_array()
+    delta_f: jnp.ndarray = empty_array()
+    delta_s: jnp.ndarray = empty_array()
 
     # Body Axis Derivatives
 
-    u: jnp.ndarray = empty_array(0)
-    v: jnp.ndarray = empty_array(0)
-    w: jnp.ndarray = empty_array(0)
+    u: jnp.ndarray = empty_array()
+    v: jnp.ndarray = empty_array()
+    w: jnp.ndarray = empty_array()
 
-    p: jnp.ndarray = empty_array(0)
-    q: jnp.ndarray = empty_array(0)
-    r: jnp.ndarray = empty_array(0)
+    p: jnp.ndarray = empty_array()
+    q: jnp.ndarray = empty_array()
+    r: jnp.ndarray = empty_array()
 
 
 class StaticDerivatives(Condition):
@@ -295,13 +295,13 @@ class StaticStability(Condition):
     coefficients: StaticCoefficients = init_field(StaticCoefficients)
     derivatives: StaticDerivatives = init_field(StaticDerivatives)
 
-    static_margin: jnp.ndarray = empty_array(0)
-    neutral_point: jnp.ndarray = empty_array(0)
-    spiral_criteria: jnp.ndarray = empty_array(0)
+    static_margin: jnp.ndarray = empty_array()
+    neutral_point: jnp.ndarray = empty_array()
+    spiral_criteria: jnp.ndarray = empty_array()
 
-    pitch_rate: jnp.ndarray = empty_array(0)
-    roll_rate: jnp.ndarray = empty_array(0)
-    yaw_rate: jnp.ndarray = empty_array(0)
+    pitch_rate: jnp.ndarray = empty_array()
+    roll_rate: jnp.ndarray = empty_array()
+    yaw_rate: jnp.ndarray = empty_array()
 
 
 class DynamicStability(Condition):

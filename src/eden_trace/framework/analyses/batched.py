@@ -49,10 +49,26 @@ class BatchedAnalysis(Process):
     analyze: Process = init_field(Process)
     state_inputs: tuple[DataPath, ...] = init_field(())
 
+    def __init__(
+                self,
+                tag: str = "Batched Analysis",
+                analyze: Process = Process(tag="Batched Analysis"),
+                state_inputs: tuple[DataPath, ...] = ()
+                ):
+            super().__init__(tag=tag)
+    
+            self.analyze = analyze
+    
+            if not isinstance(self.analyze, ResidualAnalysis):
+                self.state_inputs = state_inputs
+            else:
+                ctrls = self.analyze.controls
+                ctrl_inputs = tuple(DataPath(path=c.state_path.path, value=jnp.atleast_3d(c.initial_value)) for c in ctrls)
+                self.state_inputs = self.state_inputs + ctrl_inputs
+
     def _batch_inputs(self, mode='mesh'):
 
         batch_arrays = []
-        N = 0
 
         raw_arrays = [jnp.atleast_1d(jnp.array(p.value)) for p in self.state_inputs]
         
@@ -103,14 +119,6 @@ class BatchedAnalysis(Process):
 
         return state_inputs, total_states
 
-    def __post_init__(self):
-        if not isinstance(self.analyze, ResidualAnalysis):
-            pass
-        else:
-            ctrls = self.analyze.controls
-            ctrl_inputs = tuple(DataPath(path=c.state_path, value=c.initial_value) for c in ctrls)
-            object.__setattr__(self, "state_inputs", self.state_inputs + ctrl_inputs)
-    
     @staticmethod
     def _update_inputs(pytree: State | System, idx: int, batch_size: int, inputs:Sequence[DataPath]):
         input_arrays = tuple(si.value[idx:idx+batch_size] for si in inputs)

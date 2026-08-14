@@ -73,13 +73,13 @@ class WindFrame(Frame):
 class PlanetFrame(Frame):
     # Attribute     Type            Default Value
     tag: str = init_field("Planet Frame", static=True)
-    start_time: jnp.ndarray = empty_array(0)
+    start_time: jnp.ndarray = empty_array()
 
     # Default to takeoff at JFK
     latitude: jnp.ndarray = init_field(lambda: jnp.array([40.6446]))
     longitude: jnp.ndarray = init_field(lambda: jnp.array([73.7797]))
 
-    true_course: jnp.ndarray = empty_array(0)
+    true_course: jnp.ndarray = empty_array()
 
 
 class Frames(Condition):

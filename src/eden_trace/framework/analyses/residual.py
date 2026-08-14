@@ -7,19 +7,15 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING, Optional, Any, Callable, Self, Tuple
+from typing import TYPE_CHECKING, Optional, Any, Callable, Literal, overload
 
-from jax.numpy import ndarray
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
-    from eden_trace.framework.conditions import ControlsConditions
 
 import sys
 import time
-import warnings
 import threading
 
-from dataclasses import replace
 from collections import Counter
 
 import jax
@@ -190,27 +186,24 @@ class ResidualAnalysis(Process):
     solver: Any | str = init_field(optx.LevenbergMarquardt, as_value=True, static=True)
     solver_options: Optional[dict] = init_field(None, static=True)
 
-    solution_tolerance: Optional[float] = None
-    max_evaluations: Optional[int] = None
-
     controls: tuple[Control, ...] = init_field(tuple)
     residuals: tuple[Residual, ...] = init_field(tuple)
 
-    def __post_init__(self):
-        init_controls = ProcessStep(
-                            tag=f"Controls Initialization",
-                            function=lambda st, sys, setts: self._initialize_controls(st, sys, setts)
-                        )
-
-        if self.initialize is not None:
-            init_steps = self.initialize.steps +(init_controls,)
-            object.__setattr__(self, "initialize", eqx.tree_at(lambda i: i.steps, self.initialize, init_steps))
-        else:
-            object.__setattr__(
-                self,
-                "initialize",
-                Process(tag=f"{self.tag} Initialization", steps=(init_controls,))
-            )
+    def __init__(
+            self,
+            analyze: Process = Process(tag="Residual Analysis Forward Pass"),
+            solver: Any | str = optx.LevenbergMarquardt,
+            solver_options: Optional[dict] = None,
+            controls: tuple[Control, ...] = (),
+            residuals: tuple[Residual, ...] = (),
+            **kwds
+        ) -> None:
+        super().__init__(**kwds)
+        self.analyze = analyze
+        self.solver = solver
+        self.solver_options = solver_options
+        self.controls = controls
+        self.residuals = residuals
 
     def _check_controls_balance(self, settings: Settings) -> bool:
         """
@@ -546,7 +539,7 @@ class ResidualAnalysis(Process):
         
         return f_ctrls, opt_state, f_st, f_sys, f_set
     
-    def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
+    def __call__(self, state: State, system: System, settings: Settings):
 
         global _analysis_stack, _last_static, _last_shapes, _trace_count
         _analysis_stack.append(self.tag)
@@ -588,11 +581,33 @@ class ResidualAnalysis(Process):
 
         return f_st, f_sys, f_set
 
-    def run(self, state, system, settings, initialize=False, track_history: bool = False) -> Tuple[State, System, Settings, jax.Array | None, Self | None]:
-        if track_history:
-            warnings.warn(f"Track history unavailable for residual analyses. "
-                          "You can track the history of a single forward pass by calling ResidualAnalysis.analyze.run.")
-        if initialize and self.initialize is not None:
-            state, system, settings = self.initialize(state, system, settings)
+    @overload
+    def run(
+        self, state: State, system: System, settings: Settings, *,
+        initialize: bool = ..., track_history: Literal[True]
+    ) -> tuple[State, System, Settings, Process]: ...
 
-        return self(state, system, settings)
+    @overload
+    def run(
+        self, state: State, system: System, settings: Settings, *,
+        initialize: bool = ..., track_history: Literal[False] = ...
+    ) -> tuple[State, System, Settings]: ...
+
+    def run(self, state: State, system: System, settings:Settings, *, initialize=False, track_history: bool = False):
+
+        if initialize:
+            state, system, settings = self.initialize(state, system, settings)
+            state, system, settings = self._initialize_controls(state, system, settings)
+        if not track_history:
+            return self(state, system, settings)
+
+        if settings.verbose:
+            print(f"Residual analysis '{self.tag}' called with track_history enabled. "
+                  "History returned will be single forward pass with final input values.")
+            
+        r_st, r_sys, r_setts = self(state, system, settings)
+        f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, track_history=True)
+        return f_st, f_sys, f_setts, history
+        
+
+        

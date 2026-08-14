@@ -80,7 +80,7 @@ class TurbojetLine(EnergyLine):
         #  Compute fuel fraction
         total_fuel_mass = jnp.sum(jnp.asarray([t.mass_properties.total for t in self.fuel_tanks]))
         current_fuel_mass = jnp.sum(jnp.asarray([state.energy.nodes[t.network_ID].mass for t in self.fuel_tanks]))
-        fuel_fraction = current_fuel_mass / total_fuel_mass
+        fuel_fraction = current_fuel_mass / jnp.where(total_fuel_mass > 1e-6, total_fuel_mass, 1e-6)
 
         # Extract configuration as pure JAX arrays
         selector_ratios = jnp.asarray([t.selector_ratio for t in self.fuel_tanks])

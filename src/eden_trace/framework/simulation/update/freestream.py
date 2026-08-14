@@ -6,25 +6,23 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
+from __future__ import annotations
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from eden_trace.framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 import jax.numpy as jnp
-
-# Trace imports
-if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
-
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Freestream
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 def update_freestream(
-    state: "State",
-    system: "System",
-    settings: "Settings",
+    state: State,
+    system: System,
+    settings: Settings,
 ):
 
     # Update Altitude

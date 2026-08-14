@@ -2,6 +2,8 @@ import pandas as pd
 
 import equinox as eqx
 
+from eden_trace.utils import configure_environment
+
 from eden_trace.library.components.energy.jets import data as jet_data
 from eden_trace.library.components.energy.networks import TurbofanNetwork
 
@@ -15,7 +17,7 @@ if __name__ == "__main__":
     e_st = State()
     sys = Aircraft(subcomponents=(TurbofanNetwork(),))
     setts = Settings(verbose=True, DEBUG_MODE=True)
-    e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
+    configure_environment(setts)
 
     for e_name in [
         "CF6_50_C2",
@@ -36,6 +38,7 @@ if __name__ == "__main__":
         # "FJ44",
     ]:
         engine = getattr(jet_data, e_name, False)
+        e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
         
         if not engine:
             print(f"Failed to import '{e_name}'. Skipping...")

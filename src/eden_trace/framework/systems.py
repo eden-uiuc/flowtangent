@@ -53,8 +53,8 @@ class System(Component):
 
 
 class AircraftReferenceGeometry(eqx.Module):
-    mean_aerodynamic_chord: jnp.ndarray = empty_array(0)
-    projected_span: jnp.ndarray = empty_array(0)
+    mean_aerodynamic_chord: jnp.ndarray = empty_array()
+    projected_span: jnp.ndarray = empty_array()
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
 

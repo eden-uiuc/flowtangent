@@ -33,16 +33,16 @@ class Airfoil(Component):
     wedge_angle: float = 0.0
 
     coordinates: jnp.ndarray = empty_array((0, 2))
-    camber: jnp.ndarray = empty_array(0)
+    camber: jnp.ndarray = empty_array()
 
-    x_coordinates: jnp.ndarray = empty_array(0)
-    y_coordinates: jnp.ndarray = empty_array(0)
+    x_coordinates: jnp.ndarray = empty_array()
+    y_coordinates: jnp.ndarray = empty_array()
 
-    x_upper_surface: jnp.ndarray = empty_array(0)
-    x_lower_surface: jnp.ndarray = empty_array(0)
+    x_upper_surface: jnp.ndarray = empty_array()
+    x_lower_surface: jnp.ndarray = empty_array()
 
-    y_upper_surface: jnp.ndarray = empty_array(0)
-    y_lower_surface: jnp.ndarray = empty_array(0)
+    y_upper_surface: jnp.ndarray = empty_array()
+    y_lower_surface: jnp.ndarray = empty_array()
 
     @classmethod
     def NACA_4_Series(cls, series_number: str | int, n_pts: int = 201, edge_factor: float = 1.5):

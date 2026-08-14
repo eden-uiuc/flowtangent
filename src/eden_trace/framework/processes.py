@@ -9,9 +9,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, Self, Tuple, TypeAlias, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, Self, Tuple, TypeAlias, Sequence, Literal, overload
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
     from .settings import JacobianMap
 
 import os
@@ -19,9 +18,10 @@ import re
 import time
 import inspect
 import warnings
-from datetime import datetime
 
 from collections import Counter
+from dataclasses import replace
+from datetime import datetime
 
 import equinox as eqx
 
@@ -31,18 +31,16 @@ import jax.numpy as jnp
 import networkx as nx
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-import eden_trace.utils as tu
-
 # Trace imports
-from eden_trace.utils import MERMAID_STYLES, DataPath, Token, init_field
+from .state import State
+from .systems import System
+from .settings import Settings
+from ..utils import MERMAID_STYLES, DataPath, init_field, compute_tree_delta, null_step, get_target
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-def null_step(*args):
-    return args
 
 TraceFunction: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
 
@@ -57,8 +55,8 @@ class ProcessStep(eqx.Module):
 
     def __init__(
         self,
-        function: TraceFunction | ProcessStep = null_step,
         tag: str = "Process Step",
+        function: TraceFunction | ProcessStep = null_step,
         _state_delta: Optional[State] = None,
         _system_delta: Optional[System] = None,
         _settings_delta: Optional[Settings] = None,
@@ -182,7 +180,7 @@ class Process(ProcessStep):
 
     _val_and_jac_fn: Optional[Callable] = init_field(None, static=True)
     _cached_grad_map: Optional[JacobianMap] = init_field(None, static=True)
-    _filter_map: dict = init_field({
+    _filter_map: dict = init_field(lambda _:{
             "energy": r"state\.energy\.nodes\.\[*\].outputs"
         }, static=True)
 
@@ -254,30 +252,34 @@ class Process(ProcessStep):
         raise AttributeError(f"{self.__class__.__name__}: {self.tag} has no attribute '{key}'")
 
     def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
+        if settings.DEBUG_MODE or settings._DEV_MODE:
 
+            start_time = datetime.fromtimestamp(time.time()).strftime(settings.logging.date_format)
+            print(f"Beginning Process: '{self.tag}' | {start_time}") 
+        
         if settings.numerical.calculate_jacobian:
             jac_map = settings.numerical.jacobian_map
             
             if jac_map is not None:
                 # Returns the two distinct flat arrays
                 flat_st, flat_sys = jac_map.flatten_inputs(state, system)
+                val_and_jac_fn = self._build_value_and_jacobian(jac_map)
 
-                if self._val_and_jac_fn is None or self._cached_grad_map != jac_map:
-                    # Let JAX handle the compilation caching natively
-                    val_and_jac_fn = self._build_value_and_jacobian(jac_map)
-                    object.__setattr__(self, "_val_and_jac_fn", val_and_jac_fn)
-                    object.__setattr__(self, "_cached_grad_map", jac_map)
-
-                jacobian_matrix, final_st, final_sys, final_setts = self._val_and_jac_fn(
+                jacobian_matrix, final_st, final_sys, final_setts = val_and_jac_fn(
                     flat_st, flat_sys, state, system, settings
                 )
                 
                 final_st = eqx.tree_at(lambda s: s.numerics.jacobian, final_st, jacobian_matrix)
                 return final_st, final_sys, final_setts
+            else: warnings.warn(f"Process '{self.tag}' Jacobian called with no Jacbian Map set. Jacobian will not be calculated.")
 
         # Standard Execution Path
         for step in self.steps[self.initial_step :]:
             state, system, settings = step(state, system, settings)
+
+        if settings.DEBUG_MODE or settings._DEV_MODE:
+            end_time = datetime.fromtimestamp(time.time()).strftime(settings.logging.date_format)
+            print(f"Process '{self.tag}' Complete. | {end_time}") 
 
         return state, system, settings
 
@@ -296,13 +298,17 @@ class Process(ProcessStep):
         def objective_fn(flat_st, flat_sys, base_state, base_system, base_settings):
             st, sys = grad_map.update_inputs(flat_st, flat_sys, base_state, base_system)
 
-            # CRITICAL: Prevent infinite recursion by temporarily disabling the Jacobian flag
-            inner_settings = eqx.tree_at(
-                lambda s: s.numerical.calculate_jacobian, base_settings, False
-            )
+            # Prevent recursion by temporarily disabling the Jacobian flag
+            inner_num = replace(base_settings.numerical, calculate_jacobian=False)
+            inner_setts = replace(base_settings, numerical=inner_num)
 
-            f_st, f_sys, f_setts = self(st, sys, inner_settings)
+            f_st, f_sys, f_setts = self(st, sys, inner_setts)
             out_array = grad_map.flatten_outputs(f_st, f_sys, f_setts)
+
+            # Restore modified setting
+            restored_num = replace(f_setts.numerical, calculate_jacobian=True)
+            f_setts = replace(f_setts, numerical=restored_num)
+
             return out_array, (f_st, f_sys, f_setts)
 
         def batched_jacrev_fn(flat_st, flat_sys, base_state, base_system, base_settings):
@@ -355,94 +361,78 @@ class Process(ProcessStep):
 
         return jax.tree_util.tree_map(_to_array, tree)
 
+    @overload
+    def run(
+        self, state: State, system: System, settings: Settings, *,
+        initialize: bool = ..., track_history: Literal[True]
+    ) -> tuple[State, System, Settings, Process]: ...
+
+    @overload
+    def run(
+        self, state: State, system: System, settings: Settings, *,
+        initialize: bool = ..., track_history: Literal[False] = ...
+    ) -> tuple[State, System, Settings]: ...
+    
     def run(
         self,
-        state: State, system: System, settings: Settings,
-        initialize: bool = False,
-        track_history: bool = False
-    ) -> Tuple[State, System, Settings, Optional[jnp.ndarray], Optional[Self]]:
+        state: State, system: System, settings: Settings, *,
+        initialize: bool = False, track_history: bool = False
+    ):
 
         # Sanitize inputs (map floats/ints to JAX arrays)
         state = self._sanitize_inputs(state)
         system = self._sanitize_inputs(system)
         settings = self._sanitize_inputs(settings)
 
-        # Save original/intial state
-        if initialize and self.initialize is not None:
-            i_st, i_sys, i_setts = self.initialize(state, system, settings)
-        else:
-            i_st, i_sys, i_setts = state, system, settings
+        if initialize:
+            state, system, settings = self.initialize(state, system, settings)
 
-        # Prep for gradient calcuation/history tracking
-        jacobian_matrix = None
-        raw_hist = None
+        # Direct call if not tracking history
+        if not track_history:
+            return self(state, system, settings)
 
-        # Grad map acts as flag to get gradients
-        grad_map = settings.analysis.gradient_map
-        if grad_map is not None:
-            # Flatten inputs for Jacobian calculation
-            flat_input_array = grad_map.flatten_inputs(i_st, i_sys, i_setts)
-
-            # Build Value and Jacobian function only if it doesn't exist or the cached grad_map is outdated
-            if self._val_and_jac_fn is None or self._cached_grad_map != grad_map:
-                object.__setattr__(self, "_val_and_jac_fn", self._build_value_and_jacobian(grad_map, track_history))
-                object.__setattr__(self, "_cached_grad_map", grad_map)
-
-            jacobian_matrix, aux = self._val_and_jac_fn(flat_input_array, i_st, i_sys, i_setts)  # type: ignore
-            f_st, f_sys, f_setts, raw_hist = aux
-
-        else:
-            if track_history:
-                f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(i_st, i_sys, i_setts)
-            else:
-                f_st, f_sys, f_setts = self(i_st, i_sys, i_setts)
+        
+        f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(state, system, settings)
 
         logged_process = None
-        if track_history and raw_hist is not None:
-            logged_steps = []
-            for i, step in enumerate(self.steps[self.initial_step :]):
-                logged_step = eqx.tree_at(
-                    lambda s: (s.state_delta, s.system_delta, s.settings_delta),
-                    step,
-                    (
-                        tu.compute_tree_delta(raw_hist[i + 1][0], raw_hist[i][0]),
-                        tu.compute_tree_delta(raw_hist[i + 1][1], raw_hist[i][1]),
-                        tu.compute_tree_delta(raw_hist[i + 1][2], raw_hist[i][2]),
-                    ),
-                )
-                logged_steps.append(logged_step)
+        logged_steps = []
 
-            logged_process = eqx.tree_at(
-                lambda p: (
-                    p.steps,
-                    p.initial_state,
-                    p.initial_system,
-                    p.initial_settings,
-                    p.state_delta,
-                    p.system_delta,
-                    p.settings_delta,
-                ),
-                self,
+        for i, step in enumerate(self.steps[self.initial_step :]):
+            logged_step = eqx.tree_at(
+                lambda s: (s.state_delta, s.system_delta, s.settings_delta),
+                step,
                 (
-                    tuple(logged_steps),
-                    i_st,
-                    i_sys,
-                    i_setts,
-                    tu.compute_tree_delta(f_st, i_st),
-                    tu.compute_tree_delta(f_sys, i_sys),
-                    tu.compute_tree_delta(f_setts, i_setts),
+                    compute_tree_delta(raw_hist[i + 1][0], raw_hist[i][0]),
+                    compute_tree_delta(raw_hist[i + 1][1], raw_hist[i][1]),
+                    compute_tree_delta(raw_hist[i + 1][2], raw_hist[i][2]),
                 ),
-                is_leaf=lambda x: x is None,
             )
+            logged_steps.append(logged_step)
 
-        # Always return final State, System, Settings, optionally return Jacobian matrix and logged Process
-        out_vals = (f_st, f_sys, f_setts)
-        if jacobian_matrix is not None:
-            out_vals += (jacobian_matrix,)
-        if logged_process is not None:
-            out_vals += (logged_process,)
+        logged_process = eqx.tree_at(
+            lambda p: (
+                p.steps,
+                p.initial_state,
+                p.initial_system,
+                p.initial_settings,
+                p.state_delta,
+                p.system_delta,
+                p.settings_delta,
+            ),
+            self,
+            (
+                tuple(logged_steps),
+                state,
+                system,
+                settings,
+                compute_tree_delta(f_st, state),
+                compute_tree_delta(f_sys, system),
+                compute_tree_delta(f_setts, settings),
+            ),
+            is_leaf=lambda x: x is None,
+        )
 
-        return out_vals  # type: ignore
+        return f_st, f_sys, f_setts, logged_process
 
     def append(self, step: ProcessStep | Self):
         new_steps = self.steps + (step,)
@@ -881,7 +871,7 @@ class OptimizerInterface:
             f_st, f_sys, f_setts, jac = self.process.run(state, system, settings)
             token = dict(state=f_st, system=f_sys, settings=f_setts)
 
-            self.last_val = tu.get_target(token, self.objective_path)
+            self.last_val = get_target(token, self.objective_path)
             self.last_jac = np.array(jac)
             self.last_x = x
 

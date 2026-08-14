@@ -7,7 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from typing import Sequence, Self
+from typing import Sequence, Self, Optional
 from dataclasses import fields
 
 import equinox as eqx
@@ -53,23 +53,31 @@ class Condition(eqx.Module):
     def __iter__(self):
         return iter(self.subconditions)
 
-    def expand_time(self, n: int):
+    def expand_time(self, N: Optional[int] = None):
+
+        if N is None:
+            if hasattr(self, "time"):
+                if hasattr(self.time, "N"):
+                    N = self.time.N
+            else:
+                N = 1
 
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray)):
                 # Zero-copy expansion for actual data
                 if leaf.ndim == 1:
                     # e.g., Shape (X,) -> Shape (n, X)
-                    return jnp.broadcast_to(leaf, (n,) + leaf.shape)
+                    return jnp.broadcast_to(leaf, (N,) + leaf.shape)
                 elif leaf.ndim == 2 and leaf.shape[0] == 1:
                     # e.g., Shape (1, X) -> Shape (n, X)
-                    return jnp.broadcast_to(leaf, (n, leaf.shape[1]))
+                    return jnp.broadcast_to(leaf, (N, leaf.shape[1]))
 
             return leaf
 
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
 
     def expand_batch(self, batch_size: int):
+
         def _expand(leaf):
             if _is_static_node(leaf):
                 return leaf
@@ -81,6 +89,7 @@ class Condition(eqx.Module):
                 # # Zero-copy expansion prepending batch dim
                 return jnp.broadcast_to(leaf, (batch_size,) + leaf.shape)
             return leaf
+
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
 
     @classmethod

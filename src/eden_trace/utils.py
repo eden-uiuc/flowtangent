@@ -8,6 +8,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Callable, Self, Sequence, Optional
+if TYPE_CHECKING:
+    from .framework.settings import Settings
+
 import os
 import gzip
 import json
@@ -16,16 +21,12 @@ import warnings
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Self, Sequence, Optional
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
-if TYPE_CHECKING:
-    from .framework.settings import Settings
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Utility Functions
@@ -58,7 +59,7 @@ def init_field(initializer: Any, as_value: bool = False, **kwargs):
     return eqx.field(default=initializer, **kwargs)
 
 
-def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
+def empty_array(shape: tuple | int = 1, dtype: Any = float, **kwargs):
     """Syntactic sugar for an empty JAX array in an Equinox module."""
     return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
@@ -71,6 +72,8 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
 def get_trace_root():
     return Path(os.path.dirname(os.path.abspath(__file__))).resolve()
 
+def null_step(*args):
+    return args
 
 # ---------------------------------------------------------
 # Input/Output Function Decorators
@@ -159,15 +162,16 @@ class DataPath:
                 path_tuple = tuple(path.split('.'))
             else:
                 raise ValueError(f"DataPath path must be a tuple or string.")
+
             object.__setattr__(self, "path", path_tuple)
             object.__setattr__(self, "path_slice", path_slice)
-
             object.__setattr__(self, "value", value)
 
             if tag is None:
                 path_tag = '.'.join(self.path)
             else:
                 path_tag = tag
+
             object.__setattr__(self, "tag", path_tag)
 
     def __len__(self):
@@ -452,7 +456,7 @@ def configure_environment(settings: Settings):
     if debug_mode:
         jax.config.update("jax_disable_jit", True)
         jax.config.update("jax_debug_nans", True)
-        print("TRACE WARNING: JIT disabled and NaN debugging enabled. Performance will drop.")
+        print("TRACE WARNING: Debug mode is active. JIT disabled and NaN debugging enabled.")
     else:
         jax.config.update("jax_disable_jit", False)
         jax.config.update("jax_debug_nans", False)
