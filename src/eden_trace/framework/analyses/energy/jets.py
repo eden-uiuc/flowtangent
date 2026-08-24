@@ -160,7 +160,7 @@ def DesignTurbojet(state: State, system: Aircraft, settings: Settings) -> tuple[
     mass_ctrl = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
-        initial_value=des.initial_MFR,
+        initial_value=des.mass_flow_rate,
         bounds=(
             1e-3 * units.kg / units.s,
             5e3  * units.kg / units.s,
@@ -170,7 +170,7 @@ def DesignTurbojet(state: State, system: Aircraft, settings: Settings) -> tuple[
     turb_ctrl = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
-        initial_value=des.initial_turb_PR,
+        initial_value=des.turbine_PR,
         bounds=(1.001, 1e2),
     )
 

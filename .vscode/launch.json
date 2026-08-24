@@ -10,7 +10,8 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/trace/bin/numactl_python.sh"
         }
     ]
 }
