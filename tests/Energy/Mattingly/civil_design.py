@@ -1,13 +1,3 @@
-# import os
-# node_0_cores = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
-
-# try:
-#     # 0 means "current process"
-#     os.sched_setaffinity(0, node_0_cores)
-#     print(f"NUMA Lock Engaged. Running on cores: {os.sched_getaffinity(0)}")
-# except AttributeError:
-#     pass # Fails gracefully if you ever run this on Windows/Mac
-
 import pandas as pd
 
 import equinox as eqx

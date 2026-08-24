@@ -226,7 +226,7 @@ class FlowDesign(eqx.Module):
     rotation_speed: float = 0.0
     noise_speed: float = 0.0
 
-    eff: Efficiencies = init_field(Efficiencies, static=True)
+    eff: Efficiencies = init_field(Efficiencies)
 
 @register
 class BleedFlow(GraphNode):

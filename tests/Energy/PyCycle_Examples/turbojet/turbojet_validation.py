@@ -1,3 +1,30 @@
+import os
+import sys
+
+def numerical_environment():
+    # 1. JAX Memory/Precision Config (Safe everywhere)
+    os.environ["JAX_ENABLE_X64"] = "True"
+    
+    # 2. NUMA / Hardware Auto-Detection
+    if sys.platform == "linux":
+        # A simple heuristic: if you have a massive amount of cores, 
+        # it's likely the Threadripper workstation.
+        cpu_count = os.cpu_count() or 1
+        if cpu_count > 16:  # Adjust threshold based on your hardware
+            try:
+                # Bind to the first 16 cores (Node 0) to prevent cross-NUMA memory latency
+                node_0_cores = set(range(16))
+                os.sched_setaffinity(0, node_0_cores)
+                
+                # Tell OpenMP to respect this boundary
+                os.environ["OMP_PROC_BIND"] = "true"
+                os.environ["OMP_PLACES"] = "cores"
+                print(f"Hardware Config: NUMA affinity set to Node 0 (16 cores).")
+            except Exception as e:
+                print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
+
+numerical_environment()
+
 import json
 
 import jax.numpy as jnp
@@ -6,8 +33,9 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
+from dataclasses import replace
 
-from eden_trace.utils import save_data, load_data, format_array
+from eden_trace.utils import save_data, load_data, format_array, configure_environment
 
 from eden_trace.library import units
 from eden_trace.library.components.energy.networks import TurbojetNetwork, JetNetDesign
@@ -15,7 +43,7 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine, Tu
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance
+from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
@@ -23,6 +51,8 @@ def system_setup(variable_nozzle: bool = False):
 
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
+        mass_flow_rate=168.45 * units.lbm/units.s,
+        turbine_PR=4.46
     )
     engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
     
@@ -54,7 +84,7 @@ def system_setup(variable_nozzle: bool = False):
             b.design_parameters.pressure_ratio,
             b.design_parameters.exit_mach_number,
         ),
-        engine.combustor,
+        engine.burner,
         (
             2370 * units.R,
             0.97,
@@ -67,12 +97,14 @@ def system_setup(variable_nozzle: bool = False):
             t.design_parameters.eff.flow,
             t.design_parameters.rotation_speed,
             t.design_parameters.exit_mach_number,
+            t.design_parameters.pressure_ratio,
         ),
         engine.turbine,
         (
             0.86,
             8070. * units.rev/units.mins,
             0.4,
+            4.46
         )
     )
 
@@ -82,11 +114,11 @@ def system_setup(variable_nozzle: bool = False):
         0.99
     )
 
-    engine = eqx.tree_at(lambda e:
+    des_engine = eqx.tree_at(lambda e:
         (
             e.inlet,
             e.compressor,
-            e.combustor,
+            e.burner,
             e.turbine,
             e.core_nozzle,
         ), engine,
@@ -95,18 +127,16 @@ def system_setup(variable_nozzle: bool = False):
             comp_design,
             burn_design,
             turb_design,
-            nozz_design
+            nozz_design,
         )                
     )
 
-    line = TurbojetLine(tag="Line", subcomponents=(engine,),)
+    line = TurbojetLine(tag="Line", subcomponents=(des_engine,),)
     
     net_design = JetNetDesign(
         altitude=0.0,
         mach_number=1e-6,
         thrust=11_800 * units.lbf,
-        initial_MFR=168.453135137 * units.lbm / units.s,
-        initial_turb_PR=4.46138725662
     )
     
     net = TurbojetNetwork(subcomponents=(line,), design_parameters=net_design)
@@ -303,52 +333,57 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     print(f" - Min:  {df['Mag. Error'].min():.4e}")
     print(f" - Max:  {df['Mag. Error'].max():.4e}")
     print("\n" + "="*80 + "\n")
-    
-
 
     return df
 
 if __name__ == "__main__":
     
     # Control Board
-    DEBUG = False
+    DEBUG = True
     VERBOSE = True
-    V_NOZZ = True
+    V_NOZZ = False
+    STATICS = False
 
     DESIGN_POINT = True
-    OFF_DESIGN_0 = True
-    OFF_DESIGN_1 = True
+    OFF_DESIGN_0 = False
+    OFF_DESIGN_1 = False
 
     # Build Turbojet------------------------------------------------------------
     system = system_setup(variable_nozzle=V_NOZZ)
-    settings = Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE)
+    settings = eqx.tree_at(
+        lambda s: s.analysis.energy,
+        Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE),
+        JetSettings(design_mode=DESIGN_POINT, statics=STATICS)
+    )
+    configure_environment(settings)
     test_dir = Path("./tests/PyCycle/PyCycle_Examples/turbojet")
 
     if DESIGN_POINT:
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
-        st, sys, set = setup_TJ_design(
+
+        des_st, des_sys, des_set = setup_TJ_design(
             state=State(),
             system=system,
             settings=settings,
         )
 
-        save_data(sys, test_dir / "simple_turbojet.trs")
+        save_data(des_sys, test_dir / "simple_turbojet.trs")
 
-        validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", st)
+        validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", des_st)
         validation_df.to_csv(test_dir / "DESIGN_validation.csv")
      
     else:
-        sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
+        des_sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
     
-    sys = sys.update_network_topology()
+    des_sys = des_sys.update_network_topology()
 
     print("="*80)
     print(" System Validation")
     print("-"*80)
 
-    for comp in sys.energy.line.engine.subcomponents:
+    for comp in des_sys.energy.line.engine.subcomponents:
         if hasattr(comp, "design_parameters") and comp.design_parameters:
             d = comp.design_parameters
             A_i = d.A_intake
@@ -363,14 +398,14 @@ if __name__ == "__main__":
                     print(f" - {p:<11}: {format_array(real_params[p])}")
     
     print("Compressor Map Scaling:")
-    c_map = sys.energy.line.engine.compressor.map
+    c_map = des_sys.energy.line.engine.compressor.map
     print(f" - {'s_Wc':<11}: {format_array(c_map.s_Wc)}")
     print(f" - {'s_PR':<11}: {format_array(c_map.s_PR)}")
     print(f" - {'s_eff':<11}: {format_array(c_map.s_eff)}")
     print(f" - {'s_Nc':<11}: {format_array(c_map.s_Nc)}")
 
     print("Turbine Map Scaling:")
-    t_map = sys.energy.line.engine.turbine.map
+    t_map = des_sys.energy.line.engine.turbine.map
     print(f" - {'s_Wp':<11}: {format_array(t_map.s_Wp)}")
     print(f" - {'s_PR':<11}: {format_array(t_map.s_PR)}")
     print(f" - {'s_eff':<11}: {format_array(t_map.s_eff)}")
@@ -388,7 +423,7 @@ if __name__ == "__main__":
             M0=1e-6,
             alt=0.0,
             thrust=11_000 * units.lbf,
-            system=sys,
+            system=des_sys,
             settings=settings,
             # PyCycle Initial Guess Values
             # initial_Rline=2.0,
@@ -422,7 +457,7 @@ if __name__ == "__main__":
             M0=0.2,
             alt=5_000 * units.ft,
             thrust=8_000 * units.lbf,
-            system=sys,
+            system=des_sys,
             settings=settings,
             initial_Rline= 2.0,
             initial_turb_PR=4.669,

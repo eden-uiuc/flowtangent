@@ -126,12 +126,11 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
         des_engine = eqx.tree_at(lambda e: (
             e.compressor.design_parameters.rotation_speed,
             e.compressor.design_parameters.pressure_ratio,
-            e.burner.pressure_ratio,
-            e.burner.output_temperature,
+            e.burner.design_parameters.pressure_ratio,
+            e.burner.design_parameters.output_temperature,
             e.turbine.design_parameters.rotation_speed,
         ),
         engine,(
-            des.inlet_pressure_recovery,
             des.rotation_speed,
             OPR,
             des.burner_pressure_ratio,
@@ -165,7 +164,7 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
     # Setup test state according to design parameters
 
     des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
-    des: TurbojetDesign = des_system.energy.design_parameters
+    des: TurbojetDesign = des_system.energy.line.engine.design_parameters
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
