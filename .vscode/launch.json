@@ -11,7 +11,6 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "python": "${workspaceFolder}/trace/bin/numactl_python.sh"
         }
     ]
 }
