@@ -85,10 +85,10 @@ class Control(Condition):
 
     state_path: DataPath = init_field(DataPath, static=True)
     
-    # Inital values aren't actually optional, but an unset one will be flagged in State.initialize_controls
+    # Inital values aren't actually optional, but an unset one will be flagged in initialize_controls
     initial_value: Optional[float | jnp.ndarray] = None
-    bounds: tuple[float, ...] = tuple((-1e6, 1e6))
-    scaling: Literal["linear", "logistic"] = init_field("linear", static=True)
+    bounds: tuple[float, ...] = init_field(tuple((-1e6, 1e6)), static=True)
+    scaling: Literal["linear", "logistic"] = init_field("logistic", static=True)
 
     _active: bool = init_field(False, static=True)
 
@@ -119,11 +119,7 @@ class Control(Condition):
             object.__setattr__(self, "bounds", rev_bnds)
 
         if self.initial_value is not None:
-            clip_value = jnp.clip(self.initial_value, self.bounds[0] * 1.10, self.bounds[1] * 0.90)
-            if self.initial_value != clip_value:
-                warnings.warn(f"Control '{self.tag}' initialized with out of bounds value {self.initial_value}. Clipping to {clip_value}...")
-                object.__setattr__(self, "initial_value", clip_value)
-
+            object.__setattr__(self, "initial_value", jnp.clip(self.initial_value, self.bounds[0] * 1.10, self.bounds[1] * 0.90))
         
         return super().__post_init__()
 
@@ -164,20 +160,20 @@ class ControlsConditions(Condition):
     tag: str = init_field("Controls", static=True)
 
     _default_paths: dict = init_field(lambda: {
-        "bank_angle": ("frames", "body", "inertial_rotations"),
-        "body_angle": ("frames", "body", "inertial_rotations"),
-        "velocity": ("frames", "inertial", "velocity_vector"),
-        "altitude": ("frames", "inertial", "position_vector", slice(None, 2)),
+        "bank_angle": (("frames", "body", "inertial_rotations"), slice(None)),
+        "body_angle": (("frames", "body", "inertial_rotations"), slice(None)),
+        "velocity": (("frames", "inertial", "velocity_vector"), slice(None)),
+        "altitude": (("frames", "inertial", "position_vector") , slice(None, 2)),
     }, static=True)
 
     def __post_init__(self):
-        for ctrl, ctrl_path in self._default_paths.items():
+        for ctrl, (ctrl_path, path_slice) in self._default_paths.items():
             object.__setattr__(
                 self,
                 ctrl,
                 Control(
                     tag=ctrl.replace('_', " ").title(),
-                    state_path=DataPath(ctrl_path),
+                    state_path=DataPath(path=ctrl_path, path_slice=path_slice),
                 ),
             )
         return super().__post_init__()

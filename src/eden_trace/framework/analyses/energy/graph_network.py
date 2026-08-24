@@ -27,8 +27,12 @@ from eden_trace.framework import Process, ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class GraphEnergyAnalysis(Process):
+class PACTNetwork(Process):
     analysis_network: GraphNetwork = init_field(GraphNetwork)
+
+    def __init__(self, analysis_network: GraphNetwork, **kwargs):
+        super().__init__(**kwargs)
+        self.analysis_network = analysis_network
 
     def graph(self, **kwargs) -> nx.DiGraph:
 
@@ -88,8 +92,9 @@ def build_analysis_from_network(network: GraphNetwork):
 
     full_steps = node_steps + (net_step,)
 
-    network_analysis = GraphEnergyAnalysis(
+    network_analysis = PACTNetwork(
         tag=f"{network.tag} Analysis",
+        analysis_network=analysis_network,
         steps=full_steps,
     )
 

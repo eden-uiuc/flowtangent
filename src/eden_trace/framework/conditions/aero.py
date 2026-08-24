@@ -29,7 +29,7 @@ from eden_trace.framework.conditions import Condition
 class ComponentCoefficients(Condition):
     tag: str = init_field("Component Coefficients", static=True)
 
-    total: jnp.ndarray = empty_array(0)
+    total: jnp.ndarray = empty_array()
 
     # Component Arrays: (n_time, n_components)
     wings: jnp.ndarray = empty_array((0, 0))
@@ -57,7 +57,7 @@ class InducedDrag(Condition):
     # Attribute   Type            Default Value
     tag: str = init_field("Induced Drag", static=True)
 
-    total: jnp.ndarray = empty_array(0)
+    total: jnp.ndarray = empty_array()
 
     inviscid: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Inviscid Induced Drag"))
     viscous: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Viscous Induced Drag"))
@@ -69,7 +69,7 @@ class DragCoefficients(Condition):
     # Attribute     Type            Default Value
     tag: str = init_field("Drag Coefficients", static=True)
 
-    total: jnp.ndarray = empty_array(0)
+    total: jnp.ndarray = empty_array()
 
     parasite: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Parasite Drag"))
     compressible: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Compressible Drag"))
@@ -86,9 +86,9 @@ class MomentCoefficients(Condition):
     # Attribute         Type            Default Value
     tag: str = init_field("Moment Coefficients", static=True)
 
-    pitch: jnp.ndarray = empty_array(0)
-    roll: jnp.ndarray = empty_array(0)
-    yaw: jnp.ndarray = empty_array(0)
+    pitch: jnp.ndarray = empty_array()
+    roll: jnp.ndarray = empty_array()
+    yaw: jnp.ndarray = empty_array()
 
 
 # All Coefficients -----------------------------------------
@@ -103,9 +103,9 @@ class AerodynamicCoefficients(Condition):
 
     moments: MomentCoefficients = init_field(MomentCoefficients)
 
-    X: jnp.ndarray = empty_array(0)
-    Y: jnp.ndarray = empty_array(0)
-    Z: jnp.ndarray = empty_array(0)
+    X: jnp.ndarray = empty_array()
+    Y: jnp.ndarray = empty_array()
+    Z: jnp.ndarray = empty_array()
 
 
 # ----------------------------------------------------------
@@ -117,9 +117,9 @@ class AerodynamicAngles(Condition):
     # Attribute         Type        Default Value
     tag: str = init_field("Aerodynamic Angles", static=True)
 
-    alpha: jnp.ndarray = empty_array(0)  # Y-axis / angle of attack
-    beta: jnp.ndarray = empty_array(0)  # Z-axis / sideslip angle
-    phi: jnp.ndarray = empty_array(0)  # X-axis / roll angle
+    alpha: jnp.ndarray = empty_array()  # Y-axis / angle of attack
+    beta: jnp.ndarray = empty_array()  # Z-axis / sideslip angle
+    phi: jnp.ndarray = empty_array()  # X-axis / roll angle
 
 
 # ----------------------------------------------------------

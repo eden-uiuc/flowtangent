@@ -8,6 +8,11 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Callable, Self, Sequence, Optional
+if TYPE_CHECKING:
+    from .framework.settings import Settings
+
 import os
 import gzip
 import json
@@ -16,16 +21,12 @@ import warnings
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Self, Sequence
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 
-# --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
-if TYPE_CHECKING:
-    pass
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Utility Functions
@@ -58,7 +59,7 @@ def init_field(initializer: Any, as_value: bool = False, **kwargs):
     return eqx.field(default=initializer, **kwargs)
 
 
-def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
+def empty_array(shape: tuple | int = 1, dtype: Any = float, **kwargs):
     """Syntactic sugar for an empty JAX array in an Equinox module."""
     return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
@@ -71,6 +72,8 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
 def get_trace_root():
     return Path(os.path.dirname(os.path.abspath(__file__))).resolve()
 
+def null_step(*args):
+    return args
 
 # ---------------------------------------------------------
 # Input/Output Function Decorators
@@ -131,38 +134,51 @@ MERMAID_STYLES = {
 # Find Targets from Path in PyTrees
 # ---------------------------------------------------------
 
-
-class Token(eqx.Module):
-    state: eqx.Module
-    system: eqx.Module
-    settings: eqx.Module
-
-
 @dataclass(frozen=True)
 class DataPath:
     path: tuple
-    slice_obj: slice
-    tag: str = "Variable Path"
+    path_slice: slice
+    value: Any
+    tag: str
 
-    def __init__(self, path: tuple | Self = (slice(None),), tag="Variable Path"):
+    def __init__(
+            self,
+            path: tuple | str | Self = ('state',),
+            path_slice: slice = slice(None),
+            value: Optional[Any] = None,
+            tag: Optional[str] = None,
+        ):
 
         if isinstance(path, DataPath):
             object.__setattr__(self, "path", path.path)
-            object.__setattr__(self, "slice_obj", path.slice_obj)
+            object.__setattr__(self, "path_slice", path.path_slice)
+            object.__setattr__(self, "value", path.value)
             object.__setattr__(self, "tag", path.tag)
 
         else:
-            if isinstance(path[-1], slice):
-                object.__setattr__(self, "path", path[:-1])
-                object.__setattr__(self, "slice_obj", path[-1])
+            if isinstance(path, tuple):
+                path_tuple = path
+            elif isinstance(path, str):
+                path_tuple = tuple(path.split('.'))
             else:
-                object.__setattr__(self, "path", path)
-                object.__setattr__(self, "slice_obj", slice(None))
+                raise ValueError(f"DataPath path must be a tuple or string.")
 
-            object.__setattr__(self, "tag", tag)
+            object.__setattr__(self, "path", path_tuple)
+            object.__setattr__(self, "path_slice", path_slice)
+            object.__setattr__(self, "value", value)
+
+            if tag is None:
+                path_tag = '.'.join(self.path)
+            else:
+                path_tag = tag
+
+            object.__setattr__(self, "tag", path_tag)
 
     def __len__(self):
         return len(self.path)
+
+    def _snip_lead(self):
+        return eqx.tree_at(lambda p: p.path, self, self.path[1:])
 
 
 def get_parent_target(obj, path_tuple: DataPath):
@@ -178,14 +194,12 @@ def get_parent_target(obj, path_tuple: DataPath):
 def get_target(obj, path_tuple: DataPath):
     """Gets the target and applies the slice if one exists."""
     parent = get_parent_target(obj, path_tuple)
-    if hasattr(parent, "__getitem__") and path_tuple.slice_obj != slice(None):
-        return parent[path_tuple.slice_obj]
+    if hasattr(parent, "__getitem__") and path_tuple.path_slice != slice(None):
+        return parent[path_tuple.path_slice]
     return parent
-
 
 def get_all_parents(s, input_map: Sequence[DataPath]):
     return tuple(get_parent_target(s, path) for path in input_map)
-
 
 def get_all_targets(s, input_map: Sequence[DataPath]):
     return tuple(get_target(s, path) for path in input_map)
@@ -426,6 +440,26 @@ def load_data(filename: str | Path) -> Any:
 # Debugging Tools
 # ---------------------------------------------------------
 
+def configure_environment(settings: Settings):
+    """
+    Configures global JAX and XLA compiler flags. 
+    MUST be called at the very top of your script before any arrays are created.
+    """
+
+    dev_mode = settings._DEV_MODE
+    debug_mode = settings.DEBUG_MODE
+
+    if dev_mode:
+        os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        
+    if debug_mode:
+        jax.config.update("jax_disable_jit", True)
+        jax.config.update("jax_debug_nans", True)
+        print("TRACE WARNING: Debug mode is active. JIT disabled and NaN debugging enabled.")
+    else:
+        jax.config.update("jax_disable_jit", False)
+        jax.config.update("jax_debug_nans", False)
 
 def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
     print(f"--- Scanning {name} for invalid dynamic leaves ---")

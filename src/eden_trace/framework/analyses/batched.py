@@ -9,10 +9,10 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, Sequence
 
 if TYPE_CHECKING:
-    from eden_trace.framework import State, System, Settings
+    from eden_trace.framework import System, Settings
 
 import logging
 import os
@@ -32,14 +32,136 @@ import zarr
 from numcodecs import Blosc
 from tqdm import tqdm, trange
 
-import eden_trace.utils as tu
 
-from eden_trace.framework import Process, State
+from eden_trace.utils import init_field, get_all_targets, DataPath
+from eden_trace.framework import Process, Settings, State, System
 
+from .residual import ResidualAnalysis
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Batch Analysis
 # ----------------------------------------------------------------------------------------------------------------------
+
+class BatchedAnalysis(Process):
+
+    tag: str = init_field("Batched Analysis")
+
+    analyze: Process = init_field(Process)
+    state_inputs: tuple[DataPath, ...] = init_field(())
+
+    def __init__(
+                self,
+                tag: str = "Batched Analysis",
+                analyze: Process = Process(tag="Batched Analysis"),
+                state_inputs: tuple[DataPath, ...] = ()
+                ):
+            super().__init__(tag=tag)
+    
+            self.analyze = analyze
+    
+            if not isinstance(self.analyze, ResidualAnalysis):
+                self.state_inputs = state_inputs
+            else:
+                ctrls = self.analyze.controls
+                ctrl_inputs = tuple(DataPath(path=c.state_path.path, value=jnp.atleast_3d(c.initial_value)) for c in ctrls)
+                self.state_inputs = self.state_inputs + ctrl_inputs
+
+    def _batch_inputs(self, mode='mesh'):
+
+        batch_arrays = []
+
+        raw_arrays = [jnp.atleast_1d(jnp.array(p.value)) for p in self.state_inputs]
+        
+        if mode == "zip":
+            input_size = raw_arrays[0].shape[0]
+            for arr in raw_arrays:
+                if arr.shape[0] != input_size:
+                    raise ValueError(f"In 'zip' batch mode all input arrays must have the same size.")
+                batch_arrays = raw_arrays
+
+        elif mode == "mesh":
+            num_inputs = len(raw_arrays)
+            input_sizes = [arr.shape[0] for arr in raw_arrays]
+
+            for i, arr in enumerate(raw_arrays):
+                leading_shape = [1] * num_inputs
+                leading_shape[i] = input_sizes[i]
+
+                target_shape = tuple(leading_shape) + arr.shape[1:]
+                reshaped_arr = arr.reshape(target_shape)
+
+                full_leading_shape = tuple(input_sizes)
+                full_target_shape = full_leading_shape + arr.shape[1:]
+                broadcasted_arr = jnp.broadcast_to(reshaped_arr, full_target_shape)
+
+                final_shape = (-1,) + arr.shape[1:]
+                final_arr = broadcasted_arr.reshape(final_shape)
+
+                batch_arrays.append(final_arr)
+        
+        else:
+            raise ValueError("Batch mode must be 'zip' or 'mesh'.")
+
+        total_states = batch_arrays[0].shape[0]
+        tag_groups = [p.tag.split('.') for p in self.state_inputs]
+        leading_state = [int(g[0] == "state") for g in tag_groups]
+        state_tags = ['.'.join(g[slice(leading_state[i], None)]) for i, g in enumerate(tag_groups)]
+
+        state_inputs = tuple(
+            DataPath(
+                tag=p.tag,
+                path=state_tags[idx],
+                path_slice=p.path_slice,
+                value=batch_arrays[idx]
+            )
+            for idx, p in enumerate(self.state_inputs)
+        )
+
+        return state_inputs, total_states
+
+    @staticmethod
+    def _update_inputs(pytree: State | System, idx: int, batch_size: int, inputs:Sequence[DataPath]):
+        input_arrays = tuple(si.value[idx:idx+batch_size] for si in inputs)
+        actual_size = input_arrays[0].shape[0]
+
+        if actual_size < batch_size:
+            pads = [((0, batch_size - actual_size),) + ((0, 0),) * (arr.ndim - 1) for arr in input_arrays]
+            padded_arrays = [jnp.pad(arr, pads[i], mode="edge") for i, arr in enumerate(input_arrays)]
+        else:
+            padded_arrays = input_arrays
+
+        return eqx.tree_at(lambda p: get_all_targets(p, inputs), pytree, padded_arrays)
+
+    def __call__(self, state:State, system:System, settings:Settings) -> Tuple[State, System, Settings]:
+
+        batch_size = settings.numerical.batch_size
+        batch_mode = settings.numerical.batch_mode
+
+        state_inputs, total_states = self._batch_inputs(batch_mode)
+
+        batch_state = state.expand_batch(batch_size)
+        batch_axes = batch_state.get_vmap_axes()
+
+        batch_analyze = eqx.filter_jit(eqx.filter_vmap(self.analyze.__call__, in_axes=(batch_axes, None, None)))
+
+        if settings.logging.handle is not None:
+            pbar = range(0, total_states, batch_size)
+        else:
+            pbar = trange(0, total_states, batch_size, desc=self.tag)
+
+        batch_states = []
+        for batch_idx in pbar:
+            updated_state = self._update_inputs(batch_state, batch_idx, batch_size, state_inputs)
+            b_st,  _ ,  _ = batch_analyze(updated_state, system, settings)
+            actual_size = min(batch_size, total_states - batch_idx)
+            if actual_size < batch_size:
+                b_st = b_st.truncate(actual_size)
+            batch_states.append(b_st)
+
+        f_st = State.concatenate(batch_states)
+
+        return f_st, system, settings
+
 class BatchAnalysis:
     def __init__(
         self,
@@ -68,10 +190,9 @@ class BatchAnalysis:
         system: System,
         settings: Settings,
         mode="zip",
-        batch_size: Optional[int] = None,
         handle: Optional[str] = None,
         **kwargs,
-    ):
+    ):  
 
         if handle is not None:  # Inherit logger from dataset generator
             logger = logging.getLogger(handle)
@@ -86,11 +207,11 @@ class BatchAnalysis:
             logger.addHandler(ch)
 
         # Set up base state
-        from eden_trace.framework.conditions import Time
-
-        state = State(time=Time(number_of_control_points=1, calculate_integration=False))
+        state = State()
         initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
         base_state = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
+
+        batch_size = settings.numerical.batch_size
 
         input_keys = []
         active_keys = []
@@ -220,36 +341,7 @@ class BatchAnalysis:
 #  Sharded Dataset Generator
 # ----------------------------------------------------------------------------------------------------------------------
 
-class JAXCompileFilter(logging.Filter):
-    
-    def filter(self, record):
-        msg = record.getMessage()
 
-        # 1. Identify if this is a compilation/tracing log
-        is_compile_log = any(
-            keyword in msg
-            for keyword in ["Compiling", "tracing + transforming", "Finished jaxpr to MLIR", "Finished XLA compilation"]
-        )
-
-        # 2. If it IS a compile log, apply our strict whitelist & formatting
-        if is_compile_log:
-            # Block it if it's not the main solve
-            # if "jit(run)" not in msg:
-            #     return False
-
-            # If it is the main solve, truncate the massive PyTree dump
-            if "with global shapes and types" in msg:
-                parts = msg.split("with global shapes and types")
-                prefix = parts[0] + "with global shapes and types"
-                suffix = parts[1][:30] if len(parts) > 1 else ""
-
-                record.msg = f"{prefix} {suffix} ... [PyTree Truncated]"
-                record.args = ()
-
-            return True
-
-        # 3. If it's NOT a compile log (e.g., GPU memory warning), let it through untouched
-        return True
 
 
 class ShardManager:

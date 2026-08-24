@@ -12,13 +12,13 @@ import pandas as pd
 
 import equinox as eqx
 
+from eden_trace.utils import configure_environment
+
 from eden_trace.library.components.energy.jets import data as jet_data
 from eden_trace.library.components.energy.networks import TurbofanNetwork
 
 from eden_trace.framework import State, Settings, Aircraft
-from eden_trace.framework.analyses.energy.jets import DesignTurbofan, JetSettings
-
-
+from eden_trace.framework.analyses.energy.jets import design_turbofan_mp, JetSettings
 
 if __name__ == "__main__":
     
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     e_st = State()
     sys = Aircraft(subcomponents=(TurbofanNetwork(),))
     setts = Settings(verbose=True, DEBUG_MODE=True)
-    e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
+    configure_environment(setts)
 
     for e_name in [
         "CF6_50_C2",
@@ -48,6 +48,7 @@ if __name__ == "__main__":
         # "FJ44",
     ]:
         engine = getattr(jet_data, e_name, False)
+        e_setts = eqx.tree_at(lambda s: s.analysis.energy, setts, JetSettings("Imperial", True))
         
         if not engine:
             print(f"Failed to import '{e_name}'. Skipping...")
@@ -56,14 +57,14 @@ if __name__ == "__main__":
             print(f"Designing {e_name.replace('_','-')}")
             print("-"*70)
             e_sys = eqx.tree_at(lambda n: n.energy.line.engine, sys, engine)
-            d_st, d_sys, d_setts = DesignTurbofan(e_st, e_sys, e_setts)
+            d_st, d_sys, d_setts = design_turbofan_mp(e_st, e_sys, e_setts)
 
-            thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
-            fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()
-            lpc_MFR = d_st.energy.nodes['network.line.engine.lpc'].outputs.flow.mass_flow_rate.item()
+            # thrust = d_st.energy.nodes['network.line.engine'].outputs.force.thrust.item()
+            # fan_MFR = d_st.energy.nodes['network.line.engine.fan'].outputs.flow.mass_flow_rate.item()
+            # lpc_MFR = d_st.energy.nodes['network.line.engine.lpc'].outputs.flow.mass_flow_rate.item()
 
-            print(f"Fan MFR: {fan_MFR:.2e}")
-            print(f"LPC MFR: {lpc_MFR:.2e}")
+            # print(f"Fan MFR: {fan_MFR:.2e}")
+            # print(f"LPC MFR: {lpc_MFR:.2e}")
 
             MFR = d_st.energy.mass_flow_rate.item()
             dMFR = d_sys.energy.line.engine.design_parameters.mass_flow_rate

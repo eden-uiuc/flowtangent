@@ -217,7 +217,6 @@ class FlowDesign(eqx.Module):
     intake_temperature: float = 298.15
     output_temperature: float = 298.15
     
-    A_ratio: float = 1.0
     A_intake: float = 1.0
     A_throat: float = 1.0
     A_exit: float = 1.0
@@ -279,7 +278,7 @@ class BleedFlow(GraphNode):
 
 
 @register
-class FlowNode[DesignType: FlowDesign](GraphNode):
+class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
     
     design_parameters: DesignType = init_field(FlowDesign)
     working_fluid: IdealGas = init_field(Air)
@@ -310,40 +309,48 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
     
     def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-        
-        # Get incoming flow values
-        W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
-        T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
-        h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
-        
-        # Calculate mixed baseline
-        W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
-        h_t_mix = jnp.dot(W_fracs, h_t_fracs.T) / W_mix
 
-        # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
-        elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
-        template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
-        
-        mixed_fluid = eqx.tree_at(
-            lambda t: t.composition.mass_fractions,
-            template_fluid,
-            fractions)
-        
-        # Invert temperature from enthalpy
-        T_t_guess = jnp.dot(W_fracs, T_t_fracs.T) / W_mix
-        T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
-        P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
-
-        # Check for fuel in mixture and dilute
-        try:
-            p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
-            p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
-            FAR = p_FAR * p_W / W_mix
-        except:
-            FAR = jnp.atleast_2d(0.0)
-        
         M = self.get_primary_input_state(state, "flow", "mach_number")
 
+        if len(self.flow_inputs) == 1:
+            mixed_fluid = self.get_primary_input_state(state, "flow", "fluid")
+            T_t         = self.get_primary_input_state(state, "flow", "stagnation_temperature")
+            P_t         = self.get_primary_input_state(state, "flow", "stagnation_pressure")
+            W_mix       = self.get_primary_input_state(state, "flow", "mass_flow_rate")
+            FAR         = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
+
+        else:
+            # Get incoming flow values
+            W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
+            T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
+            h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
+            
+            # Calculate mixed baseline
+            W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
+            h_t_mix = jnp.sum(W_fracs * h_t_fracs, axis=-1, keepdims=True) / W_mix
+
+            # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
+            elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
+            template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
+            
+            mixed_fluid = eqx.tree_at(
+                lambda t: t.composition.mass_fractions,
+                template_fluid,
+                fractions)
+            
+            # Invert temperature from enthalpy
+            T_t_guess = jnp.sum(W_fracs * T_t_fracs, axis=-1, keepdims=True) / W_mix
+            T_t = mixed_fluid.invert_enthalpy(h_t_mix, T_t_guess)
+            P_t = self.get_primary_input_state(state, "flow", "stagnation_pressure")
+
+            # Check for fuel in mixture and dilute
+            try:
+                p_FAR = self.get_primary_input_state(state, "flow", "fuel_air_ratio")
+                p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
+                FAR = p_FAR * p_W / W_mix
+            except:
+                FAR = jnp.atleast_2d(0.0)
+        
         return mixed_fluid, T_t, P_t, W_mix, FAR, M
     
     def bleed_MFR_frac(self, state:State):
@@ -402,6 +409,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         P_t_out = jnp.where(M > 1.0, ns_P_t, P_t_out_ideal)
         PR_actual = P_t_out / P_t
 
+        # Newton-Raphson step to average T_t_out over gamma change
         def step(T_t_out_ideal, _):
             gamma_out = gas.compute_gamma(T_t_out_ideal)
             gamma_avg = 0.5 * (gamma_in + gamma_out)
@@ -469,9 +477,9 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
         gas, T_t, P_t, W_in, FAR, M = self.mix_inputs(state)
         W_out = W_in * (1.0 - self.bleed_MFR_frac(state))
         
-        PR    = jnp.atleast_2d(self.design_parameters.pressure_ratio)
-        P_rec = jnp.atleast_2d(self.design_parameters.pressure_recovery)
-        n_isn = jnp.atleast_2d(self.design_parameters.eff.flow)
+        PR    = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.pressure_ratio)
+        P_rec = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.pressure_recovery)
+        n_isn = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.eff.flow)
         
         if not statics:
             M = jnp.atleast_2d(0.0)
@@ -481,7 +489,7 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
 
         if design_mode:
             if statics:
-                M_out = jnp.atleast_2d(self.design_parameters.exit_mach_number)
+                M_out = jnp.atleast_2d(system.energy.nodes[self.network_ID].design_parameters.exit_mach_number)
 
                 A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(
                     gas=gas,
@@ -524,8 +532,6 @@ class FlowNode[DesignType: FlowDesign](GraphNode):
             outputs = eqx.tree_at(lambda o: o.mach_number, outputs,         jnp.atleast_2d(M_out))
             outputs = eqx.tree_at(lambda o: o.enthalpy, outputs,            jnp.atleast_2d(h_out))
             outputs = eqx.tree_at(lambda o: o.area, outputs,                jnp.atleast_2d(A_out))
-
-
 
         updated_state = eqx.tree_at(lambda s:
             s.energy.nodes[self.network_ID].outputs.flow,

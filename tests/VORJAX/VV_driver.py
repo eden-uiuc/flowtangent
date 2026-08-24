@@ -37,7 +37,7 @@ from eden_trace.library.components.airfoils import Airfoil, Airfoil_Data
 
 from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
 
-from eden_trace.framework import Process, State, Aircraft, Settings, GradientMap, System
+from eden_trace.framework import Process, State, Aircraft, Settings, JacobianMap, System
 from eden_trace.framework.settings import AnalysisSettings
 from eden_trace.framework.conditions import Time
 
@@ -493,9 +493,9 @@ def VORJAX_test_run(
             InitializeVORJAX(),
             ComputeVORJAX()
         ),
-        initial_state=initial_state,
-        initial_system=initial_system,
-        initial_settings=initial_settings
+        _initial_state=initial_state,
+        _initial_system=initial_system,
+        _initial_settings=initial_settings
     )
 
     results = analysis.run(
@@ -1611,7 +1611,7 @@ if __name__ == "__main__":
     nf_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
     ff_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
 
-    GRAD_MAP = GradientMap(
+    GRAD_MAP = JacobianMap(
         state_inputs=(
             mach_path,
             alpha_path,
@@ -1817,7 +1817,7 @@ if __name__ == "__main__":
                     vehicle,
                     alpha=alpha , Mach=0.00,
                     n_sw=max_segments,
-                    grad_map=GradientMap(
+                    grad_map=JacobianMap(
                         state_inputs=(alpha_path,),
                         state_outputs=(nf_drag_path, ff_drag_path)
                     ),

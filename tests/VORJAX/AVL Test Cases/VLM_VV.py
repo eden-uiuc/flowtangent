@@ -24,7 +24,7 @@ from eden_trace.library.components import Areas
 from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
 from eden_trace.library.components.airfoils import Airfoil
 
-from eden_trace.framework import Process, State, Settings, GradientMap
+from eden_trace.framework import Process, State, Settings, JacobianMap
 from eden_trace.framework.systems import Aircraft
 from eden_trace.framework.conditions import Time
 
@@ -411,9 +411,9 @@ def VORJAX_test_run(vehicle, alpha, Mach, n_sw=20, n_cw=6, grad_map=None, debug_
             InitializeVLM(),
             VLM()
         ),
-        initial_state=initial_state,
-        initial_system=initial_system,
-        initial_settings=initial_settings
+        _initial_state=initial_state,
+        _initial_system=initial_system,
+        _initial_settings=initial_settings
     )
 
     results = analysis.run(
@@ -879,7 +879,7 @@ if __name__ == "__main__":
     alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
     lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
-    grad_map = GradientMap(
+    grad_map = JacobianMap(
         state_inputs=(alpha_path,),
         state_outputs=(lift_path,)
     )
@@ -1016,7 +1016,7 @@ if __name__ == "__main__":
         alpha_path = ru.DataPath(("aerodynamics", "angles", "alpha"))
         lift_path = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"))
 
-        grad_map = GradientMap(
+        grad_map = JacobianMap(
             state_inputs=(alpha_path,),
             state_outputs=(lift_path,)
         )

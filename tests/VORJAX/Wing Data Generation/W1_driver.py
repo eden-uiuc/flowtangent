@@ -18,7 +18,7 @@ from eden_trace.utils import DataPath
 from eden_trace.library import units
 from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
 
-from eden_trace.framework import Aircraft, Settings, GradientMap
+from eden_trace.framework import Aircraft, Settings, JacobianMap
 from eden_trace.framework.settings import AnalysisSettings
 from eden_trace.framework.analyses.batched import ShardedDatasetGenerator
 from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
@@ -246,7 +246,7 @@ if __name__ == "__main__":
         lift_path   = DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
         drag_path   = DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
 
-        GRAD_MAP = GradientMap(
+        GRAD_MAP = JacobianMap(
             state_inputs=(
                 mach_path,
                 alpha_path,

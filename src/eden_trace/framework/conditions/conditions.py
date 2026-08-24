@@ -7,6 +7,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+from typing import Sequence, Self, Optional
 from dataclasses import fields
 
 import equinox as eqx
@@ -21,6 +22,10 @@ from eden_trace.utils import init_field
 #  Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
+STATIC_CONDITIONS = ("AtmosphericBreakpoints")
+
+def _is_static_node(node):
+        return hasattr(node, "__class__") and node.__class__.__name__ in STATIC_CONDITIONS
 
 class Condition(eqx.Module):
     tag: str = init_field("Conditions", static=True)
@@ -48,36 +53,81 @@ class Condition(eqx.Module):
     def __iter__(self):
         return iter(self.subconditions)
 
-    def expand_rows(self, n: int):
+    def expand_time(self, N: Optional[int] = None):
 
-        CLASSES_TO_SKIP = ("AtmosphericBreakpoints", "SolverConditions")
+        if N is None:
+            if hasattr(self, "time"):
+                if hasattr(self.time, "N"):
+                    N = self.time.N
+            else:
+                N = 1
 
         def _expand(leaf):
             if isinstance(leaf, (jnp.ndarray)):
-                # 1. Intercept the empty placeholders
-                if leaf.size == 0:
-                    if leaf.ndim == 1:
-                        # Create a single zero, then broadcast it to (n, 1)
-                        base = jnp.zeros((1, 1), dtype=leaf.dtype)
-                        return jnp.broadcast_to(base, (n, 1))
-                    elif leaf.ndim == 2:
-                        base = jnp.zeros((1, leaf.shape[1]), dtype=leaf.dtype)
-                        return jnp.broadcast_to(base, (n, leaf.shape[1]))
-
-                # 2. Zero-copy expansion for actual data
+                # Zero-copy expansion for actual data
                 if leaf.ndim == 1:
                     # e.g., Shape (X,) -> Shape (n, X)
-                    return jnp.broadcast_to(leaf, (n,) + leaf.shape)
+                    return jnp.broadcast_to(leaf, (N,) + leaf.shape)
                 elif leaf.ndim == 2 and leaf.shape[0] == 1:
                     # e.g., Shape (1, X) -> Shape (n, X)
-                    return jnp.broadcast_to(leaf, (n, leaf.shape[1]))
+                    return jnp.broadcast_to(leaf, (N, leaf.shape[1]))
 
             return leaf
 
-        def _is_static_node(node):
-            return hasattr(node, "__class__") and node.__class__.__name__ in CLASSES_TO_SKIP
+        return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
+
+    def expand_batch(self, batch_size: int):
+
+        def _expand(leaf):
+            if _is_static_node(leaf):
+                return leaf
+            if isinstance(leaf, jnp.ndarray):
+                # # Intercept the empty placeholders
+                # if leaf.size==0:
+                #     trailing_dims = (1,) if leaf.ndim==1 else leaf.shape[1:]
+                #     return jnp.zeros((batch_size,) + trailing_dims, dtype=leaf.dtype)
+                # # Zero-copy expansion prepending batch dim
+                return jnp.broadcast_to(leaf, (batch_size,) + leaf.shape)
+            return leaf
 
         return jax.tree_util.tree_map(_expand, self, is_leaf=_is_static_node)
+
+    @classmethod
+    def concatenate(cls, states: Sequence[Self]):
+        def _concat(*leaves):
+            first_leaf = leaves[0]
+            if _is_static_node(first_leaf):
+                return first_leaf
+            if isinstance(first_leaf, jnp.ndarray):
+                return jnp.concatenate(leaves, axis=0)
+            return first_leaf
+        return jax.tree_util.tree_map(_concat, *states, is_leaf=_is_static_node)
+
+    def truncate(self, size: int):
+        def _trunc(leaf):
+            # 1. Ignore static classes
+            if _is_static_node(leaf):
+                return leaf
+            
+            # 2. Slice the batch dimension (axis 0) of the array
+            if isinstance(leaf, jnp.ndarray):
+                return leaf[:size]
+                
+            return leaf
+
+        return jax.tree_util.tree_map(_trunc, self, is_leaf=_is_static_node)
+
+    def get_vmap_axes(self):
+        def _get_axis(leaf):
+            if _is_static_node(leaf):
+                # JAX allows prefix-trees for in_axes. Returning None for the whole 
+                # object tells JAX to broadcast everything inside this class.
+                return None 
+            if isinstance(leaf, jnp.ndarray):
+                return 0
+            return None
+            
+        return jax.tree_util.tree_map(_get_axis, self, is_leaf=_is_static_node)
 
     def add_subcondition(self, subcondition: "Condition"):
 

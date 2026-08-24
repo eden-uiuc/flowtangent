@@ -516,9 +516,9 @@ def mission_setup(state: State, system: Aircraft, settings: Settings):
             cruise_segment,
             # descent_segment,
             ), #type: ignore
-        initial_state=state,
-        initial_system=system,
-        initial_settings=settings
+        _initial_state=state,
+        _initial_system=system,
+        _initial_settings=settings
     )
 
     updated_segments = []

@@ -25,8 +25,8 @@ from eden_trace.framework.conditions import Condition
 
 @register
 class NumericalTime(Condition):
-    control_points: jnp.ndarray = empty_array(0)
-    differentiate: jnp.ndarray = empty_array(0)
+    control_points: jnp.ndarray = empty_array()
+    differentiate: jnp.ndarray = empty_array()
     integrate: jnp.ndarray | None = None
 
     def __repr__(self):
@@ -37,7 +37,7 @@ class NumericalTime(Condition):
 class Time(Condition):
     tag: str = init_field("Time", static=True)
 
-    n_cp: int = init_field(1, static=True)
+    N: int = 1
     
     dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
     dimensional: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensional Time"))
@@ -100,5 +100,5 @@ class Time(Condition):
 
     def __post_init__(self):
         # Guard against abstract tracers during JIT
-        if self.n_cp <= 1:
+        if self.N <= 1:
             return

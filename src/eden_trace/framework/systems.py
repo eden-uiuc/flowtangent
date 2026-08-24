@@ -53,8 +53,8 @@ class System(Component):
 
 
 class AircraftReferenceGeometry(eqx.Module):
-    mean_aerodynamic_chord: jnp.ndarray = empty_array(0)
-    projected_span: jnp.ndarray = empty_array(0)
+    mean_aerodynamic_chord: jnp.ndarray = empty_array()
+    projected_span: jnp.ndarray = empty_array()
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
 
@@ -103,7 +103,7 @@ class Aircraft[EnergyType: GraphNetwork](System):
     reference_geometry: AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
     analysis_data: dict = init_field(dict)
 
-    def sort_network_topology(self) -> Aircraft:
-        sorted_network = self.energy.sort_network_topology()
+    def update_network_topology(self) -> Aircraft:
+        sorted_network = self.energy.update_node_topology()
         return self.replace_subcomponent(sorted_network)
         

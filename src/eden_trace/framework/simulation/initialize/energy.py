@@ -61,5 +61,6 @@ def initialize_energy(state: State, system: System, settings: Settings):
             updated_state = eqx.tree_at(lambda s: s.energy, updated_state, network_state)
         
         updated_state = eqx.tree_at(lambda s: s.energy.nodes, updated_state, node_states)
+        updated_state = updated_state.expand_time()
 
     return updated_state, updated_system, settings
