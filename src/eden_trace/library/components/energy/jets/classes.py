@@ -1303,7 +1303,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
                 base_components = _TurbojetSetup()
         
 
-        inlet = FlowNode(tag="Inlet", inputs=GraphInput("flow", "freestream"))
+        inlet = Inlet()
         comp = Compressor()
         comb = Burner()
         turb = Turbine()

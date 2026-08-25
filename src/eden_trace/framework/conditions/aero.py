@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.framework.conditions import Condition
 
@@ -26,6 +26,7 @@ from eden_trace.framework.conditions import Condition
 # Component-Level Bookkeeping ------------------------------
 
 
+@register
 class ComponentCoefficients(Condition):
     tag: str = init_field("Component Coefficients", static=True)
 
@@ -40,6 +41,7 @@ class ComponentCoefficients(Condition):
 # Lift Coefficients ----------------------------------------
 
 
+@register
 class LiftCoefficients(Condition):
     # Attribute     Type            Default Value
     tag: str = init_field("Lift Coefficients", static=True)
@@ -53,6 +55,7 @@ class LiftCoefficients(Condition):
 # Drag Coefficients ----------------------------------------
 
 
+@register
 class InducedDrag(Condition):
     # Attribute   Type            Default Value
     tag: str = init_field("Induced Drag", static=True)
@@ -65,6 +68,7 @@ class InducedDrag(Condition):
     far_field: ComponentCoefficients = init_field(lambda: ComponentCoefficients(tag="Far-Field Induced Drag"))
 
 
+@register
 class DragCoefficients(Condition):
     # Attribute     Type            Default Value
     tag: str = init_field("Drag Coefficients", static=True)
@@ -82,6 +86,7 @@ class DragCoefficients(Condition):
 # Moment Coefficients --------------------------------------
 
 
+@register
 class MomentCoefficients(Condition):
     # Attribute         Type            Default Value
     tag: str = init_field("Moment Coefficients", static=True)
@@ -94,6 +99,7 @@ class MomentCoefficients(Condition):
 # All Coefficients -----------------------------------------
 
 
+@register
 class AerodynamicCoefficients(Condition):
     # Attribute         Type                Default Value
     tag: str = init_field("Aerodynamic Coefficients", static=True)
@@ -113,6 +119,7 @@ class AerodynamicCoefficients(Condition):
 # ----------------------------------------------------------
 
 
+@register
 class AerodynamicAngles(Condition):
     # Attribute         Type        Default Value
     tag: str = init_field("Aerodynamic Angles", static=True)
@@ -127,6 +134,7 @@ class AerodynamicAngles(Condition):
 # ----------------------------------------------------------
 
 
+@register
 class AerodynamicsConditions(Condition):
     # Attribute     Type                    Default Value
     tag: str = init_field("Aerodynamics", static=True)

@@ -182,7 +182,7 @@ class NumericalSettings(eqx.Module):
     batch_mode: Literal['zip', 'mesh'] = init_field('zip', static=True)
 
     number_of_control_points: int = init_field(1, static=True)
-    maximum_graph_complexity: int = init_field(2e5, static=True)
+    maximum_graph_complexity: int = init_field(1e6, static=True)
 
     sum_residuals: bool = init_field(False, static=True)
     calculate_jacobian: bool = init_field(False, static=True)

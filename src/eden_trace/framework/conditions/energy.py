@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.library.gases import IdealGas, Air
 from eden_trace.framework.conditions import Condition
@@ -20,6 +20,7 @@ from eden_trace.framework.conditions import Condition
 #  Energy Interfaces
 # ----------------------------------------------------------------------------------------------------------------------
 
+@register
 class MechanicalOutputs(Condition):
     tag = "Mechanical Outputs"
 
@@ -27,6 +28,7 @@ class MechanicalOutputs(Condition):
     power: jnp.ndarray = empty_array()
 
 
+@register
 class ElectricalOutputs(Condition):
     tag = "Electrical Outputs"
 
@@ -35,6 +37,7 @@ class ElectricalOutputs(Condition):
     current: jnp.ndarray = empty_array()
 
 
+@register
 class FuelOutputs(Condition):
     tag = "Fuel Outputs"
 
@@ -42,6 +45,7 @@ class FuelOutputs(Condition):
     flow_rate: jnp.ndarray = empty_array()
 
 
+@register
 class FlowOutputs(Condition):
     tag = "Flow Outputs"
     fluid: IdealGas = init_field(Air)
@@ -71,6 +75,7 @@ class FlowOutputs(Condition):
     Cp: jnp.ndarray = empty_array()
     R: jnp.ndarray = empty_array()
 
+@register
 class ResidualOutputs(Condition):
     tag = "Residual Outputs"
 
@@ -95,6 +100,7 @@ class ResidualOutputs(Condition):
     lpt_Wp: jnp.ndarray = empty_array()
     hpt_Wp: jnp.ndarray = empty_array()
 
+@register
 class ForceOutputs(Condition):
     tag = "Force Outputs"
 
@@ -103,6 +109,7 @@ class ForceOutputs(Condition):
     specific_impulse: jnp.ndarray = empty_array()
 
 
+@register
 class OutputConditions(Condition):
     tag = "Node Outputs"
 
@@ -114,6 +121,7 @@ class OutputConditions(Condition):
     residual: ResidualOutputs = init_field(ResidualOutputs)
 
 
+@register
 class NodeConditions(Condition):
     # Attribute         Type                Default Value
     tag: str = init_field("Energy Node Conditions", static=True)
@@ -126,6 +134,7 @@ class NodeConditions(Condition):
 #  Energy Stores
 # ----------------------------------------------------------------------------------------------------------------------
 
+@register
 class BatteryCellConditions(NodeConditions):
     # Attribute                 Type        Default Value
     tag: str = init_field("Battery Cell", static=True)
@@ -139,6 +148,7 @@ class BatteryCellConditions(NodeConditions):
     state_of_charge: jnp.ndarray = empty_array()
 
 
+@register
 class BatteryPackConditions(NodeConditions):
     # Attribute             Type                    Default Value
     tag: str = init_field("Battery Pack", static=True)
@@ -155,6 +165,7 @@ class BatteryPackConditions(NodeConditions):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@register
 class EnergyNetworkConditions(NodeConditions):
     tag: str = init_field("Energy Network", static=True)
 
@@ -170,6 +181,7 @@ class EnergyNetworkConditions(NodeConditions):
     total_moment_vector: jnp.ndarray = empty_array((0, 3))
 
 
+@register
 class TurbojetNetworkConditions(EnergyNetworkConditions):
     
     tag: str = init_field("Turbojet Network", static=True)
@@ -184,6 +196,7 @@ class TurbojetNetworkConditions(EnergyNetworkConditions):
     target_thrust: jnp.ndarray = empty_array()
     target_temperature: jnp.ndarray = empty_array()
 
+@register
 class TurbofanNetworkConditions(EnergyNetworkConditions):
 
     tag: str = init_field("Turbofan Network", static=True)

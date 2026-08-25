@@ -23,6 +23,11 @@ def numerical_environment():
             except Exception as e:
                 print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
 
+    cache_path = os.path.expanduser("~/.eden_trace/jax_cache")
+    os.makedirs(cache_path, exist_ok=True)
+    os.environ["JAX_COMPILATION_CACHE_DIR"] = cache_path
+
+
 numerical_environment()
 
 import json
@@ -52,7 +57,8 @@ def system_setup(variable_nozzle: bool = False):
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
         mass_flow_rate=168.45 * units.lbm/units.s,
-        turbine_PR=4.46
+        turbine_PR=4.46,
+        turbine_intake_temperature=2370.0 * units.R,
     )
     engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
     
@@ -216,7 +222,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
         # 'fc.Fl_O':     'freestream',
         'inlet.Fl_O':  'network.line.engine.inlet',
         'comp.Fl_O':   'network.line.engine.compressor',
-        'burner.Fl_O': 'network.line.engine.combustor',
+        'burner.Fl_O': 'network.line.engine.burner',
         'turb.Fl_O':   'network.line.engine.turbine',
         'nozz.Fl_O':   'network.line.engine.core_nozzle'
     }
@@ -339,8 +345,10 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
 if __name__ == "__main__":
     
     # Control Board
-    DEBUG = True
+    DEV = True
+    DEBUG = False
     VERBOSE = True
+
     V_NOZZ = False
     STATICS = False
 
@@ -352,11 +360,11 @@ if __name__ == "__main__":
     system = system_setup(variable_nozzle=V_NOZZ)
     settings = eqx.tree_at(
         lambda s: s.analysis.energy,
-        Settings(DEBUG_MODE=DEBUG, verbose=VERBOSE),
+        Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE),
         JetSettings(design_mode=DESIGN_POINT, statics=STATICS)
     )
     configure_environment(settings)
-    test_dir = Path("./tests/PyCycle/PyCycle_Examples/turbojet")
+    test_dir = Path("./tests/Energy/PyCycle_Examples/turbojet")
 
     if DESIGN_POINT:
         print("="*80)
@@ -369,7 +377,8 @@ if __name__ == "__main__":
             settings=settings,
         )
 
-        save_data(des_sys, test_dir / "simple_turbojet.trs")
+        save_data(des_sys, test_dir / "turbojet.fts")
+        save_data(des_st, test_dir / "turbojet_design_state.fts")
 
         validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", des_st)
         validation_df.to_csv(test_dir / "DESIGN_validation.csv")

@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.library.atmospheres import Atmosphere, USStandard1976
 from eden_trace.library.planets import Earth, Planet
@@ -22,7 +22,7 @@ from eden_trace.framework.conditions import Condition
 #  Freestream
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class FreestreamConditions(Condition):
     """
     Represents the freestream conditions in a flight environment.

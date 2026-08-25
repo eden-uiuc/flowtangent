@@ -12,8 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
-
+from eden_trace.utils import empty_array, init_field, register
 from eden_trace.framework.conditions import Condition
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -21,6 +20,7 @@ from eden_trace.framework.conditions import Condition
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+@register
 class StaticCoefficients(Condition):
     """
     Static stability coefficients for an aircraft.
@@ -74,6 +74,7 @@ class StaticCoefficients(Condition):
     e: jnp.ndarray = empty_array()
 
 
+@register
 class StaticForces(Condition):
     """
     Static forces acting on an aircraft.
@@ -113,6 +114,7 @@ class StaticForces(Condition):
     Z: jnp.ndarray = empty_array()
 
 
+@register
 class StaticMoments(Condition):
     """
     Represents the static moments acting on an aircraft.
@@ -145,6 +147,7 @@ class StaticMoments(Condition):
     N: jnp.ndarray = empty_array()
 
 
+@register
 class CoefficientDerivatives(Condition):
     """
     Represents the coefficient derivatives for static stability analysis of an aircraft.
@@ -221,6 +224,7 @@ class CoefficientDerivatives(Condition):
     r: jnp.ndarray = empty_array()
 
 
+@register
 class StaticDerivatives(Condition):
     """
     Represents the static stability coefficient derivatives for an aircraft.
@@ -286,6 +290,7 @@ class StaticDerivatives(Condition):
     )
 
 
+@register
 class StaticStability(Condition):
     tag: str = init_field("Static Stability", static=True)
 
@@ -304,6 +309,7 @@ class StaticStability(Condition):
     yaw_rate: jnp.ndarray = empty_array()
 
 
+@register
 class DynamicStability(Condition):
     # Attribute      Type        Default Value
     tag: str = init_field("Dynamic Stability", static=True)
@@ -312,6 +318,7 @@ class DynamicStability(Condition):
     LatModes: Condition = init_field(lambda: Condition(tag="Lateral Modes"))
 
 
+@register
 class StabilityConditions(Condition):
     # Attribute     Type                Default Value
     tag: str = init_field("Stability", static=True)

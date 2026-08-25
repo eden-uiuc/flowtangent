@@ -12,7 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.framework.conditions import Condition
 
@@ -20,7 +20,7 @@ from eden_trace.framework.conditions import Condition
 #  Mass
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class MassConditions(Condition):
     """
     Represents the mass conditions for a vehicle or system.

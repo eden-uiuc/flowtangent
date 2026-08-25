@@ -12,7 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, init_field, register
 
 from eden_trace.framework.conditions import Condition
 
@@ -20,7 +20,7 @@ from eden_trace.framework.conditions import Condition
 #  Frames
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class Frame(Condition):
     # Attribute             Type        Default Value
     tag: str = init_field("Frame", static=True)
@@ -30,7 +30,7 @@ class Frame(Condition):
     total_force_vector: jnp.ndarray = empty_array((0, 3))
     total_moment_vector: jnp.ndarray = empty_array((0, 3))
 
-
+@register
 class InertialFrame(Frame):
     # Attribute                     Type        Default Value
     tag: str = init_field("Inertial Frame", static=True)
@@ -48,7 +48,7 @@ class InertialFrame(Frame):
     time: jnp.ndarray = empty_array((0))
     system_range: jnp.ndarray = empty_array((0))
 
-
+@register
 class BodyFrame(Frame):
     # Attribute             Type        Default Value
     tag: str = init_field("Body Frame", static=True)
@@ -57,7 +57,7 @@ class BodyFrame(Frame):
     thrust_force_vector: jnp.ndarray = empty_array((0, 3))
     moment_vector: jnp.ndarray = empty_array((0, 3))
 
-
+@register
 class WindFrame(Frame):
     # Attribute         Type            Default Value
     tag: str = init_field("Wind Frame", static=True)
@@ -69,7 +69,7 @@ class WindFrame(Frame):
     force_vector: jnp.ndarray = empty_array((0, 3))
     moment_vector: jnp.ndarray = empty_array((0, 3))
 
-
+@register
 class PlanetFrame(Frame):
     # Attribute     Type            Default Value
     tag: str = init_field("Planet Frame", static=True)
@@ -81,7 +81,7 @@ class PlanetFrame(Frame):
 
     true_course: jnp.ndarray = empty_array()
 
-
+@register
 class Frames(Condition):
     # Attribute     Type            Default Value
     tag: str = init_field("Dynamic Frames", static=True)
