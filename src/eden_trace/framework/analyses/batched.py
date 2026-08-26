@@ -36,7 +36,7 @@ from tqdm import tqdm, trange
 from eden_trace.utils import init_field, get_all_targets, DataPath
 from eden_trace.framework import Process, Settings, State, System
 
-from .residual import ResidualAnalysis
+from .implicit import ImplicitAnalysis
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Batch Analysis
@@ -59,7 +59,7 @@ class BatchedAnalysis(Process):
     
             self.analyze = analyze
     
-            if not isinstance(self.analyze, ResidualAnalysis):
+            if not isinstance(self.analyze, ImplicitAnalysis):
                 self.state_inputs = state_inputs
             else:
                 ctrls = self.analyze.controls

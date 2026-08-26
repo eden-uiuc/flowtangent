@@ -177,7 +177,6 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
     def _get_all_nodes(self) -> "GraphNetwork":
         nodes_dict = {}
 
-
         def _recurse(subcomponents):
             for comp in subcomponents:
                 if isinstance(comp, GraphNode):

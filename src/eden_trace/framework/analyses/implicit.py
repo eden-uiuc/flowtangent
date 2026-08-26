@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING, Optional, Any, Callable, Literal, overload
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
 
+import contextlib
+import io
+import logging
+import os
 import sys
 import time
 import threading
@@ -25,18 +29,19 @@ import numpy as np
 import optimistix as optx
 
 from jax.core import Tracer
+from jax.flatten_util import ravel_pytree
 from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
 from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
-from eden_trace.framework import Process, ProcessStep, Settings, State, System
+from eden_trace.framework import Process, Settings, State, System
 from eden_trace.framework.conditions.controls import Control, Residual
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
-class Spinner:
+class TraceReadout:
     def __init__(self, message="Tracing ...", enabled=True):
         self.spinner_chars = "|/-\\"
         self.message = message
@@ -44,24 +49,43 @@ class Spinner:
         self.running = False
         self.thread = None
 
+        self.start_time = None
+        self.null_fd = None
+        self.saved_stderr_fd = None
+
     def spin(self):
         i = 0
         while self.running:
-            sys.stdout.write(f"\r{self.message} {self.spinner_chars[i % 4]}")
+            if self.start_time:
+                elapsed = int(time.time() - self.start_time)
+                mins, secs = divmod(elapsed, 60)
+                sys.stdout.write(f"\r{self.message} [{mins:02d}:{secs:02d}] \033[K")
+            else:
+                sys.stdout.write(f"\r{self.message} {self.spinner_chars[i % 4]} \033[K")
+
             sys.stdout.flush()
             time.sleep(0.1)
             i += 1
 
     def update_status(self, message):
-        """Allows external updates to the message while running."""
         self.message = message
-        # \033[K clears to the end of the line so shorter strings don't leave artifacts
-        sys.stdout.write(f"\r{self.message} \033[K")
+        if self.start_time:
+            elapsed = int(time.time() - self.start_time)
+            mins, secs = divmod(elapsed, 60)
+            sys.stdout.write(f"\r{self.message} [{mins:02d}:{secs:02d}] \033[K")
+        else:
+            sys.stdout.write(f"\r{self.message} \033[K")
         sys.stdout.flush()
     
 
     def __enter__(self):
         if self.enabled:
+            # 1. Hijack the OS-level stderr (File Descriptor 2) to silence C++ XLA
+            self.null_fd = os.open(os.devnull, os.O_WRONLY)
+            self.saved_stderr_fd = os.dup(2) # Save the real stderr
+            os.dup2(self.null_fd, 2)         # Point stderr to black hole
+            
+            self.start_time = time.time()
             self.running = True
             self.thread = threading.Thread(target=self.spin)
             self.thread.start()
@@ -72,7 +96,16 @@ class Spinner:
             self.running = False
             if self.thread is not None:
                 self.thread.join()
-            sys.stdout.write(f"\nAnalysis complete.\n")
+                
+            # 2. Restore the OS-level stderr immediately so Python errors can print
+            if self.saved_stderr_fd is not None:
+                os.dup2(self.saved_stderr_fd, 2)
+                os.close(self.saved_stderr_fd)
+                os.close(self.null_fd)
+                
+            elapsed = int(time.time() - self.start_time)
+            mins, secs = divmod(elapsed, 60)
+            sys.stdout.write(f"\r{self.message} [{mins:02d}:{secs:02d}] Complete. \033[K\n")
             sys.stdout.flush()
 
 _last_static = None
@@ -178,12 +211,12 @@ def analyze_compute_graph(func, *args):
 #  Residual Analysis Class
 # ----------------------------------------------------------------------------------------------------------------------
 
-class ResidualAnalysis(Process):
+class ImplicitAnalysis(Process):
 
-    tag: str = init_field("Residual Analysis")
+    tag: str = init_field("Implicit Analysis")
 
     analyze: Process = init_field(Process)
-    solver: Any | str = init_field(optx.LevenbergMarquardt, as_value=True, static=True)
+    solver: Any | str = init_field(optx.Chord, as_value=True, static=True)
     solver_options: Optional[dict] = init_field(None, static=True)
 
     controls: tuple[Control, ...] = init_field(tuple)
@@ -191,8 +224,8 @@ class ResidualAnalysis(Process):
 
     def __init__(
             self,
-            analyze: Process = Process(tag="Residual Analysis Forward Pass"),
-            solver: Any | str = optx.LevenbergMarquardt,
+            analyze: Process = Process(tag="Implicit Analysis Forward Pass"),
+            solver: Any | str = optx.Chord,
             solver_options: Optional[dict] = None,
             controls: tuple[Control, ...] = (),
             residuals: tuple[Residual, ...] = (),
@@ -280,7 +313,7 @@ class ResidualAnalysis(Process):
         # Run the forward pass one last time
         print(f"\n  Final Control Values:")
         for idx, ctrl in enumerate(active_controls):
-            print(f"    {ctrl.tag:<{pad}}: {format_array(f_ctrls[idx])}")
+            print(f"    {ctrl.tag:<{pad}}: {format_array(ctrl.scale(f_ctrls[idx]))}")
 
         if f_res is not None:
             print(f"\n  Final Residual Values:")
@@ -423,7 +456,11 @@ class ResidualAnalysis(Process):
             system: System,
             settings: Settings,
     ):
-        # Residual wrapper definied in _run_solver scope to avoid tracing self argument if it were a bound method ------
+
+        # dyn_args, stat_args = eqx.partition((state, system), eqx.is_array)
+        # arg_tensor, unravel_fn = ravel_pytree(dyn_args)
+
+        # Residual wrapper defined in _run_solver scope to avoid tracing self argument if it were a bound method ------
         @eqx.filter_jit
         def get_residuals(control_values, args):
 
@@ -442,6 +479,11 @@ class ResidualAnalysis(Process):
             analysis_state, analysis_system, analysis_settings = self.analyze(control_state, system, settings)
             
             return self._get_residual_array(analysis_state, analysis_settings), (analysis_state, analysis_system, analysis_settings)
+
+        def flat_residuals(c, flat_args):
+            r_dyn = unravel_fn(flat_args)
+            r_state, r_system = eqx.combine(r_dyn, stat_args)
+            return get_residuals(c, (r_state, r_system, settings))
         
         # Run solver w/ dev mode profiling -----------------------------------------------------------------------------
         if self.solver_options is None:
@@ -462,65 +504,122 @@ class ResidualAnalysis(Process):
         else:
             solver_options = self.solver_options
 
-        if settings._DEV_MODE:
-            print("Tracing Forward Pass...")
-            t0 = time.time()
-            # Use your objective wrapper from earlier
-            forward_func = jax.jit(lambda x: get_residuals(x, (state, system, settings)))
-            _ = forward_func(control_values) # Force compile
-            print(f"Forward Pass Compile Time: {time.time() - t0:.2f} seconds")
+        if settings.DEBUG_MODE:    
 
-            # 2. Profile the Jacobian
-            print("\nTracing Jacobian...")
-            t0 = time.time()
-            jac_func = jax.jit(jax.jacfwd(lambda x: get_residuals(x, (state, system, settings))))
-            _ = jac_func(control_values) # Force compile
-            print(f"Jacobian Compile Time: {time.time() - t0:.2f} seconds")
+            print(f"DEBUG MODE: Executing single forward pass...")
+            _, (f_st, f_sys, f_set) = get_residuals(control_values, (state, system, settings))
+            f_ctrls = self._get_control_array(f_st, f_set)
+            opt_state = None
+
+        if settings._DEV_MODE:
+
+            @contextlib.contextmanager
+            def track_jax_cache():
+                "Check JAX logs to read the cache status."
+                stream = io.StringIO()
+                handler = logging.StreamHandler(stream)
+                logger = logging.getLogger("jax._src.compiler")
+
+                old_level = logger.level
+                logger.setLevel(logging.DEBUG)
+                logger.addHandler(handler)
+
+                try:
+                    yield stream
+                finally:
+                    logger.removeHandler(handler)
+                    logger.setLevel(old_level)
+
+            def get_cache_status(log_text: str) -> str:
+                log_text = log_text.lower()
+                if "cache hit" in log_text:
+                    return "CACHE HIT"
+                elif "cache miss" in log_text:
+                    return "CACHE MISS"
+                elif "writing" in log_text:
+                    return "WRITING TO CACHE"
+                else:
+                    return "UNKNOWN CACHE STATUS (Check cache dir)"
 
             print(f"\n{'='*60}")
             print("Starting JAX AOT Compilation Profiler...")
             print(f"{'-'*60}")
 
-            # Profile the JAX lowering phase if using Optimistix
+            leaves = jax.tree_util.tree_leaves((control_values, (state, system, settings)))
+            print(f"Total Input Leaves: {len(leaves)}\n")
+
+            print("1. Tracing Forward Pass and Lowering to HLO...")
+            t0 = time.time()
+            
+            fwd_fn = lambda x: get_residuals(x, (state, system, settings))
+            fwd_lowered = eqx.filter_jit(fwd_fn).lower(control_values)
+            print(f" - Forward Lowering Time: {time.time() - t0:.2f} seconds")
+
+            fwd_hlo_text = fwd_lowered.as_text()
+            fwd_graph_length = len(fwd_hlo_text.splitlines())
+            print(f" - Forward XLA HLO Graph Size: {fwd_graph_length:,} Lines of Code")
+
+            print(" - Compiling Forward Pass ...")
+            t0 = time.time()
+            with track_jax_cache() as log_stream:
+                fwd_compiled = fwd_lowered.compile()
+            t_comp = time.time() - t0
+            cache_status = get_cache_status(log_stream.getvalue())
+            print(f" - Forwrd XLA Compile Time: {t_comp:.2f} seconds ({cache_status})")
+
+            print("\n2. Tracing Jacobian & Lowering to HLO...")
+            t0 = time.time()
+            jac_fn = lambda x: jax.jacrev(fwd_fn, has_aux=True)(x)
+            jac_lowered = eqx.filter_jit(jac_fn).lower(control_values)
+            print(f" - Jacobian Lowering Time: {time.time() - t0:.2f} seconds")
+
+            jac_hlo_text = jac_lowered.as_text()
+            jac_graph_length = len(jac_hlo_text.splitlines())
+            print(f" - Jacobian XLA HLO Graph Size: {jac_graph_length:,} Lines of Code")
+
+            print(" - Compiling Jacobian (Checking Cache)...")
+            t0 = time.time()
+            with track_jax_cache() as log_stream:
+                jac_compiled = jac_lowered.compile()
+            t_comp = time.time() - t0
+            cache_status = get_cache_status(log_stream.getvalue())
+            print(f" - XLA Compile Time: {t_comp:.2f} seconds ({cache_status})")
             
             # We use a lambda to cleanly pass all arguments to the solver's run method
             if isinstance(self.solver, str):
                 pass
             else:
+                print("\n3. Tracing Full Optimistix Solver & Lowering...")
                 t0 = time.time()
-                run_fn = lambda c, s, sys, set: optx.least_squares(
+                run_fn = lambda c, st, sy, se: optx.root_find(
                     fn=get_residuals,
                     solver=self.solver(**solver_options),
                     y0=c,
-                    args=(s, sys, set),
+                    args=(st, sy, se),
                     max_steps=settings.numerical.max_evaluations,
                 )
-                lowered = jax.jit(run_fn).lower(control_values, state, system, settings)
-                t_lower = time.time() - t0
-                print(f"Lowering Time (JAX Tracing & Autodiff) : {t_lower:.2f} seconds")
+                solver_lowered = eqx.filter_jit(run_fn).lower(control_values, state, system, settings)
+                print(f" - Solver Lowering Time : {time.time() - t0:.2f} seconds")
 
                 # 2. Measure the Graph Size
-                hlo_text = lowered.as_text()
-                graph_length = len(hlo_text.splitlines())
-                print(f"XLA HLO Graph Size (Lines of Code)     : {graph_length:,}")
+                solver_hlo_text = solver_lowered.as_text()
+                solver_graph_length = len(solver_hlo_text.splitlines())
+                print(f" - Solver XLA HLO Graph Size: {solver_graph_length:,} Lines of Code")
 
-                if graph_length < settings.numerical.maximum_graph_complexity:
-                    # 3. Profile the XLA 'Compiling' Phase
+                if solver_graph_length < settings.numerical.maximum_graph_complexity:
+                    print(" - Compiling Solver (Checking Cache)...")
                     t0 = time.time()
-                    compiled = lowered.compile()
+                    with track_jax_cache() as log_stream:
+                        solver_compiled = solver_lowered.compile()
                     t_compile = time.time() - t0
-                    print(f"Compilation Time (XLA Backend)         : {t_compile:.2f} seconds")
+                    
+                    cache_status = get_cache_status(log_stream.getvalue())
+                    print(f" - Solver XLA Compile Time: {t_compile:.2f} seconds ({cache_status})")
                     print(f"{'='*60}\n")
                 else:
-                    sys.exit(f"Graph complexity ({graph_length:,}) higher than \
-                            settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity: ,}). \
-                            Terminating.")
-        
-        if settings.DEBUG_MODE:    
-
-            print(f"DEBUG MODE: Executing single forward pass...")
-            f_ctrls, (f_st, f_sys, f_set) = get_residuals(control_values, (state, system, settings))
-            opt_state = None
+                    sys.exit(f"Graph complexity ({solver_graph_length:,}) higher than "
+                             f"settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity:,}). "
+                             "Terminating.")
         
         else:
             if isinstance(self.solver, str):
@@ -551,10 +650,11 @@ class ResidualAnalysis(Process):
             scan_for_invalid_JAX_types(system,  "Analysis System")
 
         # Get analysis control values 
+        self._check_controls_balance(settings)
         initial_control_values = self._get_control_array(state, settings)
 
         # Run Solver
-        with Spinner(enabled=not settings.DEBUG_MODE and len(_analysis_stack) == 1,
+        with TraceReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
                      message=f"Tracing {self.tag}..."):
             
             f_ctrls, opt_state, f_st, f_sys, f_set = self._run_solver(

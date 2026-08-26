@@ -177,7 +177,7 @@ class Compressor(FlowNode):
         if not isinstance(self.map, CompressorMap):
             raise TypeError(f"'{self.tag}' requires a CompressorMap, got {type(self.map).__name__}")
         if self.design_parameters.eff.flow == 1.0:
-            map_effs = replace(self.design_parameters.eff, flow=self.map.eff_des)
+            map_effs = replace(self.design_parameters.eff, flow=self.map.eff_des + 0.0)  # +0.0 trick to force new memory allocation
             map_params = replace(self.design_parameters, eff=map_effs)
             object.__setattr__(self, "design_parameters", map_params)
         super(Compressor, self).__post_init__()
@@ -1046,7 +1046,7 @@ class Nozzle(FlowNode):
                         T_t=T_t,
                         P_t=P_t,
                         P0=P0,
-                        diverging_section=self.diverging_section,
+                        diverging_section=system.energy.nodes[self.network_ID].diverging_section,
                         A_throat=A_t,
                         A_exit=A_x,
                         n_v=system.energy.nodes[self.network_ID].design_parameters.eff.flow,))
@@ -1285,6 +1285,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
     def build_custom(
         cls,
         variable_nozzle: bool = True,
+        cd_nozzle: bool = True,
         afterburner: bool = False,
         turbofan: bool = False,
         **kwargs
@@ -1302,12 +1303,13 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
                 base_components = _TurbojetSetup()
         
 
-        inlet = FlowNode(tag="Inlet", inputs=GraphInput("flow", "freestream"))
+        inlet = Inlet()
         comp = Compressor()
         comb = Burner()
         turb = Turbine()
         shaft = Turboshaft()
-        nozz = Nozzle(variable_exit=variable_nozzle)
+        diverging = variable_nozzle or cd_nozzle
+        nozz = Nozzle(variable_exit=variable_nozzle, diverging_section=diverging)
 
         custom_subs = (inlet, comp, comb, turb, shaft, nozz)
 

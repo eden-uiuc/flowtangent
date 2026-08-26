@@ -4,8 +4,6 @@ import logging
 # warnings.filterwarnings("error", category=UserWarning)
 
 import os
-os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 import jax
 import jax.numpy as jnp

@@ -17,6 +17,7 @@ dependencies = [
     "numcodecs",
     "nvidia-ml-py",
     "numpy",
+    "optimistix",
     "pandas",
     "plotly",
     "scikit-learn",

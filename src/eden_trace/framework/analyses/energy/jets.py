@@ -26,7 +26,7 @@ from eden_trace.utils import DataPath, init_field
 from eden_trace.library import units
 from eden_trace.library.components.energy.jets.classes import Nozzle, TurbojetEngine, TurbofanDesign, TurbojetDesign
 
-from ..residual import ResidualAnalysis
+from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis
 
 from ... import State, System, Aircraft, Settings, Process, ProcessStep
@@ -126,12 +126,11 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
         des_engine = eqx.tree_at(lambda e: (
             e.compressor.design_parameters.rotation_speed,
             e.compressor.design_parameters.pressure_ratio,
-            e.burner.pressure_ratio,
-            e.burner.output_temperature,
+            e.burner.design_parameters.pressure_ratio,
+            e.burner.design_parameters.output_temperature,
             e.turbine.design_parameters.rotation_speed,
         ),
         engine,(
-            des.inlet_pressure_recovery,
             des.rotation_speed,
             OPR,
             des.burner_pressure_ratio,
@@ -154,6 +153,12 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
         des_settings = settings
         if settings.analysis.energy.build_network:
             des_state, des_system, des_settings = initialize_energy(des_state, des_system, des_settings)
+
+    des_state = eqx.tree_at(
+        lambda s: (s.energy.target_thrust, s.energy.target_temperature),
+        des_state,
+        (jnp.atleast_2d(des.thrust), jnp.atleast_2d(des.turbine_intake_temperature,))
+    )
         
     des_state, des_system, des_settings = update_freestream(des_state, des_system, des_settings)
     base_analysis = build_analysis_from_network(des_system.energy)
@@ -165,12 +170,12 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
     # Setup test state according to design parameters
 
     des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
-    des: TurbojetDesign = des_system.energy.design_parameters
+    des: TurbojetDesign = des_system.energy.line.engine.design_parameters
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
-        initial_value=des.initial_MFR,
+        initial_value=des.mass_flow_rate,
         bounds=(
             1e-3 * units.kg / units.s,
             5e3  * units.kg / units.s,
@@ -180,7 +185,7 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
     turb_ctrl = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
-        initial_value=des.initial_turb_PR,
+        initial_value=des.turbine_PR,
         bounds=(1.001, 1e2),
     )
 
@@ -194,14 +199,17 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
         get_value=lambda s: s.energy.outputs.residual.power
     )
 
-    design_analysis = ResidualAnalysis(
+    design_analysis = ImplicitAnalysis(
         tag="Turbojet Design",
         analyze=base_analysis,
         controls=(mass_ctrl, turb_ctrl),
         residuals=(d_thrust, d_power),
     )
 
-    des_state, des_system, des_settings = design_analysis(des_state, des_system, des_settings)
+    des_state, des_system, des_settings = design_analysis.run(
+        des_state, des_system, des_settings,
+        initialize=True
+    )
     
     if des_settings.analysis.energy.clear_nodes:
         des_net = des_system.energy.sync_and_clear_nodes()
@@ -209,7 +217,7 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
     
     return des_state, des_system, settings
 
-def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> ResidualAnalysis:
+def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
 
     # Setup test state according to design parameters
     _, des_system, _, base_analysis = _design_update(state, system, settings)
@@ -257,7 +265,7 @@ def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> Resid
         get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power
     )
 
-    design_analysis = ResidualAnalysis(
+    design_analysis = ImplicitAnalysis(
         tag=f"Turbofan Design",
         analyze=base_analysis,
         controls=(mass_ctrl, LPT_ctrl, HPT_ctrl),
@@ -377,7 +385,7 @@ def turbojet_performance(
 
     # Construct Analysis -------------------------------------------------------
 
-    return ResidualAnalysis(
+    return ImplicitAnalysis(
         tag="Turbojet Performance",
         analyze=build_analysis_from_network(network),
         controls=ctrls,
@@ -552,7 +560,7 @@ def turbofan_performance(network: TurbofanNetwork):
 
     # Construct Analysis -------------------------------------------------------
 
-    return ResidualAnalysis(
+    return ImplicitAnalysis(
         tag="Turbofan Performance",
         analyze=build_analysis_from_network(network),
         controls=ctrls,
@@ -688,7 +696,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
         )
     )
 
-    MP_outer_loop = ResidualAnalysis(
+    MP_outer_loop = ImplicitAnalysis(
         tag="Multi-Point Turbofan Design",
         analyze=MP_inner_loop,
         controls=(F_ctrl, T_ctrl),

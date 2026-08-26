@@ -406,6 +406,10 @@ def save_data(obj, filename:str | Path):
     """
     Serializes any registered Trace data structure and compresses it to a file.
     """
+
+    file_path = Path(filename).resolve()
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         payload = serialize_Trace_node(obj)
@@ -414,9 +418,9 @@ def save_data(obj, filename:str | Path):
         json.dump(payload, f)
         
     if hasattr(obj, "tag") and obj.tag:
-        print(f"Successfully saved {type(obj).__name__} '{obj.tag}' to {filename}")
+        print(f"Successfully saved {type(obj).__name__} '{obj.tag}' to {file_path}")
     else:
-        print(f"Successfully saved {type(obj).__name__} to {filename}")
+        print(f"Successfully saved {type(obj).__name__} to {file_path}")
 
 
 def load_data(filename: str | Path) -> Any:
@@ -450,8 +454,11 @@ def configure_environment(settings: Settings):
     debug_mode = settings.DEBUG_MODE
 
     if dev_mode:
-        os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
-        os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        # os.environ["XLA_FLAGS"] = "--xla_backend_optimization_level=0"
+        # os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+        os.environ["JAX_LOGGING_LEVEL"] = "DEBUG"
+        os.environ["JAX_DEBUG_LOG_MODULES"] = "jax._src.compiler, jax._src.lru_cache"
+        os.environ["JAX_EXPLAIN_CACHE_MISSES"] = "1"
         
     if debug_mode:
         jax.config.update("jax_disable_jit", True)
@@ -503,7 +510,7 @@ def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
 # ---------------------------------------------------------
 
 def initialize_jax_cache(
-    cache_dir="~/.Trace/jax_cache", 
+    cache_dir="~/.eden_trace/jax_cache", 
     max_size_gb=2.0, 
     max_age_days=30
 ):

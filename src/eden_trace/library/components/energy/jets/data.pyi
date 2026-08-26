@@ -23,6 +23,7 @@ JT8D_7B: TurbojetEngine
 CFM56_3: TurbojetEngine
 J60_P_3: TurbojetEngine
 GE90_B4: TurbojetEngine
+CF6_50_C2: TurbojetEngine
 CF6_80_C2: TurbojetEngine
 TF33_P_7: TurbojetEngine
 F101_GE_102: TurbojetEngine

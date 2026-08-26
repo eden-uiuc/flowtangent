@@ -40,7 +40,7 @@ class VehicleEnvelope(eqx.Module):
 #  System
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class System(Component):
     tag: str = init_field("System", static=True)
 
@@ -51,14 +51,14 @@ class System(Component):
 #  Aircraft
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@register
 class AircraftReferenceGeometry(eqx.Module):
     mean_aerodynamic_chord: jnp.ndarray = empty_array()
     projected_span: jnp.ndarray = empty_array()
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
 
-
+@register
 class AircraftMassProperties(MassProperties):
     max_takeoff: float = 0.0
     takeoff: float = 0.0

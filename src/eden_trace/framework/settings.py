@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import numpy as np # For calculating Jacobian shape on JAX array metadata
 
 # Trace imports
-from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_parents, null_step
+from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_parents
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings
@@ -182,7 +182,7 @@ class NumericalSettings(eqx.Module):
     batch_mode: Literal['zip', 'mesh'] = init_field('zip', static=True)
 
     number_of_control_points: int = init_field(1, static=True)
-    maximum_graph_complexity: int = init_field(2e5, static=True)
+    maximum_graph_complexity: int = init_field(1e6, static=True)
 
     sum_residuals: bool = init_field(False, static=True)
     calculate_jacobian: bool = init_field(False, static=True)
