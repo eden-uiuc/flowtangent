@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 from eden_trace.utils import inputs, outputs
 
-from eden_trace.framework.conditions.aero import ComponentCoefficients
+from eden_trace.framework.state_data.aero import ComponentCoeffs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Initialize Aerodynamic Conditions
@@ -42,9 +42,9 @@ def initialize_aerodynamics(state: "State", system: "Aircraft", settings: "Setti
     n_fuselages = len(system.fuselages)
     n_nacelles = len(system.nacelles)
 
-    def _expand_col(leaf: ComponentCoefficients):
+    def _expand_col(leaf: ComponentCoeffs):
         # 1. Dynamically extract n_time from the already row-expanded arrays
-        if isinstance(leaf, ComponentCoefficients):
+        if isinstance(leaf, ComponentCoeffs):
             n_time = leaf.wings.shape[0]
 
             # 2. Instantiate the component arrays
@@ -60,7 +60,7 @@ def initialize_aerodynamics(state: "State", system: "Aircraft", settings: "Setti
             return leaf
 
     updated_aero = jax.tree_util.tree_map(
-        _expand_col, aero_conditions, is_leaf=lambda leaf: isinstance(leaf, ComponentCoefficients)
+        _expand_col, aero_conditions, is_leaf=lambda leaf: isinstance(leaf, ComponentCoeffs)
     )
 
     updated_state = eqx.tree_at(lambda s: s.aerodynamics, state, updated_aero)

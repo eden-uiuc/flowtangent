@@ -16,7 +16,7 @@ import equinox as eqx
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
 
-from eden_trace.framework.conditions import Condition
+from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Time Conditions
@@ -24,7 +24,7 @@ from eden_trace.framework.conditions import Condition
 
 
 @register
-class NumericalTime(Condition):
+class NumericalTime(StateData):
     control_points: jnp.ndarray = empty_array()
     differentiate: jnp.ndarray = empty_array()
     integrate: jnp.ndarray | None = None
@@ -34,7 +34,7 @@ class NumericalTime(Condition):
 
 
 @register
-class Time(Condition):
+class Time(StateData):
     tag: str = init_field("Time", static=True)
 
     N: int = 1

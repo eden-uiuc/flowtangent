@@ -14,14 +14,14 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
 
-from eden_trace.framework.conditions import Condition
+from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Frames
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class Frame(Condition):
+class Frame(StateData):
     # Attribute             Type        Default Value
     tag: str = init_field("Frame", static=True)
 
@@ -31,7 +31,7 @@ class Frame(Condition):
     total_moment_vector: jnp.ndarray = empty_array((0, 3))
 
 @register
-class InertialFrame(Frame):
+class Inertial(Frame):
     # Attribute                     Type        Default Value
     tag: str = init_field("Inertial Frame", static=True)
 
@@ -49,7 +49,7 @@ class InertialFrame(Frame):
     system_range: jnp.ndarray = empty_array((0))
 
 @register
-class BodyFrame(Frame):
+class Body(Frame):
     # Attribute             Type        Default Value
     tag: str = init_field("Body Frame", static=True)
 
@@ -58,7 +58,7 @@ class BodyFrame(Frame):
     moment_vector: jnp.ndarray = empty_array((0, 3))
 
 @register
-class WindFrame(Frame):
+class Wind(Frame):
     # Attribute         Type            Default Value
     tag: str = init_field("Wind Frame", static=True)
 
@@ -70,7 +70,7 @@ class WindFrame(Frame):
     moment_vector: jnp.ndarray = empty_array((0, 3))
 
 @register
-class PlanetFrame(Frame):
+class Planet(Frame):
     # Attribute     Type            Default Value
     tag: str = init_field("Planet Frame", static=True)
     start_time: jnp.ndarray = empty_array()
@@ -82,11 +82,11 @@ class PlanetFrame(Frame):
     true_course: jnp.ndarray = empty_array()
 
 @register
-class Frames(Condition):
+class FrameData(StateData):
     # Attribute     Type            Default Value
     tag: str = init_field("Dynamic Frames", static=True)
 
-    inertial: InertialFrame = init_field(InertialFrame)
-    body: BodyFrame = init_field(BodyFrame)
-    wind: WindFrame = init_field(WindFrame)
-    planet: PlanetFrame = init_field(PlanetFrame)
+    inertial: Inertial = init_field(Inertial)
+    body: Body = init_field(Body)
+    wind: Wind = init_field(Wind)
+    planet: Planet = init_field(Planet)

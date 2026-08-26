@@ -39,7 +39,7 @@ from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
 
 from eden_trace.framework import Process, State, Aircraft, Settings, JacobianMap, System
 from eden_trace.framework.settings import AnalysisSettings
-from eden_trace.framework.conditions import Time
+from eden_trace.framework.state_data import Time
 
 from eden_trace.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from eden_trace.framework.analyses.batched import ShardedDatasetGenerator

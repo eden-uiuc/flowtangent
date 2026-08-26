@@ -14,14 +14,14 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
 
-from eden_trace.framework.conditions import Condition
+from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mass
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class MassConditions(Condition):
+class Mass(StateData):
     """
     Represents the mass conditions for a vehicle or system.
 
@@ -53,11 +53,11 @@ class MassConditions(Condition):
     # Attribute             Type        Default Value
     tag: str = init_field("Mass Conditions", static=True)
 
-    total: jnp.ndarray = empty_array((0))
-    rate_of_change: jnp.ndarray = empty_array((0))
-    volume: jnp.ndarray = empty_array((0))
-    density: jnp.ndarray = empty_array((0))
+    total: jnp.ndarray = empty_array(())
+    rate_of_change: jnp.ndarray = empty_array(())
+    volume: jnp.ndarray = empty_array(())
+    density: jnp.ndarray = empty_array(())
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
     moments_of_inertia: jnp.ndarray = empty_array((0, 3, 3))
 
-    breakdown: Condition = init_field(lambda: Condition(tag="Mass Breakdown"))
+    breakdown: StateData = init_field(lambda: StateData(tag="Mass Breakdown"))

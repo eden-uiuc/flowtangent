@@ -26,7 +26,7 @@ from eden_trace.library.components.airfoils import Airfoil
 
 from eden_trace.framework import Process, State, Settings, JacobianMap
 from eden_trace.framework.systems import Aircraft
-from eden_trace.framework.conditions import Time
+from eden_trace.framework.state_data import Time
 
 from eden_trace.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 

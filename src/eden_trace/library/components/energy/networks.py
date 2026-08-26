@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from eden_trace.framework import State, System, Settings
-    from eden_trace.framework.conditions.controls import Control, Residual
+    from eden_trace.framework.state_data.controls import Control, Residual
     from eden_trace.library.atmospheres import Atmosphere
 
 from dataclasses import replace

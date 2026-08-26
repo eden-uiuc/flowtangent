@@ -15,11 +15,14 @@ if TYPE_CHECKING:
 
 import os
 import gzip
+import itertools
 import json
+import string
 import time
 import warnings
 
 from dataclasses import dataclass
+from functools import reduce
 from pathlib import Path
 
 import equinox as eqx
@@ -59,7 +62,7 @@ def init_field(initializer: Any, as_value: bool = False, **kwargs):
     return eqx.field(default=initializer, **kwargs)
 
 
-def empty_array(shape: tuple | int = 1, dtype: Any = float, **kwargs):
+def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
     """Syntactic sugar for an empty JAX array in an Equinox module."""
     return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
@@ -93,6 +96,64 @@ def outputs(*outputs: str):
         return func
 
     return decorator
+
+def parse_io(io_string: str, var_map: dict) -> set:
+    # 1. Strip type hints
+    io_string = io_string.split(":")[0].strip()
+
+    # 2. Extract raw keys (e.g., 'flow_inputs.network_ID')
+    required_keys = [
+        tup[1] for tup in string.Formatter().parse(io_string) 
+        if tup[1] is not None
+    ]
+
+    if not required_keys:
+        return {io_string}
+
+    normalized_map = {}
+    for full_key in required_keys:
+        # Prevent .format() from natively trying to evaluate the dot on our unpacked strings
+        safe_key = full_key.replace('.', '___')
+        io_string = io_string.replace(f"{{{full_key}}}", f"{{{safe_key}}}")
+
+        # Split into base key and attribute chain (e.g., ['flow_inputs', 'network_ID'])
+        parts = full_key.split('.')
+        base_key = parts[0]
+        attrs = parts[1:]
+
+        # Fetch the base value and wrap it in a list if necessary
+        base_val = var_map.get(base_key, [])
+        if isinstance(base_val, (str, int, float, bool)):
+            base_list = [base_val]
+        elif isinstance(base_val, (list, tuple, set)):
+            base_list = list(base_val)
+        else:
+            base_list = [base_val]
+
+        # 3. Iterate through the list and apply the attribute chain using your reduce logic!
+        resolved_list = []
+        for item in base_list:
+            try:
+                # If attrs is empty, reduce just returns item. 
+                # If attrs is ['network_ID'], it runs getattr(item, 'network_ID')
+                resolved_item = reduce(getattr, attrs, item)
+                resolved_list.append(resolved_item)
+            except AttributeError:
+                raise AttributeError(f"Could not resolve '{'.'.join(attrs)}' on {item}")
+
+        normalized_map[safe_key] = resolved_list
+
+    # 4. Generate all permutations (Cartesian product)
+    keys = list(normalized_map.keys())
+    value_lists = list(normalized_map.values())
+    
+    resolved_paths = set()
+    for combination in itertools.product(*value_lists):
+        combo_dict = dict(zip(keys, combination))
+        resolved_paths.add(io_string.format(**combo_dict))
+            
+    return resolved_paths
+
 # ---------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------
@@ -284,6 +345,78 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
         new_leaves[idx] = leaf
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
+
+def prune_tree(tree):
+    def replace_empty(leaf):
+        if isinstance(leaf, (jax.Array, np.ndarray)) and leaf.size == 0:
+            return None
+        return leaf
+
+    return jax.tree_util.tree_map(replace_empty, tree)
+
+def inspect_tree_leaves(tree, tree_name="Tree", depth=3, output_file=None, print_to_console=False):
+    """
+    Groups PyTree leaves by their hierarchical path and writes the summary 
+    to the terminal, a file, or both.
+    """
+    leaves_with_path, _ = jax.tree_util.tree_flatten_with_path(tree)
+    
+    summary = {}
+    
+    for path, leaf in leaves_with_path:
+        # Convert JAX path keys into a readable string
+        path_strs = []
+        for p in path:
+            if hasattr(p, 'name'):
+                path_strs.append(f".{p.name}")
+            elif hasattr(p, 'key'):
+                path_strs.append(f"['{p.key}']")
+            elif hasattr(p, 'idx'):
+                path_strs.append(f"[{p.idx}]")
+            else:
+                path_strs.append(str(p))
+                
+        # Truncate to depth
+        prefix = tree_name + "".join(path_strs[:depth])
+        if not prefix:
+            prefix = tree_name
+            
+        if prefix not in summary:
+            summary[prefix] = {"kept": 0, "pruned": 0, "types": set()}
+            
+        # Check pruning logic
+        if isinstance(leaf, (jax.Array, np.ndarray)) and getattr(leaf, "size", 1) == 0:
+            summary[prefix]["pruned"] += 1
+        else:
+            summary[prefix]["kept"] += 1
+            # Track the type of the kept leaves to spot rogue scalars
+            leaf_type = type(leaf).__name__
+            summary[prefix]["types"].add(leaf_type)
+            
+    # Format the output table
+    lines = []
+    header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 10 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
+    lines.append(header)
+    lines.append("-" * 100)
+    
+    for prefix, counts in sorted(summary.items()):
+        if counts['kept'] > 0 or counts['pruned'] > 0:
+            types_str = ", ".join(sorted(list(counts['types']))[:3])
+            lines.append(f"{prefix:<{35 + 10 * depth}} | {counts['kept']:<6} | {counts['pruned']:<6} | {types_str}")
+            
+    output_text = "\n".join(lines)
+    
+    # Route the output
+    if print_to_console:
+        print("\n" + output_text)
+        
+    if output_file:
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
+        with open(output_file, 'w') as f:
+            f.write(output_text)
+        if print_to_console:
+            print(f"\n[!] Log saved to {output_file}")
 
 #----------------------------------------------------------
 # Saving and Loading

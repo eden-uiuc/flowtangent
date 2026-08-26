@@ -22,24 +22,21 @@ from eden_trace.utils import init_field
 #  Conditions
 # ----------------------------------------------------------------------------------------------------------------------
 
-STATIC_CONDITIONS = ("AtmosphericBreakpoints")
+STATIC_DATA = ("AtmosphericBreakpoints")
 
 def _is_static_node(node):
-        return hasattr(node, "__class__") and node.__class__.__name__ in STATIC_CONDITIONS
+        return hasattr(node, "__class__") and node.__class__.__name__ in STATIC_DATA
 
-class Condition(eqx.Module):
+class StateData(eqx.Module):
     tag: str = init_field("Conditions", static=True)
 
-    subconditions: tuple = init_field(tuple)
-
-    def __post_init__(self):
-        subcons = tuple(
+    @property
+    def subconditions(self) -> tuple:
+        return tuple(
             getattr(self, f.name)
             for f in fields(self)
-            if f.name != "subconditions" and isinstance(getattr(self, f.name), Condition)
+            if f.name != "subconditions" and isinstance(getattr(self, f.name), StateData)
         )
-
-        object.__setattr__(self, "subconditions", subcons)
 
     def __getitem__(self, item):
         if isinstance(item, (int, slice)):
@@ -129,19 +126,19 @@ class Condition(eqx.Module):
             
         return jax.tree_util.tree_map(_get_axis, self, is_leaf=_is_static_node)
 
-    def add_subcondition(self, subcondition: "Condition"):
+    def add_subcondition(self, subcondition: "StateData"):
 
         new_subconditions = self.subconditions + (subcondition,)
         new_self = eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
         return new_self
 
-    def insert_subcondition(self, subcondition: "Condition", index: int):
+    def insert_subcondition(self, subcondition: "StateData", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index:]
 
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)
 
-    def replace_subcondition(self, subcondition: "Condition", index: int):
+    def replace_subcondition(self, subcondition: "StateData", index: int):
         new_subconditions = self.subconditions[:index] + (subcondition,) + self.subconditions[index + 1 :]
 
         return eqx.tree_at(lambda c: c.subconditions, self, new_subconditions)

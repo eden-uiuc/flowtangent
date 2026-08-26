@@ -30,8 +30,8 @@ from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis
 
 from ... import State, System, Aircraft, Settings, Process, ProcessStep
-from ...settings import EnergyAnalysisSettings, NumericalSettings
-from ...conditions.controls import Control, Residual
+from ...settings import EnergyAnalysisSettings
+from ...state_data.controls import Control, Residual
 from ...simulation.initialize import initialize_energy
 from ...simulation.update import update_freestream
 
