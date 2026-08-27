@@ -21,6 +21,7 @@ import time
 import threading
 
 from collections import Counter
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -29,14 +30,13 @@ import numpy as np
 import optimistix as optx
 
 from jax.core import Tracer
-from jax.flatten_util import ravel_pytree
 from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
-from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array
+from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, prune_tree, inspect_tree_leaves
 from eden_trace.framework import Process, Settings, State, System
-from eden_trace.framework.conditions.controls import Control, Residual
+from eden_trace.framework.state_data.controls import Control, Residual
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
@@ -456,10 +456,6 @@ class ImplicitAnalysis(Process):
             system: System,
             settings: Settings,
     ):
-
-        # dyn_args, stat_args = eqx.partition((state, system), eqx.is_array)
-        # arg_tensor, unravel_fn = ravel_pytree(dyn_args)
-
         # Residual wrapper defined in _run_solver scope to avoid tracing self argument if it were a bound method ------
         @eqx.filter_jit
         def get_residuals(control_values, args):
@@ -479,11 +475,6 @@ class ImplicitAnalysis(Process):
             analysis_state, analysis_system, analysis_settings = self.analyze(control_state, system, settings)
             
             return self._get_residual_array(analysis_state, analysis_settings), (analysis_state, analysis_system, analysis_settings)
-
-        def flat_residuals(c, flat_args):
-            r_dyn = unravel_fn(flat_args)
-            r_state, r_system = eqx.combine(r_dyn, stat_args)
-            return get_residuals(c, (r_state, r_system, settings))
         
         # Run solver w/ dev mode profiling -----------------------------------------------------------------------------
         if self.solver_options is None:
@@ -504,12 +495,15 @@ class ImplicitAnalysis(Process):
         else:
             solver_options = self.solver_options
 
-        if settings.DEBUG_MODE:    
+        # Prune Inputs
 
-            print(f"DEBUG MODE: Executing single forward pass...")
-            _, (f_st, f_sys, f_set) = get_residuals(control_values, (state, system, settings))
-            f_ctrls = self._get_control_array(f_st, f_set)
-            opt_state = None
+        inspect_tree_leaves(state, tree_name="state", depth=3, output_file=Path("./state_structure.txt"))
+        inspect_tree_leaves(system, tree_name="system", depth=3, output_file=Path("./system_structure.txt"))
+
+        state = prune_tree(state)
+        system = prune_tree(system)
+
+        # Special Run Modes
 
         if settings._DEV_MODE:
 
@@ -620,6 +614,13 @@ class ImplicitAnalysis(Process):
                     sys.exit(f"Graph complexity ({solver_graph_length:,}) higher than "
                              f"settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity:,}). "
                              "Terminating.")
+
+
+        if settings.DEBUG_MODE:    
+                    print(f"DEBUG MODE: Executing single forward pass...")
+                    _, (f_st, f_sys, f_set) = get_residuals(control_values, (state, system, settings))
+                    f_ctrls = self._get_control_array(f_st, f_set)
+                    opt_state = None
         
         else:
             if isinstance(self.solver, str):

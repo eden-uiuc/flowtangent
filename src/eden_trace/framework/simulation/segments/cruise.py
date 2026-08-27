@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 from eden_trace.utils import init_field
 
 from eden_trace.framework import ProcessStep
-from eden_trace.framework.conditions.controls import Control, Control, NamedResidual
+from eden_trace.framework.state_data.controls import Control, Control, NamedResidual
 from eden_trace.framework.simulation.segments import Segment
 
 from .profiles import *

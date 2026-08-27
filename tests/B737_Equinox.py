@@ -12,14 +12,14 @@ import jax.numpy as jnp
 import eden_trace.utils as tu
 
 from eden_trace.framework import Process, State, Settings
-from eden_trace.framework.conditions import Time
+from eden_trace.framework.state_data import Time
 from eden_trace.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
 from eden_trace.framework.simulation.segments import Segment
 from eden_trace.framework.simulation.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from eden_trace.framework.conditions.controls import Control
+from eden_trace.framework.state_data.controls import Control
 from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from trace.framework.analyses.energy.sizing import update_design_parameters
 from eden_trace.framework.analyses.energy import build_analysis_from_network

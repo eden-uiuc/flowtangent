@@ -502,6 +502,14 @@ class Process(ProcessStep):
     def outputs(self) -> set:
         return set.union(*[step.outputs for step in self.steps]) if self.steps else set()
 
+    @property
+    def full_io(self) -> set:
+        all_io = set()
+        for step in self.steps:
+            all_io |= step.inputs
+            all_io |= step.outputs
+        return all_io
+
     def _get_flattened_steps(self, prefix: str = "") -> Generator[Tuple[str, ProcessStep], None, None]:
         """
         Recursively yields (node_name, step_obj) for all steps.

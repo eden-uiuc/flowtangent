@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Literal, Optional
 if TYPE_CHECKING:
     from eden_trace.framework import Settings, State, System
-    from eden_trace.framework.conditions.energy import TurbojetNetworkConditions
+    from eden_trace.framework.state_data.energy import TurbojetData
     from eden_trace.framework.analyses.energy.jets import JetSettings
 
 import json
@@ -53,25 +53,25 @@ class Inlet(FlowNode):
         "state.freestream.mach_number",
         "state.freestream.Cp",
         "state.freestream.gamma",
-        "system.energy.nodes[InletNozzle].pressure_ratio",
-        "system.energy.nodes[InletNozzle].pressure_recovery",
-        "system.energy.nodes[InletNozzle].design_parameters.eff.flow",
+        "system.energy.nodes['{network_ID}'].pressure_ratio",
+        "system.energy.nodes['{network_ID}'].pressure_recovery",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes[InletNozzle].outputs.flow.mach_number",
-        "state.energy.nodes[InletNozzle].outputs.flow.speed",
-        "state.energy.nodes[InletNozzle].outputs.flow.stagnation_pressure",
-        "state.energy.nodes[InletNozzle].outputs.flow.temperature",
-        "state.energy.nodes[InletNozzle].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[InletNozzle].outputs.flow.enthalpy",
-        "state.energy.nodes[InletNozzle].outputs.flow.stagnation_enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.flow.mach_number",
+        "state.energy.nodes['{network_ID}'].outputs.flow.speed",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.nodes['{network_ID}'].outputs.flow.temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_enthalpy",
     )
     def transmit(self, state: State, system: Aircraft, settings: Settings):  # type: ignore
 
         updated_system = system
         fs = state.freestream
         
-        network_state: TurbojetNetworkConditions = state.energy
+        network_state: TurbojetData = state.energy
         
         analysis_settings: JetSettings = settings.analysis.energy
         design_mode = analysis_settings.design_mode
@@ -185,16 +185,16 @@ class Compressor(FlowNode):
     @tu.inputs(
         "state.freestream.Cp",
         "state.freestream.gamma",
-        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[Compressor_flow_inputs].outputs.flow.stagnation_pressure",
-        "system.energy.nodes[Compressor].pressure_ratio",
-        "system.energy.nodes[Compressor].design_parameters.eff.flow",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_pressure",
+        "system.energy.nodes['{network_ID}'].pressure_ratio",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes[Compressor].flow.stagnation_temperature"
-        "state.energy.nodes[Compressor].flow.stagnation_pressure",
-        "state.energy.nodes[Compressor].flow.stagnation_enthalpy",
-        "state.energy.nodes[Compressor].mechanical.work",
+        "state.energy.nodes['{network_ID}'].flow.stagnation_temperature"
+        "state.energy.nodes['{network_ID}'].flow.stagnation_pressure",
+        "state.energy.nodes['{network_ID}'].flow.stagnation_enthalpy",
+        "state.energy.nodes['{network_ID}'].mechanical.work",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
@@ -1703,4 +1703,3 @@ def TurbofanEngine(**kwargs):
         design_parameters=TurbofanDesign(),
         **kwargs
     )
-

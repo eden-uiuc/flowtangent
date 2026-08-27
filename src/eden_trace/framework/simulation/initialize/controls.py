@@ -23,7 +23,7 @@ import equinox as eqx
 
 from eden_trace.library.components import Wing
 
-from eden_trace.framework.conditions.controls import Control, SurfaceControl
+from eden_trace.framework.state_data.controls import Control, SurfaceControl
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize

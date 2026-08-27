@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 import networkx as nx
 
-from eden_trace.utils import init_field, inputs, outputs
+from eden_trace.utils import init_field, inputs, outputs, parse_io
 
 from eden_trace.library.components.energy.networks import GraphNetwork
 
@@ -49,20 +49,30 @@ class PACTNetwork(Process):
 
         return G
 
-
 def build_analysis_from_network(network: GraphNetwork):
 
     analysis_network = network.assign_network_IDs()
 
-    def make_node_function(node_ID: str):
-        node_func = analysis_network.nodes[node_ID].__class__.transmit
-        node_inputs = getattr(node_func, "_inputs", set())
-        node_outputs = getattr(node_func, "_outputs", set())
+    def make_node_function(network_ID: str):
+        node = analysis_network.nodes[network_ID]
+        node_func = node.__class__.transmit
+
+        context_mape = vars(node)
+
+        raw_inputs = getattr(node_func, "_inputs", set())
+        node_inputs = set()
+        for io_str in raw_inputs:
+            node_inputs.update(parse_io(io_str, context_map))
+
+        raw_outputs = getattr(node_func, "_outputs", set())
+        node_outputs = set()
+        for io_str in raw_outputs:
+            node_outputs.update(parse_io(io_str, context_map))
 
         @inputs(*node_inputs)
         @outputs(*node_outputs)
         def transmit(state, system, settings):
-            return analysis_network.nodes[node_ID].transmit(state, system, settings)
+            return analysis_network.nodes[network_ID].transmit(state, system, settings)
 
         return transmit
     

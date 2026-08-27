@@ -13,7 +13,7 @@ import jax.numpy as jnp
 
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
-from eden_trace.framework.conditions import Condition
+from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Stability
@@ -21,7 +21,7 @@ from eden_trace.framework.conditions import Condition
 
 
 @register
-class StaticCoefficients(Condition):
+class StaticCoeffs(StateData):
     """
     Static stability coefficients for an aircraft.
 
@@ -75,7 +75,7 @@ class StaticCoefficients(Condition):
 
 
 @register
-class StaticForces(Condition):
+class StaticForces(StateData):
     """
     Static forces acting on an aircraft.
 
@@ -115,7 +115,7 @@ class StaticForces(Condition):
 
 
 @register
-class StaticMoments(Condition):
+class StaticMoments(StateData):
     """
     Represents the static moments acting on an aircraft.
 
@@ -148,7 +148,7 @@ class StaticMoments(Condition):
 
 
 @register
-class CoefficientDerivatives(Condition):
+class Sensitivities(StateData):
     """
     Represents the coefficient derivatives for static stability analysis of an aircraft.
 
@@ -225,7 +225,7 @@ class CoefficientDerivatives(Condition):
 
 
 @register
-class StaticDerivatives(Condition):
+class StaticDerivatives(StateData):
     """
     Represents the static stability coefficient derivatives for an aircraft.
 
@@ -262,42 +262,42 @@ class StaticDerivatives(Condition):
     # Attribute     Type            Default Value
     tag: str = init_field("Static Stability Coefficients Derivatives", static=True)
 
-    Clift: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="Lift Coefficient Static Stability Derivatives")
+    Clift: Sensitivities = init_field(
+        lambda: Sensitivities(tag="Lift Coefficient Static Stability Derivatives")
     )
-    Cdrag: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="Drag Coefficient Static Stability Derivatives")
-    )
-
-    CX: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="X Coefficient Static Stability Derivatives")
-    )
-    CY: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="Y Coefficient Static Stability Derivatives")
-    )
-    CZ: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="Z Coefficient Static Stability Derivatives")
+    Cdrag: Sensitivities = init_field(
+        lambda: Sensitivities(tag="Drag Coefficient Static Stability Derivatives")
     )
 
-    CL: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="L Coefficient Static Stability Derivatives")
+    CX: Sensitivities = init_field(
+        lambda: Sensitivities(tag="X Coefficient Static Stability Derivatives")
     )
-    CM: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="M Coefficient Static Stability Derivatives")
+    CY: Sensitivities = init_field(
+        lambda: Sensitivities(tag="Y Coefficient Static Stability Derivatives")
     )
-    CN: CoefficientDerivatives = init_field(
-        lambda: CoefficientDerivatives(tag="N Coefficient Static Stability Derivatives")
+    CZ: Sensitivities = init_field(
+        lambda: Sensitivities(tag="Z Coefficient Static Stability Derivatives")
+    )
+
+    CL: Sensitivities = init_field(
+        lambda: Sensitivities(tag="L Coefficient Static Stability Derivatives")
+    )
+    CM: Sensitivities = init_field(
+        lambda: Sensitivities(tag="M Coefficient Static Stability Derivatives")
+    )
+    CN: Sensitivities = init_field(
+        lambda: Sensitivities(tag="N Coefficient Static Stability Derivatives")
     )
 
 
 @register
-class StaticStability(Condition):
+class Static(StateData):
     tag: str = init_field("Static Stability", static=True)
 
     forces: StaticForces = init_field(StaticForces)
     moments: StaticMoments = init_field(StaticMoments)
 
-    coefficients: StaticCoefficients = init_field(StaticCoefficients)
+    coefficients: StaticCoeffs = init_field(StaticCoeffs)
     derivatives: StaticDerivatives = init_field(StaticDerivatives)
 
     static_margin: jnp.ndarray = empty_array()
@@ -310,18 +310,18 @@ class StaticStability(Condition):
 
 
 @register
-class DynamicStability(Condition):
+class Dynamic(StateData):
     # Attribute      Type        Default Value
     tag: str = init_field("Dynamic Stability", static=True)
 
-    LongModes: Condition = init_field(lambda: Condition(tag="Longitudinal Modes"))
-    LatModes: Condition = init_field(lambda: Condition(tag="Lateral Modes"))
+    LongModes: StateData = init_field(lambda: StateData(tag="Longitudinal Modes"))
+    LatModes: StateData = init_field(lambda: StateData(tag="Lateral Modes"))
 
 
 @register
-class StabilityConditions(Condition):
+class StabilityData(StateData):
     # Attribute     Type                Default Value
     tag: str = init_field("Stability", static=True)
 
-    static: StaticStability = init_field(StaticStability)
-    dynamic: DynamicStability = init_field(DynamicStability)
+    static: Static = init_field(Static)
+    dynamic: Dynamic = init_field(Dynamic)

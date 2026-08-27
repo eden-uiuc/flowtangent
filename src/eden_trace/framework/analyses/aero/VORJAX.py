@@ -30,7 +30,7 @@ from eden_trace.library import units
 from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
 
 from eden_trace.framework import Process, ProcessStep
-from eden_trace.framework.analyses import BatchAnalysis
+from eden_trace.framework.analyses import BatchedAnalysis
 from eden_trace.framework.methods.aero.VORJAX import (
     apply_aerodynamic_forces,
     check_freestream,
@@ -315,7 +315,7 @@ VORJAX_Outputs = {
 }
 
 
-class BatchVORJAX(BatchAnalysis):
+class BatchVORJAX(BatchedAnalysis):
     def __init__(
         self,
         tag: str = "Batched VORJAX",

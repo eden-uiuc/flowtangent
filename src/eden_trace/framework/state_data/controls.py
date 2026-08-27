@@ -19,15 +19,15 @@ from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import Component
 
-from eden_trace.framework.conditions import Condition
-from eden_trace.framework.conditions.stability import StabilityConditions
+from eden_trace.framework.state_data import StateData
+from eden_trace.framework.state_data.stability import StabilityData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Controls
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def get_active(cond: Condition) -> tuple[Condition, ...]:
+def get_active(cond: StateData) -> tuple[StateData, ...]:
     """
     Returns the active controls/residuals
     """
@@ -43,14 +43,14 @@ def get_active(cond: Condition) -> tuple[Condition, ...]:
     return tuple(actives)
 
 
-class Residual(Condition):
+class Residual(StateData):
     tag: str = init_field("Dynamic Residual", static=True)
     
     get_value: Callable = init_field(lambda state: jnp.empty(0), as_value=True, static=True)
 
     _active: bool = init_field(False, static=True)
 
-class DynamicsConditions(Condition):
+class DynamicsConditions(StateData):
 
     tag: str = init_field("Dynamics", static=True)
 
@@ -59,7 +59,7 @@ class DynamicsConditions(Condition):
         return get_active(self)
 
 
-class Control(Condition):
+class Control(StateData):
     """
     Represents a control variable in a simulation or control system.
 
@@ -120,8 +120,6 @@ class Control(Condition):
 
         if self.initial_value is not None:
             object.__setattr__(self, "initial_value", jnp.clip(self.initial_value, self.bounds[0] * 1.10, self.bounds[1] * 0.90))
-        
-        return super().__post_init__()
 
 
 class SurfaceControl(Control):
@@ -153,10 +151,10 @@ class SurfaceControl(Control):
     tag: str = init_field("Surface Control Variable", static=True)
     surfaces: tuple[Component] | None = None
 
-    stability: StabilityConditions = init_field(StabilityConditions)
+    stability: StabilityData = init_field(StabilityData)
 
 
-class ControlsConditions(Condition):
+class ControlsConditions(StateData):
     tag: str = init_field("Controls", static=True)
 
     _default_paths: dict = init_field(lambda: {

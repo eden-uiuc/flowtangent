@@ -31,7 +31,7 @@ def update_freestream(
 
     # Update gravity
     G = state.freestream.planet.compute_gravity()
-    state = eqx.tree_at(lambda s: s.freestream.gravity, state, state.freestream.gravity.at[:, 0].set(G))
+    state = eqx.tree_at(lambda s: s.freestream.gravity, state, jnp.atleast_2d(G))
 
     # Update Atmospheric Properties
     atmo = state.freestream.atmosphere

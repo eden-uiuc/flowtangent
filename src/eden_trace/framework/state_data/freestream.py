@@ -16,14 +16,14 @@ from eden_trace.utils import empty_array, init_field, register
 from eden_trace.library.atmospheres import Atmosphere, USStandard1976
 from eden_trace.library.planets import Earth, Planet
 
-from eden_trace.framework.conditions import Condition
+from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Freestream
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class FreestreamConditions(Condition):
+class Freestream(StateData):
     """
     Represents the freestream conditions in a flight environment.
 
