@@ -27,9 +27,7 @@ from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices,
 # One Segment Wing Data
 #-----------------------------------------------------------------------------------------------------------------------
 
-def generate_flow_state_grid(
-        
-):
+def generate_flow_state_grid():
     alphas = np.linspace(-5.0, 15.0, 81) * units.deg
     machs = np.linspace(0.1, 2.0, 20)
     betas = np.linspace(0.0, 10.0, 11) * units.deg

@@ -37,7 +37,8 @@ from eden_trace.utils import inputs, outputs
     "state.stability.static.pitch_rate",
     "state.stability.static.yaw_rate",
 )
-@outputs("system.analysis_data['boundary_conditions']", "system.analysis_data['relative_velocity']")
+@outputs("system.analysis_data['boundary_conditions']",
+         "system.analysis_data['relative_velocity']")
 def compute_boundary_conditions(state: "State", system: "System", settings: "Settings"):
     """
     Computes the Neumann boundary condition (RHS) for the VLM.

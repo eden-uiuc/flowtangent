@@ -227,9 +227,9 @@ class VORJAX_Settings(eqx.Module):
 
 def _default_VORJAX_init_steps():
     return (
-        ProcessStep(initialize_aerodynamics, "Initialize Component Bookkeeping"),
-        ProcessStep(initialize_VORJAX_data, "Initialize Data Structures"),
-        ProcessStep(discretize_surfaces, "Discretize Surfaces"),
+        ProcessStep(function=initialize_aerodynamics, tag="Initialize Component Bookkeeping"),
+        ProcessStep(function=initialize_VORJAX_data, tag="Initialize Data Structures"),
+        ProcessStep(function=discretize_surfaces, tag="Discretize Surfaces"),
     )
 
 
@@ -246,13 +246,13 @@ class InitializeVORJAX(Process):
 def _default_VORJAX_compute_steps():
     return (
         # Lift and Induced Drag
-        ProcessStep(check_freestream, "Freestream Validation"),
-        ProcessStep(compute_boundary_conditions, "Calculate Boundary Conditions"),
-        ProcessStep(compute_induced_velocity, "Calculate VICs"),
-        ProcessStep(compute_vortex_strength, "Compute Vortex Strength"),
-        ProcessStep(compute_panel_pressures, "Compute Pressure Coefficients"),
-        ProcessStep(compute_coefficients, "Compute Aerodynamic Coefficients"),
-        ProcessStep(apply_aerodynamic_forces, "Apply Aerodynamic Forces"),
+        ProcessStep(function=check_freestream, tag="Freestream Validation"),
+        ProcessStep(function=compute_boundary_conditions, tag="Calculate Boundary Conditions"),
+        ProcessStep(function=compute_induced_velocity, tag="Calculate VICs"),
+        ProcessStep(function=compute_vortex_strength, tag="Compute Vortex Strength"),
+        ProcessStep(function=compute_panel_pressures, tag="Compute Pressure Coefficients"),
+        ProcessStep(function=compute_coefficients, tag="Compute Aerodynamic Coefficients"),
+        ProcessStep(function=apply_aerodynamic_forces, tag="Apply Aerodynamic Forces"),
     )
 
 

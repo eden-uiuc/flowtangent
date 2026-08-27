@@ -53,10 +53,10 @@ class MassConditions(Condition):
     # Attribute             Type        Default Value
     tag: str = init_field("Mass Conditions", static=True)
 
-    total: jnp.ndarray = empty_array((0))
-    rate_of_change: jnp.ndarray = empty_array((0))
-    volume: jnp.ndarray = empty_array((0))
-    density: jnp.ndarray = empty_array((0))
+    total: jnp.ndarray = empty_array(())
+    rate_of_change: jnp.ndarray = empty_array(())
+    volume: jnp.ndarray = empty_array(())
+    density: jnp.ndarray = empty_array(())
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
     moments_of_inertia: jnp.ndarray = empty_array((0, 3, 3))
 
