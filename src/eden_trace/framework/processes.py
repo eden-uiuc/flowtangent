@@ -181,7 +181,7 @@ class Process(ProcessStep):
     _val_and_jac_fn: Optional[Callable] = init_field(None, static=True)
     _cached_grad_map: Optional[JacobianMap] = init_field(None, static=True)
     _filter_map: dict = init_field(lambda _:{
-            "energy": r"state\.energy\.nodes\.\[*\].outputs"
+            "energy": r"state\.energy\.nodes\.\[*\]."
         }, static=True)
 
     def __init__(
@@ -218,7 +218,7 @@ class Process(ProcessStep):
         
         # Handle mutable dictionary default safely
         self._filter_map = _filter_map if _filter_map is not None else {
-            "energy": r"state\.energy\.nodes\.\[*\].outputs"
+            "energy": r"state\.energy\.nodes\.\[*\]."
         }
                 
         self.steps = tuple(ProcessStep.from_function(step) for step in steps)

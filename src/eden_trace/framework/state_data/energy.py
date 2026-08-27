@@ -22,7 +22,7 @@ from eden_trace.framework.state_data import StateData
 
 @register
 class MechanicalOutputs(StateData):
-    tag = "Mechanical Outputs"
+    tag: str = init_field("Mechanical Outputs", static=True)
 
     work: jnp.ndarray = empty_array()
     power: jnp.ndarray = empty_array()
@@ -30,7 +30,7 @@ class MechanicalOutputs(StateData):
 
 @register
 class ElectricalOutputs(StateData):
-    tag = "Electrical Outputs"
+    tag: str = init_field("Electrical Outputs", static=True)
 
     power: jnp.ndarray = empty_array()
     voltage: jnp.ndarray = empty_array()
@@ -39,7 +39,7 @@ class ElectricalOutputs(StateData):
 
 @register
 class FuelOutputs(StateData):
-    tag = "Fuel Outputs"
+    tag: str = init_field("Fuel Outputs", static=True)
 
     TSFC: jnp.ndarray = empty_array()
     flow_rate: jnp.ndarray = empty_array()
@@ -47,7 +47,7 @@ class FuelOutputs(StateData):
 
 @register
 class FlowOutputs(StateData):
-    tag = "Flow Outputs"
+    tag: str = init_field("Flow Outputs", static=True)
     fluid: IdealGas = init_field(Air)
 
     speed: jnp.ndarray = empty_array()
@@ -77,7 +77,7 @@ class FlowOutputs(StateData):
 
 @register
 class ResidualOutputs(StateData):
-    tag = "Residual Outputs"
+    tag: str = init_field("Residual Outputs", static=True)
 
     mass: jnp.ndarray = empty_array()
     mass_flow_rate: jnp.ndarray = empty_array()
@@ -102,7 +102,7 @@ class ResidualOutputs(StateData):
 
 @register
 class ForceOutputs(StateData):
-    tag = "Force Outputs"
+    tag: str = init_field("Force Outputs", static=True)
 
     thrust: jnp.ndarray = empty_array()
     nondimensional_thrust: jnp.ndarray = empty_array()
@@ -110,8 +110,8 @@ class ForceOutputs(StateData):
 
 
 @register
-class OutputConditions(StateData):
-    tag = "Node Outputs"
+class NodeConditions(StateData):
+    tag: str = init_field("Node Outputs", static=True)
 
     mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
     electrical: ElectricalOutputs = init_field(ElectricalOutputs)
@@ -120,15 +120,7 @@ class OutputConditions(StateData):
     force: ForceOutputs = init_field(ForceOutputs)
     residual: ResidualOutputs = init_field(ResidualOutputs)
 
-
-@register
-class NodeConditions(StateData):
-    # Attribute         Type                Default Value
-    tag: str = init_field("Energy Node Conditions", static=True)
-
-    outputs: OutputConditions = init_field(OutputConditions)
-
-    mass: jnp.ndarray = empty_array()
+    mass = jnp.ndarray = empty_array()
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Stores

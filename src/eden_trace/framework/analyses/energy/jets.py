@@ -257,12 +257,12 @@ def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> Impli
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].residual.power
     )
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].residual.power
     )
 
     design_analysis = ImplicitAnalysis(
@@ -528,18 +528,18 @@ def turbofan_performance(network: TurbofanNetwork):
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power)
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].residual.power)
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power)
+        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].residual.power)
     
     d_W_core = Residual(
         tag="Core MFR",
-        get_value=lambda s: s.energy.nodes['network.line.engine.core_nozzle'].outputs.residual.mass_flow_rate)
+        get_value=lambda s: s.energy.nodes['network.line.engine.core_nozzle'].residual.mass_flow_rate)
     d_W_byp = Residual(
         tag="Bypass MFR",
-        get_value=lambda s: s.energy.nodes['network.line.engine.fan_nozzle'].outputs.residual.mass_flow_rate)
+        get_value=lambda s: s.energy.nodes['network.line.engine.fan_nozzle'].residual.mass_flow_rate)
 
     # Variable Setup -----------------------------------------------------------
     
@@ -660,7 +660,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
     OD_TSFC = jnp.array([d.TSFC for d in OD_points]).reshape((-1, 1))
     d_TSFC = Residual(
         tag="Off-Design TSFC",
-        get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].outputs.fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
+        get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
 
     def split_residuals(swap_state, swap_system, swap_settings):
 

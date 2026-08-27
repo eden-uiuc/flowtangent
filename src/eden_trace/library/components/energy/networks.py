@@ -253,13 +253,13 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
     )
 
     @tu.inputs(
-            "state.energy.nodes['{force_inputs.network_ID}'].outputs.force.thrust",
-            "state.energy.nodes['{residual_inputs.network_ID}'].outputs.residual.power",
+            "state.energy.nodes['{force_inputs.network_ID}'].force.thrust",
+            "state.energy.nodes['{residual_inputs.network_ID}'].residual.power",
     )
     @tu.outputs(
             "state.energy.total_force_vector",
-            "state.energy.nodes['{network_ID}'].outputs.residual.thrust",
-            "state.energy.nodes['{network_ID}'].outputs.residual.power",
+            "state.energy.nodes['{network_ID}'].residual.thrust",
+            "state.energy.nodes['{network_ID}'].residual.power",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 

@@ -48,6 +48,7 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine, Tu
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
+from eden_trace.framework.settings import LoggingSettings
 from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
@@ -357,14 +358,19 @@ if __name__ == "__main__":
     OFF_DESIGN_1 = False
 
     # Build Turbojet------------------------------------------------------------
+    test_dir = Path(__file__).resolve().parent
+    data_dir = test_dir / "ft_data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
     system = system_setup(variable_nozzle=V_NOZZ)
     settings = eqx.tree_at(
         lambda s: s.analysis.energy,
-        Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE),
+        Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE,
+                 logging=LoggingSettings(log_dir=test_dir/"ft_logs")),
         JetSettings(design_mode=DESIGN_POINT, statics=STATICS)
     )
     configure_environment(settings)
-    test_dir = Path("./tests/Energy/PyCycle_Examples/turbojet")
+    
 
     if DESIGN_POINT:
         print("="*80)
@@ -377,14 +383,14 @@ if __name__ == "__main__":
             settings=settings,
         )
 
-        save_data(des_sys, test_dir / "turbojet.fts")
-        save_data(des_st, test_dir / "turbojet_design_state.fts")
+        save_data(des_sys, data_dir / "turbojet.fts")
+        save_data(des_st, data_dir / "turbojet_design_state.fts")
 
-        validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", des_st)
-        validation_df.to_csv(test_dir / "DESIGN_validation.csv")
+        validation_df = validate_design_point(data_dir / "turbojet_DESIGN.json", des_st)
+        validation_df.to_csv(data_dir / "DESIGN_validation.csv")
      
     else:
-        des_sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
+        des_sys: Aircraft = load_data(data_dir / "/simple_turbojet.trs")
     
     des_sys = des_sys.update_network_topology()
 
@@ -449,12 +455,12 @@ if __name__ == "__main__":
         )
 
         OD0_df = validate_design_point(
-            "./tests/PyCycle/PyCycle_Examples/turbojet_OD0.json",
+            data_dir / "turbojet_OD0.json",
             OD0_st,
             point_name="Off Design 0"
         )
         OD0_df.to_csv(
-            "./tests/PyCycle/PyCycle_Examples/OD0_validation.csv"
+            data_dir / "OD0_validation.csv"
         )
     
     if OFF_DESIGN_1:
@@ -476,13 +482,11 @@ if __name__ == "__main__":
         )
 
         OD0_df = validate_design_point(
-            "./tests/PyCycle/PyCycle_Examples/turbojet_OD1.json",
+            data_dir / "turbojet_OD1.json",
             OD1_st,
             point_name="Off Design 1"
         )
-        OD0_df.to_csv(
-            "./tests/PyCycle/PyCycle_Examples/OD1_validation.csv"
-        )
+        OD0_df.to_csv(data_dir / "OD1_validation.csv")
 
     
     

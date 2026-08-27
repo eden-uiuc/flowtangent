@@ -99,7 +99,12 @@ def outputs(*outputs: str):
 
 def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
     # 1. Strip type hints
-    io_string = io_string.split(":")[0].strip()
+    io_parts = io_string.split(":")
+    io_string = io_parts[0].strip()
+    if len(io_parts > 1):
+        meta_string = ": " + io_string.split(":")[1].strip()
+    else:
+        meta_string = ""
 
     # 2. Extract raw keys (e.g., 'flow_inputs.network_ID')
     required_keys = [
@@ -140,7 +145,7 @@ def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
                 # If attrs is empty, reduce just returns item. 
                 # If attrs is ['network_ID'], it runs getattr(item, 'network_ID')
                 resolved_item = reduce(getattr, attrs, item)
-                resolved_list.append(resolved_item)
+                resolved_list.append(resolved_item + meta_string)
             except AttributeError:
                 raise AttributeError(f"Could not resolve '{'.'.join(attrs)}' on {item}")
 
@@ -157,6 +162,18 @@ def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
         resolved_paths.add(resolved_string)
             
     return resolved_paths
+
+def jax_path_string(jax_path: tuple) -> str:
+    """Converts internal JAX path tuple into standard Python syntax."""
+    path_str = ""
+    for p in jax_path:
+        if hasattr(p, 'name'):
+            path_str += f".{p.name}"
+        elif hasattr(p, 'key'):
+            path_str += f"['{p.key}']"
+        elif hasattr(p, 'idx'):
+            path_str += f"[{p.idx}]"
+    return path_str.lstrip(".")
 
 # ---------------------------------------------------------
 # Formatting
@@ -350,24 +367,52 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
 
-def prune_tree(tree):
-    def replace_empty(leaf):
-        if isinstance(leaf, (jax.Array, np.ndarray)) and leaf.size == 0:
-            return None
-        return leaf
+def io_partition(tree, active_paths: set[str], keep_optional=False):
+    """
+    Partitions a PyTree in dynamic and static halves based on an IO whitelist.
+    Only JAX arrays whose paths are in the whitelist are kept dynamic.
 
-    return jax.tree_util.tree_map(replace_empty, tree)
+    Returns (dyn_tree, stat_tree)
+    """
+    path_parts = [p.split(':') for p in active_paths]
+    if keep_optional:
+        path_strings = [p[0] for p in path_parts]
+    else:
+        path_strings = [p[0] for p in path_parts if len(p) > 1 and "optional" not in p[1].lower()]
+        
 
-def inspect_tree_leaves(tree, tree_name="Tree", depth=3, output_file=None, print_to_console=False):
+    def is_active(jax_path, leaf):
+        if not eqx.is_array(leaf):
+            return False
+
+        full_path = jax_path_string(jax_path)
+        parts = full_path.replace("['", ".['").replace("[", ".[").split(".")
+
+        for i in range(len(parts)):
+            # Reconstruct the path backwards
+            parent_path = ".".join(parts[:len(parts)-i]).replace(".['", "['").replace(".[", "[")
+            if parent_path in path_strings:
+                return True
+                
+        return False
+
+    mask = jax.tree_util.tree_map_with_path(is_active, tree)
+    dyn, stat = eqx.partition(tree, mask)
+    return dyn, stat, mask
+
+def inspect_leaves(tree, mask, settings, tree_name:str="Tree", depth:int=3):
     """
     Groups PyTree leaves by their hierarchical path and writes the summary 
-    to the terminal, a file, or both.
+    to the terminal, a file, or both based on a boolean mask.
     """
+    # Flatten both the tree and the boolean mask.
+    # Because mask was generated from tree, their structures match perfectly.
     leaves_with_path, _ = jax.tree_util.tree_flatten_with_path(tree)
+    mask_leaves, _ = jax.tree_util.tree_flatten(mask)
     
     summary = {}
     
-    for path, leaf in leaves_with_path:
+    for (path, leaf), is_kept in zip(leaves_with_path, mask_leaves):
         # Convert JAX path keys into a readable string
         path_strs = []
         for p in path:
@@ -388,8 +433,8 @@ def inspect_tree_leaves(tree, tree_name="Tree", depth=3, output_file=None, print
         if prefix not in summary:
             summary[prefix] = {"kept": 0, "pruned": 0, "types": set()}
             
-        # Check pruning logic
-        if isinstance(leaf, (jax.Array, np.ndarray)) and getattr(leaf, "size", 1) == 0:
+        # Check pruning logic directly from the mask!
+        if not is_kept:
             summary[prefix]["pruned"] += 1
         else:
             summary[prefix]["kept"] += 1
@@ -399,28 +444,29 @@ def inspect_tree_leaves(tree, tree_name="Tree", depth=3, output_file=None, print
             
     # Format the output table
     lines = []
-    header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 10 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
+    header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 15 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
     lines.append(header)
     lines.append("-" * 100)
     
     for prefix, counts in sorted(summary.items()):
         if counts['kept'] > 0 or counts['pruned'] > 0:
             types_str = ", ".join(sorted(list(counts['types']))[:3])
-            lines.append(f"{prefix:<{35 + 10 * depth}} | {counts['kept']:<6} | {counts['pruned']:<6} | {types_str}")
+            lines.append(f"{prefix:<{35 + 15 * depth}} | {counts['kept']:<6} | {counts['pruned']:<6} | {types_str}")
             
     output_text = "\n".join(lines)
     
-    # Route the output
-    if print_to_console:
+    # Route the output (Note: check if stream_ouput should be stream_output in your settings schema!)
+    if settings.logging.stream_ouput:
         print("\n" + output_text)
         
-    if output_file:
+    if settings.logging.log_dir is not None:
         # Ensure the directory exists
+        output_file = Path(settings.logging.log_dir) / f"{tree_name}_structure.log"
         os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
         with open(output_file, 'w') as f:
             f.write(output_text)
-        if print_to_console:
-            print(f"\n[!] Log saved to {output_file}")
+        if getattr(settings, 'verbose', False):
+            print(f" - {tree_name.title()} leaf structure log saved to {output_file}")
 
 #----------------------------------------------------------
 # Saving and Loading

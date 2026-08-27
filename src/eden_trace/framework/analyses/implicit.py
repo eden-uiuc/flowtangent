@@ -34,7 +34,7 @@ from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
-from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, prune_tree, inspect_tree_leaves
+from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
 from eden_trace.framework import Process, Settings, State, System
 from eden_trace.framework.state_data.controls import Control, Residual
 # ----------------------------------------------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ class ImplicitAnalysis(Process):
 
         if f_res is not None:
             print(f"\n  Final Residual Values:")
-            for i, res in enumerate(f_st.dynamics.active_residuals):
+            for i, res in enumerate(self.residuals):
                 print(f"    {res.tag:<{pad}}: {format_array(f_res[i])}")
 
         if f_jac is not None:
@@ -421,9 +421,9 @@ class ImplicitAnalysis(Process):
 
         if settings.DEBUG_MODE:
             print(f"\n--- {self.tag.upper()} CLOSEOUT PASS ---")
-        _, (f_st, f_sys, f_set) = get_residuals(jnp.array(results.x), args)
+        _, (f_st, f_sys) = get_residuals(jnp.array(results.x), args)
 
-        return results.x, results, f_st, f_sys, f_set
+        return results.x, results, f_st, f_sys
 
     @eqx.filter_jit
     def _run_optx_solver(
@@ -445,9 +445,9 @@ class ImplicitAnalysis(Process):
             has_aux=True
         )
 
-        final_state, final_system, final_settings = results.aux
+        final_state, final_system = results.aux
 
-        return results.value, results.state, final_state, final_system, final_settings
+        return results.value, results.state, final_state, final_system
 
     def _run_solver(
             self,
@@ -456,25 +456,44 @@ class ImplicitAnalysis(Process):
             system: System,
             settings: Settings,
     ):
-        # Residual wrapper defined in _run_solver scope to avoid tracing self argument if it were a bound method ------
+
+        # Partition inputs to avoid tracing the entire state and system trees
+        active_paths = self.analyze.full_io
+        active_state_paths = set(['.'.join(p.split('.')[1:]) for p in active_paths if p.split('.')[0].lower() == "state"])
+        active_system_paths = set(['.'.join(p.split('.')[1:]) for p in active_paths if p.split('.')[0].lower() == "system"])
+
+        dyn_state, stat_state, state_mask = io_partition(state, active_state_paths)
+        dyn_system, stat_system, system_mask = io_partition(system, active_system_paths)
+
+        inspect_leaves(state, state_mask, settings, tree_name="state", depth=3)
+        inspect_leaves(system, system_mask, settings, tree_name="system", depth=3)
+        
+        # Residual closure defined in _run_solver scope to avoid tracing self argument if it were a bound method
         @eqx.filter_jit
         def get_residuals(control_values, args):
 
-            state, system, settings = args
+            r_state, r_system = args
+
+            full_state = eqx.combine(r_state, stat_state)
+            full_system = eqx.combine(r_system, stat_system)
 
             if settings.DEBUG_MODE:
                 global _analysis_stack, _trace_count
                 if len(_analysis_stack) > len(_trace_count):
                         _trace_count.append(0)
                 if _trace_count[_analysis_stack.index(self.tag)] > 1:
-                    diff_args((control_values, state, system, settings))
+                    diff_args((control_values, full_state, full_system, settings))
                 _trace_count[_analysis_stack.index(self.tag)] += 1
                 print(f"\n--- {self.tag.upper()} PASS {_trace_count[_analysis_stack.index(self.tag)]} ---")
 
-            control_state = self._update_controls(state, control_values, settings)
-            analysis_state, analysis_system, analysis_settings = self.analyze(control_state, system, settings)
+            control_state = self._update_controls(full_state, control_values, settings)
+            analysis_state, analysis_system, analysis_settings = self.analyze(control_state, full_system, settings)
+
+            res = self._get_residual_array(analysis_state, analysis_settings)
+            updated_r_state = eqx.partition(analysis_state, state_mask)
+            updated_r_system = eqx.partition(analysis_system, system_mask)
             
-            return self._get_residual_array(analysis_state, analysis_settings), (analysis_state, analysis_system, analysis_settings)
+            return res, (updated_r_state, updated_r_system)
         
         # Run solver w/ dev mode profiling -----------------------------------------------------------------------------
         if self.solver_options is None:
@@ -494,14 +513,6 @@ class ImplicitAnalysis(Process):
                 }
         else:
             solver_options = self.solver_options
-
-        # Prune Inputs
-
-        inspect_tree_leaves(state, tree_name="state", depth=3, output_file=Path("./state_structure.txt"))
-        inspect_tree_leaves(system, tree_name="system", depth=3, output_file=Path("./system_structure.txt"))
-
-        state = prune_tree(state)
-        system = prune_tree(system)
 
         # Special Run Modes
 
@@ -539,13 +550,13 @@ class ImplicitAnalysis(Process):
             print("Starting JAX AOT Compilation Profiler...")
             print(f"{'-'*60}")
 
-            leaves = jax.tree_util.tree_leaves((control_values, (state, system, settings)))
+            leaves = jax.tree_util.tree_leaves((control_values, (dyn_state, dyn_system)))
             print(f"Total Input Leaves: {len(leaves)}\n")
 
             print("1. Tracing Forward Pass and Lowering to HLO...")
             t0 = time.time()
             
-            fwd_fn = lambda x: get_residuals(x, (state, system, settings))
+            fwd_fn = lambda x: get_residuals(x, (dyn_state, dyn_system))
             fwd_lowered = eqx.filter_jit(fwd_fn).lower(control_values)
             print(f" - Forward Lowering Time: {time.time() - t0:.2f} seconds")
 
@@ -585,14 +596,14 @@ class ImplicitAnalysis(Process):
             else:
                 print("\n3. Tracing Full Optimistix Solver & Lowering...")
                 t0 = time.time()
-                run_fn = lambda c, st, sy, se: optx.root_find(
+                run_fn = lambda c, st, sy: optx.root_find(
                     fn=get_residuals,
                     solver=self.solver(**solver_options),
                     y0=c,
-                    args=(st, sy, se),
+                    args=(st, sy),
                     max_steps=settings.numerical.max_evaluations,
                 )
-                solver_lowered = eqx.filter_jit(run_fn).lower(control_values, state, system, settings)
+                solver_lowered = eqx.filter_jit(run_fn).lower(control_values, dyn_state, dyn_system)
                 print(f" - Solver Lowering Time : {time.time() - t0:.2f} seconds")
 
                 # 2. Measure the Graph Size
@@ -618,8 +629,8 @@ class ImplicitAnalysis(Process):
 
         if settings.DEBUG_MODE:    
                     print(f"DEBUG MODE: Executing single forward pass...")
-                    _, (f_st, f_sys, f_set) = get_residuals(control_values, (state, system, settings))
-                    f_ctrls = self._get_control_array(f_st, f_set)
+                    _, (f_st, f_sys) = get_residuals(control_values, (dyn_state, dyn_system))
+                    f_ctrls = self._get_control_array(f_st, settings)
                     opt_state = None
         
         else:
@@ -628,7 +639,7 @@ class ImplicitAnalysis(Process):
             else:
                 run_fn = self._run_optx_solver
 
-            f_ctrls, opt_state, f_st, f_sys, f_set = run_fn(
+            f_ctrls, opt_state, f_st, f_sys = run_fn(
                 get_residuals,
                 control_values,
                 state,
@@ -637,7 +648,7 @@ class ImplicitAnalysis(Process):
                 solver_options
             )
         
-        return f_ctrls, opt_state, f_st, f_sys, f_set
+        return f_ctrls, opt_state, f_st, f_sys
     
     def __call__(self, state: State, system: System, settings: Settings):
 
@@ -658,7 +669,7 @@ class ImplicitAnalysis(Process):
         with TraceReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
                      message=f"Tracing {self.tag}..."):
             
-            f_ctrls, opt_state, f_st, f_sys, f_set = self._run_solver(
+            f_ctrls, opt_state, f_st, f_sys = self._run_solver(
                 initial_control_values,
                 state,
                 system,
@@ -680,7 +691,7 @@ class ImplicitAnalysis(Process):
         del _analysis_stack[-1]
         del _trace_count[-1]
 
-        return f_st, f_sys, f_set
+        return f_st, f_sys, settings
 
     @overload
     def run(
