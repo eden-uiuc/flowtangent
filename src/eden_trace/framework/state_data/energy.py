@@ -120,7 +120,7 @@ class NodeConditions(StateData):
     force: ForceOutputs = init_field(ForceOutputs)
     residual: ResidualOutputs = init_field(ResidualOutputs)
 
-    mass = jnp.ndarray = empty_array()
+    mass: jnp.ndarray = empty_array()
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Stores

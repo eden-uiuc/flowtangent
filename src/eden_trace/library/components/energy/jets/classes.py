@@ -44,7 +44,7 @@ from eden_trace.library.propellants import JetA, Propellant
 
 @register
 class Inlet(FlowNode):
-    tag: str = init_field("Inlet", static=True)
+    tag: str = init_field("inlet", static=True)
 
     @tu.inputs(
         "state.freestream",
@@ -155,9 +155,9 @@ def _compressor_performance(
 
 @register
 class Compressor(FlowNode):
-    tag: str = init_field("Compressor", static=True)
+    tag: str = init_field("compressor", static=True)
 
-    inputs: tuple | GraphInput = init_field(GraphInput("flow", "Inlet"), static=True)
+    inputs: tuple | GraphInput = init_field(GraphInput("flow", "inlet"), static=True)
 
     map: CompressorMap = init_field(map_data.AXI5)
 

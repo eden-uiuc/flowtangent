@@ -101,8 +101,8 @@ def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
     # 1. Strip type hints
     io_parts = io_string.split(":")
     io_string = io_parts[0].strip()
-    if len(io_parts > 1):
-        meta_string = ": " + io_string.split(":")[1].strip()
+    if len(io_parts) > 1:
+        meta_string = ": " + io_parts[1].strip()
     else:
         meta_string = ""
 
@@ -142,10 +142,18 @@ def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
         resolved_list = []
         for item in base_list:
             try:
-                # If attrs is empty, reduce just returns item. 
-                # If attrs is ['network_ID'], it runs getattr(item, 'network_ID')
-                resolved_item = reduce(getattr, attrs, item)
-                resolved_list.append(resolved_item + meta_string)
+                resolved_item = item
+                for attr in attrs:
+                    if attr.endswith('()'):
+                        # It is a method call (e.g., "lower()")
+                        method_name = attr[:-2]
+                        method = getattr(resolved_item, method_name)
+                        resolved_item = method()
+                    else:
+                        # It is a standard attribute
+                        resolved_item = getattr(resolved_item, attr)
+                        
+                resolved_list.append(resolved_item)
             except AttributeError:
                 raise AttributeError(f"Could not resolve '{'.'.join(attrs)}' on {item}")
 
