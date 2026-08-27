@@ -24,6 +24,7 @@ import equinox as eqx
 
 
 # Trace imports
+import eden_trace.utils as tu
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import units
@@ -251,6 +252,15 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
         )
     )
 
+    @tu.inputs(
+            "state.energy.nodes['{force_inputs.network_ID}'].outputs.force.thrust",
+            "state.energy.nodes['{residual_inputs.network_ID}'].outputs.residual.power",
+    )
+    @tu.outputs(
+            "state.energy.total_force_vector",
+            "state.energy.nodes['{network_ID}'].outputs.residual.thrust",
+            "state.energy.nodes['{network_ID}'].outputs.residual.power",
+    )
     def transmit(self, state: State, system: System, settings: Settings):
 
         updated_state = state

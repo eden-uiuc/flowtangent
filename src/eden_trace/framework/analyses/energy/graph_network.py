@@ -57,17 +57,15 @@ def build_analysis_from_network(network: GraphNetwork):
         node = analysis_network.nodes[network_ID]
         node_func = node.__class__.transmit
 
-        context_mape = vars(node)
-
         raw_inputs = getattr(node_func, "_inputs", set())
         node_inputs = set()
         for io_str in raw_inputs:
-            node_inputs.update(parse_io(io_str, context_map))
+            node_inputs.update(parse_io(io_str, node))
 
         raw_outputs = getattr(node_func, "_outputs", set())
         node_outputs = set()
         for io_str in raw_outputs:
-            node_outputs.update(parse_io(io_str, context_map))
+            node_outputs.update(parse_io(io_str, node))
 
         @inputs(*node_inputs)
         @outputs(*node_outputs)
@@ -78,8 +76,16 @@ def build_analysis_from_network(network: GraphNetwork):
     
     def make_network_function():
         net_func = analysis_network.__class__.transmit
-        node_inputs = getattr(net_func, "_inputs", set())
-        node_outputs = getattr(net_func, "_outputs", set())
+
+        raw_inputs = getattr(net_func, "_inputs", set())
+        node_inputs = set()
+        for io_str in raw_inputs:
+            node_inputs.update(parse_io(io_str, analysis_network))
+
+        raw_outputs = getattr(net_func, "_outputs", set())
+        node_outputs = set()
+        for io_str in raw_outputs:
+            node_outputs.update(parse_io(io_str, analysis_network))
 
         @inputs(*node_inputs)
         @outputs(*node_outputs)

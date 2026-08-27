@@ -191,7 +191,7 @@ class Compressor(FlowNode):
         "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes['{network_ID}'].flow.stagnation_temperature"
+        "state.energy.nodes['{network_ID}'].flow.stagnation_temperature",
         "state.energy.nodes['{network_ID}'].flow.stagnation_pressure",
         "state.energy.nodes['{network_ID}'].flow.stagnation_enthalpy",
         "state.energy.nodes['{network_ID}'].mechanical.work",
@@ -418,18 +418,17 @@ class Burner(FlowNode):
 
     @tu.inputs(
         "state.freestream.Cp",
-        "state.energy.nodes[burner_flow_inputs].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[burner_flow_inputs].outputs.flow.stagnation_pressure",
-        "system.energy.nodes[Turbojet].design_paramters.turbine_intake_temperature",
-        "system.energy.nodes[Turbojet].fuel.specific_energy",
-        "system.energy.nodes[burner].pressure_ratio",
-        "system.energy.nodes[burner].design_parameters.eff.flow",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.target_temperature",
+        "system.energy.nodes['{network_ID}'].pressure_ratio",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes[burner].outputs.flow.stagnation_pressure",
-        "state.energy.nodes[burner].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[burner].outputs.flow.stagnation_enthalpy",
-        "state.energy.nodes[burner].outputs.fuel.fuel_air_ratio",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.fuel.fuel_air_ratio",
     )
     def transmit(self, state: State, system: System, settings: Settings):
         
@@ -570,17 +569,17 @@ class Turbine(FlowNode):
     @tu.inputs(
         "state.freestream.gamma",
         "state.freestream.Cp",
-        "state.energy.nodes[Turbine_flow_inputs].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[Turbine_flow_inputs].outputs.flow.stagnation_pressure",
-        "state.energy.nodes[Turbine_fuel_inputs].outputs.fuel.fuel_air_ratio",
-        "state.energy.nodes[Turbine_mechanical_inputs].outputs.mechanical.work",
-        "system.energy.nodes[Turbine].design_parameters.eff.mechanical",
-        "system.energy.nodes[Turbine].design_parameters.eff.flow",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.nodes['{fuel_inputs.network_ID}'].outputs.fuel.fuel_air_ratio",
+        "state.energy.nodes['{mechanical_inputs.network_ID}'].outputs.mechanical.work",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.mechanical",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes[Turbine].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[Turbine].outputs.flow.stagnation_pressure",
-        "state.energy.nodes[Turbine].outputs.flow.stagnation_enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_enthalpy",
     )
     def transmit(self, state: State, system: System, settings: Settings):
         
@@ -961,21 +960,21 @@ class Nozzle(FlowNode):
         "state.freestream.Cp",
         "state.freestream.gamma",
         "state.freestream.R",
-        "system.energy.nodes[ExpansionNozzle].pressure_ratio",
-        "system.energy.nodes[ExpansionNozzle].design_parameters.eff.flow",
+        "system.energy.nodes['{network_ID}'].pressure_ratio",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
     )
     @tu.outputs(
-        "state.energy.nodes[ExpansionNozzle].outputs.flow",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.area_ratio",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.mach_number",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.density",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.speed",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.pressure",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.stagnation_pressure",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.temperature",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.stagnation_temperature",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.enthalpy",
-        "state.energy.nodes[ExpansionNozzle].outputs.flow.stagnation_enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.flow",
+        "state.energy.nodes['{network_ID}'].outputs.flow.area_ratio",
+        "state.energy.nodes['{network_ID}'].outputs.flow.mach_number",
+        "state.energy.nodes['{network_ID}'].outputs.flow.density",
+        "state.energy.nodes['{network_ID}'].outputs.flow.speed",
+        "state.energy.nodes['{network_ID}'].outputs.flow.pressure",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_pressure",
+        "state.energy.nodes['{network_ID}'].outputs.flow.temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_temperature",
+        "state.energy.nodes['{network_ID}'].outputs.flow.enthalpy",
+        "state.energy.nodes['{network_ID}'].outputs.flow.stagnation_enthalpy",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
@@ -1092,6 +1091,12 @@ class Turboshaft(GraphNode):
         GraphInput("mechanical", "turbine"),
     )
 
+    @tu.inputs(
+        "state.energy.nodes['{mechanical_inputs.network_ID}'].outputs.power",
+    )
+    @tu.outputs(
+        "state.energy.nodes['{network_ID}'].outputs.residual.power"
+    )
     def transmit(self, state: State, system: System, settings: Settings):
         
         if settings.analysis.energy.design_mode:
@@ -1438,22 +1443,22 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
         "state.freestream.mach_number",
         "state.freestream.pressure",
         "state.freestream.gravity",
-        "state.energy.nodes[Turbojet].throttle",
-        "state.energy.nodes[Turbojet_core_nozzle].outputs.flow.speed",
-        "state.energy.nodes[Turbojet_core_nozzle].outputs.flow.area_ratio",
-        "state.energy.nodes[Turbojet_core_nozzle].outputs.flow.pressure",
-        "state.energy.nodes[Turbojet_burner].outputs.fuel.fuel_air_ratio",
-        "system.energy.nodes[Turbojet].design_parameters.total_thrust"
-        "system.energy.nodes[Turbojet].design_parameters.delta_SFC",
+        "state.energy.nodes['{network_ID}'].throttle",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.speed",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.area_ratio",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.flow.pressure",
+        "state.energy.nodes['{flow_inputs.network_ID}'].outputs.fuel.fuel_air_ratio",
+        "system.energy.nodes['{network_ID}'].design_parameters.total_thrust"
+        "system.energy.nodes['{network_ID}'].design_parameters.delta_SFC",
     )
     @tu.outputs(
-        "state.energy.nodes[Turbojet].outputs.force.thrust",
-        "state.energy.nodes[Turbojet].outputs.force.nondimensional_thrust",
-        "state.energy.nodes[Turbojet].outputs.force.specific_impulse",
-        "state.energy.nodes[Turbojet].outputs.fuel.TSFC",
-        "state.energy.nodes[Turbojet].outputs.fuel.flow_rate",
-        "state.energy.nodes[Turbojet].outputs.flow.mass_flow_rate",
-        "state.energy.nodes[Turbojet].outputs.mechanical.power",
+        "state.energy.nodes['{network_ID}'].outputs.force.thrust",
+        "state.energy.nodes['{network_ID}'].outputs.force.nondimensional_thrust",
+        "state.energy.nodes['{network_ID}'].outputs.force.specific_impulse",
+        "state.energy.nodes['{network_ID}'].outputs.fuel.TSFC",
+        "state.energy.nodes['{network_ID}'].outputs.fuel.flow_rate",
+        "state.energy.nodes['{network_ID}'].outputs.flow.mass_flow_rate",
+        "state.energy.nodes['{network_ID}'].outputs.mechanical.power",
     )
     def transmit(self, state: State, system: System, settings: Settings):        
 

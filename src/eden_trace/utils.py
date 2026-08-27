@@ -97,7 +97,7 @@ def outputs(*outputs: str):
 
     return decorator
 
-def parse_io(io_string: str, var_map: dict) -> set:
+def parse_io(io_string: str, var_map: dict | eqx.Module) -> set:
     # 1. Strip type hints
     io_string = io_string.split(":")[0].strip()
 
@@ -122,7 +122,10 @@ def parse_io(io_string: str, var_map: dict) -> set:
         attrs = parts[1:]
 
         # Fetch the base value and wrap it in a list if necessary
-        base_val = var_map.get(base_key, [])
+        if isinstance(var_map, dict):
+            base_val = var_map.get(base_key, [])
+        else:
+            base_val = getattr(var_map, base_key, [])
         if isinstance(base_val, (str, int, float, bool)):
             base_list = [base_val]
         elif isinstance(base_val, (list, tuple, set)):
@@ -150,7 +153,8 @@ def parse_io(io_string: str, var_map: dict) -> set:
     resolved_paths = set()
     for combination in itertools.product(*value_lists):
         combo_dict = dict(zip(keys, combination))
-        resolved_paths.add(io_string.format(**combo_dict))
+        resolved_string = io_string.format(**combo_dict)
+        resolved_paths.add(resolved_string)
             
     return resolved_paths
 

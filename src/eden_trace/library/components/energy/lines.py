@@ -65,13 +65,19 @@ class TurbojetLine(EnergyLine):
     )
 
     @func_inputs(
-        "state.energy.nodes[Line_fuel_tanks].mass",
-        "state.energy.nodes[Line_fuel_inputs].outputs.fuel.flow_rate",
-        "system.energy.nodes[Line_fuel_tanks].selector_ratio",
-        "system.energy.nodes[Line_fuel_tanks].mass_properties.total",
-        "system.energy.nodes[Line].tank_draw_ratios",
+        # "state.energy.nodes['{fuel_tanks.network_ID}'].mass",
+        "state.energy.nodes['{fuel_inputs.network_ID}'].outputs.fuel.flow_rate",
+        # "system.energy.nodes['{fuel_tanks.network_ID}'].selector_ratio",
+        # "system.energy.nodes['{fuel_tanks.network_ID}'].mass_properties.total",
+        "system.energy.nodes['{network_ID}'].tank_draw_ratios",
     )
-    @outputs("state.energy.nodes[Line_fuel_tanks].outputs.fuel.flow_rate")
+    @outputs(
+        # "state.energy.nodes['{fuel_tanks}'].outputs.fuel.flow_rate",
+        "state.mass.rate_of_change",
+        "state.energy.nodes['{network_ID}'].outputs.force.thrust",
+        "state.energy.nodes['{network_ID}'].outputs.residual.thrust",
+        "state.energy.nodes['{network_ID}'].outputs.residual.power",
+    )
     def transmit(self, state: State, system: System, settings: Settings):
 
         # Fuel Burn ------------------------------------------------------------
