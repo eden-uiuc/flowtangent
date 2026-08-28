@@ -37,7 +37,7 @@ class NumericalTime(StateData):
 class Time(StateData):
     tag: str = init_field("Time", static=True)
 
-    N: int = 1
+    N: int = init_field(1, static=True)
     
     dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
     dimensional: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensional Time"))

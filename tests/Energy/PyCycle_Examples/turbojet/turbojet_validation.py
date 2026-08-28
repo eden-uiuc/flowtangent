@@ -346,8 +346,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
 if __name__ == "__main__":
     
     # Control Board
-    DEV = True
-    DEBUG = False
+    DEV = False
+    DEBUG = True
     VERBOSE = True
 
     V_NOZZ = False

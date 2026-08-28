@@ -336,7 +336,7 @@ class ImplicitAnalysis(Process):
             if settings.numerical.sum_residuals:
                 N = 1
             else:
-                N = int(state.time.N.item())
+                N = state.time.N
             ctrl_idx = 0
     
             for ctrl in self.controls:
@@ -355,7 +355,7 @@ class ImplicitAnalysis(Process):
         control_values = []
         
         for ctrl in self.controls:
-            n_cp = int(state.time.N.item())
+            n_cp = state.time.N
 
             # All control values are normalized by their initial value, so set initial control value to 1.0
             # Values are rescaled in update_controls when actually added to state
