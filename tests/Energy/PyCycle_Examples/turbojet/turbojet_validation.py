@@ -346,8 +346,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
 if __name__ == "__main__":
     
     # Control Board
-    DEV = False
-    DEBUG = True
+    DEV = True
+    DEBUG = False
     VERBOSE = True
 
     V_NOZZ = False
@@ -401,11 +401,10 @@ if __name__ == "__main__":
     for comp in des_sys.energy.line.engine.subcomponents:
         if hasattr(comp, "design_parameters") and comp.design_parameters:
             d = comp.design_parameters
-            A_i = d.A_intake
-            A_t = d.A_throat
-            A_x = d.A_exit
-            AR = d.A_ratio
-            d_params = {"Intake Area": A_i, "Throat Area": A_t, "Exit Area":A_x, "Area_Ratio":AR}
+            A_i = d.A_intake if d.A_intake else 1.0
+            A_t = d.A_throat if d.A_throat else 1.0
+            A_x = d.A_exit if d.A_throat else 1.0
+            d_params = {"Intake Area": A_i, "Throat Area": A_t, "Exit Area":A_x}
             real_params = {k:a for k, a in d_params.items() if a != 1.0}
             if any(real_params):
                 print(f"{comp.tag}:")

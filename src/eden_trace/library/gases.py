@@ -17,7 +17,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from eden_trace.utils import empty_array, get_trace_root, init_field
+from eden_trace.utils import get_trace_root, register
 
 # Trace imports
 from eden_trace.library import units
@@ -61,11 +61,10 @@ R_UNIV = 8.314462
 R_SPEC = R_UNIV / MOL_MASS
 
 def _eval_Cp(T):
-    """
-    Evaluates specific heat for all species simultaneously.
-    NASA_LOW/HIGH shape: (N_species, 7)
-    """
     T_arr = jnp.asarray(T)
+    if T_arr.ndim > 1 and T_arr.shape[-1] == 1:
+        T_arr = T_arr[..., 0]
+        
     T_vec = jnp.stack([jnp.ones_like(T_arr), T_arr, T_arr**2, T_arr**3, T_arr**4], axis=-1)
 
     cp_low  = R_SPEC * jnp.dot(T_vec, NASA_LOW[:, :5].T)
@@ -80,14 +79,17 @@ def _eval_h(T):
     """
     # Build the T-multiplier vector for enthalpy [T, T^2/2, T^3/3, T^4/4, T^5/5, 1, 0]
     T_arr = jnp.asarray(T)
+    if T_arr.ndim > 1 and T_arr.shape[-1] == 1:
+        T_arr = T_arr[..., 0]
+
     T_vec = jnp.stack([
         T_arr, 
         (T_arr**2) / 2.0, 
         (T_arr**3) / 3.0, 
         (T_arr**4) / 4.0, 
         (T_arr**5) / 5.0, 
-        1.0, 
-        0.0
+        jnp.ones_like(T_arr), 
+        jnp.zeros_like(T_arr)
     ], axis=-1) # Shape (7, T.shape)
     
     # Dot product across the coefficients for low and high temperature ranges
@@ -99,8 +101,17 @@ def _eval_h(T):
 
 def _eval_s0(T):
     T_arr = jnp.asarray(T)
+    if T_arr.ndim > 1 and T_arr.shape[-1] == 1:
+        T_arr = T_arr[..., 0]
+
     T_vec = jnp.stack([
-        jnp.log(T_arr), T_arr, (T_arr**2) / 2.0, (T_arr**3) / 3.0, (T_arr**4) / 4.0, 0.0, 1.0
+        jnp.log(T_arr),
+        T_arr,
+        (T_arr**2) / 2.0,
+        (T_arr**3) / 3.0,
+        (T_arr**4) / 4.0,
+        jnp.zeros_like(T_arr),
+        jnp.ones_like(T_arr)
     ], axis=-1)
     
     # FIX: Use T_vec @ NASA.T so shapes perfectly align to (..., N_species)
@@ -109,6 +120,7 @@ def _eval_s0(T):
     
     return jnp.where(jnp.expand_dims(T_arr, axis=-1) > NASA_MID, s_high, s_low)
 
+@register
 class Gas(eqx.Module):
     mass_fractions: jax.Array
 
@@ -201,6 +213,9 @@ class Gas(eqx.Module):
     def compute_speed_of_sound(self, T: float | jnp.ndarray = 298.0):
         g = self.compute_gamma(T)
         return jnp.sqrt(g * self.R_specific * T)
+
+    def compute_absolute_viscosity(self, T: float | jnp.ndarray = 298.0):
+        return 1.8e-5
 
 @lru_cache(maxsize=None)
 def _get_gas(name: str):
@@ -297,73 +312,6 @@ def BurnedJetA(FAR: float | jax.Array) -> Gas:
     )
 
     return Gas(mass_fractions=fractions)
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  Caching Mixes
-# ----------------------------------------------------------------------------------------------------------------------
-
-@lru_cache(maxsize=None)
-def GasTemplate(**kwargs) -> Gas:
-    dummy_fractions = jnp.zeros((1, len(elements)))
-    comp = GasComposition(elements=elements, mass_fractions=dummy_fractions)
-    return MixedGas(**kwargs)
-
-def flatten_element_names(elements) -> tuple[str, ...]:
-    e_set = set()
-    for elem in elements:
-        if hasattr(elem, "composition"):
-            sub_set = flatten_element_names(elem.composition.elements)
-            e_set = e_set.union(sub_set)
-        else:
-            e_set.add(str(elem))
-    
-    return tuple(sorted(e_set))
-
-def flatten_elements(elements: tuple, mass_fractions: jnp.ndarray):
-
-    def _extract_elements(
-        elements: tuple, 
-        mass_fractions: jnp.ndarray, 
-        current_fraction: jnp.ndarray
-    ) -> dict[str, jnp.ndarray]:
-        """
-        Recursively drills down into nested elements and accumulates 
-        the absolute mass fractions of the base elements.
-        """
-        base_dict = defaultdict(lambda: jnp.zeros_like(current_fraction))
-        
-        # Ensure 2D for broadcasting safely
-        mass_fractions_2d = jnp.atleast_2d(mass_fractions)
-        
-        for e_idx, elem in enumerate(elements):
-            
-            # Calculate this specific element's absolute fraction
-            e_frac = current_fraction * mass_fractions_2d[..., e_idx:e_idx+1]
-            
-            if hasattr(elem, "composition"):
-                # It's a MixedGas! Feed its inner components into the recursion
-                sub_dict = _extract_elements(
-                    elements=elem.composition.elements, 
-                    mass_fractions=elem.composition.mass_fractions, 
-                    current_fraction=e_frac
-                )
-                
-                # Merge the returned sub-elements into our dictionary
-                for gas, frac in sub_dict.items():
-                    gas_name = str(gas).upper()
-                    base_dict[gas_name] = base_dict[gas_name] + frac
-            else:
-                # It's a base element (string or IdealGas). Add directly.
-                gas_name = str(elem).upper()
-                base_dict[gas_name] = base_dict[gas_name] + e_frac
-                
-        return base_dict
-
-    base_dict = _extract_elements(elements, mass_fractions, jnp.ones((1, 1)))
-    sorted_elements = tuple(sorted(base_dict.keys()))
-    stacked_fractions = jnp.concatenate([base_dict[k] for k in sorted_elements], axis=-1)
-
-    return sorted_elements, stacked_fractions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  CHEMKIN Harvester

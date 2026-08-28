@@ -442,7 +442,7 @@ class ImplicitAnalysis(Process):
             fn=get_residuals,
             solver=self.solver(**solver_options),
             y0=control_values,
-            args=(state, system, settings),
+            args=(state, system),
             max_steps=settings.numerical.max_evaluations,
             has_aux=True
         )
@@ -502,8 +502,8 @@ class ImplicitAnalysis(Process):
             analysis_state, analysis_system, analysis_settings = self.analyze(control_state, full_system, settings)
 
             res = self._get_residual_array(analysis_state, analysis_settings)
-            updated_r_state = eqx.partition(analysis_state, state_mask)
-            updated_r_system = eqx.partition(analysis_system, system_mask)
+            updated_r_state, _ = eqx.partition(analysis_state, state_mask)
+            updated_r_system, _ = eqx.partition(analysis_system, system_mask)
             
             return res, (updated_r_state, updated_r_system)
         
@@ -638,12 +638,11 @@ class ImplicitAnalysis(Process):
                              f"settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity:,}). "
                              "Terminating.")
 
-
         if settings.DEBUG_MODE:    
-                    print(f"DEBUG MODE: Executing single forward pass...")
-                    _, (f_st, f_sys) = get_residuals(control_values, (dyn_state, dyn_system))
-                    f_ctrls = self._get_control_array(f_st, settings)
-                    opt_state = None
+            print(f"DEBUG MODE: Executing single forward pass...")
+            _, (f_st, f_sys) = get_residuals(control_values, (dyn_state, dyn_system))
+            f_ctrls = self._get_control_array(f_st, settings)
+            opt_state = None
         
         else:
             if isinstance(self.solver, str):
@@ -659,8 +658,11 @@ class ImplicitAnalysis(Process):
                 settings,
                 solver_options
             )
+
+        full_state = eqx.combine(f_st, stat_state)
+        full_system = eqx.combine(f_sys, stat_system)
         
-        return f_ctrls, opt_state, f_st, f_sys
+        return f_ctrls, opt_state, full_state, full_system
     
     def __call__(self, state: State, system: System, settings: Settings):
 
@@ -722,6 +724,7 @@ class ImplicitAnalysis(Process):
         if initialize:
             state, system, settings = array_barrier(state, system, settings)
             state, system, settings = self._initialize_controls(state, system, settings)
+
         if not track_history:
             return self(state, system, settings)
 

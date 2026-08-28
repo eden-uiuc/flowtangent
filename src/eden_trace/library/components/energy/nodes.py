@@ -26,7 +26,7 @@ from functools import reduce
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import Component
-from eden_trace.library.gases import Air, Gas, GasTemplate, flatten_elements
+from eden_trace.library.gases import Air, Gas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Nodes
