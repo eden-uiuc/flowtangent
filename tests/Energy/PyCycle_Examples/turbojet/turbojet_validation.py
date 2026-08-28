@@ -244,7 +244,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     def get_Trace_value(state, network_id, prop_tag):
 
         node = state.energy.nodes[network_id]
-        value = np.asarray(getattr(node.outputs.flow, prop_tag))
+        value = np.asarray(getattr(node.flow, prop_tag))
         if value.size == 1:
             return value.item()
         else:
@@ -346,8 +346,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
 if __name__ == "__main__":
     
     # Control Board
-    DEV = True
-    DEBUG = False
+    DEV = False
+    DEBUG = True
     VERBOSE = True
 
     V_NOZZ = False

@@ -191,12 +191,12 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
 
     d_thrust = Residual(
         tag="Design Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust
+        get_value=lambda s: s.energy.residual.thrust
     )
 
     d_power = Residual(
         tag="Power Imbalance",
-        get_value=lambda s: s.energy.outputs.residual.power
+        get_value=lambda s: s.energy.residual.power
     )
 
     design_analysis = ImplicitAnalysis(
@@ -208,7 +208,6 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
 
     des_state, des_system, des_settings = design_analysis.run(
         des_state, des_system, des_settings,
-        initialize=True
     )
     
     if des_settings.analysis.energy.clear_nodes:
@@ -252,7 +251,7 @@ def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> Impli
     # Residuals Setup
     d_thrust = Residual(
         tag="Design Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust
+        get_value=lambda s: s.energy.residual.thrust
     )
 
     d_LP_power = Residual(
@@ -361,17 +360,17 @@ def turbojet_performance(
     
     # Residual Setup -----------------------------------------------------------
 
-    d_m_nozz = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.outputs.residual.mass_flow_rate)
+    d_m_nozz = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.residual.mass_flow_rate)
     
-    d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.outputs.residual.power)
+    d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.residual.power)
     
-    d_thrust = Residual(tag="Thrust", get_value=lambda s: s.energy.outputs.residual.thrust)
+    d_thrust = Residual(tag="Thrust", get_value=lambda s: s.energy.residual.thrust)
 
-    d_Wc = Residual(tag="Compressor Mass Flow", get_value=lambda s: s.energy.outputs.residual.compressor_Wc)
+    d_Wc = Residual(tag="Compressor Mass Flow", get_value=lambda s: s.energy.residual.compressor_Wc)
 
-    d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.outputs.residual.turbine_Wp)
+    d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.residual.turbine_Wp)
 
-    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.outputs.residual.area)
+    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.residual.area)
 
     # Variable Setup -----------------------------------------------------------
     
@@ -517,14 +516,14 @@ def turbofan_performance(network: TurbofanNetwork):
     )
     
     # Residual Setup -----------------------------------------------------------    
-    d_fWc = Residual(tag="Fan Mass Flow", get_value=lambda s: s.energy.outputs.residual.fan_Wc)
-    d_lWc = Residual(tag="LPC Mass Flow", get_value=lambda s: s.energy.outputs.residual.lpc_Wc)
-    d_hWc = Residual(tag="HPC Mass Flow", get_value=lambda s: s.energy.outputs.residual.hpc_Wc)
+    d_fWc = Residual(tag="Fan Mass Flow", get_value=lambda s: s.energy.residual.fan_Wc)
+    d_lWc = Residual(tag="LPC Mass Flow", get_value=lambda s: s.energy.residual.lpc_Wc)
+    d_hWc = Residual(tag="HPC Mass Flow", get_value=lambda s: s.energy.residual.hpc_Wc)
     
-    d_lWp = Residual(tag="LPT Mass Flow", get_value=lambda s: s.energy.outputs.residual.lpt_Wp)
-    d_hWp = Residual(tag="HPT Mass Flow", get_value=lambda s: s.energy.outputs.residual.hpt_Wp)
+    d_lWp = Residual(tag="LPT Mass Flow", get_value=lambda s: s.energy.residual.lpt_Wp)
+    d_hWp = Residual(tag="HPT Mass Flow", get_value=lambda s: s.energy.residual.hpt_Wp)
 
-    d_thrust = Residual(tag="Thrust",     get_value=lambda s: s.energy.outputs.residual.thrust)
+    d_thrust = Residual(tag="Thrust",     get_value=lambda s: s.energy.residual.thrust)
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
@@ -655,7 +654,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
     OD_F = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1)).at[0,0].set(0.0)
     d_F = Residual(
         "Off-Design Thrust",
-        get_value=lambda s: jnp.where(OD_F, s.energy.outputs.residual.thrust, OD_F))
+        get_value=lambda s: jnp.where(OD_F, s.energy.residual.thrust, OD_F))
 
     OD_TSFC = jnp.array([d.TSFC for d in OD_points]).reshape((-1, 1))
     d_TSFC = Residual(

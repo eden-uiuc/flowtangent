@@ -33,7 +33,7 @@ from eden_trace.library import units
 from ..maps import data as map_data
 from ..maps.classes import CompressorMap, TurbineMap
 from ..nodes import GraphInput, GraphNode, Splitter, FlowNode, FlowDesign, BleedFlow
-from eden_trace.library.gases import Air, BurnedJetA, IdealGas
+from eden_trace.library.gases import Air, BurnedJetA, Gas
 from eden_trace.library.propellants import JetA, Propellant
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ class Inlet(FlowNode):
         "state.energy.mass_flow_rate",
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_ratio",
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_recovery",
-        "system.energy.nodes['{network_ID}'].design_parameters.design_parameters.eff.flow",
+        "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
         "system.energy.nodes['{network_ID}'].design_parameters.exit_mach_number: Optional",
     )
     @tu.outputs(
@@ -177,7 +177,6 @@ class Compressor(FlowNode):
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_ratio",
         "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
         "system.energy.nodes['{network_ID}'].design_parameters.rotation_speed",
-        "system.energy.nodes['{network_ID}'].design_parameters.mass_flow_rate"
         "system.energy.nodes['{network_ID}'].design_parameters.exit_mach_number: Optional",
     )
     @tu.outputs(
@@ -325,7 +324,7 @@ class Compressor(FlowNode):
         Wc_res  = (W_in - state.energy.mass_flow_rate)/W_des
 
         updated_state = eqx.tree_at(
-            lambda s:getattr(s.energy.outputs.residual, f"{self.tag.lower()}_Wc"),
+            lambda s:getattr(s.energy.residual, f"{self.tag.lower()}_Wc"),
             updated_state,
             Wc_res)
 
@@ -334,7 +333,7 @@ class Compressor(FlowNode):
 # Burner -----------------------------------------------------------------------
 
 def _burner_design(
-    gas: IdealGas,
+    gas: Gas,
     T_t: jnp.ndarray,
     P_t: jnp.ndarray,
     T_t_out: jnp.ndarray,
@@ -364,7 +363,7 @@ def _burner_design(
     return P_t_out, h_t_out, jnp.atleast_2d(FAR), mdot_out
 
 def _burner_performance(
-    gas: IdealGas,            # IdealGas or BurnedGas model
+    gas: Gas,            # Gas or BurnedGas model
     fuel: Propellant,
     T_t: jnp.ndarray,
     P_t: jnp.ndarray,
@@ -421,7 +420,7 @@ class Burner(FlowNode):
         "system.energy.nodes['{network_ID}'].fuel.specific_energy",
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_ratio",
         "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
-        "system.energy.nodes['{network_ID}'].design_parameters.eff.exit_mach_number: Optional",
+        "system.energy.nodes['{network_ID}'].design_parameters.exit_mach_number: Optional",
     )
     @tu.outputs(
         "state.energy.nodes['{network_ID}'].flow",
@@ -728,7 +727,7 @@ class Turbine(FlowNode):
         W_des = eng_des.mass_flow_rate
         Wp_res = (W / (1. + FAR) - state.energy.mass_flow_rate)/W_des
         updated_state = eqx.tree_at(
-            lambda s: getattr(s.energy.outputs.residual, f"{self.tag.lower()}_Wp"),
+            lambda s: getattr(s.energy.residual, f"{self.tag.lower()}_Wp"),
             updated_state,
             Wp_res)
 
@@ -756,7 +755,7 @@ def _isentropic_expansion(
     return P_t_out, T_t_out, T_out, M_out
 
 def _mass_flux(
-        gas: IdealGas,
+        gas: Gas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,
         M: jnp.ndarray
@@ -774,7 +773,7 @@ def _mass_flux(
 # Sections -----------------------------------------------------------
 
 def _nozzle_design(
-        gas: IdealGas,
+        gas: Gas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,
         mdot: jnp.ndarray,
@@ -821,7 +820,7 @@ def _nozzle_design(
     return A_throat, A_exit, M_out, rho_out, u_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
 def _fixed_nozzle_performance(
-        gas: IdealGas,
+        gas: Gas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,
         P0: jnp.ndarray,
@@ -888,7 +887,7 @@ def _fixed_nozzle_performance(
     return mdot_out, M_exit, u_out, rho_out, P_out, P_t_out, T_out, T_t_out, h_out, h_t_out
 
 def _variable_nozzle_performance(
-        gas: IdealGas,
+        gas: Gas,
         T_t: jnp.ndarray,
         P_t: jnp.ndarray,
         P0: jnp.ndarray,
@@ -1031,7 +1030,7 @@ class Nozzle(FlowNode):
                 A_t_des = des_params.A_throat
                 A_t_res =  (A_t - A_t_des)/A_t_des
                 updated_state = eqx.tree_at(
-                    lambda s: s.energy.outputs.residual.area,
+                    lambda s: s.energy.residual.area,
                     updated_state,
                     A_t_res)
 
@@ -1089,7 +1088,7 @@ class Turboshaft(GraphNode):
     )
 
     @tu.inputs(
-        "state.energy.nodes['{mechanical_inputs.network_ID}'].power",
+        "state.energy.nodes['{mechanical_inputs.network_ID}'].mechanical.power",
         "system.energy.nodes['network.line.engine'].design_parameters",
     )
     @tu.outputs(
@@ -1261,7 +1260,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
 
     plug_diameter: float = 0.0
 
-    working_fluid: IdealGas = init_field(Air)
+    working_fluid: Gas = init_field(Air)
     design_parameters: TurbojetDesign | tuple = init_field(TurbojetDesign)
 
     inputs: tuple | GraphInput = init_field(
@@ -1435,7 +1434,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
                 ))
 
     @tu.inputs(
-        "state.freestream"
+        "state.freestream",
         "state.energy.throttle",
         "state.energy.nodes['{flow_inputs.network_ID}'].flow",
         "system.energy.nodes['{network_ID}'].design_parameters",

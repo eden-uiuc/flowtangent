@@ -19,6 +19,7 @@ import os
 import sys
 import time
 import threading
+import warnings
 
 from collections import Counter
 from pathlib import Path
@@ -34,9 +35,10 @@ from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
-from eden_trace.utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
-from eden_trace.framework import Process, Settings, State, System
-from eden_trace.framework.state_data.controls import Control, Residual
+from ...utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
+from .. import Settings, State, System
+from ..state_data.controls import Control, Residual
+from ..processes import Process, array_barrier
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
@@ -275,7 +277,7 @@ class ImplicitAnalysis(Process):
 
         return valid_controls
 
-    def _report_results(self, f_ctrls: jnp.ndarray | np.ndarray, f_st: State, opt_state=None):
+    def _report_results(self, f_ctrls: jnp.ndarray | np.ndarray, opt_state=None):
 
         print(f"\n{'='*70}")
         print(f"Final {self.tag} Solver State")
@@ -334,7 +336,7 @@ class ImplicitAnalysis(Process):
             if settings.numerical.sum_residuals:
                 N = 1
             else:
-                N = int(state.time.N)
+                N = int(state.time.N.item())
             ctrl_idx = 0
     
             for ctrl in self.controls:
@@ -353,7 +355,7 @@ class ImplicitAnalysis(Process):
         control_values = []
         
         for ctrl in self.controls:
-            n_cp = int(state.time.N)
+            n_cp = int(state.time.N.item())
 
             # All control values are normalized by their initial value, so set initial control value to 1.0
             # Values are rescaled in update_controls when actually added to state
@@ -458,12 +460,22 @@ class ImplicitAnalysis(Process):
     ):
 
         # Partition inputs to avoid tracing the entire state and system trees
-        active_paths = self.analyze.full_io
-        active_state_paths = set(['.'.join(p.split('.')[1:]) for p in active_paths if p.split('.')[0].lower() == "state"])
-        active_system_paths = set(['.'.join(p.split('.')[1:]) for p in active_paths if p.split('.')[0].lower() == "system"])
+        active_paths = [p.split(':')[0].strip() for p in self.analyze.full_io]
+        active_ids = set()
 
-        dyn_state, stat_state, state_mask = io_partition(state, active_state_paths)
-        dyn_system, stat_system, system_mask = io_partition(system, active_system_paths)
+        ctx = {'state': state, 'system': system}
+        for io_str in active_paths:
+            try:
+                target_obj = eval(io_str, {}, ctx)
+                leaves = jax.tree_util.tree_leaves(target_obj)
+                for leaf in leaves:
+                    if eqx.is_array_like(leaf):
+                        active_ids.add(id(leaf))
+            except Exception as e:
+                warnings.warn(f"Failed to evaluate IO dependency '{io_str}': {e}")
+
+        dyn_state, stat_state, state_mask = io_partition(state, active_ids)
+        dyn_system, stat_system, system_mask = io_partition(system, active_ids)
 
         inspect_leaves(state, state_mask, settings, tree_name="state", depth=3)
         inspect_leaves(system, system_mask, settings, tree_name="system", depth=3)
@@ -678,7 +690,7 @@ class ImplicitAnalysis(Process):
 
         # Post-Processing
         if settings.verbose and len(_analysis_stack) == 1:
-            self._report_results(f_ctrls, f_st, opt_state)
+            self._report_results(f_ctrls, opt_state)
         
         if settings._DEV_MODE:
             print(f"\n{'='*70}")
@@ -705,10 +717,10 @@ class ImplicitAnalysis(Process):
         initialize: bool = ..., track_history: Literal[False] = ...
     ) -> tuple[State, System, Settings]: ...
 
-    def run(self, state: State, system: System, settings:Settings, *, initialize=False, track_history: bool = False):
+    def run(self, state: State, system: System, settings:Settings, *, initialize=True, track_history: bool = False):
 
         if initialize:
-            state, system, settings = self.initialize(state, system, settings)
+            state, system, settings = array_barrier(state, system, settings)
             state, system, settings = self._initialize_controls(state, system, settings)
         if not track_history:
             return self(state, system, settings)
@@ -718,7 +730,7 @@ class ImplicitAnalysis(Process):
                   "History returned will be single forward pass with final input values.")
             
         r_st, r_sys, r_setts = self(state, system, settings)
-        f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, track_history=True)
+        f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, initialize=initialize, track_history=True)
         return f_st, f_sys, f_setts, history
         
 

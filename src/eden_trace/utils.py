@@ -375,36 +375,18 @@ def apply_tree_delta(base_tree, delta_indices, delta_leaves):
 
     return jax.tree_util.tree_unflatten(treedef, new_leaves)
 
-def io_partition(tree, active_paths: set[str], keep_optional=False):
+def io_partition(tree, active_ids: set[int]):
     """
     Partitions a PyTree in dynamic and static halves based on an IO whitelist.
     Only JAX arrays whose paths are in the whitelist are kept dynamic.
 
     Returns (dyn_tree, stat_tree)
     """
-    path_parts = [p.split(':') for p in active_paths]
-    if keep_optional:
-        path_strings = [p[0] for p in path_parts]
-    else:
-        path_strings = [p[0] for p in path_parts if len(p) > 1 and "optional" not in p[1].lower()]
-        
 
-    def is_active(jax_path, leaf):
-        if not eqx.is_array(leaf):
-            return False
+    def is_active(leaf):
+        return eqx.is_array_like(leaf) and id(leaf) in active_ids
 
-        full_path = jax_path_string(jax_path)
-        parts = full_path.replace("['", ".['").replace("[", ".[").split(".")
-
-        for i in range(len(parts)):
-            # Reconstruct the path backwards
-            parent_path = ".".join(parts[:len(parts)-i]).replace(".['", "['").replace(".[", "[")
-            if parent_path in path_strings:
-                return True
-                
-        return False
-
-    mask = jax.tree_util.tree_map_with_path(is_active, tree)
+    mask = jax.tree_util.tree_map(is_active, tree)
     dyn, stat = eqx.partition(tree, mask)
     return dyn, stat, mask
 

@@ -26,7 +26,7 @@ from functools import reduce
 from eden_trace.utils import init_field, register
 
 from eden_trace.library import Component
-from eden_trace.library.gases import Air, IdealGas, MixedGas, MixedGasTemplate, flatten_elements
+from eden_trace.library.gases import Air, Gas, GasTemplate, flatten_elements
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Nodes
@@ -266,7 +266,7 @@ class BleedFlow(GraphNode):
             )
 
             if attr == "stagnation_enthalpy":
-                fluid: IdealGas = state.energy.nodes[self.parent_ID].flow.fluid
+                fluid: Gas = state.energy.nodes[self.parent_ID].flow.fluid
                 T_t = fluid.invert_enthalpy(bleed_value)
                 updated_state = eqx.tree_at(
                     lambda s: s.energy.nodes[self.network_ID].flow.stagnation_temperature,
@@ -321,22 +321,25 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
 
         else:
             # Get incoming flow values
-            W_fracs = jnp.concatenate([i.get_value(state, "mass_flow_rate") for i in self.flow_inputs], axis=-1)
-            T_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_temperature") for i in self.flow_inputs], axis=-1)
-            h_t_fracs = jnp.concatenate([i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs], axis=-1)
+            W_list = [i.get_value(state, "mass_flow_rate") for i in self.flow_inputs]
+            T_t_list = [i.get_value(state, "stagnation_temperature") for i in self.flow_inputs]
+            h_t_list = [i.get_value(state, "stagnation_enthalpy") for i in self.flow_inputs]
+            fluid_list = [i.get_value(state, "fluid") for i in self.flow_inputs]
             
-            # Calculate mixed baseline
+            # Concatenate for the thermodynamic state mixing
+            W_fracs = jnp.concatenate(W_list, axis=-1)
+            T_t_fracs = jnp.concatenate(T_t_list, axis=-1)
+            h_t_fracs = jnp.concatenate(h_t_list, axis=-1)
+
+            # Calculate mixed baseline mass flow and enthalpy
             W_mix = self.apply_domain_op(jnp.sum, state, "flow", "mass_flow_rate")
             h_t_mix = jnp.sum(W_fracs * h_t_fracs, axis=-1, keepdims=True) / W_mix
 
-            # Mix flows into new fluid using cached MixedGasTemplate to avoid recompilation
-            elements, fractions = flatten_elements(tuple(i.get_value(state, "fluid") for i in self.flow_inputs), W_fracs/W_mix)
-            template_fluid = MixedGasTemplate(tag=f"{self.tag} Input Fluid", elements=elements)
-            
-            mixed_fluid = eqx.tree_at(
-                lambda t: t.composition.mass_fractions,
-                template_fluid,
-                fractions)
+            # Mixed Fluid
+            mixed_mf = sum(
+                W * f.mass_fractions for W, f in zip(W_list, fluid_list)
+            ) / W_mix
+            mixed_fluid = Gas(mass_fractions=mixed_mf)
             
             # Invert temperature from enthalpy
             T_t_guess = jnp.sum(W_fracs * T_t_fracs, axis=-1, keepdims=True) / W_mix
@@ -362,7 +365,7 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
             return jnp.atleast_2d(0.0)
     
     @staticmethod
-    def kinematic_design(gas: IdealGas, T_t_out, P_t_out, M_out, mdot):
+    def kinematic_design(gas: Gas, T_t_out, P_t_out, M_out, mdot):
 
         # Unpack boundary stagnation properties
         R       = gas.R_specific
