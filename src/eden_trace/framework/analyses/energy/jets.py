@@ -129,6 +129,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             e.burner.design_parameters.pressure_ratio,
             e.burner.design_parameters.output_temperature,
             e.turbine.design_parameters.rotation_speed,
+            e.turbine.design_parameters.pressure_ratio
         ),
         engine,(
             des.rotation_speed,
@@ -136,6 +137,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             des.burner_pressure_ratio,
             des.turbine_intake_temperature,
             des.rotation_speed,
+            des.turbine_PR
         ))
 
     des_system = eqx.tree_at(

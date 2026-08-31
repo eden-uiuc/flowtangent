@@ -240,21 +240,21 @@ class ImplicitAnalysis(Process):
         self.controls = controls
         self.residuals = residuals
 
-    def _report_results(self, f_ctrls: jax.Array, f_res: jax.Array, opt_state=None):
+    def _report_results(self, f_ctrls: jax.Array, f_res: jax.Array, opt_stats=None):
     
         print(f"\n{'='*70}")
         print(f"Final {self.tag} Solver State")
         print(f"{'-'*70}")
         
-        if opt_state:
+        if opt_stats:
             try:
                 if isinstance(self.solver, str):
                     solver_name = f"Scipy Root; Method: {self.solver}"
-                    iter_num = opt_state.nit
+                    iter_num = opt_stats.nit
                     avg_res = np.mean(np.asarray(f_res)).item()
                 else:
                     solver_name = f"Optimistix Least Squares; Method: {self.solver.__name__}"
-                    iter_num = opt_state.stats['num_steps'].item()
+                    iter_num = opt_stats['num_steps'].item()
                     avg_res = np.mean(np.asarray(f_res)).item()
 
                 print(f"  Solver          : {solver_name}")
@@ -262,7 +262,7 @@ class ImplicitAnalysis(Process):
                 print(f"  Avg. Residual   : {avg_res:.4e}")
             except Exception as e:
                 print(f"  ERROR: Optimizer state parsing error: {e} Printing raw results...")
-                print(opt_state)
+                print(opt_stats)
             
         # Determine the maximum tag length
         active_controls = self.controls
@@ -439,7 +439,7 @@ class ImplicitAnalysis(Process):
 
         final_state, final_system = results.aux
 
-        return results.value, results.state, final_state, final_system
+        return results.value, results.stats, final_state, final_system
 
     def _run_solver(
             self,

@@ -58,6 +58,8 @@ def system_setup(variable_nozzle: bool = False):
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
         mass_flow_rate=168.45 * units.lbm/units.s,
+        rotation_speed=8070. * units.rev/units.mins,
+        overall_pressure_ratio=13.5,
         turbine_PR=4.46,
         turbine_intake_temperature=2370.0 * units.R,
     )
@@ -71,15 +73,11 @@ def system_setup(variable_nozzle: bool = False):
     
     comp_design = eqx.tree_at(lambda c:
         (
-            c.design_parameters.pressure_ratio,
-            c.design_parameters.rotation_speed,
             c.design_parameters.exit_mach_number,
             c.design_parameters.eff.flow,
         ),
         engine.compressor,
         (
-            13.5,
-            8070. * units.rev/units.mins,
             0.02,
             0.83
         )
@@ -102,16 +100,12 @@ def system_setup(variable_nozzle: bool = False):
     turb_design = eqx.tree_at(lambda t:
         (
             t.design_parameters.eff.flow,
-            t.design_parameters.rotation_speed,
             t.design_parameters.exit_mach_number,
-            t.design_parameters.pressure_ratio,
         ),
         engine.turbine,
         (
             0.86,
-            8070. * units.rev/units.mins,
             0.4,
-            4.46
         )
     )
 
@@ -277,7 +271,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                 'Station': "fc",
                 'Property': pyc_prop,
                 'PyCycle Val': pyc_val,
-                'Trace Val': Trace_val,
+                'FlowTan Val': Trace_val,
                 'Diff': diff,
                 'Rel. Error': rel_error,
                 'Mag. Error': np.abs(rel_error)
@@ -291,8 +285,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
             
         for pyc_prop, pyc_val in pyc_props.items():
 
-            if pyc_prop == "ht":
-                continue
+            # if pyc_prop == "ht":
+            #     continue
             
             Trace_tag, pyc_units = property_map.get(pyc_prop, (None, None))
             if not Trace_tag or pyc_val is None:
@@ -316,7 +310,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                     'Station': pyc_station.split('.')[0],
                     'Property': pyc_prop,
                     'PyCycle Val': pyc_val,
-                    'Trace Val': Trace_val,
+                    'FlowTan Val': Trace_val,
                     'Diff': diff,
                     'Rel. Error': rel_error,
                     'Mag. Error': np.abs(rel_error)
@@ -330,7 +324,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     pd.set_option('display.float_format', '{:.4e}'.format)
     
     print("\n" + "="*80)
-    print(f" PyCycle vs. Trace {point_name} Point Validation")
+    print(f" PyCycle vs. FlowTangent {point_name} Point Validation")
     print("-"*80)
     print(df.drop(columns='Mag. Error').to_string(index=False))
     

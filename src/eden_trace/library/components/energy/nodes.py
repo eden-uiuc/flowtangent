@@ -211,7 +211,7 @@ class Splitter(GraphNode):
 # ----------------------------------------------------------------------------------------------------------------------
 @register
 class FlowDesign(eqx.Module):
-    pressure_ratio: float = 0.99
+    pressure_ratio: float = 1.0
     pressure_recovery: float = 1.0
     
     intake_temperature: float = 298.15
