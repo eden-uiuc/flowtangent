@@ -247,7 +247,7 @@ class Compressor(FlowNode):
                 h_t_out = gas.compute_enthalpy(T_t_out)
                 updated_design_paramters = system_node.design_parameters
 
-            power = h_t_out - jnp.atleast_2d(gas.compute_enthalpy(T_t))
+            power = (h_t_out - jnp.atleast_2d(gas.compute_enthalpy(T_t))) * W_in
 
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
@@ -631,7 +631,7 @@ class Turbine(FlowNode):
                 h_t_out = gas.compute_enthalpy(T_t_out)
                 A_out = des_params.A_exit
 
-            power = jnp.atleast_2d(h_t_out - gas.compute_enthalpy(T_t))
+            power = (jnp.atleast_2d(h_t_out - gas.compute_enthalpy(T_t))) * W
 
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),

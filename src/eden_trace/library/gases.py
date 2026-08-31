@@ -8,7 +8,6 @@
 # ----------------------------------------------------------------------------------------------------------------------
 import json
 from functools import lru_cache
-from collections import defaultdict
 from typing import Optional
 
 # package imports

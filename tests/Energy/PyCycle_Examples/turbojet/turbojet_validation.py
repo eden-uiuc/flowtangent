@@ -58,7 +58,7 @@ def system_setup(variable_nozzle: bool = False):
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
         mass_flow_rate=168.45 * units.lbm/units.s,
-        rotation_speed=8070. * units.rev/units.mins,
+        rotation_speed=8070. * units.rpm,
         overall_pressure_ratio=13.5,
         turbine_PR=4.46,
         turbine_intake_temperature=2370.0 * units.R,
@@ -112,7 +112,7 @@ def system_setup(variable_nozzle: bool = False):
     nozz_design = eqx.tree_at(
         lambda n: n.design_parameters.eff.flow,
         engine.core_nozzle,
-        0.99
+        1.0
     )
 
     des_engine = eqx.tree_at(lambda e:
@@ -154,7 +154,7 @@ def off_design_point(
     settings: Settings,
     initial_Rline: float | jnp.ndarray = 2.0,
     initial_turb_PR: float | jnp.ndarray = 5.0,
-    initial_RPM: float | jnp.ndarray = 1000 * units.rev / units.mins,
+    initial_RPM: float | jnp.ndarray = 1000 * units.rpm,
     initial_MFR: float | jnp.ndarray = 100 * units.kg / units.s,
     initial_FAR: float | jnp.ndarray = 1e-4,
 ):
@@ -285,8 +285,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
             
         for pyc_prop, pyc_val in pyc_props.items():
 
-            # if pyc_prop == "ht":
-            #     continue
+            if pyc_prop == "ht":
+                continue
             
             Trace_tag, pyc_units = property_map.get(pyc_prop, (None, None))
             if not Trace_tag or pyc_val is None:
@@ -442,7 +442,7 @@ if __name__ == "__main__":
             # PyCycle Converged Values
             initial_Rline=2.0,
             initial_turb_PR=3.88,
-            initial_RPM=8197.38 * units.parse('rev/mins'),
+            initial_RPM=8197.38 * units.rpm,
             initial_MFR=70.00,
             initial_FAR=0.0168,
         )
@@ -469,7 +469,7 @@ if __name__ == "__main__":
             settings=settings,
             initial_Rline= 2.0,
             initial_turb_PR=4.669,
-            initial_RPM= 8197.38 * units.parse('rev/mins'),
+            initial_RPM= 8197.38 * units.rpm,
             initial_MFR= 168.45 * units.parse('lbm/s'),
             initial_FAR= 0.01680,
         )

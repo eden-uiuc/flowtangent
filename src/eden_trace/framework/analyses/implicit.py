@@ -467,8 +467,9 @@ class ImplicitAnalysis(Process):
         dyn_state, stat_state, state_mask = io_partition(state, active_ids)
         dyn_system, stat_system, system_mask = io_partition(system, active_ids)
 
-        inspect_leaves(state, state_mask, settings, tree_name="state", depth=3)
-        inspect_leaves(system, system_mask, settings, tree_name="system", depth=3)
+        if settings._DEV_MODE:
+            inspect_leaves(state, state_mask, settings, tree_name="state", depth=3)
+            inspect_leaves(system, system_mask, settings, tree_name="system", depth=3)
         
         # Residual closure defined in _run_solver scope to avoid tracing self argument if it were a bound method
         @eqx.filter_jit

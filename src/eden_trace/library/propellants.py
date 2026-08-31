@@ -67,7 +67,7 @@ class JetA(Propellant):
     density: float = init_field(820.0, static=True)
     
     # Specific energy is higher than reference value (43.15 MJ/kg) due to stoichiometric burn assumption
-    specific_energy: float = init_field(44.0e6 * units.parse('J/kg'), static=True)
+    specific_energy: float = init_field(42.7984e6 * units.parse('J/kg'), static=True)
     energy_density: float = init_field(35.3e6 * units.parse('J/m**3'), static=True)
 
     max_mass_fraction: MaxPropellantMassFractions = init_field(_JetAFractions, static=True)
