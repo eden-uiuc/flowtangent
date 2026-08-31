@@ -229,7 +229,7 @@ class Compressor(FlowNode):
             s_eff = n_isn / eff_map
             s_Nc = (Nc_des/Nc_map).squeeze()
 
-            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR_map, 1.0 / n_isn)
+            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
             
             if statics:
                 A_out, u_out, P_out, T_out, h_t_out, h_out = self.kinematic_design(

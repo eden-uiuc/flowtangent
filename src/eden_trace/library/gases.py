@@ -52,7 +52,7 @@ for name in SPECIES_LIST:
     _MID_LIST.append(data["T_mid"])
     _HIGH_LIST.append(data["nasa_high_coeffs"])
 
-MOL_MASS    = jnp.array(_MOL_LIST, dtype=jnp.float64)
+MOL_MASS    = jnp.array(_MOL_LIST, dtype=jnp.float64) * units.gram
 NASA_LOW    = jnp.array(_LOW_LIST, dtype=jnp.float64)
 NASA_MID    = jnp.array(_MID_LIST, dtype=jnp.float64)
 NASA_HIGH   = jnp.array(_HIGH_LIST, dtype=jnp.float64)
@@ -149,7 +149,7 @@ class Gas(eqx.Module):
         mf = np.asarray(self.mass_fractions)
 
         # Filter out numerical noise (anything below 0.0001%)
-        active_indices = np.where(mf > 1e-6)[0]
+        active_indices = np.where(mf > 1e-6)[-1]
 
         if len(active_indices) == 0:
             return "Gas(Empty)"
@@ -319,12 +319,12 @@ def BurnedJetA(FAR: float | jax.Array) -> Gas:
 
 # Standard atomic weights in g/mol
 ATOMIC_MASSES = {
-    "H": 1.008 * units.gram,
-    "C": 12.011 * units.gram,
-    "N": 14.007 * units.gram,
-    "O": 15.999 * units.gram,
-    "AR": 39.948 * units.gram,
-    "S": 32.065 * units.gram
+    "H": 1.008,
+    "C": 12.011,
+    "N": 14.007,
+    "O": 15.999,
+    "AR": 39.948,
+    "S": 32.065 
 }
 
 def parse_chemkin_thermo(filepath: str, output_path: str):

@@ -456,7 +456,7 @@ def inspect_leaves(tree, mask, settings, tree_name:str="Tree", depth:int=3):
         with open(output_file, 'w') as f:
             f.write(output_text)
         if getattr(settings, 'verbose', False):
-            print(f" - {tree_name.title()} leaf structure log saved to {output_file}")
+            print(f"\n - {tree_name.title()} leaf structure log saved to {output_file}")
 
 #----------------------------------------------------------
 # Saving and Loading

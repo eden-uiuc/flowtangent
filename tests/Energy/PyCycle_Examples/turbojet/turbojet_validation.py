@@ -347,7 +347,7 @@ if __name__ == "__main__":
     
     # Control Board
     DEV = False
-    DEBUG = True
+    DEBUG = False
     VERBOSE = True
 
     V_NOZZ = False

@@ -240,6 +240,49 @@ class ImplicitAnalysis(Process):
         self.controls = controls
         self.residuals = residuals
 
+    def _report_results(self, f_ctrls: jax.Array, f_res: jax.Array, opt_state=None):
+    
+        print(f"\n{'='*70}")
+        print(f"Final {self.tag} Solver State")
+        print(f"{'-'*70}")
+        
+        if opt_state:
+            try:
+                if isinstance(self.solver, str):
+                    solver_name = f"Scipy Root; Method: {self.solver}"
+                    iter_num = opt_state.nit
+                    avg_res = np.mean(np.asarray(f_res)).item()
+                else:
+                    solver_name = f"Optimistix Least Squares; Method: {self.solver.__name__}"
+                    iter_num = opt_state.stats['num_steps'].item()
+                    avg_res = np.mean(np.asarray(f_res)).item()
+
+                print(f"  Solver          : {solver_name}")
+                print(f"  Num. Iterations : {iter_num}")
+                print(f"  Avg. Residual   : {avg_res:.4e}")
+            except Exception as e:
+                print(f"  ERROR: Optimizer state parsing error: {e} Printing raw results...")
+                print(opt_state)
+            
+        # Determine the maximum tag length
+        active_controls = self.controls
+        active_residuals = self.residuals
+        
+        all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
+        # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
+        pad = max((len(t) for t in all_tags), default=20) + 2
+        
+        # Run the forward pass one last time
+        print(f"\n  Final Control Values:")
+        for idx, ctrl in enumerate(active_controls):
+            print(f"    {ctrl.tag:<{pad}}: {format_array(ctrl.scale(f_ctrls[idx]))}")
+
+        print(f"\n  Final Residual Values:")
+        for i, res in enumerate(self.residuals):
+            print(f"    {res.tag:<{pad}}: {format_array(f_res[i])}")
+        
+        print(f"{'='*70}\n")
+
     def _check_controls_balance(self, settings: Settings) -> bool:
         """
         Checks that the number of active controls is equal to the number of active dynamics residuals.
@@ -276,59 +319,6 @@ class ImplicitAnalysis(Process):
             print("\n")
 
         return valid_controls
-
-    def _report_results(self, f_ctrls: jnp.ndarray | np.ndarray, opt_state=None):
-
-        print(f"\n{'='*70}")
-        print(f"Final {self.tag} Solver State")
-        print(f"{'-'*70}")
-        
-        if opt_state is not None:
-            if isinstance(self.solver, str):
-                solver_name = f"Scipy Root; Method: {self.solver}"
-                iter_num = opt_state.nit
-                obj_val = np.mean(opt_state.fun)
-                f_res = opt_state.fun
-                f_jac = opt_state.jac
-            else:
-                solver_name = f"Optimistix Least Squares; Method: {self.solver.__name__}"
-                iter_num = opt_state.num_steps.item()
-
-                f_res = opt_state.f_info.residual
-                f_jac = None
-                obj_val = np.mean(np.asarray(f_res)).item()
-            print(f"  Solver          : {solver_name}")
-            print(f"  Num. Iterations : {iter_num}")
-            print(f"  Final Residual  : {obj_val:.4e}")
-        else:
-            f_res = None
-            f_jac = None
-            
-        # Determine the maximum tag length
-        active_controls = self.controls
-        active_residuals = self.residuals
-        
-        all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
-        # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
-        pad = max((len(t) for t in all_tags), default=20) + 2
-        
-        # Run the forward pass one last time
-        print(f"\n  Final Control Values:")
-        for idx, ctrl in enumerate(active_controls):
-            print(f"    {ctrl.tag:<{pad}}: {format_array(ctrl.scale(f_ctrls[idx]))}")
-
-        if f_res is not None:
-            print(f"\n  Final Residual Values:")
-            for i, res in enumerate(self.residuals):
-                print(f"    {res.tag:<{pad}}: {format_array(f_res[i])}")
-
-        if f_jac is not None:
-            print(f"\n Final Jacobian:")
-            grad_np = np.asarray(f_jac)
-            for i, ctrl in enumerate(active_controls):
-                print(f"    {ctrl.tag:<{pad}}: {format_array(grad_np[i])}")
-        
-        print(f"{'='*70}\n")
 
     def _update_controls(self, state: State, control_values:jnp.ndarray, settings:Settings) -> State:
     
@@ -692,7 +682,8 @@ class ImplicitAnalysis(Process):
 
         # Post-Processing
         if settings.verbose and len(_analysis_stack) == 1:
-            self._report_results(f_ctrls, opt_state)
+            f_res = self._get_residual_array(f_st, settings)
+            self._report_results(f_ctrls, f_res, opt_state)
         
         if settings._DEV_MODE:
             print(f"\n{'='*70}")

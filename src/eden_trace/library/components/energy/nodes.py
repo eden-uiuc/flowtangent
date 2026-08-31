@@ -388,7 +388,7 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
     
     @staticmethod
     def stagnation(
-        gas: IdealGas,
+        gas: Gas,
         T_t: jnp.ndarray | float,
         P_t: jnp.ndarray | float,
         PR: jnp.ndarray | float,
@@ -428,7 +428,7 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
     
     @staticmethod
     def statics(
-        gas: IdealGas,
+        gas: Gas,
         T_t: float | jnp.ndarray,
         P_t: float | jnp.ndarray,
         mdot: float | jnp.ndarray,
