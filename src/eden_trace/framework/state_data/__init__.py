@@ -21,8 +21,8 @@ from .controls import (
 from .energy import (
     BatteryCellConditions,
     BatteryPackConditions,
-    NetworkData,
-    NodeConditions,
+    NetworkState,
+    NodeState,
 )
 
 from .frames import Body, Frame, FrameData, Inertial, Planet, Wind

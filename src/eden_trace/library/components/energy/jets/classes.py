@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Literal, Optional
 if TYPE_CHECKING:
     from eden_trace.framework import Settings, State, System
-    from eden_trace.framework.state_data.energy import TurbojetData
+    from eden_trace.framework.state_data.energy import TurbojetState
     from eden_trace.framework.analyses.energy.jets import JetSettings
 
 import json
@@ -133,26 +133,6 @@ def _alpha_c(Nc, Nc_design):
     """
     return jnp.where(Nc_design > 0.0, jnp.maximum(0.0, 90.0 - (Nc / Nc_design) * 90.0), jnp.zeros_like(Nc))
 
-def _compressor_performance(
-        gas,
-        T_t,
-        P_t,
-        PR,
-        n_isn,
-):
-    """
-    Computes power and output thermal quantities for a compressor.
-    """
-
-    T_t_out, P_t_out = FlowNode.stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
-
-    # 3. Calculate work using absolute enthalpies
-    h_t = gas.compute_enthalpy(T_t)
-    h_t_out = gas.compute_enthalpy(T_t_out)
-    d_power = h_t_out - h_t
-
-    return d_power, P_t_out, T_t_out, h_t_out
-
 @register
 class Compressor(FlowNode):
     tag: str = init_field("compressor", static=True)
@@ -173,6 +153,8 @@ class Compressor(FlowNode):
         super(Compressor, self).__post_init__()
 
     @tu.inputs(
+        "state.energy.rotation_speed",
+        "state.energy.{tag.lower()}_Rline",
         "state.energy.nodes['{flow_inputs.network_ID}'].flow",
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_ratio",
         "system.energy.nodes['{network_ID}'].design_parameters.eff.flow",
@@ -180,8 +162,9 @@ class Compressor(FlowNode):
         "system.energy.nodes['{network_ID}'].design_parameters.exit_mach_number: Optional",
     )
     @tu.outputs(
+        "state.energy.residual.{tag.lower()}_Wc",
         "state.energy.nodes['{network_ID}'].flow",
-        "state.energy.nodes['{network_ID}'].residual.{tag.lower()}_Wc",
+        "state.energy.nodes['{network_ID}'].mechanical.power",
         "system.energy.nodes['{network_ID}'].design_parameters.A_exit: Optional",
         "system.energy.nodes['{network_ID}'].map.s_Wc",
         "system.energy.nodes['{network_ID}'].map.s_PR",
@@ -247,8 +230,6 @@ class Compressor(FlowNode):
                 h_t_out = gas.compute_enthalpy(T_t_out)
                 updated_design_paramters = system_node.design_parameters
 
-            power = (h_t_out - jnp.atleast_2d(gas.compute_enthalpy(T_t))) * W_in
-
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
                 self.map,
@@ -282,12 +263,8 @@ class Compressor(FlowNode):
             PR, Wc, n_isn = system_node.map.evaluate(alpha, Nc, Rline)
             W_in = Wc * delta_c / jnp.sqrt(theta_c)
 
-            power, P_t_out, T_t_out, h_t_out = _compressor_performance(
-                gas=gas,
-                T_t=T_t,
-                P_t=P_t,
-                PR=PR,
-                n_isn=n_isn,)
+            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, PR, 1.0 / n_isn)
+            h_t_out = gas.compute_enthalpy(T_t_out)
             
             if statics:
                 T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(
@@ -296,6 +273,8 @@ class Compressor(FlowNode):
                     P_t_out,
                     W_in,
                     des_params.A_exit)
+
+        power = (h_t_out - jnp.atleast_2d(gas.compute_enthalpy(T_t))) * W_in
 
         outputs = state_node
 
@@ -416,6 +395,7 @@ class Burner(FlowNode):
 
     @tu.inputs(
         "state.energy.target_temperature",
+        "state.energy.fuel_air_ratio",
         "state.energy.nodes['{flow_inputs.network_ID}'].flow",
         "system.energy.nodes['{network_ID}'].fuel.specific_energy",
         "system.energy.nodes['{network_ID}'].design_parameters.pressure_ratio",
@@ -516,28 +496,6 @@ class Burner(FlowNode):
 
 # Turbine ----------------------------------------------------------------------
 
-def _turbine_performance(
-    gas,  # The BurnedGas mixture
-    PR,   # Pressure Ratio (guessed by global solver or map)
-    n_isn,  # Isentropic efficiency (from the TurbineMap or PyCycle)
-    n_mech, # Mechanical work transmission efficiency
-    T_t,
-    P_t,
-):
-    # Target exit pressure based on the given PR
-    P_t_out = P_t / PR
-    T_t_out, P_t_out = FlowNode.stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
-
-    # 3. Calculate actual work extracted per kg of core air
-    h_t_in = gas.compute_enthalpy(T_t)
-    h_t_out = gas.compute_enthalpy(T_t_out)
-
-    # Turbine mass flow is higher than compressor due to added fuel
-    # Work will be a negative value (energy leaving the fluid)
-    power = (h_t_out - h_t_in) * n_mech
-
-    return T_t_out, P_t_out, h_t_out, power
-
 @register
 class Turbine(FlowNode):
     tag: str = init_field("Turbine", static=True)
@@ -571,7 +529,9 @@ class Turbine(FlowNode):
         "system.energy.nodes['{network_ID}'].design_parameters.exit_mach_number: Optional",
     )
     @tu.outputs(
+        "state.energy.residual.{tag.lower()}_Wp",
         "state.energy.nodes['{network_ID}'].flow",
+        "state.energy.nodes['{network_ID}'].mechanical.power",
         "system.energy.nodes['{network_ID}'].map.s_Wp",
         "system.energy.nodes['{network_ID}'].map.s_PR",
         "system.energy.nodes['{network_ID}'].map.s_eff",
@@ -631,8 +591,6 @@ class Turbine(FlowNode):
                 h_t_out = gas.compute_enthalpy(T_t_out)
                 A_out = des_params.A_exit
 
-            power = (jnp.atleast_2d(h_t_out - gas.compute_enthalpy(T_t))) * W
-
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wp, m.s_PR, m.s_eff, m.s_Np),
                 system_node.map,
@@ -681,14 +639,8 @@ class Turbine(FlowNode):
             Wp, n_isn = system_node.map.evaluate(alpha, Np, PR)
             W = Wp * P_t / jnp.sqrt(T_t) * (1. + FAR)
 
-            T_t_out, P_t_out, h_t_out, power = _turbine_performance(
-                gas=gas,
-                PR=PR,
-                n_isn=n_isn,
-                n_mech=des_params.eff.mechanical,
-                T_t=T_t,
-                P_t=P_t,
-            )
+            P_t_out = P_t / PR
+            T_t_out, P_t_out = self.stagnation(gas, T_t, P_t, 1.0 / PR, n_isn)
 
             if statics:
                 T_out, P_out, h_t_out, h_out, u_out, M_out = self.statics(
@@ -700,6 +652,10 @@ class Turbine(FlowNode):
                 )
 
         # Set Output State
+        h_t_in = gas.compute_enthalpy(T_t)
+        h_t_out = gas.compute_enthalpy(T_t_out)
+        power = (h_t_out - h_t_in) * W * des_params.eff.mechanical
+
         outputs = state_node
 
         outputs = eqx.tree_at(lambda o: o.mechanical.power, outputs, jnp.atleast_2d(power))
@@ -725,7 +681,7 @@ class Turbine(FlowNode):
         else:
             eng_des = system.energy.line.engine.design_parameters
         W_des = eng_des.mass_flow_rate
-        Wp_res = (W / (1. + FAR) - state.energy.mass_flow_rate)/W_des
+        Wp_res = (W - state.energy.mass_flow_rate)/W_des
         updated_state = eqx.tree_at(
             lambda s: getattr(s.energy.residual, f"{self.tag.lower()}_Wp"),
             updated_state,
@@ -965,7 +921,7 @@ class Nozzle(FlowNode):
     )
     @tu.outputs(
         "state.energy.nodes['{network_ID}'].flow",
-        "state.energy.nodes['{network_ID}'].residual.area",
+        "state.energy.residual.area",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 

@@ -218,7 +218,7 @@ class ImplicitAnalysis(Process):
     tag: str = init_field("Implicit Analysis")
 
     analyze: Process = init_field(Process)
-    solver: Any | str = init_field(optx.Chord, as_value=True, static=True)
+    solver: Any | str = init_field(optx.LevenbergMarquardt, as_value=True, static=True)
     solver_options: Optional[dict] = init_field(None, static=True)
 
     controls: tuple[Control, ...] = init_field(tuple)
@@ -227,7 +227,7 @@ class ImplicitAnalysis(Process):
     def __init__(
             self,
             analyze: Process = Process(tag="Implicit Analysis Forward Pass"),
-            solver: Any | str = optx.Chord,
+            solver: Any | str = optx.LevenbergMarquardt,
             solver_options: Optional[dict] = None,
             controls: tuple[Control, ...] = (),
             residuals: tuple[Residual, ...] = (),

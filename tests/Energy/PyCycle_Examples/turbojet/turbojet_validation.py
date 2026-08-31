@@ -49,7 +49,7 @@ from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
 from eden_trace.framework.settings import LoggingSettings
-from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance, JetSettings
+from eden_trace.framework.analyses.energy.jets import turbojet_design, turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
@@ -115,6 +115,8 @@ def system_setup(variable_nozzle: bool = False):
         1.0
     )
 
+    nozz_design = replace(nozz_design, variable_exit=variable_nozzle)
+
     des_engine = eqx.tree_at(lambda e:
         (
             e.inlet,
@@ -175,7 +177,7 @@ def off_design_point(
         (
             jnp.array([[0., 0., -alt]]),
             jnp.atleast_2d(M0),
-            jnp.atleast_2d(jnp.array([[a0 * M0, 0.0, 0.0]])),
+            jnp.atleast_2d(jnp.array([[(a0 * M0).item(), 0.0, 0.0]])),
         ),
     )
 
@@ -199,7 +201,10 @@ def off_design_point(
             jnp.atleast_2d(thrust),
         )
     )
-    od_state, od_system, od_settings = od_analysis(od_state, od_system, od_settings)
+
+    new_settings = JetSettings(design_mode=False, statics=od_settings.analysis.energy.statics)
+    od_settings = eqx.tree_at(lambda s: s.analysis.energy, od_settings, new_settings)
+    od_state, od_system, od_settings = od_analysis.run(od_state, od_system, od_settings, initialize=True)
 
     return od_state, od_system, od_settings
 
@@ -344,12 +349,12 @@ if __name__ == "__main__":
     DEBUG = False
     VERBOSE = True
 
-    V_NOZZ = False
+    V_NOZZ = True
     STATICS = False
 
-    DESIGN_POINT = True
-    OFF_DESIGN_0 = False
-    OFF_DESIGN_1 = False
+    DESIGN_POINT = False
+    OFF_DESIGN_0 = True
+    OFF_DESIGN_1 = True
 
     # Build Turbojet------------------------------------------------------------
     test_dir = Path(__file__).resolve().parent
@@ -371,11 +376,14 @@ if __name__ == "__main__":
         print(" Design Point Analysis")
         print("-"*80)
 
-        des_st, des_sys, des_set = setup_TJ_design(
+        des_st, des_sys, des_set = turbojet_design(
             state=State(),
-            system=system,
+            system=system,  # type: ignore
             settings=settings,
+            initialize=True
         )
+
+        des_sys = des_sys.replace_subcomponent(des_sys.energy.sync_and_clear_nodes())
 
         save_data(des_sys, data_dir / "turbojet.fts")
         save_data(des_st, data_dir / "turbojet_design_state.fts")
@@ -384,7 +392,7 @@ if __name__ == "__main__":
         validation_df.to_csv(data_dir / "DESIGN_validation.csv")
      
     else:
-        des_sys: Aircraft = load_data(data_dir / "/simple_turbojet.trs")
+        des_sys: Aircraft = load_data(data_dir / "turbojet.fts")
     
     des_sys = des_sys.update_network_topology()
 
@@ -433,13 +441,6 @@ if __name__ == "__main__":
             thrust=11_000 * units.lbf,
             system=des_sys,
             settings=settings,
-            # PyCycle Initial Guess Values
-            # initial_Rline=2.0,
-            # initial_turb_PR=4.669,
-            # initial_RPM=8197.38 * units.parse('rev/mins'),
-            # initial_MFR=166.073 * units.parse('lbm/s'),
-            # initial_FAR=0.01680,
-            # PyCycle Converged Values
             initial_Rline=2.0,
             initial_turb_PR=3.88,
             initial_RPM=8197.38 * units.rpm,

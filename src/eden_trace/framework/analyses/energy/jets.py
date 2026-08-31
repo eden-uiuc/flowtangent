@@ -167,7 +167,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     return des_state, des_system, des_settings, base_analysis
 
-def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
+def turbojet_design(state: State, system: Aircraft, settings: Settings, initialize: bool = False) -> ImplicitAnalysis:
 
     # Setup test state according to design parameters
 
@@ -208,17 +208,9 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
         residuals=(d_thrust, d_power),
     )
 
-    des_state, des_system, des_settings = design_analysis.run(
-        des_state, des_system, des_settings,
-    )
-    
-    if des_settings.analysis.energy.clear_nodes:
-        des_net = des_system.energy.sync_and_clear_nodes()
-        des_system = des_system.replace_subcomponent(des_net)
-    
-    return des_state, des_system, settings
+    return design_analysis.run(des_state, des_system, des_settings, initialize=initialize)
 
-def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
+def turbofan_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
 
     # Setup test state according to design parameters
     _, des_system, _, base_analysis = _design_update(state, system, settings)
@@ -322,7 +314,7 @@ def turbojet_performance(
     
     Rline = Control(
         tag="Rline",
-        state_path=DataPath(("energy", "Rline")),
+        state_path=DataPath(("energy", "compressor_Rline")),
         initial_value=initial_Rline,
         bounds=R_bnds,
         scaling='logistic'
@@ -629,7 +621,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
     # Set up Inner Loop
 
     des_state, des_system, des_settings, OD_analysis = _design_update_batched(state, system, settings)
-    des_analysis = setup_TF_design(des_state, des_system, des_settings)
+    des_analysis = turbofan_design(des_state, des_system, des_settings)
     des_state, des_system, des_settings = des_analysis.initialize(des_state, des_system, des_settings)
 
     engine = system.energy.line.engine

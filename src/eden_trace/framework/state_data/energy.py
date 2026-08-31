@@ -110,7 +110,7 @@ class ForceOutputs(StateData):
 
 
 @register
-class NodeConditions(StateData):
+class NodeState(StateData):
     tag: str = init_field("Node Outputs", static=True)
 
     mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
@@ -127,7 +127,7 @@ class NodeConditions(StateData):
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class BatteryCellConditions(NodeConditions):
+class BatteryCellConditions(NodeState):
     # Attribute                 Type        Default Value
     tag: str = init_field("Battery Cell", static=True)
 
@@ -141,7 +141,7 @@ class BatteryCellConditions(NodeConditions):
 
 
 @register
-class BatteryPackConditions(NodeConditions):
+class BatteryPackConditions(NodeState):
     # Attribute             Type                    Default Value
     tag: str = init_field("Battery Pack", static=True)
 
@@ -158,7 +158,7 @@ class BatteryPackConditions(NodeConditions):
 
 
 @register
-class NetworkData(NodeConditions):
+class NetworkState(NodeState):
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)
@@ -174,7 +174,7 @@ class NetworkData(NodeConditions):
 
 
 @register
-class TurbojetData(NetworkData):
+class TurbojetState(NetworkState):
     
     tag: str = init_field("Turbojet Network", static=True)
 
@@ -189,7 +189,7 @@ class TurbojetData(NetworkData):
     target_temperature: jnp.ndarray = empty_array()
 
 @register
-class TurbofanData(NetworkData):
+class TurbofanState(NetworkState):
 
     tag: str = init_field("Turbofan Network", static=True)
 
