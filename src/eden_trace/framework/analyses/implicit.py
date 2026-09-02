@@ -694,8 +694,8 @@ class ImplicitAnalysis(Process):
             pprint(opt_state)
             print(f"\n{'='*70}")
 
-        del _analysis_stack[-1]
-        del _trace_count[-1]
+        # del _analysis_stack[-1]
+        # del _trace_count[-1]
 
         return f_st, f_sys, settings
 

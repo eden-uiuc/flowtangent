@@ -332,7 +332,7 @@ def turbojet_performance(
         tag="Rotation Speed",
         state_path=DataPath(("energy", "rotation_speed")),
         initial_value=initial_RPM,
-        bounds=Nc_bnds,
+        bounds=(initial_RPM * 0.5, initial_RPM * 2.0),
         scaling='logistic'
     )
 
@@ -340,7 +340,7 @@ def turbojet_performance(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
         initial_value=initial_MFR,
-        bounds=Wc_bnds,
+        bounds=(initial_MFR * 0.5, initial_MFR * 2.0),
         scaling='logistic'
     )
 
@@ -384,8 +384,6 @@ def turbojet_performance(
         controls=ctrls,
         residuals=res
     )
-
-def turbojet_performance_mp()
 
 def turbofan_performance(network: TurbofanNetwork):
 

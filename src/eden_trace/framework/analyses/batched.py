@@ -147,7 +147,7 @@ class BatchedAnalysis(Process):
         if settings.logging.handle is not None:
             pbar = range(0, total_states, batch_size)
         else:
-            pbar = trange(0, total_states, batch_size, desc=self.tag)
+            pbar = trange(0, total_states, batch_size, desc=self.tag, leave=False)
 
         batch_states = []
         for batch_idx in pbar:

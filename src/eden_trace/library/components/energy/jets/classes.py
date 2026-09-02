@@ -232,7 +232,7 @@ class Compressor(FlowNode):
 
             updated_map = eqx.tree_at(
                 lambda m: (m.s_Wc, m.s_PR, m.s_eff, m.s_Nc),
-                self.map,
+                system_node.map,
                 (s_Wc, s_PR, s_eff, s_Nc))
 
             updated_system = eqx.tree_at(

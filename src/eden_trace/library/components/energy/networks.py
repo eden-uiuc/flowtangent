@@ -255,6 +255,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
     @tu.inputs(
             "state.energy.nodes['{force_inputs.network_ID}'].force.thrust",
             "state.energy.nodes['{residual_inputs.network_ID}'].residual.power",
+            "state.energy.target_thrust",
     )
     @tu.outputs(
             "state.energy.total_force_vector",

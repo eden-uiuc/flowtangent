@@ -8,6 +8,7 @@ def numerical_environment():
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
+    os.environ["JAX_PLATFORM_NAME"] = "cpu"
     
     # 2. NUMA / Hardware Auto-Detection
     if sys.platform == "linux":
@@ -30,7 +31,6 @@ def numerical_environment():
     cache_path = os.path.expanduser("~/.eden_trace/jax_cache")
     os.makedirs(cache_path, exist_ok=True)
     os.environ["JAX_COMPILATION_CACHE_DIR"] = cache_path
-
 
 numerical_environment()
 
@@ -62,11 +62,15 @@ warnings.filterwarnings('ignore', category=SolverWarning)
 
 # Import OpenMDAO and FlowTangent models
 from simple_turbojet import Turbojet
-from ..PyCycle_Examples.turbojet.turbojet_validation import system_setup
+from turbojet_validation import system_setup as ft_turbojet
 
-from eden_trace.utils import DataPath
+from eden_trace.utils import configure_environment
 from eden_trace.framework import State, Settings
+from eden_trace.framework.settings import NumericalSettings
+from eden_trace.framework.analyses.batched import BatchedAnalysis
 from eden_trace.framework.analyses.energy.jets import _design_update, turbojet_design, turbojet_performance, JetSettings
+from eden_trace.framework.simulation.initialize import initialize_energy
+from eden_trace.framework.simulation.update import update_freestream
 
 from eden_trace.library import units
 from eden_trace.library.atmospheres import USStandard1976
@@ -596,8 +600,6 @@ def run_pact_python_benchmark(N_points):
 # MAUD OPAQUE AD BENCHMARK (Does not converge due to MDF constraint)
 # ==============================================================================
 
-coupling_inits = des_primal_np(np.array([13.5], dtype=np.float64))
-
 class OpaqueDesignAD(om.ExplicitComponent):
     def setup(self):
         self.add_input('comp_PR', val=13.5)
@@ -647,8 +649,6 @@ class OpaqueDesignAD(om.ExplicitComponent):
         for var in COUPLED_VARS_DES:
             safe_name = var.replace('.', '_').replace(':', '_')
             partials[safe_name, 'comp_PR'] = J_dict[var]['comp.PR'][0][0]
-
-error_history = []
 
 class OpaqueOffDesignAD(om.ExplicitComponent):
     def setup(self):
@@ -910,6 +910,7 @@ def run_flowtangent_benchmark(N_points):
     jax.clear_caches()
     gc.collect()
     tracemalloc.start()
+
     #---------------------------------------------------------------------------
     # Setup: Data Structures and Settings
     #---------------------------------------------------------------------------
@@ -917,12 +918,14 @@ def run_flowtangent_benchmark(N_points):
 
     # Design Point Setup -----------------------------------
     state = State()
-    system = system_setup()
+    system = ft_turbojet()
     settings = eqx.tree_at(
         lambda s: s.analysis.energy,
-        Settings(),
+        Settings(DEBUG_MODE=False),
         JetSettings(design_mode=True, statics=False)
     )
+
+    configure_environment(settings)
 
     des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
     des: TurbojetDesign = des_system.energy.line.engine.design_parameters
@@ -949,26 +952,114 @@ def run_flowtangent_benchmark(N_points):
     )
 
     od_settings = eqx.tree_at(
-        lambda s: (s.analysis.energy, s.numerical.batch_size),
-        Settings(),
+        lambda s: (s.analysis.energy, s.numerical),
+        Settings(DEBUG_MODE=False),
         (
-            JetSettings(design_mode=True, statics=False),
-            N_points,
+            JetSettings(design_mode=False, statics=False),
+            NumericalSettings(batch_size=N_points),
         )
     )
 
-    od_base_analysis = 
+    od_state, _, _ = initialize_energy(od_state, system, od_settings)
+    od_state, _, _ = update_freestream(od_state, system, od_settings)
+    od_state = eqx.tree_at(
+            lambda s: (
+                s.energy.target_thrust,
+            ),
+            od_state,
+            (
+                jnp.atleast_2d(8_000 * units.lbf),
+            )
+        )
 
+    od_base_analysis = turbojet_performance(
+        network=system.energy,
+        initial_Rline=2.0,
+        initial_turb_PR=4.669,
+        initial_RPM=8197.38 * units.rpm,
+        initial_MFR=168.453135137 * units.parse('lbm/s'),
+        initial_FAR=0.0168,
+        )
 
-    t_setup_end = time.perf_counter()
-    
+    od_analysis = BatchedAnalysis(tag="Off-Design Analysis", analyze=od_base_analysis)
 
     def cycle_objective(comp_pr):
+        obj_sys = eqx.tree_at(lambda s:
+            (
+                s.energy.line.engine.design_parameters.overall_pressure_ratio,
+                s.energy.line.engine.compressor.design_parameters.pressure_ratio,
+            ),
+            system,
+            (comp_pr, comp_pr)
+        )
+
         des_st, des_sys, des_set = turbojet_design(
             state,
-            system,
+            obj_sys,
             settings,
             initialize=True)
+
+
+        # debug_base = od_base_analysis.run(od_state, des_sys, od_settings, initialize=True)
+
+        od_st, od_sys, od_set = od_analysis.run(
+            od_state,
+            des_sys,
+            od_settings,
+            initialize=True
+        )
+
+        return jnp.mean(od_st.energy.nodes['network.line.engine'].fuel.TSFC)
+
+    t_setup_end = time.perf_counter()
+
+    # debug_tsfc = cycle_objective(13.5)
+
+    #---------------------------------------------------------------------------
+    # Compilation
+    #---------------------------------------------------------------------------
+
+    t_comp_start = time.perf_counter()
+    grad_func = jax.jit(jax.value_and_grad(cycle_objective))
+    _ = grad_func.lower(13.5).compile()
+    t_comp_end = time.perf_counter()
+
+    #---------------------------------------------------------------------------
+    # Execution
+    #---------------------------------------------------------------------------
+
+    t_exec_start = time.perf_counter()
+    mean_tsfc, grad = grad_func(13.5)
+    mean_tsfc.block_until_ready()
+    t_exec_end = time.perf_counter()
+
+    #---------------------------------------------------------------------------
+    # Metrics
+    #---------------------------------------------------------------------------
+
+    current_mem, peak_mem = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    
+    peak_mem_mb = peak_mem / (1024 * 1024)
+    jac_mem_mb = 0.0  # The graph architecture never builds a Jacobian matrix
+    
+    t_setup = t_setup_end - t_setup_start
+    t_comp = t_comp_end - t_comp_start
+    t_exec = t_exec_end - t_exec_start
+    
+    # Cast JAX arrays back to standard Python floats for the summary table
+    return (
+        peak_mem_mb, 
+        jac_mem_mb, 
+        t_setup, 
+        t_comp, 
+        t_exec, 
+        float(mean_tsfc), 
+        float(grad[0] if grad.ndim > 0 else grad), 
+        primal_calls, 
+        jac_calls
+    )
+    
 
         
 
@@ -1070,7 +1161,8 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         ("MAUD Monolithic", run_monolithic_benchmark, 'r-o'),
         ("Hybrid PACT", run_pact_hybrid_benchmark, 'b-o'),
         ("Python PACT", run_pact_python_benchmark, 'm-o'),
-        ("MAUD Opaque AD", run_maud_opaque_ad_benchmark, 'g-o'),
+        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o')
+        # ("MAUD Opaque AD", run_maud_opaque_ad_benchmark, 'g-o'),
         # ("MAUD Opaque FD", run_maud_opaque_fd_benchmark, 'm-o'),
     ]
     
@@ -1118,12 +1210,6 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
 
 if __name__ == "__main__":
-    # test_dir = Path("./tests/Energy/mp_optimization")
-    # N_array = [1, 
-    #         #    2, 5, 10, 20, 30, 40, 50
-    #            ]
-    # fig_fn = test_dir / 'architecture_scaling_benchmark.png'
-    # Compare_Architectures(N_array, fig_fn)
-
-    run_maud_opaque_ad_benchmark(1)
-    plot_error()
+    N_array = [1, 2, 5, 10, 20, 30, 40, 50]
+    fig_fn = test_dir / 'architecture_scaling_benchmark.png'
+    Compare_Architectures(N_array, fig_fn)
