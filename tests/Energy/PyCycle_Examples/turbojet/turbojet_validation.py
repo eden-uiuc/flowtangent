@@ -53,7 +53,7 @@ from eden_trace.framework.analyses.energy.jets import turbojet_design, turbojet_
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
-def system_setup(variable_nozzle: bool = False):
+def system_setup():
 
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
@@ -63,7 +63,7 @@ def system_setup(variable_nozzle: bool = False):
         turbine_PR=4.46,
         turbine_intake_temperature=2370.0 * units.R,
     )
-    engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
+    engine = TurbojetEngine.build_custom(variable_nozzle=True, design_parameters=engine_design)
     
     inlet_design = eqx.tree_at(lambda i:
         i.design_parameters.exit_mach_number,
@@ -115,7 +115,7 @@ def system_setup(variable_nozzle: bool = False):
         1.0
     )
 
-    nozz_design = replace(nozz_design, variable_exit=variable_nozzle)
+    nozz_design = replace(nozz_design, variable_exit=True)
 
     des_engine = eqx.tree_at(lambda e:
         (
@@ -349,7 +349,6 @@ if __name__ == "__main__":
     DEBUG = False
     VERBOSE = True
 
-    V_NOZZ = True
     STATICS = False
 
     DESIGN_POINT = False
@@ -361,7 +360,7 @@ if __name__ == "__main__":
     data_dir = test_dir / "ft_data"
     data_dir.mkdir(parents=True, exist_ok=True)
     
-    system = system_setup(variable_nozzle=V_NOZZ)
+    system = system_setup()
     settings = eqx.tree_at(
         lambda s: s.analysis.energy,
         Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE,

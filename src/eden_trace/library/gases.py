@@ -13,8 +13,11 @@ from typing import Optional
 # package imports
 import equinox as eqx
 import jax
+jax.config.update("jax_enable_x64", True)
+
 import jax.numpy as jnp
 import numpy as np
+
 
 from eden_trace.utils import get_trace_root, register
 

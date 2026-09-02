@@ -1,11 +1,38 @@
 import os
-os.environ['OPENMDAO_REPORTS'] = '0'
-# Prevent JAX from pre-allocating 75-90% of GPU/CPU memory
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-# Force JAX to use standard malloc so tracemalloc can actually see it
-os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
-# Disable persistent disk caching of compiled executables
-os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
+import sys
+
+def numerical_environment():
+    # 1. JAX Memory/Precision Config (Safe everywhere)
+    os.environ["JAX_ENABLE_X64"] = "True"
+    os.environ['OPENMDAO_REPORTS'] = '0'
+    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+    os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
+    
+    # 2. NUMA / Hardware Auto-Detection
+    if sys.platform == "linux":
+        # A simple heuristic: if you have a massive amount of cores, 
+        # it's likely the Threadripper workstation.
+        cpu_count = os.cpu_count() or 1
+        if cpu_count > 16:  # Adjust threshold based on your hardware
+            try:
+                # Bind to the first 16 cores (Node 0) to prevent cross-NUMA memory latency
+                node_0_cores = set(range(16))
+                os.sched_setaffinity(0, node_0_cores)
+                
+                # Tell OpenMP to respect this boundary
+                os.environ["OMP_PROC_BIND"] = "true"
+                os.environ["OMP_PLACES"] = "cores"
+                print(f"Hardware Config: NUMA affinity set to Node 0 (16 cores).")
+            except Exception as e:
+                print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
+
+    cache_path = os.path.expanduser("~/.eden_trace/jax_cache")
+    os.makedirs(cache_path, exist_ok=True)
+    os.environ["JAX_COMPILATION_CACHE_DIR"] = cache_path
+
+
+numerical_environment()
 
 import json
 import time
@@ -17,11 +44,11 @@ import openmdao.api as om
 import pycycle.api as pyc
 import scipy.sparse
 
-from tqdm import tqdm
-
 import jax
 import jax.numpy as jnp
+import equinox as eqx
 
+from tqdm import tqdm
 from pathlib import Path
 
 import warnings
@@ -33,14 +60,25 @@ warnings.filterwarnings('ignore', category=RuntimeWarning, message='invalid valu
 warnings.filterwarnings('ignore', category=OpenMDAOWarning, message='The top level group has a nonlinear solver')
 warnings.filterwarnings('ignore', category=SolverWarning)
 
-# Assuming Turbojet is defined in your local pycycle install/scripts
+# Import OpenMDAO and FlowTangent models
 from simple_turbojet import Turbojet
+from ..PyCycle_Examples.turbojet.turbojet_validation import system_setup
+
+from eden_trace.utils import DataPath
+from eden_trace.framework import State, Settings
+from eden_trace.framework.analyses.energy.jets import _design_update, turbojet_design, turbojet_performance, JetSettings
+
+from eden_trace.library import units
+from eden_trace.library.atmospheres import USStandard1976
+from eden_trace.library.components.energy.jets.classes import TurbojetDesign
 
 pact_primal_calls = 0
 pact_vjp_calls = 0
 opaque_fd_primal_calls = 0
 opaque_ad_primal_calls = 0
 opaque_ad_jac_calls = 0
+
+test_dir = Path(__file__).resolve().parent
 
 # ==============================================================================
 # MAUD MONOLITHIC BENCHMARK
@@ -342,7 +380,7 @@ prob_od.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforceme
 prob_od.model.nonlinear_solver.options['err_on_non_converge'] = False
 prob_od.model.nonlinear_solver.options['maxiter'] = 30
 
-prob_od.model.nonlinear_solver.add_recorder(om.SqliteRecorder(Path(__file__).resolve().parent / "solver_errors.sql"))
+prob_od.model.nonlinear_solver.add_recorder(om.SqliteRecorder(test_dir / "solver_errors.sql"))
 prob_od.model.nonlinear_solver.recording_options['record_abs_error'] = True
 prob_od.model.nonlinear_solver.recording_options['record_rel_error'] = True
 prob_od.model.nonlinear_solver.linesearch.options['iprint'] = -1
@@ -555,7 +593,7 @@ def run_pact_python_benchmark(N_points):
     return (peak_mem / (1024*1024)), 0.0, (t_setup_end - t_setup_start), 0.0, (t_exec_end - t_exec_start), mean_tsfc, final_gradient, pact_primal_calls, pact_vjp_calls
 
 # ==============================================================================
-# MAUD OPAQUE AD BENCHMARK
+# MAUD OPAQUE AD BENCHMARK (Does not converge due to MDF constraint)
 # ==============================================================================
 
 coupling_inits = des_primal_np(np.array([13.5], dtype=np.float64))
@@ -741,7 +779,7 @@ def run_maud_opaque_ad_benchmark(N_points):
     return (peak_mem / (1024*1024)), jac_mem_mb, (t_setup_end - t_setup_start), 0.0, (t_exec_end - t_exec_start), mean_tsfc, gradient, opaque_ad_primal_calls, opaque_ad_jac_calls
 
 # ==============================================================================
-# MAUD OPAQUE FD BENCHMARK
+# MAUD OPAQUE FD BENCHMARK (Does not converge due to MDF constraint)
 # ==============================================================================
 
 class OpaqueDesignFD(om.ExplicitComponent):
@@ -861,6 +899,78 @@ def run_maud_opaque_fd_benchmark(N_points):
     
     return (peak_mem / (1024*1024)), jac_mem_mb, (t_setup_end - t_setup_start), 0.0, (t_exec_end - t_exec_start), opaque_fd_primal_calls
 
+# ==============================================================================
+# FLOWTANGENT BENCHMARK
+# ==============================================================================
+
+def run_flowtangent_benchmark(N_points):
+    primal_calls = 1 + N_points
+    jac_calls = 1 + N_points
+
+    jax.clear_caches()
+    gc.collect()
+    tracemalloc.start()
+    #---------------------------------------------------------------------------
+    # Setup: Data Structures and Settings
+    #---------------------------------------------------------------------------
+    t_setup_start = time.perf_counter()
+
+    # Design Point Setup -----------------------------------
+    state = State()
+    system = system_setup()
+    settings = eqx.tree_at(
+        lambda s: s.analysis.energy,
+        Settings(),
+        JetSettings(design_mode=True, statics=False)
+    )
+
+    des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
+    des: TurbojetDesign = des_system.energy.line.engine.design_parameters
+
+    # Off-Design Point Setup -------------------------------
+
+    alt     = 5_000 * units.ft
+    M0      = 0.2
+    atmo    = USStandard1976()
+    a0      = atmo.compute_speed_of_sound(alt)
+
+    od_state = eqx.tree_at(
+        lambda s: (
+            s.frames.inertial.position_vector,
+            s.freestream.mach_number,
+            s.frames.inertial.velocity_vector,
+        ),
+        State().expand_time(1),
+        (
+            jnp.array([[0., 0., -alt]]),
+            jnp.atleast_2d(M0),
+            jnp.atleast_2d(jnp.array([[(a0 * M0).item(), 0.0, 0.0]])),
+        ),
+    )
+
+    od_settings = eqx.tree_at(
+        lambda s: (s.analysis.energy, s.numerical.batch_size),
+        Settings(),
+        (
+            JetSettings(design_mode=True, statics=False),
+            N_points,
+        )
+    )
+
+    od_base_analysis = 
+
+
+    t_setup_end = time.perf_counter()
+    
+
+    def cycle_objective(comp_pr):
+        des_st, des_sys, des_set = turbojet_design(
+            state,
+            system,
+            settings,
+            initialize=True)
+
+        
 
 #===============================================================================
 # HELPER FUNCTIONS
@@ -925,7 +1035,7 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
     return metrics
 
 def plot_error():
-    cr = om.CaseReader(Path(__file__).resolve().parent / "solver_errors.sql")
+    cr = om.CaseReader(test_dir / "solver_errors.sql")
     case_keys = cr.list_cases("root.nonlinear_solver", out_stream=None)
 
     abs_error_history = [cr.get_case(cid).abs_err for cid in case_keys]
@@ -949,11 +1059,11 @@ def plot_error():
     plt.grid(True, which="both", ls="-", alpha=0.5)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(Path(__file__).resolve().parent/'error_history.png', dpi=300)
+    plt.savefig(test_dir/'error_history.png', dpi=300)
 
 
 def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
-    cache_file = Path(__file__).resolve().parent / "benchmark_cache.json"
+    cache_file = test_dir / "benchmark_cache.json"
     
     # Easily toggle architectures by commenting them out
     architectures = [

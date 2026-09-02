@@ -24,7 +24,7 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.jets.classes import Nozzle, TurbojetEngine, TurbofanDesign, TurbojetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetDesign
 
 from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis
@@ -167,7 +167,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     return des_state, des_system, des_settings, base_analysis
 
-def turbojet_design(state: State, system: Aircraft, settings: Settings, initialize: bool = False) -> ImplicitAnalysis:
+def turbojet_design(state: State, system: Aircraft, settings: Settings, initialize: bool = False):
 
     # Setup test state according to design parameters
 
@@ -371,7 +371,7 @@ def turbojet_performance(
     ctrls = (N, W, FAR, Rline, turb_PR)
     base_res = (d_power, d_thrust, d_Wc, d_Wp)
     
-    if isinstance(network.line.engine.core_nozzle, Nozzle):
+    if network.line.engine.core_nozzle.variable_exit:
         res = base_res + (d_area,)
     else:    
         res = base_res + (d_m_nozz,)
@@ -384,6 +384,8 @@ def turbojet_performance(
         controls=ctrls,
         residuals=res
     )
+
+def turbojet_performance_mp()
 
 def turbofan_performance(network: TurbofanNetwork):
 
