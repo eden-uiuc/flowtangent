@@ -16,7 +16,7 @@ from scipy.stats import qmc, beta
 from eden_trace.utils import DataPath
 
 from eden_trace.library import units
-from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
 from eden_trace.framework import Aircraft, Settings, JacobianMap
 from eden_trace.framework.settings import AnalysisSettings
@@ -178,8 +178,8 @@ def wing_generator(df_geometries):
             symmetric=True,
             taper=row.taper_ratio,
             dihedral=row.dihedral,
-            sweeps=WingSweeps(quarter_chord=row.sweep),
-            chords=WingChords(root=1.0),
+            sweeps=Sweeps(quarter_chord=row.sweep),
+            chords=Chords(root=1.0),
             twists=WingDimensions(tip=row.twist),
             spans=WingDimensions(projected=row.aspect_ratio * (1 + row.taper_ratio)/2),
             origin=jnp.array([[0., 0., 0.]]),

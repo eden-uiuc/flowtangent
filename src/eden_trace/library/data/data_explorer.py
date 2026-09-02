@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
 from eden_trace.framework import Aircraft, Settings, State
 from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
@@ -129,8 +129,8 @@ def wing_generator(aspect_ratio, taper, sweep, dihedral, twist):
         symmetric=True,
         taper=taper,
         dihedral=dihedral,
-        sweeps=WingSweeps(quarter_chord=sweep),
-        chords=WingChords(root=1.0),
+        sweeps=Sweeps(quarter_chord=sweep),
+        chords=Chords(root=1.0),
         spans=WingDimensions(projected=aspect_ratio),
         origin=jnp.array([[0.0, 0.0, 0.0]]),
     ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)

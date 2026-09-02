@@ -21,7 +21,7 @@ import eden_trace.utils as tu
 
 from eden_trace.library import units
 from eden_trace.library.components import Areas
-from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
 from eden_trace.library.components.airfoils import Airfoil
 
 from eden_trace.framework import Process, State, Settings, JacobianMap
@@ -183,7 +183,7 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     wing_spans = WingDimensions(projected=span)
 
-    wing_chords = WingChords(root=chord, tip=chord, mean_aerodynamic=chord)
+    wing_chords = Chords(root=chord, tip=chord, mean_aerodynamic=chord)
 
     wing_areas = Areas(reference=span * chord, wetted=2 * span * chord)
 
@@ -235,7 +235,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
             tag=f"{i}", 
             percent_span_location=eta_start, 
             root_chord_percent=chord_frac_start,
-            sweeps=WingSweeps(quarter_chord=sweep_c4)  # Inject sweep here!
+            sweeps=Sweeps(quarter_chord=sweep_c4)  # Inject sweep here!
         ),)
 
     # Tip segment doesn't need a sweep since there's no geometry after it
@@ -251,7 +251,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=WingChords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
+                chords=Chords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
                 areas=wing_areas,
                 taper=0.01,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -281,7 +281,7 @@ def VORJAX_delta_wing(AR=2.0):
             tag="Root_to_Tip",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=WingSweeps(quarter_chord=sweep_c4)
+            sweeps=Sweeps(quarter_chord=sweep_c4)
         ),
         WingSegment(
             tag="Tip",
@@ -296,7 +296,7 @@ def VORJAX_delta_wing(AR=2.0):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=WingChords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
+                chords=Chords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
                 areas=wing_areas,
                 taper=c_tip_ratio,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -330,7 +330,7 @@ def VORJAX_ONERA_M6():
             tag="ONERA M6",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
+            sweeps=Sweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
             airfoil=Airfoil.from_file("/home/jordan/dev/Trace/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
         ),
         WingSegment(
@@ -348,7 +348,7 @@ def VORJAX_ONERA_M6():
         aspect_ratio=AR,
         taper=0.56,
         origin=jnp.array([[0.0, 0.0, 0.0]]),
-        chords=WingChords(root=c_root, mean_aerodynamic=mac),
+        chords=Chords(root=c_root, mean_aerodynamic=mac),
         spans=WingDimensions(projected=2 * semispan),
     ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 

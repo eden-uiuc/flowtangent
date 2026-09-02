@@ -101,9 +101,9 @@ class MassProperties(eqx.Module):
     volume: float = 1.0
     density: float = 0.0
 
-    center_of_gravity: jnp.ndarray = empty_array(3)
-    moments_of_inertia: jnp.ndarray = empty_array((3, 3))
-    subcomponent_moments_of_inertia: jnp.ndarray = empty_array((3, 3))
+    center_of_gravity: jnp.ndarray = init_field(lambda: jnp.zeros((1, 3)))
+    moments_of_inertia: jnp.ndarray = init_field(lambda: jnp.zeros((3, 3)))
+    subcomponent_moments_of_inertia: jnp.ndarray = init_field(lambda: jnp.zeros((3, 3)))
 
     def __repr__(self):
         return ""
@@ -116,7 +116,7 @@ class Component(eqx.Module):
 
     segments: tuple[Component, ...] = init_field(tuple)
     subcomponents: tuple[Component, ...] = init_field(tuple)
-    origin: jnp.ndarray = empty_array(3)
+    origin: jnp.ndarray = init_field(lambda: jnp.zeros((1, 3)))
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
     areas: Areas = init_field(Areas)

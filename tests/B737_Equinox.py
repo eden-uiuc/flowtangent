@@ -27,7 +27,7 @@ from eden_trace.framework.plotting import plot_vlm_panels
 
 from eden_trace.library import units
 from eden_trace.library.components import Areas, Airfoil, _AF_DIR, MassProperties
-from eden_trace.library.components.wings import Wing, WingChords, WingControlSurface, WingDimensions, WingSegment, WingSweeps
+from eden_trace.library.components.wings import Wing, Chords, WingControlSurface, WingDimensions, WingSegment, Sweeps
 from eden_trace.library.components.fuselages import *
 from eden_trace.library.components.landing_gear import LandingGear
 from eden_trace.library.components.nacelles import Nacelle, NacelleDiameters
@@ -85,7 +85,7 @@ def vehicle_setup():
         root_chord_percent      =1.,
         thickness_to_chord      =0.1,
         dihedral_outboard       =2.5 * units.deg,
-        sweeps                  =WingSweeps(quarter_chord=28.225 * units.deg),
+        sweeps                  =Sweeps(quarter_chord=28.225 * units.deg),
         airfoil                 =Airfoil.from_file(_AF_DIR/'B737a.txt'))
 
     yehudi_segment = WingSegment(
@@ -95,7 +95,7 @@ def vehicle_setup():
         root_chord_percent=0.5,
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * units.deg,
-        sweeps=WingSweeps(quarter_chord=25. * units.deg),
+        sweeps=Sweeps(quarter_chord=25. * units.deg),
         airfoil=Airfoil.from_file(_AF_DIR/'B737b.txt'))
 
     mid_segment = WingSegment(
@@ -105,7 +105,7 @@ def vehicle_setup():
         root_chord_percent=0.220,
         thickness_to_chord=0.1,
         dihedral_outboard=5.5 * units.deg,
-        sweeps=WingSweeps(quarter_chord=56.75 * units.deg),
+        sweeps=Sweeps(quarter_chord=56.75 * units.deg),
         airfoil=Airfoil.from_file(_AF_DIR/'B737c.txt'))
 
     tip_segment = WingSegment(
@@ -152,9 +152,9 @@ def vehicle_setup():
         symmetric=True,
         high_lift=True,
         dynamic_pressure_ratio=1.0,
-        sweeps=WingSweeps(quarter_chord=25. * units.deg),
+        sweeps=Sweeps(quarter_chord=25. * units.deg),
         spans=WingDimensions(projected=34.32),
-        chords=WingChords(root=7.760, tip=0.782, mean_aerodynamic=4.235),
+        chords=Chords(root=7.760, tip=0.782, mean_aerodynamic=4.235),
         areas=Areas(reference=124.862, wetted=225.08),
         twists=WingDimensions(root=4.0 * units.deg, tip=0.0 * units.deg),
         segments=(root_segment, yehudi_segment, mid_segment, tip_segment),
@@ -174,7 +174,7 @@ def vehicle_setup():
         percent_span_location=0.0,
         root_chord_percent=1.0,
         dihedral_outboard=8.63 * units.deg,
-        sweeps=WingSweeps(quarter_chord=28.2250 * units.deg))
+        sweeps=Sweeps(quarter_chord=28.2250 * units.deg))
 
     h_tip_segment = WingSegment(
         tag='Horizontal Stabilizer Tip Segment',
@@ -202,9 +202,9 @@ def vehicle_setup():
         aerodynamic_center      =jnp.array([0, 0, 0]),
         vertical                =False,
         symmetric               =True,
-        sweeps                  =WingSweeps(quarter_chord=28.2250 * units.deg),
+        sweeps                  =Sweeps(quarter_chord=28.2250 * units.deg),
         spans                   =WingDimensions(projected=14.4),
-        chords                  =WingChords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
+        chords                  =Chords(root=4.2731, tip=1.4243, mean_aerodynamic=8.0),
         areas                   =Areas(reference=41.49, exposed=59.354, wetted=71.81),
         twists                  =WingDimensions(root=3.0 * units.deg, tip=3.0 * units.deg),
         segments                =(h_root_segment, h_tip_segment),
@@ -224,13 +224,13 @@ def vehicle_setup():
         percent_span_location=0.0,
         root_chord_percent=1.,
         thickness_to_chord=.1,
-        sweeps=WingSweeps(quarter_chord=61.485 * units.deg))
+        sweeps=Sweeps(quarter_chord=61.485 * units.deg))
 
     mid_segment = WingSegment(
         tag='Vertical Stabilizer Mid Segment',
         percent_span_location=0.2962,
         root_chord_percent=0.45,
-        sweeps=WingSweeps(quarter_chord=31.2 * units.deg),
+        sweeps=Sweeps(quarter_chord=31.2 * units.deg),
         thickness_to_chord=.1,)
 
     tip_segment = WingSegment(
@@ -251,9 +251,9 @@ def vehicle_setup():
         symmetric               =False,
         t_tail                  =False,
         dynamic_pressure_ratio  =1.0,
-        sweeps                  =WingSweeps(quarter_chord=32.2 * units.deg),
+        sweeps                  =Sweeps(quarter_chord=32.2 * units.deg),
         spans                   =WingDimensions(projected=8.33),
-        chords                  =WingChords(root=10.1, tip=1.20, mean_aerodynamic=4.0),
+        chords                  =Chords(root=10.1, tip=1.20, mean_aerodynamic=4.0),
         areas                   =Areas(reference=34.89, wetted=57.25),
         segments=(root_segment, mid_segment, tip_segment)).update_geometry()
 
