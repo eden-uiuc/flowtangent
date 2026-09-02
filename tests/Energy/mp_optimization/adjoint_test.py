@@ -1,12 +1,14 @@
 import jax
 import jax.numpy as jnp
 
+import numpy as np
+
 # A global counter to track how many times the adjoint solver is executed
 adjoint_call_counter = 0
 
 # 1. Define the interface for our "External Solver"
 @jax.custom_vjp
-def mock_cfd_solver(x):
+def mock_cfd_solver(x: np.ndarray):
     # Imagine this calls an external C++ binary
     # It takes 2 inputs and outputs 3 coupling variables (N_c = 3)
     out_1 = x[0]**2          # Lift

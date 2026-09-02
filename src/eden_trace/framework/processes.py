@@ -165,13 +165,43 @@ class ProcessStep(eqx.Module):
 #  Process Class
 # ----------------------------------------------------------------------------------------------------------------------
 
+def array_barrier(state:State, system:System, settings:Settings):
+
+    def _to_array(leaf, ndim: int = 1):
+        # 1. Check if it's a raw scalar, a list/tuple of scalars, OR already an array
+        is_scalar = isinstance(leaf, (float, int, complex))
+        is_iterable = isinstance(leaf, (list, tuple)) and all(isinstance(i, (float, int, complex)) for i in leaf)
+        is_array = isinstance(leaf, (jax.Array, np.ndarray))
+
+        if is_scalar or is_iterable or is_array:
+            # 2. Convert to JAX array (jnp.asarray is a no-op if it's already a JAX array)
+            # Using standard float allows JAX to respect its 32/64-bit config settings naturally
+            leaf_arr = jnp.asarray(leaf, dtype=float)
+            
+            # 3. Enforce the minimum dimension barrier
+            if leaf_arr.ndim < ndim:
+                axes_to_add = tuple(range(ndim - leaf_arr.ndim))
+                return jnp.expand_dims(leaf_arr, axis=axes_to_add)
+                
+            return leaf_arr
+            
+        # Leave strings, booleans, empty sentinels, or other metadata alone
+        return leaf
+
+    # Apply ndim=2 to State
+    arr_state = jax.tree_util.tree_map(lambda x: _to_array(x, ndim=2), state)
+    
+    # Apply ndim=1 to System
+    arr_system = jax.tree_util.tree_map(lambda x: _to_array(x, ndim=1), system)
+
+    return arr_state, arr_system, settings
 
 class Process(ProcessStep):
 
     tag: str = init_field("Process", static=True)
     steps: tuple[ProcessStep, ...] = ()
     
-    initialize: TraceFunction = init_field(null_step, static=True)
+    initialize: TraceFunction = init_field(array_barrier, static=True)
     initial_step: int = init_field(0, static=True)
 
     _initial_state: Optional[State] = init_field(None)
@@ -181,14 +211,14 @@ class Process(ProcessStep):
     _val_and_jac_fn: Optional[Callable] = init_field(None, static=True)
     _cached_grad_map: Optional[JacobianMap] = init_field(None, static=True)
     _filter_map: dict = init_field(lambda _:{
-            "energy": r"state\.energy\.nodes\.\[*\].outputs"
+            "energy": r"state\.energy\.nodes\.\[*\]."
         }, static=True)
 
     def __init__(
         self,
         steps: Sequence[ProcessStep | TraceFunction] = (),
         tag: str = "Process",
-        initialize: TraceFunction = null_step,
+        initialize: TraceFunction = array_barrier,
         initial_step: int = 0,
         _initial_state: Optional[State] = None,
         _initial_system: Optional[System] = None,
@@ -218,7 +248,7 @@ class Process(ProcessStep):
         
         # Handle mutable dictionary default safely
         self._filter_map = _filter_map if _filter_map is not None else {
-            "energy": r"state\.energy\.nodes\.\[*\].outputs"
+            "energy": r"state\.energy\.nodes\.\[*\]."
         }
                 
         self.steps = tuple(ProcessStep.from_function(step) for step in steps)
@@ -347,20 +377,6 @@ class Process(ProcessStep):
 
         return batched_jacrev_fn
 
-    @staticmethod
-    def _sanitize_inputs(tree):
-        """Cast all numeric leaves to 0D JAX scalars for gradient computations."""
-
-        def _to_array(leaf):
-            if isinstance(leaf, (float, int)) or (
-                isinstance(leaf, list) and all(isinstance(i, (float, int)) for i in leaf)
-            ):
-                return jnp.array(leaf, dtype=jnp.float64)
-            else:
-                return leaf
-
-        return jax.tree_util.tree_map(_to_array, tree)
-
     @overload
     def run(
         self, state: State, system: System, settings: Settings, *,
@@ -376,13 +392,8 @@ class Process(ProcessStep):
     def run(
         self,
         state: State, system: System, settings: Settings, *,
-        initialize: bool = False, track_history: bool = False
+        initialize: bool = True, track_history: bool = False
     ):
-
-        # Sanitize inputs (map floats/ints to JAX arrays)
-        state = self._sanitize_inputs(state)
-        system = self._sanitize_inputs(system)
-        settings = self._sanitize_inputs(settings)
 
         if initialize:
             state, system, settings = self.initialize(state, system, settings)

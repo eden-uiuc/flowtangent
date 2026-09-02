@@ -14,7 +14,7 @@ from eden_trace.utils import init_field
 
 # Trace imports
 from eden_trace.library import units
-from eden_trace.library.gases import O2, IdealGas, BurnedJetA
+from eden_trace.library.gases import O2, Gas, BurnedJetA
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants
@@ -35,7 +35,7 @@ class PropellantTemperatures(eqx.Module):
 class Propellant(eqx.Module):
     tag: str = init_field("Propellant", static=True)
 
-    oxidizer: IdealGas = init_field(IdealGas)
+    oxidizer: Gas = init_field(Gas)
 
     density: float = init_field(0.0, static=True)
     specific_energy: float = init_field(0.0, static=True)
@@ -62,12 +62,12 @@ def _JetATemperatures():
     )
 
 class JetA(Propellant):
-    oxidizer: IdealGas = init_field(O2)
+    oxidizer: Gas = init_field(O2)
 
     density: float = init_field(820.0, static=True)
     
     # Specific energy is higher than reference value (43.15 MJ/kg) due to stoichiometric burn assumption
-    specific_energy: float = init_field(44.0e6 * units.parse('J/kg'), static=True)
+    specific_energy: float = init_field(42.7984e6 * units.parse('J/kg'), static=True)
     energy_density: float = init_field(35.3e6 * units.parse('J/m**3'), static=True)
 
     max_mass_fraction: MaxPropellantMassFractions = init_field(_JetAFractions, static=True)

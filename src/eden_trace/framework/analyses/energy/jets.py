@@ -24,7 +24,7 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.jets.classes import Nozzle, TurbojetEngine, TurbofanDesign, TurbojetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetDesign
 
 from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis
@@ -129,6 +129,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             e.burner.design_parameters.pressure_ratio,
             e.burner.design_parameters.output_temperature,
             e.turbine.design_parameters.rotation_speed,
+            e.turbine.design_parameters.pressure_ratio
         ),
         engine,(
             des.rotation_speed,
@@ -136,6 +137,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
             des.burner_pressure_ratio,
             des.turbine_intake_temperature,
             des.rotation_speed,
+            des.turbine_PR
         ))
 
     des_system = eqx.tree_at(
@@ -165,7 +167,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     return des_state, des_system, des_settings, base_analysis
 
-def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings]:
+def turbojet_design(state: State, system: Aircraft, settings: Settings, initialize: bool = False):
 
     # Setup test state according to design parameters
 
@@ -191,12 +193,12 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
 
     d_thrust = Residual(
         tag="Design Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust
+        get_value=lambda s: s.energy.residual.thrust
     )
 
     d_power = Residual(
         tag="Power Imbalance",
-        get_value=lambda s: s.energy.outputs.residual.power
+        get_value=lambda s: s.energy.residual.power
     )
 
     design_analysis = ImplicitAnalysis(
@@ -206,18 +208,9 @@ def setup_TJ_design(state: State, system: Aircraft, settings: Settings) -> tuple
         residuals=(d_thrust, d_power),
     )
 
-    des_state, des_system, des_settings = design_analysis.run(
-        des_state, des_system, des_settings,
-        initialize=True
-    )
-    
-    if des_settings.analysis.energy.clear_nodes:
-        des_net = des_system.energy.sync_and_clear_nodes()
-        des_system = des_system.replace_subcomponent(des_net)
-    
-    return des_state, des_system, settings
+    return design_analysis.run(des_state, des_system, des_settings, initialize=initialize)
 
-def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
+def turbofan_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
 
     # Setup test state according to design parameters
     _, des_system, _, base_analysis = _design_update(state, system, settings)
@@ -252,17 +245,17 @@ def setup_TF_design(state: State, system: Aircraft, settings: Settings) -> Impli
     # Residuals Setup
     d_thrust = Residual(
         tag="Design Thrust",
-        get_value=lambda s: s.energy.outputs.residual.thrust
+        get_value=lambda s: s.energy.residual.thrust
     )
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].residual.power
     )
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power
+        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].residual.power
     )
 
     design_analysis = ImplicitAnalysis(
@@ -321,7 +314,7 @@ def turbojet_performance(
     
     Rline = Control(
         tag="Rline",
-        state_path=DataPath(("energy", "Rline")),
+        state_path=DataPath(("energy", "compressor_Rline")),
         initial_value=initial_Rline,
         bounds=R_bnds,
         scaling='logistic'
@@ -361,24 +354,24 @@ def turbojet_performance(
     
     # Residual Setup -----------------------------------------------------------
 
-    d_m_nozz = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.outputs.residual.mass_flow_rate)
+    d_m_nozz = Residual(tag="Mass Flow Rate", get_value=lambda s: s.energy.residual.mass_flow_rate)
     
-    d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.outputs.residual.power)
+    d_power = Residual(tag="Power Imbalance", get_value=lambda s: s.energy.residual.power)
     
-    d_thrust = Residual(tag="Thrust", get_value=lambda s: s.energy.outputs.residual.thrust)
+    d_thrust = Residual(tag="Thrust", get_value=lambda s: s.energy.residual.thrust)
 
-    d_Wc = Residual(tag="Compressor Mass Flow", get_value=lambda s: s.energy.outputs.residual.compressor_Wc)
+    d_Wc = Residual(tag="Compressor Mass Flow", get_value=lambda s: s.energy.residual.compressor_Wc)
 
-    d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.outputs.residual.turbine_Wp)
+    d_Wp = Residual(tag="Turbine Mass Flow", get_value=lambda s: s.energy.residual.turbine_Wp)
 
-    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.outputs.residual.area)
+    d_area = Residual(tag="Throat Area", get_value=lambda s: s.energy.residual.area)
 
     # Variable Setup -----------------------------------------------------------
     
     ctrls = (N, W, FAR, Rline, turb_PR)
     base_res = (d_power, d_thrust, d_Wc, d_Wp)
     
-    if isinstance(network.line.engine.core_nozzle, Nozzle):
+    if network.line.engine.core_nozzle.variable_exit:
         res = base_res + (d_area,)
     else:    
         res = base_res + (d_m_nozz,)
@@ -391,6 +384,8 @@ def turbojet_performance(
         controls=ctrls,
         residuals=res
     )
+
+def turbojet_performance_mp()
 
 def turbofan_performance(network: TurbofanNetwork):
 
@@ -517,29 +512,29 @@ def turbofan_performance(network: TurbofanNetwork):
     )
     
     # Residual Setup -----------------------------------------------------------    
-    d_fWc = Residual(tag="Fan Mass Flow", get_value=lambda s: s.energy.outputs.residual.fan_Wc)
-    d_lWc = Residual(tag="LPC Mass Flow", get_value=lambda s: s.energy.outputs.residual.lpc_Wc)
-    d_hWc = Residual(tag="HPC Mass Flow", get_value=lambda s: s.energy.outputs.residual.hpc_Wc)
+    d_fWc = Residual(tag="Fan Mass Flow", get_value=lambda s: s.energy.residual.fan_Wc)
+    d_lWc = Residual(tag="LPC Mass Flow", get_value=lambda s: s.energy.residual.lpc_Wc)
+    d_hWc = Residual(tag="HPC Mass Flow", get_value=lambda s: s.energy.residual.hpc_Wc)
     
-    d_lWp = Residual(tag="LPT Mass Flow", get_value=lambda s: s.energy.outputs.residual.lpt_Wp)
-    d_hWp = Residual(tag="HPT Mass Flow", get_value=lambda s: s.energy.outputs.residual.hpt_Wp)
+    d_lWp = Residual(tag="LPT Mass Flow", get_value=lambda s: s.energy.residual.lpt_Wp)
+    d_hWp = Residual(tag="HPT Mass Flow", get_value=lambda s: s.energy.residual.hpt_Wp)
 
-    d_thrust = Residual(tag="Thrust",     get_value=lambda s: s.energy.outputs.residual.thrust)
+    d_thrust = Residual(tag="Thrust",     get_value=lambda s: s.energy.residual.thrust)
 
     d_LP_power = Residual(
         tag="LP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].outputs.residual.power)
+        get_value=lambda s: s.energy.nodes['network.line.engine.lp_shaft'].residual.power)
 
     d_HP_power = Residual(
         tag="HP Power Imbalance",
-        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].outputs.residual.power)
+        get_value=lambda s: s.energy.nodes['network.line.engine.hp_shaft'].residual.power)
     
     d_W_core = Residual(
         tag="Core MFR",
-        get_value=lambda s: s.energy.nodes['network.line.engine.core_nozzle'].outputs.residual.mass_flow_rate)
+        get_value=lambda s: s.energy.nodes['network.line.engine.core_nozzle'].residual.mass_flow_rate)
     d_W_byp = Residual(
         tag="Bypass MFR",
-        get_value=lambda s: s.energy.nodes['network.line.engine.fan_nozzle'].outputs.residual.mass_flow_rate)
+        get_value=lambda s: s.energy.nodes['network.line.engine.fan_nozzle'].residual.mass_flow_rate)
 
     # Variable Setup -----------------------------------------------------------
     
@@ -628,7 +623,7 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
     # Set up Inner Loop
 
     des_state, des_system, des_settings, OD_analysis = _design_update_batched(state, system, settings)
-    des_analysis = setup_TF_design(des_state, des_system, des_settings)
+    des_analysis = turbofan_design(des_state, des_system, des_settings)
     des_state, des_system, des_settings = des_analysis.initialize(des_state, des_system, des_settings)
 
     engine = system.energy.line.engine
@@ -655,12 +650,12 @@ def design_turbofan_mp(state: State, system: Aircraft, settings: Settings) -> tu
     OD_F = jnp.array([d.thrust for d in OD_points]).reshape((-1, 1)).at[0,0].set(0.0)
     d_F = Residual(
         "Off-Design Thrust",
-        get_value=lambda s: jnp.where(OD_F, s.energy.outputs.residual.thrust, OD_F))
+        get_value=lambda s: jnp.where(OD_F, s.energy.residual.thrust, OD_F))
 
     OD_TSFC = jnp.array([d.TSFC for d in OD_points]).reshape((-1, 1))
     d_TSFC = Residual(
         tag="Off-Design TSFC",
-        get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].outputs.fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
+        get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
 
     def split_residuals(swap_state, swap_system, swap_settings):
 

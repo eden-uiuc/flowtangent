@@ -19,7 +19,7 @@ import jax.numpy as jnp
 from eden_trace.library.components.energy.networks import GraphNetwork
 
 # Trace Imports
-from eden_trace.framework.state_data.energy import NodeConditions, TurbojetData, TurbofanData
+from eden_trace.framework.state_data.energy import NodeState, TurbojetState, TurbofanState
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
@@ -29,8 +29,8 @@ from eden_trace.framework.state_data.energy import NodeConditions, TurbojetData,
 def initialize_energy(state: State, system: System, settings: Settings):
     node_states = {}
     conditions_map = {
-        "TurbojetNetwork": TurbojetData,
-        "TurbofanNetwork": TurbofanData,
+        "TurbojetNetwork": TurbojetState,
+        "TurbofanNetwork": TurbofanState,
     }
 
     def _extract_to_flat_state(n):
@@ -39,7 +39,7 @@ def initialize_energy(state: State, system: System, settings: Settings):
                 tag=n.network_ID
             )  # Initialize the state
         else:
-            node_states[n.network_ID] = NodeConditions(tag=n.network_ID)  # Initialize the state
+            node_states[n.network_ID] = NodeState(tag=n.network_ID)  # Initialize the state
         if hasattr(n, "subcomponents"):
             for child in n.subcomponents:
                 _extract_to_flat_state(child)

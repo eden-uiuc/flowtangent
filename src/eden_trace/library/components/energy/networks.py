@@ -253,13 +253,13 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
     )
 
     @tu.inputs(
-            "state.energy.nodes['{force_inputs.network_ID}'].outputs.force.thrust",
-            "state.energy.nodes['{residual_inputs.network_ID}'].outputs.residual.power",
+            "state.energy.nodes['{force_inputs.network_ID}'].force.thrust",
+            "state.energy.nodes['{residual_inputs.network_ID}'].residual.power",
     )
     @tu.outputs(
             "state.energy.total_force_vector",
-            "state.energy.nodes['{network_ID}'].outputs.residual.thrust",
-            "state.energy.nodes['{network_ID}'].outputs.residual.power",
+            "state.energy.residual.thrust",
+            "state.energy.residual.power",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
@@ -273,7 +273,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
         updated_state = eqx.tree_at(
             lambda s: (
                 s.energy.total_force_vector,
-                s.energy.outputs.residual.thrust,
+                s.energy.residual.thrust,
             ),
             updated_state,(
                 total_force_vector,
@@ -283,7 +283,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
 
         total_d_power = self.apply_domain_op(jnp.sum, updated_state, "residual", "power")
 
-        updated_state = eqx.tree_at(lambda s: s.energy.outputs.residual.power, updated_state, total_d_power)
+        updated_state = eqx.tree_at(lambda s: s.energy.residual.power, updated_state, total_d_power)
 
         return updated_state, system, settings
 

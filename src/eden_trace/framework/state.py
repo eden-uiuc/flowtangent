@@ -15,7 +15,7 @@ import equinox as eqx
 # package imports
 import jax.numpy as jnp
 
-from eden_trace.framework.state_data import StateData, Aerodynamics, NetworkData, Freestream, Mass, StabilityData, Time
+from eden_trace.framework.state_data import StateData, Aerodynamics, NetworkState, Freestream, Mass, StabilityData, Time
 from eden_trace.utils import init_field, get_target, empty_array, register
 
 from eden_trace.framework.state_data import (
@@ -27,7 +27,7 @@ from eden_trace.framework.state_data import (
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class State[EnergyType: NetworkData](StateData):
+class State[EnergyType: NetworkState](StateData):
 
     tag: str = init_field("State", static=True)
 
@@ -38,7 +38,7 @@ class State[EnergyType: NetworkData](StateData):
     freestream: Freestream = init_field(Freestream)
 
     mass: Mass = init_field(Mass)
-    energy: EnergyType = init_field(NetworkData)
+    energy: EnergyType = init_field(NetworkState)
     aerodynamics: Aerodynamics = init_field(Aerodynamics)
     stability: StabilityData = init_field(StabilityData)
 

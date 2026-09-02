@@ -342,8 +342,6 @@ class BatchAnalysis:
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-
-
 class ShardManager:
     def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="Trace_dataset.manager"):
         self.local_dir = Path(cache_dir)

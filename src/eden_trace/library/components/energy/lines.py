@@ -66,17 +66,17 @@ class TurbojetLine(EnergyLine):
 
     @func_inputs(
         # "state.energy.nodes['{fuel_tanks.network_ID}'].mass",
-        "state.energy.nodes['{fuel_inputs.network_ID}'].outputs.fuel.flow_rate",
+        "state.energy.nodes['{fuel_inputs.network_ID}'].fuel.flow_rate",
         # "system.energy.nodes['{fuel_tanks.network_ID}'].selector_ratio",
         # "system.energy.nodes['{fuel_tanks.network_ID}'].mass_properties.total",
         "system.energy.nodes['{network_ID}'].tank_draw_ratios",
     )
     @outputs(
-        # "state.energy.nodes['{fuel_tanks}'].outputs.fuel.flow_rate",
+        # "state.energy.nodes['{fuel_tanks}'].fuel.flow_rate",
         "state.mass.rate_of_change",
-        "state.energy.nodes['{network_ID}'].outputs.force.thrust",
-        "state.energy.nodes['{network_ID}'].outputs.residual.thrust",
-        "state.energy.nodes['{network_ID}'].outputs.residual.power",
+        "state.energy.nodes['{network_ID}'].force.thrust",
+        "state.energy.nodes['{network_ID}'].residual.thrust",
+        "state.energy.nodes['{network_ID}'].residual.power",
     )
     def transmit(self, state: State, system: System, settings: Settings):
 
@@ -108,7 +108,7 @@ class TurbojetLine(EnergyLine):
 
         # Apply updates sequentially
         updated_state = eqx.tree_at(
-            lambda s: tuple(s.energy.nodes[t.network_ID].outputs.fuel.flow_rate for t in self.fuel_tanks),
+            lambda s: tuple(s.energy.nodes[t.network_ID].fuel.flow_rate for t in self.fuel_tanks),
             state,
             tank_burns,
         )
@@ -121,8 +121,8 @@ class TurbojetLine(EnergyLine):
 
         updated_state = eqx.tree_at(
             lambda s: (
-                s.energy.nodes[self.network_ID].outputs.force.thrust,
-                s.energy.nodes[self.network_ID].outputs.residual.thrust,
+                s.energy.nodes[self.network_ID].force.thrust,
+                s.energy.nodes[self.network_ID].residual.thrust,
             ),
             updated_state,
             (
@@ -134,7 +134,7 @@ class TurbojetLine(EnergyLine):
         # Power Imbalance ------------------------------------------------------
 
         updated_state = eqx.tree_at(
-            lambda s: s.energy.nodes[self.network_ID].outputs.residual.power,
+            lambda s: s.energy.nodes[self.network_ID].residual.power,
             updated_state, 
             self.apply_domain_op(jnp.sum, updated_state, "residual", "power"),
         )

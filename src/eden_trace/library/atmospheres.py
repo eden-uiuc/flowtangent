@@ -17,7 +17,7 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import init_field
 
-from eden_trace.library.gases import Air, IdealGas
+from eden_trace.library.gases import Air, Gas
 from eden_trace.library.planets import Earth, Planet
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ class AtmosphericBreakpoints(eqx.Module):
 class Atmosphere(eqx.Module):
     tag: str = init_field("Atmosphere", static=True)
 
-    fluid: IdealGas = init_field(Air)
+    fluid: Gas = init_field(Air)
 
     planet: Planet = init_field(Earth)
 

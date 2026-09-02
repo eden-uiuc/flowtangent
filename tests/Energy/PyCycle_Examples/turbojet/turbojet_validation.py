@@ -48,19 +48,22 @@ from eden_trace.library.components.energy.jets.classes import TurbojetEngine, Tu
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import setup_TJ_design, turbojet_performance, JetSettings
+from eden_trace.framework.settings import LoggingSettings
+from eden_trace.framework.analyses.energy.jets import turbojet_design, turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
-def system_setup(variable_nozzle: bool = False):
+def system_setup():
 
     engine_design = TurbojetDesign(
         thrust=11_800 * units.lbf,
         mass_flow_rate=168.45 * units.lbm/units.s,
+        rotation_speed=8070. * units.rpm,
+        overall_pressure_ratio=13.5,
         turbine_PR=4.46,
         turbine_intake_temperature=2370.0 * units.R,
     )
-    engine = TurbojetEngine.build_custom(variable_nozzle=variable_nozzle, design_parameters=engine_design)
+    engine = TurbojetEngine.build_custom(variable_nozzle=True, design_parameters=engine_design)
     
     inlet_design = eqx.tree_at(lambda i:
         i.design_parameters.exit_mach_number,
@@ -70,15 +73,11 @@ def system_setup(variable_nozzle: bool = False):
     
     comp_design = eqx.tree_at(lambda c:
         (
-            c.design_parameters.pressure_ratio,
-            c.design_parameters.rotation_speed,
             c.design_parameters.exit_mach_number,
             c.design_parameters.eff.flow,
         ),
         engine.compressor,
         (
-            13.5,
-            8070. * units.rev/units.mins,
             0.02,
             0.83
         )
@@ -101,24 +100,22 @@ def system_setup(variable_nozzle: bool = False):
     turb_design = eqx.tree_at(lambda t:
         (
             t.design_parameters.eff.flow,
-            t.design_parameters.rotation_speed,
             t.design_parameters.exit_mach_number,
-            t.design_parameters.pressure_ratio,
         ),
         engine.turbine,
         (
             0.86,
-            8070. * units.rev/units.mins,
             0.4,
-            4.46
         )
     )
 
     nozz_design = eqx.tree_at(
         lambda n: n.design_parameters.eff.flow,
         engine.core_nozzle,
-        0.99
+        1.0
     )
+
+    nozz_design = replace(nozz_design, variable_exit=True)
 
     des_engine = eqx.tree_at(lambda e:
         (
@@ -159,7 +156,7 @@ def off_design_point(
     settings: Settings,
     initial_Rline: float | jnp.ndarray = 2.0,
     initial_turb_PR: float | jnp.ndarray = 5.0,
-    initial_RPM: float | jnp.ndarray = 1000 * units.rev / units.mins,
+    initial_RPM: float | jnp.ndarray = 1000 * units.rpm,
     initial_MFR: float | jnp.ndarray = 100 * units.kg / units.s,
     initial_FAR: float | jnp.ndarray = 1e-4,
 ):
@@ -180,7 +177,7 @@ def off_design_point(
         (
             jnp.array([[0., 0., -alt]]),
             jnp.atleast_2d(M0),
-            jnp.atleast_2d(jnp.array([[a0 * M0, 0.0, 0.0]])),
+            jnp.atleast_2d(jnp.array([[(a0 * M0).item(), 0.0, 0.0]])),
         ),
     )
 
@@ -204,7 +201,10 @@ def off_design_point(
             jnp.atleast_2d(thrust),
         )
     )
-    od_state, od_system, od_settings = od_analysis(od_state, od_system, od_settings)
+
+    new_settings = JetSettings(design_mode=False, statics=od_settings.analysis.energy.statics)
+    od_settings = eqx.tree_at(lambda s: s.analysis.energy, od_settings, new_settings)
+    od_state, od_system, od_settings = od_analysis.run(od_state, od_system, od_settings, initialize=True)
 
     return od_state, od_system, od_settings
 
@@ -243,7 +243,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     def get_Trace_value(state, network_id, prop_tag):
 
         node = state.energy.nodes[network_id]
-        value = np.asarray(getattr(node.outputs.flow, prop_tag))
+        value = np.asarray(getattr(node.flow, prop_tag))
         if value.size == 1:
             return value.item()
         else:
@@ -276,7 +276,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                 'Station': "fc",
                 'Property': pyc_prop,
                 'PyCycle Val': pyc_val,
-                'Trace Val': Trace_val,
+                'FlowTan Val': Trace_val,
                 'Diff': diff,
                 'Rel. Error': rel_error,
                 'Mag. Error': np.abs(rel_error)
@@ -315,7 +315,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
                     'Station': pyc_station.split('.')[0],
                     'Property': pyc_prop,
                     'PyCycle Val': pyc_val,
-                    'Trace Val': Trace_val,
+                    'FlowTan Val': Trace_val,
                     'Diff': diff,
                     'Rel. Error': rel_error,
                     'Mag. Error': np.abs(rel_error)
@@ -329,7 +329,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     pd.set_option('display.float_format', '{:.4e}'.format)
     
     print("\n" + "="*80)
-    print(f" PyCycle vs. Trace {point_name} Point Validation")
+    print(f" PyCycle vs. FlowTangent {point_name} Point Validation")
     print("-"*80)
     print(df.drop(columns='Mag. Error').to_string(index=False))
     
@@ -345,46 +345,53 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
 if __name__ == "__main__":
     
     # Control Board
-    DEV = True
+    DEV = False
     DEBUG = False
     VERBOSE = True
 
-    V_NOZZ = False
     STATICS = False
 
-    DESIGN_POINT = True
-    OFF_DESIGN_0 = False
-    OFF_DESIGN_1 = False
+    DESIGN_POINT = False
+    OFF_DESIGN_0 = True
+    OFF_DESIGN_1 = True
 
     # Build Turbojet------------------------------------------------------------
-    system = system_setup(variable_nozzle=V_NOZZ)
+    test_dir = Path(__file__).resolve().parent
+    data_dir = test_dir / "ft_data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
+    system = system_setup()
     settings = eqx.tree_at(
         lambda s: s.analysis.energy,
-        Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE),
+        Settings(_DEV_MODE=DEV, DEBUG_MODE=DEBUG, verbose=VERBOSE,
+                 logging=LoggingSettings(log_dir=test_dir/"ft_logs")),
         JetSettings(design_mode=DESIGN_POINT, statics=STATICS)
     )
     configure_environment(settings)
-    test_dir = Path("./tests/Energy/PyCycle_Examples/turbojet")
+    
 
     if DESIGN_POINT:
         print("="*80)
         print(" Design Point Analysis")
         print("-"*80)
 
-        des_st, des_sys, des_set = setup_TJ_design(
+        des_st, des_sys, des_set = turbojet_design(
             state=State(),
-            system=system,
+            system=system,  # type: ignore
             settings=settings,
+            initialize=True
         )
 
-        save_data(des_sys, test_dir / "turbojet.fts")
-        save_data(des_st, test_dir / "turbojet_design_state.fts")
+        des_sys = des_sys.replace_subcomponent(des_sys.energy.sync_and_clear_nodes())
 
-        validation_df = validate_design_point(test_dir / "turbojet_DESIGN.json", des_st)
-        validation_df.to_csv(test_dir / "DESIGN_validation.csv")
+        save_data(des_sys, data_dir / "turbojet.fts")
+        save_data(des_st, data_dir / "turbojet_design_state.fts")
+
+        validation_df = validate_design_point(data_dir / "turbojet_DESIGN.json", des_st)
+        validation_df.to_csv(data_dir / "DESIGN_validation.csv")
      
     else:
-        des_sys: Aircraft = load_data(test_dir / "/simple_turbojet.trs")
+        des_sys: Aircraft = load_data(data_dir / "turbojet.fts")
     
     des_sys = des_sys.update_network_topology()
 
@@ -395,11 +402,10 @@ if __name__ == "__main__":
     for comp in des_sys.energy.line.engine.subcomponents:
         if hasattr(comp, "design_parameters") and comp.design_parameters:
             d = comp.design_parameters
-            A_i = d.A_intake
-            A_t = d.A_throat
-            A_x = d.A_exit
-            AR = d.A_ratio
-            d_params = {"Intake Area": A_i, "Throat Area": A_t, "Exit Area":A_x, "Area_Ratio":AR}
+            A_i = d.A_intake if d.A_intake else 1.0
+            A_t = d.A_throat if d.A_throat else 1.0
+            A_x = d.A_exit if d.A_throat else 1.0
+            d_params = {"Intake Area": A_i, "Throat Area": A_t, "Exit Area":A_x}
             real_params = {k:a for k, a in d_params.items() if a != 1.0}
             if any(real_params):
                 print(f"{comp.tag}:")
@@ -434,27 +440,20 @@ if __name__ == "__main__":
             thrust=11_000 * units.lbf,
             system=des_sys,
             settings=settings,
-            # PyCycle Initial Guess Values
-            # initial_Rline=2.0,
-            # initial_turb_PR=4.669,
-            # initial_RPM=8197.38 * units.parse('rev/mins'),
-            # initial_MFR=166.073 * units.parse('lbm/s'),
-            # initial_FAR=0.01680,
-            # PyCycle Converged Values
             initial_Rline=2.0,
             initial_turb_PR=3.88,
-            initial_RPM=8197.38 * units.parse('rev/mins'),
+            initial_RPM=8197.38 * units.rpm,
             initial_MFR=70.00,
             initial_FAR=0.0168,
         )
 
         OD0_df = validate_design_point(
-            "./tests/PyCycle/PyCycle_Examples/turbojet_OD0.json",
+            data_dir / "turbojet_OD0.json",
             OD0_st,
             point_name="Off Design 0"
         )
         OD0_df.to_csv(
-            "./tests/PyCycle/PyCycle_Examples/OD0_validation.csv"
+            data_dir / "OD0_validation.csv"
         )
     
     if OFF_DESIGN_1:
@@ -470,19 +469,17 @@ if __name__ == "__main__":
             settings=settings,
             initial_Rline= 2.0,
             initial_turb_PR=4.669,
-            initial_RPM= 8197.38 * units.parse('rev/mins'),
+            initial_RPM= 8197.38 * units.rpm,
             initial_MFR= 168.45 * units.parse('lbm/s'),
             initial_FAR= 0.01680,
         )
 
         OD0_df = validate_design_point(
-            "./tests/PyCycle/PyCycle_Examples/turbojet_OD1.json",
+            data_dir / "turbojet_OD1.json",
             OD1_st,
             point_name="Off Design 1"
         )
-        OD0_df.to_csv(
-            "./tests/PyCycle/PyCycle_Examples/OD1_validation.csv"
-        )
+        OD0_df.to_csv(data_dir / "OD1_validation.csv")
 
     
     

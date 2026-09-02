@@ -13,7 +13,7 @@ import jax.numpy as jnp
 # Trace imports
 from eden_trace.utils import empty_array, init_field, register
 
-from eden_trace.library.gases import IdealGas, Air
+from eden_trace.library.gases import Gas, Air
 from eden_trace.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ from eden_trace.framework.state_data import StateData
 
 @register
 class MechanicalOutputs(StateData):
-    tag = "Mechanical Outputs"
+    tag: str = init_field("Mechanical Outputs", static=True)
 
     work: jnp.ndarray = empty_array()
     power: jnp.ndarray = empty_array()
@@ -30,7 +30,7 @@ class MechanicalOutputs(StateData):
 
 @register
 class ElectricalOutputs(StateData):
-    tag = "Electrical Outputs"
+    tag: str = init_field("Electrical Outputs", static=True)
 
     power: jnp.ndarray = empty_array()
     voltage: jnp.ndarray = empty_array()
@@ -39,7 +39,7 @@ class ElectricalOutputs(StateData):
 
 @register
 class FuelOutputs(StateData):
-    tag = "Fuel Outputs"
+    tag: str = init_field("Fuel Outputs", static=True)
 
     TSFC: jnp.ndarray = empty_array()
     flow_rate: jnp.ndarray = empty_array()
@@ -47,8 +47,8 @@ class FuelOutputs(StateData):
 
 @register
 class FlowOutputs(StateData):
-    tag = "Flow Outputs"
-    fluid: IdealGas = init_field(Air)
+    tag: str = init_field("Flow Outputs", static=True)
+    fluid: Gas = init_field(Air)
 
     speed: jnp.ndarray = empty_array()
     speed_of_sound: jnp.ndarray = empty_array()
@@ -77,7 +77,7 @@ class FlowOutputs(StateData):
 
 @register
 class ResidualOutputs(StateData):
-    tag = "Residual Outputs"
+    tag: str = init_field("Residual Outputs", static=True)
 
     mass: jnp.ndarray = empty_array()
     mass_flow_rate: jnp.ndarray = empty_array()
@@ -102,7 +102,7 @@ class ResidualOutputs(StateData):
 
 @register
 class ForceOutputs(StateData):
-    tag = "Force Outputs"
+    tag: str = init_field("Force Outputs", static=True)
 
     thrust: jnp.ndarray = empty_array()
     nondimensional_thrust: jnp.ndarray = empty_array()
@@ -110,8 +110,8 @@ class ForceOutputs(StateData):
 
 
 @register
-class OutputConditions(StateData):
-    tag = "Node Outputs"
+class NodeState(StateData):
+    tag: str = init_field("Node Outputs", static=True)
 
     mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
     electrical: ElectricalOutputs = init_field(ElectricalOutputs)
@@ -120,14 +120,6 @@ class OutputConditions(StateData):
     force: ForceOutputs = init_field(ForceOutputs)
     residual: ResidualOutputs = init_field(ResidualOutputs)
 
-
-@register
-class NodeConditions(StateData):
-    # Attribute         Type                Default Value
-    tag: str = init_field("Energy Node Conditions", static=True)
-
-    outputs: OutputConditions = init_field(OutputConditions)
-
     mass: jnp.ndarray = empty_array()
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -135,7 +127,7 @@ class NodeConditions(StateData):
 # ----------------------------------------------------------------------------------------------------------------------
 
 @register
-class BatteryCellConditions(NodeConditions):
+class BatteryCellConditions(NodeState):
     # Attribute                 Type        Default Value
     tag: str = init_field("Battery Cell", static=True)
 
@@ -149,7 +141,7 @@ class BatteryCellConditions(NodeConditions):
 
 
 @register
-class BatteryPackConditions(NodeConditions):
+class BatteryPackConditions(NodeState):
     # Attribute             Type                    Default Value
     tag: str = init_field("Battery Pack", static=True)
 
@@ -166,7 +158,7 @@ class BatteryPackConditions(NodeConditions):
 
 
 @register
-class NetworkData(NodeConditions):
+class NetworkState(NodeState):
     tag: str = init_field("Energy Network", static=True)
 
     nodes: dict = init_field(dict)
@@ -182,7 +174,7 @@ class NetworkData(NodeConditions):
 
 
 @register
-class TurbojetData(NetworkData):
+class TurbojetState(NetworkState):
     
     tag: str = init_field("Turbojet Network", static=True)
 
@@ -197,7 +189,7 @@ class TurbojetData(NetworkData):
     target_temperature: jnp.ndarray = empty_array()
 
 @register
-class TurbofanData(NetworkData):
+class TurbofanState(NetworkState):
 
     tag: str = init_field("Turbofan Network", static=True)
 

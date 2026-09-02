@@ -11,6 +11,7 @@ from typing import Optional, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     from . import State, System, Settings
 
+from datetime import datetime
 import logging
 
 from pathlib import Path
@@ -229,7 +230,7 @@ class JAXCompileFilter(logging.Filter):
 class LoggingSettings(eqx.Module):
 
     handle: Optional[str] = init_field(None, static=True)
-    logfile: Optional[str | Path] = init_field(None, static=True)
+    log_dir: Optional[str | Path] = init_field(None, static=True)
 
     format_string: str = init_field("[%(asctime)s] - %(levelname)s - %(message)s", static=True)
     date_format: str = init_field("%Y-%m-%d %H:%M:%S", static=True)
@@ -238,10 +239,13 @@ class LoggingSettings(eqx.Module):
     jax_compile_whitelist: Optional[tuple[str]] = init_field(None, static=True)
 
     def setup_logger(self, handle: Optional[str] = None) -> None:
-        if self.logfile is None and not self.stream_ouput:
+        if self.log_dir is None and not self.stream_ouput:
             return
         else:
-            log_handle = handle if handle is not None else self.handle
+            if handle is None and self.handle is None:
+                log_handle = "flowtangent"
+            else:
+                log_handle = handle if handle is not None else self.handle
             logger = logging.getLogger(log_handle)
             formatter = logging.Formatter(self.format_string)
             handlers = []
@@ -252,8 +256,12 @@ class LoggingSettings(eqx.Module):
                 sh.setFormatter(formatter)
                 handlers.append(sh)
 
-            if self.logfile is not None:
-                fh = logging.FileHandler(self.logfile)
+            if self.log_dir is not None:
+                log_dir = Path(self.log_dir)
+                log_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime(self.date_format).replace(' ', '_').replace(':','-')
+                logfile = log_dir / f"main_{timestamp}.log"
+                fh = logging.FileHandler(logfile)
                 fh.setLevel(logging.INFO)
                 fh.setFormatter(formatter)
                 handlers.append(fh)
