@@ -121,7 +121,7 @@ def _compute_aerodynamic_coefficients(VD, dCp, Gamma, state, system, settings):
     dx_LE = jax.ops.segment_sum(dx_all * le_mask_float, strip_ids, num_segments=VD.total_strips)
 
     dihedral_length_LE = jnp.maximum(jnp.sqrt(dy_LE**2 + dz_LE**2), 1e-12)
-    tan_sweep_LE = jnp.clip(dx_LE / dihedral_length_LE, a_min=-3.73, a_max=3.73)
+    tan_sweep_LE = jnp.clip(dx_LE / dihedral_length_LE, min=-3.73, max=3.73)
     cos_dihedral = jnp.abs(dy_LE) / dihedral_length_LE
     sin_dihedral = jnp.sign(dy_LE) * dz_LE / dihedral_length_LE
 

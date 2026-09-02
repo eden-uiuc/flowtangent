@@ -7,6 +7,7 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import jax
 import equinox as eqx
 import jax.numpy as jnp
 
@@ -25,13 +26,13 @@ class WingDimensions(Dimensions):
     tip: float = 0.0
 
 
-class WingSweeps(WingDimensions):
+class Sweeps(WingDimensions):
     leading_edge: float = 0.0
     quarter_chord: float = 0.0
     half_chord: float = 0.0
 
 
-class WingChords(WingDimensions):
+class Chords(WingDimensions):
     mean_aerodynamic: float = 0.0
     mean_geometric: float = 0.0
 
@@ -43,14 +44,14 @@ class WingSegment(Component):
 
     # Specialty Attributes
 
-    thickness_to_chord: float = 0.0
-    root_chord_percent: float = 0.0
-    percent_span_location: float = 0.0
-    twist: float = 0.0
-    dihedral_outboard: float = 0.0
+    thickness_to_chord: float | jax.Array = 0.0
+    root_chord_percent: float | jax.Array = 0.0
+    percent_span_location: float | jax.Array = 0.0
+    twist: float | jax.Array = 0.0
+    dihedral_outboard: float | jax.Array = 0.0
 
-    sweeps: WingSweeps = init_field(WingSweeps)
-    chords: WingChords = init_field(WingChords)
+    sweeps: Sweeps = init_field(Sweeps)
+    chords: Chords = init_field(Chords)
 
     @property
     def taper(self):
@@ -129,8 +130,8 @@ class Wing(Component):
 
     spans: WingDimensions = init_field(lambda: WingDimensions(ordinal_direction=True))
     twists: WingDimensions = init_field(WingDimensions)
-    chords: WingChords = init_field(WingDimensions)
-    sweeps: WingSweeps = init_field(WingSweeps)
+    chords: Chords = init_field(WingDimensions)
+    sweeps: Sweeps = init_field(Sweeps)
 
     def __post_init__(self):
         new_taper, new_chords = self.validate_chords()
@@ -146,7 +147,7 @@ class Wing(Component):
             else:
                 tip = new_chords.root * self.segments[idx + 1].root_chord_percent
 
-            new_seg = eqx.tree_at(lambda s: s.chords, seg, WingChords(root=root, tip=tip))
+            new_seg = eqx.tree_at(lambda s: s.chords, seg, Chords(root=root, tip=tip))
             updated_segments.append(new_seg)
 
         object.__setattr__(self, "segments", updated_segments)
@@ -343,7 +344,7 @@ class Wing(Component):
             return self.segments
 
         # 1. Build Root Segment
-        root_sweeps = WingSweeps(quarter_chord=self.sweeps.quarter_chord, leading_edge=self.sweeps.leading_edge)
+        root_sweeps = Sweeps(quarter_chord=self.sweeps.quarter_chord, leading_edge=self.sweeps.leading_edge)
 
         root_segment = WingSegment(
             tag="root_segment",
@@ -358,7 +359,7 @@ class Wing(Component):
             root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, self.airfoil)
 
         # 2. Build Tip Segment
-        tip_sweeps = WingSweeps(
+        tip_sweeps = Sweeps(
             quarter_chord=0.0,
             leading_edge=1e-8,
         )

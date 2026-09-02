@@ -237,6 +237,9 @@ class InitializeVORJAX(Process):
     tag: str = init_field("Initialize VORJAX", static=True)
     steps: tuple = init_field(_default_VORJAX_init_steps)
 
+    def __init__(self, tag="Initialize VORJAX", steps = _default_VORJAX_init_steps()) -> None:
+        super().__init__(tag=tag, steps=steps)
+
 
 # ----------------------------------------------------------
 #  VORJAX Compute Process
@@ -258,13 +261,25 @@ def _default_VORJAX_compute_steps():
 
 class ComputeVORJAX(Process):
     tag: str = init_field("Compute VORJAX", static=True)
-
     steps: tuple = init_field(_default_VORJAX_compute_steps)
+
+    def __init__(
+            self,
+            tag: str="Compute VORJAX",
+            steps: tuple = _default_VORJAX_compute_steps(),
+    ) -> None:
+        super().__init__(tag=tag, steps=steps)
 
 
 class VORJAX(Process):
     tag: str = init_field("Aerodynamics", static=True)
     steps: tuple = init_field(lambda: (InitializeVORJAX(), ComputeVORJAX()))
+
+    def __init__(self,
+                 tag: str = "Aerodynamics",
+                 steps: tuple = (InitializeVORJAX(), ComputeVORJAX())
+                 ) -> None:
+        super().__init__(tag=tag, steps=steps)
 
     # TODO: Add full drag, trimming, stability analysis
 

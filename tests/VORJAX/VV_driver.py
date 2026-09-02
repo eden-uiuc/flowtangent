@@ -32,7 +32,7 @@ import eden_trace.utils as tu
 
 from eden_trace.library import units
 from eden_trace.library.components import Areas
-from eden_trace.library.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from eden_trace.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
 from eden_trace.library.components.airfoils import Airfoil, Airfoil_Data
 
 from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
@@ -249,7 +249,7 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     wing_spans = WingDimensions(projected=span)
 
-    wing_chords = WingChords(root=chord, tip=chord, mean_aerodynamic=chord)
+    wing_chords = Chords(root=chord, tip=chord, mean_aerodynamic=chord)
 
     wing_areas = Areas(reference=span * chord, wetted=2 * span * chord)
 
@@ -301,7 +301,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
             tag=f"{i}", 
             percent_span_location=eta_start, 
             root_chord_percent=chord_frac_start,
-            sweeps=WingSweeps(quarter_chord=sweep_c4)  # Inject sweep here!
+            sweeps=Sweeps(quarter_chord=sweep_c4)  # Inject sweep here!
         ),)
 
     # Tip segment doesn't need a sweep since there's no geometry after it
@@ -317,7 +317,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=WingChords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
+                chords=Chords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
                 areas=wing_areas,
                 taper=0.01,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -347,7 +347,7 @@ def VORJAX_delta_wing(AR=2.0):
             tag="Root_to_Tip",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=WingSweeps(quarter_chord=sweep_c4)
+            sweeps=Sweeps(quarter_chord=sweep_c4)
         ),
         WingSegment(
             tag="Tip",
@@ -362,7 +362,7 @@ def VORJAX_delta_wing(AR=2.0):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=WingChords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
+                chords=Chords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
                 areas=wing_areas,
                 taper=c_tip_ratio,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -396,7 +396,7 @@ def VORJAX_ONERA_M6():
             tag="ONERA M6",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
+            sweeps=Sweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
             airfoil=Airfoil.from_file(Airfoil_Data/"ONERA_M6.txt")
         ),
         WingSegment(
@@ -414,7 +414,7 @@ def VORJAX_ONERA_M6():
         aspect_ratio=AR,
         taper=0.56,
         origin=jnp.array([[0.0, 0.0, 0.0]]),
-        chords=WingChords(root=c_root, mean_aerodynamic=mac),
+        chords=Chords(root=c_root, mean_aerodynamic=mac),
         spans=WingDimensions(projected=2 * semispan),
     ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
@@ -1594,22 +1594,22 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
 if __name__ == "__main__":
 
-    os.chdir(ru.get_Trace_root())
+    os.chdir(tu.get_Trace_root())
 
-    mach_path   = ru.DataPath(("freestream", "mach_number"), tag="M")
-    alpha_path  = ru.DataPath(("aerodynamics", "angles", "alpha"), tag="a")
-    beta_path   = ru.DataPath(("aerodynamics", "angles", "beta"), tag="b")
+    mach_path   = tu.DataPath(("freestream", "mach_number"), tag="M")
+    alpha_path  = tu.DataPath(("aerodynamics", "angles", "alpha"), tag="a")
+    beta_path   = tu.DataPath(("aerodynamics", "angles", "beta"), tag="b")
 
-    p_path      = ru.DataPath(("stability", "static", "roll_rate"), tag="p")
-    q_path      = ru.DataPath(("stability", "static", "pitch_rate"), tag="q")
-    r_path      = ru.DataPath(("stability", "static", "yaw_rate"), tag="r")
+    p_path      = tu.DataPath(("stability", "static", "roll_rate"), tag="p")
+    q_path      = tu.DataPath(("stability", "static", "pitch_rate"), tag="q")
+    r_path      = tu.DataPath(("stability", "static", "yaw_rate"), tag="r")
     
-    lift_path   = ru.DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
-    drag_path   = ru.DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
+    lift_path   = tu.DataPath(("aerodynamics", "coefficients", "lift", "total"), tag="CL")
+    drag_path   = tu.DataPath(("aerodynamics", "coefficients", "drag", "total"), tag="CD")
     
-    i_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "total"))
-    nf_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
-    ff_drag_path = ru.DataPath(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
+    i_drag_path = tu.DataPath(("aerodynamics", "coefficients", "drag", "induced", "total"))
+    nf_drag_path = tu.DataPath(("aerodynamics", "coefficients", "drag", "induced", "near_field"))
+    ff_drag_path = tu.DataPath(("aerodynamics", "coefficients", "drag", "induced", "far_field"))
 
     GRAD_MAP = JacobianMap(
         state_inputs=(
@@ -1661,9 +1661,9 @@ if __name__ == "__main__":
 
             f_st, f_sys, f_setts = results
 
-            CL = ru.get_target(f_st, lift_path)
-            CD = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "drag", "total")))
-            C_m = ru.get_target(f_st, ru.DataPath(("aerodynamics", "coefficients", "moments", "pitch")))
+            CL = tu.get_target(f_st, lift_path)
+            CD = tu.get_target(f_st, tu.DataPath(("aerodynamics", "coefficients", "drag", "total")))
+            C_m = tu.get_target(f_st, tu.DataPath(("aerodynamics", "coefficients", "moments", "pitch")))
 
             data = f_sys.analysis_data
             # VORJAX_dCp = np.round(np.asarray(data["dCp"]), 5)
@@ -1720,7 +1720,7 @@ if __name__ == "__main__":
                 )
                 f_st, f_sys, f_setts, jac = results
 
-                CL.append(ru.get_target(f_st, lift_path).item(0))
+                CL.append(tu.get_target(f_st, lift_path).item(0))
                 grad_AD.append(jac.item(0))
                 error_AD.append(abs(jac.item(0) - grad_truth)/grad_truth)
 
@@ -1765,7 +1765,7 @@ if __name__ == "__main__":
                         vehicle,
                         alpha=(2.0 * units.deg) + h, Mach=0.00,
                         debug_mode=DEBUG)
-                    CL_fwd = ru.get_target(res_fwd[0], lift_path).item(0)
+                    CL_fwd = tu.get_target(res_fwd[0], lift_path).item(0)
                     
                     # Backward Step
                     res_bwd = VORJAX_test_run(
@@ -1773,7 +1773,7 @@ if __name__ == "__main__":
                         alpha=(2.0 * units.deg) - h,
                         Mach=0.00,
                         debug_mode=DEBUG)
-                    CL_bwd = ru.get_target(res_bwd[0], lift_path).item(0)
+                    CL_bwd = tu.get_target(res_bwd[0], lift_path).item(0)
                     
                     # Central Difference
                     g_FD = (CL_fwd - CL_bwd) / (2 * h)
@@ -1826,10 +1826,10 @@ if __name__ == "__main__":
                 
                 f_st, f_sys, f_setts, jac = results
 
-                CDnf.append(ru.get_target(f_st, nf_drag_path).item(0))
+                CDnf.append(tu.get_target(f_st, nf_drag_path).item(0))
                 grad_nf.append(jac.item(0))
                 
-                CDff.append(ru.get_target(f_st, ff_drag_path).item(0))
+                CDff.append(tu.get_target(f_st, ff_drag_path).item(0))
                 grad_ff.append(jac.item(1))
             
             save_plot_cache(
@@ -1888,7 +1888,7 @@ if __name__ == "__main__":
                 peak_vram = info.used / (1024 ** 3)
                 vram_gb.append(peak_vram)
 
-                CL.append(ru.get_target(f_st, lift_path).item(0))
+                CL.append(tu.get_target(f_st, lift_path).item(0))
                 grad_AD.append(jac.item(0))
                 error_AD.append(abs(jac.item(0) - grad_jones)/grad_jones)
 
@@ -1925,7 +1925,7 @@ if __name__ == "__main__":
                     debug_mode=DEBUG
                 )
 
-                CL.append(ru.get_target(f_st, lift_path).item(0))
+                CL.append(tu.get_target(f_st, lift_path).item(0))
                 grad_AD.append(jac.item(0))
 
                 if PLOT_WINGS:
@@ -1965,8 +1965,8 @@ if __name__ == "__main__":
             )
             f_st, f_sys, f_setts, jac = results
 
-            CL  = ru.get_target(f_st, lift_path)
-            CDi = ru.get_target(f_st, i_drag_path)
+            CL  = tu.get_target(f_st, lift_path)
+            CDi = tu.get_target(f_st, i_drag_path)
             dCL_dMach = jnp.array([jac[i, 0, i] for i in range(len(alpha))]).reshape(CL.shape)
 
             cache_path = Path(os.path.join(os.path.dirname(__file__), 'SU2_Test_Cases/su2_run_cache.json'))

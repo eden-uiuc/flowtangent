@@ -315,7 +315,7 @@ class Process(ProcessStep):
 
     def _run_with_raw_history(self, state, system, settings):
         if settings.DEBUG_MODE or settings._DEV_MODE:
-            print(f"Beginning Process: '{self.tag}'")
+            print(f"Beginning Process: '{se.lf.tag}'")
         history = [(state, system, settings)]
 
         for step in self.steps[self.initial_step :]:

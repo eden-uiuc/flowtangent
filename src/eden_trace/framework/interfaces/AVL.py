@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from eden_trace.library import units
 from eden_trace.library.components import Areas
 from eden_trace.library.components.airfoils import Airfoil
-from eden_trace.library.components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
+from eden_trace.library.components.wings import Wing, Chords, WingDimensions, WingSegment, Sweeps
 
 from eden_trace.framework.systems import Aircraft
 
@@ -199,7 +199,7 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
                 root_chord_percent=chord_fraction,
                 # twist=sec_in["twist"],
                 dihedral_outboard=dihedral,
-                sweeps=WingSweeps(quarter_chord=qc_sweep),
+                sweeps=Sweeps(quarter_chord=qc_sweep),
                 airfoil=airfoil,
             )
             segments_list.append(segment)
@@ -211,7 +211,7 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
                 root_chord_percent=taper,
                 twist=tip_sec["twist"],
                 dihedral_outboard=0.0,
-                sweeps=WingSweeps(quarter_chord=0.0),
+                sweeps=Sweeps(quarter_chord=0.0),
                 airfoil=airfoil,
             )
         )
@@ -225,7 +225,7 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
             segments=tuple(segments_list),
             spans=WingDimensions(projected=total_span),
             # twists=WingDimensions(root=root_sec["twist"], tip=tip_sec["twist"]),
-            chords=WingChords(root=root_chord, tip=tip_chord, mean_aerodynamic=cref),
+            chords=Chords(root=root_chord, tip=tip_chord, mean_aerodynamic=cref),
             origin=jnp.array(surf_data["translate"])
             + jnp.array([[root_sec["x_le"], root_sec["y_le"], root_sec["z_le"]]]),
             aerodynamic_center=jnp.array([[xref, yref, zref]]),

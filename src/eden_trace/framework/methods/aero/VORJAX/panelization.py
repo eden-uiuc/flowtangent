@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 # package imports
 from eden_trace.utils import inputs, outputs
 
-from eden_trace.library.components.wings import Wing, WingSegment, WingSweeps
+from eden_trace.library.components.wings import Wing, WingSegment, Sweeps
 
 # from Trace.Library.Components.Wings import All_Moving_Surface
 
@@ -288,7 +288,7 @@ def convert_to_segmented_wing(wing):
         return wing.segments
 
     # 1. Build Root Segment
-    root_sweeps = WingSweeps(quarter_chord=wing.sweeps.quarter_chord, leading_edge=wing.sweeps.leading_edge)
+    root_sweeps = Sweeps(quarter_chord=wing.sweeps.quarter_chord, leading_edge=wing.sweeps.leading_edge)
 
     root_segment = WingSegment(
         tag="root_segment",
@@ -303,7 +303,7 @@ def convert_to_segmented_wing(wing):
         root_segment = eqx.tree_at(lambda s: s.airfoil, root_segment, wing.airfoil)
 
     # 2. Build Tip Segment
-    tip_sweeps = WingSweeps(
+    tip_sweeps = Sweeps(
         quarter_chord=0.0,
         leading_edge=1e-8,
     )
