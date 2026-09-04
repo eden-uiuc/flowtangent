@@ -6,16 +6,17 @@ from functools import lru_cache
 from typing import Any
 
 import pycycle.api as pyc
-
-from flowtangent.utils import get_trace_root
-from flowtangent.library import units
 from flowtangent.library.components.energy.maps.classes import CompressorMap, TurbineMap
+
+from flowtangent.data import units
+from flowtangent.utils.io import _ft_root
+
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
 
-_MAP_DIR = get_trace_root() / "library/data/turbo_maps"
-STUB_FILE = get_trace_root() / "library/components/energy/maps/data.pyi"
+_MAP_DIR = _ft_root() / "library/data/turbo_maps"
+STUB_FILE = _ft_root() / "library/components/energy/maps/data.pyi"
 
 @lru_cache(maxsize=None)
 def _load_map_from_disk(name: str):
@@ -135,7 +136,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
         file_path = os.path.join(output_dir, f"{map_name}.json")
         with open(file_path, "w") as f:
             json.dump(json_data, f, indent=4)
-        
+
         # Update design values
         test_map = _load_map_from_disk(map_name)
         if isinstance(test_map, CompressorMap):
@@ -147,20 +148,20 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             json_data["PR_des"] = PR_map.item()
             json_data["Wc_des"] = Wc_map.item()
             json_data["eff_des"] = eff_map.item()
-        
+
         if isinstance(test_map, TurbineMap):
             Wp_map, eff_map = test_map.evaluate(
                 alpha=test_map.alpha_des,
                 Np=test_map.Np_des,
                 PR=test_map.PR_des)
-            
+
             json_data["Wp_des"] = Wp_map.item()
             json_data["eff_des"] = eff_map.item()
-        
+
         #Final Write
         with open(file_path, "w") as f:
             json.dump(json_data, f, indent=4)
-        
+
 
 
 
@@ -169,17 +170,17 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
 def generate_stub():
     lines = [
         "from typing import Any",
-        "from .classes import CompressorMap, TurbineMap", 
+        "from .classes import CompressorMap, TurbineMap",
         "",
     ]
-    
+
     for map_file in _MAP_DIR.glob("*.json"):
         with open(map_file, "r") as f:
             data = json.load(f)
-        
+
         map_type = data.get("type", "compressor").lower()
         type_hint = "CompressorMap" if map_type == "compressor" else "TurbineMap"
-        
+
         # Write the attribute to the stub file
         lines.append(f"{map_file.stem}: {type_hint}")
 

@@ -3,14 +3,14 @@ import jax.numpy as jnp
 
 from flowtangent.framework.analyses.aero.VORJAX import InitializeVORJAX, VORJAX, Vortices, VORJAX_Settings
 from flowtangent.library.components.wings import Wing, WingSegment, Sweeps, Chords, WingDimensions
-from flowtangent.framework.systems import Aircraft
+from flowtangent.core._systems import Aircraft
 from flowtangent.library.components import Areas
-from flowtangent.library import units
+from flowtangent.data import units
 
 from flowtangent.utils import configure_environment, DataPath
 
 from flowtangent.framework import State, Settings, Process
-from flowtangent.framework.settings import JacobianMap, NumericalSettings
+from flowtangent.core._settings import JacobianMap, NumericalSettings
 
 from flowtangent.framework.plotting.VLM import plot_vlm_panels
 

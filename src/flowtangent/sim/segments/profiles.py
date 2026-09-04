@@ -16,11 +16,9 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     pass
 
-from flowtangent.utils import field
-
-from flowtangent.library import units
-
+from flowtangent.data import units
 from flowtangent.framework import ProcessStep
+from flowtangent.utils import field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Segment Profiles

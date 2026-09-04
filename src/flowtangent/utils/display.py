@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def format_array(v, precision=3, width=10):
     """Formats numeric values and arrays for terminal printing."""
     v_np = np.asarray(v)

@@ -12,20 +12,20 @@ import jax.numpy as jnp
 import flowtangent.utils as tu
 
 from flowtangent.framework import Process, State, Settings
-from flowtangent.framework.state_data import Time
-from flowtangent.framework.systems import Aircraft, VehicleEnvelope, AircraftMassProperties
+from flowtangent.core._state_data import Time
+from flowtangent.core._systems import Aircraft, VehicleEnvelope, AircraftMassProperties
 from flowtangent.framework.simulation.segments import Segment
 from flowtangent.framework.simulation.segments.profiles import (ConstantAltitude, AltitudeChange,  # Position Profiles
                                                          ConstantSpeed,                     # Speed Profiles
                                                          ConstantAltitudeChangeRate,        # Velocity Profiles
                                                          FixedDistance, FixedTime,)         # Duration Profiles
-from flowtangent.framework.state_data.controls import Control
+from flowtangent.core._state_data._controls import Control
 from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, InitializeVORJAX, ComputeVORJAX
 from trace.framework.analyses.energy.sizing import update_design_parameters
 from flowtangent.framework.analyses.energy import build_analysis_from_network
 from flowtangent.framework.plotting import plot_vlm_panels
 
-from flowtangent.library import units
+from flowtangent.data import units
 from flowtangent.library.components import Areas, Airfoil, _AF_DIR, MassProperties
 from flowtangent.library.components.wings import Wing, Chords, WingControlSurface, WingDimensions, WingSegment, Sweeps
 from flowtangent.library.components.fuselages import *

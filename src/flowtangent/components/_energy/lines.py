@@ -11,8 +11,8 @@ import jax.numpy as jnp
 from flowtangent.utils import field, outputs, register
 from flowtangent.utils import inputs as func_inputs
 
-from .nodes import GraphInput, GraphNode, Splitter, EnergyStore, FuelTank
-from .jets.classes import TurbojetEngine, TurbofanEngine
+from .jets.classes import TurbofanEngine, TurbojetEngine
+from .nodes import EnergyStore, FuelTank, GraphInput, GraphNode, Splitter
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Line
@@ -43,7 +43,7 @@ def _TurbojetLineSetup():
 class TurbojetLine(EnergyLine):
 
     subcomponents: tuple = field(_TurbojetLineSetup)
-    
+
     inputs: tuple | GraphInput = field(
         (
             GraphInput("fuel", "self.engine"),
@@ -135,7 +135,7 @@ class TurbojetLine(EnergyLine):
 
         updated_state = eqx.tree_at(
             lambda s: s.energy.nodes[self.network_ID].residual.power,
-            updated_state, 
+            updated_state,
             self.apply_domain_op(jnp.sum, updated_state, "residual", "power"),
         )
 

@@ -30,7 +30,8 @@ dev = [
     "pycycle",
     "pytest",
     "nvidia-ml-py",
-    "om-pycycle"
+    "om-pycycle",
+    "ruff"
 ]
 
 [tool.ruff]
@@ -87,4 +88,4 @@ section-order = [
 [tool.ruff.lint.per-file-ignores]
 # __init__.py files are designed to re-export modules. 
 # Ignore unused imports (F401) and import sorting (I) globally.
-"__init__.py" = ["F401", "I"]
+"__init__.py" = ["F401", "I","E402"]

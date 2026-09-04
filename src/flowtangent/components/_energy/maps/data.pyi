@@ -1,4 +1,3 @@
-from typing import Any
 from .classes import CompressorMap, TurbineMap
 
 LPT: TurbineMap

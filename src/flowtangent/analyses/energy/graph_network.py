@@ -16,11 +16,9 @@ if TYPE_CHECKING:
 
 import networkx as nx
 
-from flowtangent.utils import field, inputs, outputs, parse_io
-
-from flowtangent.library.components.energy.networks import GraphNetwork
-
 from flowtangent.framework import Process, ProcessStep
+from flowtangent.library.components.energy.networks import GraphNetwork
+from flowtangent.utils import field, inputs, outputs, parse_io
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Energy Network Analysis
@@ -73,7 +71,7 @@ def build_analysis_from_network(network: GraphNetwork):
             return analysis_network.nodes[network_ID].transmit(state, system, settings)
 
         return transmit
-    
+
     def make_network_function():
         net_func = analysis_network.__class__.transmit
 
@@ -100,7 +98,7 @@ def build_analysis_from_network(network: GraphNetwork):
                 function=make_node_function(ID)
             ) for ID in analysis_network._execution_order
         )
-    
+
     net_step = ProcessStep(
         tag=f"{analysis_network.network_ID}",
         function=make_network_function()

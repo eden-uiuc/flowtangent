@@ -15,11 +15,11 @@ from scipy.stats import qmc, beta
 
 from flowtangent.utils import DataPath
 
-from flowtangent.library import units
+from flowtangent.data import units
 from flowtangent.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
 from flowtangent.framework import Aircraft, Settings, JacobianMap
-from flowtangent.framework.settings import AnalysisSettings
+from flowtangent.core._settings import AnalysisSettings
 from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
 from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 

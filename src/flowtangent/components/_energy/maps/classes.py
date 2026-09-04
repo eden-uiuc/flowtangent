@@ -1,5 +1,4 @@
 import json
-
 from pathlib import Path
 
 import equinox as eqx
@@ -29,33 +28,33 @@ def interp_2d_extrapolate(x, y, x_grid, y_grid, z_table):
     # 1. Find indices, subtract 1 to get the lower bound of the box
     idx_x = jnp.searchsorted(x_grid, x, side='right') - 1
     idx_y = jnp.searchsorted(y_grid, y, side='right') - 1
-    
+
     # 2. Clip indices to ensure we always grab a valid 2x2 box at the edges
     # If x is off the map to the right, this anchors the box at the highest 2 grid points.
     idx_x = jnp.clip(idx_x, 0, x_grid.shape[0] - 2)
     idx_y = jnp.clip(idx_y, 0, y_grid.shape[0] - 2)
-    
+
     x0 = x_grid[idx_x]
     x1 = x_grid[idx_x + 1]
     y0 = y_grid[idx_y]
     y1 = y_grid[idx_y + 1]
-    
+
     # 3. Calculate fractional distances (these will safely go >1 or <0 during extrapolation)
     tx = (x - x0) / (x1 - x0)
     ty = (y - y0) / (y1 - y0)
-    
+
     # 4. Extract the 4 corners of the box
     z00 = z_table[idx_x, idx_y]
     z10 = z_table[idx_x + 1, idx_y]
     z01 = z_table[idx_x, idx_y + 1]
     z11 = z_table[idx_x + 1, idx_y + 1]
-    
+
     # 5. Bilinear combination (carries the gradients smoothly everywhere)
     z = (1.0 - tx) * (1.0 - ty) * z00 + \
         tx * (1.0 - ty) * z10 + \
         (1.0 - tx) * ty * z01 + \
         tx * ty * z11
-        
+
     return z
 
 # -----------------------------------------------------------------------------------------------------------------------
@@ -106,15 +105,15 @@ class CompressorMap(eqx.Module):
 
         # Find blending weight between the first and last alpha grids
         a0, a1 = self.alpha_grid[0], self.alpha_grid[-1]
-        
+
         # Prevent division by zero if the map only has 1 alpha value
         denom = jnp.maximum(a1 - a0, 1e-9)
         w = jnp.clip((alpha - a0) / denom, 0.0, 1.0)
-        
+
         # Evaluate the two edge maps
         PR_0, Wc_0, eff_0 = eval_slice(0)
         PR_1, Wc_1, eff_1 = eval_slice(-1)
-        
+
         # Linearly blend
         PR_map = PR_0 + w * (PR_1 - PR_0)
         Wc_map = Wc_0 + w * (Wc_1 - Wc_0)
@@ -193,7 +192,7 @@ class TurbineMap(eqx.Module):
 
     def evaluate(self, alpha, Np, PR):
         # Un-scale the inputs to read the base map
-        Np_map = Np / self.s_Np 
+        Np_map = Np / self.s_Np
         PR_map = (PR - 1.0) * self.s_PR + 1.0
 
         def eval_slice(alpha_idx):
@@ -204,10 +203,10 @@ class TurbineMap(eqx.Module):
         a0, a1 = self.alpha_grid[0], self.alpha_grid[-1]
         denom = jnp.maximum(a1 - a0, 1e-9)
         w = jnp.clip((alpha - a0) / denom, 0.0, 1.0)
-        
+
         Wp_0, eff_0 = eval_slice(0)
         Wp_1, eff_1 = eval_slice(-1)
-        
+
         Wp_map = Wp_0 + w * (Wp_1 - Wp_0)
         eff_map = eff_0 + w * (eff_1 - eff_0)
 

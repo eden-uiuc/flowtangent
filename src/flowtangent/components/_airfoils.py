@@ -13,12 +13,12 @@ from pathlib import Path
 
 # package imports
 import jax.numpy as jnp
+from flowtangent import Component
 from scipy.interpolate import PchipInterpolator
 
 # Flowtangent imports
-from flowtangent.utils import empty_array, get_trace_root, field
-
-from flowtangent.library import Component
+from flowtangent.utils import empty_array, field
+from flowtangent.utils.io import _ft_root
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -264,7 +264,7 @@ class Airfoil(Component):
 #  Airfoil Directory
 # ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = get_trace_root() / "/library/data/airfoil_files"
+_AF_DIR = _ft_root() / "/library/data/airfoil_files"
 
 
 @lru_cache(maxsize=None)

@@ -9,18 +9,16 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
-    from flowtangent.framework import System, Settings
+    from flowtangent.framework import Settings, System
 
 import logging
 import os
 import shutil
 import tempfile
 import time
-from collections import defaultdict
-from itertools import product
 from pathlib import Path
 
 import equinox as eqx
@@ -32,9 +30,8 @@ import zarr
 from numcodecs import Blosc
 from tqdm import tqdm, trange
 
-
-from flowtangent.utils import field, get_all_targets, DataPath
 from flowtangent.framework import Process, Settings, State, System
+from flowtangent.utils import DataPath, field, get_all_targets
 
 from .implicit import ImplicitAnalysis
 
@@ -56,9 +53,9 @@ class BatchedAnalysis(Process):
                 state_inputs: tuple[DataPath, ...] = ()
                 ):
             super().__init__(tag=tag)
-    
+
             self.analyze = analyze
-    
+
             if not isinstance(self.analyze, ImplicitAnalysis):
                 self.state_inputs = state_inputs
             else:
@@ -71,12 +68,12 @@ class BatchedAnalysis(Process):
         batch_arrays = []
 
         raw_arrays = [jnp.atleast_1d(jnp.array(p.value)) for p in self.state_inputs]
-        
+
         if mode == "zip":
             input_size = raw_arrays[0].shape[0]
             for arr in raw_arrays:
                 if arr.shape[0] != input_size:
-                    raise ValueError(f"In 'zip' batch mode all input arrays must have the same size.")
+                    raise ValueError("In 'zip' batch mode all input arrays must have the same size.")
                 batch_arrays = raw_arrays
 
         elif mode == "mesh":
@@ -98,7 +95,7 @@ class BatchedAnalysis(Process):
                 final_arr = broadcasted_arr.reshape(final_shape)
 
                 batch_arrays.append(final_arr)
-        
+
         else:
             raise ValueError("Batch mode must be 'zip' or 'mesh'.")
 
@@ -193,7 +190,7 @@ class BatchedAnalysis(Process):
 #         mode="zip",
 #         handle: Optional[str] = None,
 #         **kwargs,
-#     ):  
+#     ):
 
 #         if handle is not None:  # Inherit logger from dataset generator
 #             logger = logging.getLogger(handle)

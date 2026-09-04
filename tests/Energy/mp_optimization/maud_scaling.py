@@ -67,14 +67,14 @@ from turbojet_validation import system_setup as ft_turbojet
 
 from flowtangent.utils import DataPath, configure_environment
 from flowtangent.framework import State, Settings, Process
-from flowtangent.framework.settings import NumericalSettings, JacobianSettings, JacobianMap
+from flowtangent.core._settings import NumericalSettings, JacobianSettings, JacobianMap
 from flowtangent.framework.analyses.batched import BatchedAnalysis
 from flowtangent.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
 from flowtangent.framework.simulation.initialize import initialize_energy
 from flowtangent.framework.simulation.update import update_freestream
 
-from flowtangent.library import units
-from flowtangent.library.atmospheres import USStandard1976
+from flowtangent.data import units
+from flowtangent.data.atmospheres import USStandard1976
 from flowtangent.library.components.energy.jets.classes import TurbojetOpPoint
 
 pact_primal_calls = 0

@@ -7,14 +7,13 @@
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-import jax
 import equinox as eqx
+import jax
 import jax.numpy as jnp
-
-from flowtangent.utils import empty_array, field
-
 from flowtangent.library import Component, Dimensions
 from flowtangent.library.components.airfoils import Airfoil
+
+from flowtangent.utils import empty_array, field
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing

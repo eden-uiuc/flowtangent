@@ -10,9 +10,8 @@
 
 import jax.numpy as np
 
-from flowtangent.library import units
-
 import flowtangent.framework as rcf
+from flowtangent.data import units
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

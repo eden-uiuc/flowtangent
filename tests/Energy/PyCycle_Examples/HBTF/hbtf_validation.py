@@ -15,7 +15,7 @@ from pathlib import Path
 
 from flowtangent.utils import save_data, load_data, format_array
 
-from flowtangent.library import units
+from flowtangent.data import units
 from flowtangent.library.components.energy.nodes import FlowOpPoint
 from flowtangent.library.components.energy.nodes import Efficiencies as Eff
 

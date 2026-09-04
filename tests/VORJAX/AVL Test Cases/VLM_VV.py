@@ -19,14 +19,14 @@ from plotly.subplots import make_subplots
 
 import flowtangent.utils as tu
 
-from flowtangent.library import units
+from flowtangent.data import units
 from flowtangent.library.components import Areas
 from flowtangent.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
 from flowtangent.library.components.airfoils import Airfoil
 
 from flowtangent.framework import Process, State, Settings, JacobianMap
-from flowtangent.framework.systems import Aircraft
-from flowtangent.framework.state_data import Time
+from flowtangent.core._systems import Aircraft
+from flowtangent.core._state_data import Time
 
 from flowtangent.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 

@@ -11,27 +11,26 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from flowtangent.framework import State, System, Settings
-    from flowtangent.framework.state_data.controls import Control, Residual
-    from flowtangent.library.atmospheres import Atmosphere
+    from flowtangent.framework import Settings, State, System
+
+    from flowtangent.core._state_data._controls import Control, Residual
+    from flowtangent.data.atmospheres import Atmosphere
 
 from dataclasses import replace
 from graphlib import CycleError, TopologicalSorter
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
-
 
 # Flowtangent imports
 import flowtangent.utils as tu
+from flowtangent.data import units
+from flowtangent.data.atmospheres import USStandard1976
 from flowtangent.utils import field, register
 
-from flowtangent.library import units
-from flowtangent.library.atmospheres import USStandard1976
-
-from .nodes import GraphDomain, GraphInput, GraphNode, BleedFlow
-from .lines import EnergyLine, TurbojetLine, TurbofanLine
+from .lines import EnergyLine, TurbofanLine, TurbojetLine
+from .nodes import BleedFlow, GraphDomain, GraphInput, GraphNode
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Design Conditions
@@ -106,10 +105,10 @@ def _resolve_namespaces(node, parent_prefix=""):
 
 @register
 class GraphNetwork[DesignType: NetworkDesign](GraphNode):
-    
+
     tag: str = field("Network", static=True)
     network_ID: str = field("network", static=True)
-    
+
     nodes: dict[str, "GraphNode"] = field(dict)
     domains: tuple[GraphDomain, ...] = field(tuple, static=True)
     design_parameters: DesignType = field(NetworkDesign)
@@ -203,7 +202,7 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
             return replace(updated_network, _execution_order=updated_order)
         except CycleError as e:
             raise ValueError(f"Cyclic dependency detected: {e}")
-    
+
     def sync_and_clear_nodes(self) -> GraphNetwork:
         """
         Projects the updated nodes from the flat 'nodes' dictionary
@@ -229,9 +228,9 @@ class GraphNetwork[DesignType: NetworkDesign](GraphNode):
 
         # Return a new network
         return replace(
-            self, 
-            subcomponents=synced_subcomponents, 
-            nodes={}, 
+            self,
+            subcomponents=synced_subcomponents,
+            nodes={},
             _execution_order=()
         )
 
@@ -270,7 +269,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
 
         total_thrust = jnp.atleast_2d(self.apply_domain_op(jnp.sum, state, "force", "thrust"))
         total_force_vector = jnp.hstack((total_thrust, jnp.zeros((total_thrust.shape[0], 2))))
-        
+
         updated_state = eqx.tree_at(
             lambda s: (
                 s.energy.total_force_vector,

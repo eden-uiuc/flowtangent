@@ -15,13 +15,12 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import Aircraft
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import Aircraft
 
+from flowtangent.core._state_data._aero import ComponentCoeffs
 from flowtangent.utils import inputs, outputs
-
-from flowtangent.framework.state_data.aero import ComponentCoeffs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Initialize Aerodynamic Conditions

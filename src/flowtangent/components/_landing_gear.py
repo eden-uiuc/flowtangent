@@ -10,9 +10,9 @@
 # package imports
 
 # Flowtangent imports
-from flowtangent.utils import field
-
 from flowtangent.library import Component
+
+from flowtangent.utils import field
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Landing_Gear

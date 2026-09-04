@@ -16,7 +16,7 @@ from tqdm import tqdm
 from flowtangent.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
 from flowtangent.framework import Aircraft, State, Settings
-from flowtangent.framework.settings import AnalysisSettings
+from flowtangent.core._settings import AnalysisSettings
 from flowtangent.framework.plotting import plot_vlm_panels
 
 from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices

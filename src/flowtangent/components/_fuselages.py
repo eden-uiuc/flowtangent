@@ -9,11 +9,10 @@
 
 # package imports
 import jax.numpy as jnp
+from flowtangent.library import Areas, Component, Dimensions, Fineness
 
 # Flowtangent imports
 from flowtangent.utils import empty_array, field
-
-from flowtangent.library import Component, Areas, Dimensions, Fineness
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Fuselage

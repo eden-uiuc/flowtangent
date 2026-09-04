@@ -7,38 +7,36 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import TYPE_CHECKING, Optional, Any, Callable, Literal, overload
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, overload
 
 if TYPE_CHECKING:
-    from flowtangent.framework import State, System, Settings
+    from flowtangent.framework import Settings, State, System
 
 import contextlib
 import io
 import logging
 import os
 import sys
-import time
 import threading
+import time
 import warnings
-
 from collections import Counter
-from pathlib import Path
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
 import numpy as np
 import optimistix as optx
-
 from jax.core import Flowtangentr
 from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
-from ...utils import field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
+from ...utils import field, format_array, get_target, inspect_leaves, io_partition, scan_for_invalid_JAX_types
 from .. import Settings, State, System
-from ..state_data.controls import Control, Residual
 from ..processes import Process, array_barrier
+from ..state_data.controls import Control, Residual
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
@@ -78,7 +76,7 @@ class FlowtangentReadout:
         else:
             sys.stdout.write(f"\r{self.message} \033[K")
         sys.stdout.flush()
-    
+
 
     def __enter__(self):
         if self.enabled:
@@ -86,7 +84,7 @@ class FlowtangentReadout:
             self.null_fd = os.open(os.devnull, os.O_WRONLY)
             self.saved_stderr_fd = os.dup(2) # Save the real stderr
             os.dup2(self.null_fd, 2)         # Point stderr to black hole
-            
+
             self.start_time = time.time()
             self.running = True
             self.thread = threading.Thread(target=self.spin)
@@ -98,13 +96,13 @@ class FlowtangentReadout:
             self.running = False
             if self.thread is not None:
                 self.thread.join()
-                
+
             # 2. Restore the OS-level stderr immediately so Python errors can print
             if self.saved_stderr_fd is not None:
                 os.dup2(self.saved_stderr_fd, 2)
                 os.close(self.saved_stderr_fd)
                 os.close(self.null_fd)
-                
+
             elapsed = int(time.time() - self.start_time)
             mins, secs = divmod(elapsed, 60)
             sys.stdout.write(f"\r{self.message} [{mins:02d}:{secs:02d}] Complete. \033[K\n")
@@ -117,7 +115,7 @@ _analysis_stack = []
 
 def diff_args(args):
     global _last_static, _last_shapes, _trace_count, _analysis_stack
-    
+
     dynamic, static = eqx.partition(args, eqx.is_array)
 
     dynamic_leaves = jax.tree_util.tree_leaves(dynamic)
@@ -128,13 +126,13 @@ def diff_args(args):
             print("  [EXECUTION MODE] EAGER PYTHON (JIT is disabled, actual numbers flowing)")
 
     shapes = jax.tree_util.tree_map(
-        lambda x: (x.shape, x.dtype) if hasattr(x, "shape") else type(x), 
+        lambda x: (x.shape, x.dtype) if hasattr(x, "shape") else type(x),
         dynamic
     )
-    
+
     if _last_static is not None:
         differences_found = False
-        
+
         # 1. Check Dynamic Shapes
         old_dyn, _ = jax.tree_util.tree_flatten_with_path(_last_shapes)
         new_dyn, _ = jax.tree_util.tree_flatten_with_path(shapes)
@@ -142,13 +140,13 @@ def diff_args(args):
             if old_val != new_val:
                 print(f"  [SHAPE CHANGED] {jax.tree_util.keystr(path)}: {old_val} -> {new_val}")
                 differences_found = True
-                
+
         # 2. Check Static Values & Structure
         old_stat, old_treedef = jax.tree_util.tree_flatten_with_path(_last_static)
         new_stat, new_treedef = jax.tree_util.tree_flatten_with_path(static)
-        
+
         if old_treedef != new_treedef:
-            print(f"  [TREEDEF CHANGED] Input PyTree structure mutated.")
+            print("  [TREEDEF CHANGED] Input PyTree structure mutated.")
             differences_found = True
         else:
             for (path, old_val), (_, new_val) in zip(old_stat, new_stat):
@@ -157,55 +155,55 @@ def diff_args(args):
                     print(f"  [STATIC VALUE CHANGED] {jax.tree_util.keystr(path)}")
                     print(f"    Old: {type(old_val)} {old_val} | New: {type(new_val)} {new_val}")
                     differences_found = True
-                    
+
         if not differences_found:
             print("  [IDENTICAL INPUTS] PyTree structure is identical.")
-            
+
     _last_static = static
     _last_shapes = shapes
 
 def analyze_compute_graph(func, *args):
     print("Tracing AD graph to count operations...")
-    
+
     # Flowtangent the Jacobian
     jaxpr_obj = jax.make_jaxpr(jax.jacfwd(func))(*args)
-    
+
     source_counts = Counter()
-    
+
     for eqn in jaxpr_obj.jaxpr.eqns:
         if eqn.source_info.traceback:
             user_location = "Unknown Source"
-            
+
             # Walk backward from the innermost frame (JAX internals) up to the user code
             for frame in reversed(eqn.source_info.traceback.frames):
                 # Handle varying JAX attribute naming conventions
                 file_name = getattr(frame, "file_name", None) or getattr(frame, "file", "unknown_file")
-                
+
                 # Skip internal libraries to find YOUR code
                 is_internal = any(lib in file_name for lib in ["jax/", "jax\\", "equinox", "jaxtyping"])
-                
+
                 if file_name != "unknown_file" and not is_internal:
                     func_name = getattr(frame, "code_name", None) or getattr(frame, "name", "unknown_func")
                     line_num = getattr(frame, "line_num", None) or getattr(frame, "lineno", "?")
-                    
+
                     short_file = file_name.split('/')[-1].split('\\')[-1]
                     user_location = f"{func_name} ({short_file}:{line_num})"
                     break  # Found the user code, stop walking up the stack!
-            
+
             source_counts[user_location] += 1
         else:
             source_counts["Unknown Source"] += 1
-            
+
     print("\n" + "="*60)
     print("Top 20 Functions by Node Count")
     print("="*60)
-    
+
     total_nodes = sum(source_counts.values())
-    
+
     for loc, count in source_counts.most_common(20):
         percentage = (count / total_nodes) * 100
         print(f"{count:8d} nodes ({percentage:4.1f}%) | {loc}")
-        
+
     print("="*60)
     print(f"Total Nodes Analyzed: {total_nodes}")
 
@@ -242,11 +240,11 @@ class ImplicitAnalysis(Process):
         self.residuals = residuals
 
     def _report_results(self, f_ctrls: jax.Array, f_res: jax.Array, opt_stats=None):
-    
+
         print(f"\n{'='*70}")
         print(f"Final {self.tag} Solver State")
         print(f"{'-'*70}")
-        
+
         if opt_stats:
             try:
                 if isinstance(self.solver, str):
@@ -264,24 +262,24 @@ class ImplicitAnalysis(Process):
             except Exception as e:
                 print(f"  ERROR: Optimizer state parsing error: {e} Printing raw results...")
                 print(opt_stats)
-            
+
         # Determine the maximum tag length
         active_controls = self.controls
         active_residuals = self.residuals
-        
+
         all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
         # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
         pad = max((len(t) for t in all_tags), default=20) + 2
-        
+
         # Run the forward pass one last time
-        print(f"\n  Final Control Values:")
+        print("\n  Final Control Values:")
         for idx, ctrl in enumerate(active_controls):
             print(f"    {ctrl.tag:<{pad}}: {format_array(ctrl.scale(f_ctrls[idx]))}")
 
-        print(f"\n  Final Residual Values:")
+        print("\n  Final Residual Values:")
         for i, res in enumerate(self.residuals):
             print(f"    {res.tag:<{pad}}: {format_array(f_res[i])}")
-        
+
         print(f"{'='*70}\n")
 
     def _check_controls_balance(self, settings: Settings) -> bool:
@@ -299,7 +297,7 @@ class ImplicitAnalysis(Process):
 
             active_controls = self.controls
             active_residuals = self.residuals
-            
+
             all_tags = [c.tag for c in active_controls] + [r.tag for r in active_residuals]
             # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest tag
             pad = max((len(t) for t in all_tags), default=20) + 2
@@ -322,14 +320,14 @@ class ImplicitAnalysis(Process):
         return valid_controls
 
     def _update_controls(self, state: State, control_values:jnp.ndarray, settings:Settings) -> State:
-    
+
             control_state = state
             if settings.numerical.sum_residuals:
                 N = 1
             else:
                 N = state.time.N
             ctrl_idx = 0
-    
+
             for ctrl in self.controls:
                 solver_logit = control_values[ctrl_idx : ctrl_idx + N]
                 new_val = ctrl.scale(solver_logit[:N])
@@ -339,12 +337,12 @@ class ImplicitAnalysis(Process):
                     jnp.atleast_2d(new_val).reshape((-1, 1)),
                 )
                 ctrl_idx += N
-    
+
             return control_state
 
     def initialize_controls(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
         control_values = []
-        
+
         for ctrl in self.controls:
             n_cp = state.time.N
 
@@ -471,7 +469,7 @@ class ImplicitAnalysis(Process):
         if settings._DEV_MODE:
             inspect_leaves(state, state_mask, settings, tree_name="state", depth=3)
             inspect_leaves(system, system_mask, settings, tree_name="system", depth=3)
-        
+
         # Residual closure defined in _run_solver scope to avoid tracing self argument if it were a bound method
         @eqx.filter_jit
         def get_residuals(control_values, args):
@@ -496,9 +494,9 @@ class ImplicitAnalysis(Process):
             res = self._get_residual_array(analysis_state, analysis_settings)
             updated_r_state, _ = eqx.partition(analysis_state, state_mask)
             updated_r_system, _ = eqx.partition(analysis_system, system_mask)
-            
+
             return res, (updated_r_state, updated_r_system)
-        
+
         # Run solver w/ dev mode profiling -----------------------------------------------------------------------------
         if self.solver_options is None:
             if isinstance(self.solver, str):
@@ -559,7 +557,7 @@ class ImplicitAnalysis(Process):
 
             print("1. Tracing Forward Pass and Lowering to HLO...")
             t0 = time.time()
-            
+
             fwd_fn = lambda x: get_residuals(x, (dyn_state, dyn_system))
             fwd_lowered = eqx.filter_jit(fwd_fn).lower(control_values)
             print(f" - Forward Lowering Time: {time.time() - t0:.2f} seconds")
@@ -593,7 +591,7 @@ class ImplicitAnalysis(Process):
             t_comp = time.time() - t0
             cache_status = get_cache_status(log_stream.getvalue())
             print(f" - XLA Compile Time: {t_comp:.2f} seconds ({cache_status})")
-            
+
             # We use a lambda to cleanly pass all arguments to the solver's run method
             if isinstance(self.solver, str):
                 pass
@@ -621,7 +619,7 @@ class ImplicitAnalysis(Process):
                     with track_jax_cache() as log_stream:
                         solver_compiled = solver_lowered.compile()
                     t_compile = time.time() - t0
-                    
+
                     cache_status = get_cache_status(log_stream.getvalue())
                     print(f" - Solver XLA Compile Time: {t_compile:.2f} seconds ({cache_status})")
                     print(f"{'='*60}\n")
@@ -630,12 +628,12 @@ class ImplicitAnalysis(Process):
                              f"settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity:,}). "
                              "Terminating.")
 
-        if settings.DEBUG_MODE:    
-            print(f"DEBUG MODE: Executing single forward pass...")
+        if settings.DEBUG_MODE:
+            print("DEBUG MODE: Executing single forward pass...")
             _, (f_st, f_sys) = get_residuals(control_values, (dyn_state, dyn_system))
             f_ctrls = self._get_control_array(f_st, settings)
             opt_state = None
-        
+
         else:
             if isinstance(self.solver, str):
                 run_fn = self._run_scipy_solver
@@ -653,9 +651,9 @@ class ImplicitAnalysis(Process):
 
         full_state = eqx.combine(f_st, stat_state)
         full_system = eqx.combine(f_sys, stat_system)
-        
+
         return f_ctrls, opt_state, full_state, full_system
-    
+
     def __call__(self, state: State, system: System, settings: Settings):
 
         global _analysis_stack, _last_static, _last_shapes, _trace_count
@@ -667,14 +665,14 @@ class ImplicitAnalysis(Process):
             scan_for_invalid_JAX_types(state,  "Analysis State")
             scan_for_invalid_JAX_types(system,  "Analysis System")
 
-        # Get analysis control values 
+        # Get analysis control values
         self._check_controls_balance(settings)
         initial_control_values = self._get_control_array(state, settings)
 
         # Run Solver
         with FlowtangentReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
                      message=f"Tracing {self.tag}..."):
-            
+
             f_ctrls, opt_state, f_st, f_sys = self._run_solver(
                 initial_control_values,
                 state,
@@ -686,7 +684,7 @@ class ImplicitAnalysis(Process):
         if settings.verbose and len(_analysis_stack) == 1:
             f_res = self._get_residual_array(f_st, settings)
             self._report_results(f_ctrls, f_res, opt_state)
-        
+
         if settings._DEV_MODE:
             print(f"\n{'='*70}")
             print(f"Full {self.tag} Solver State")
@@ -724,10 +722,9 @@ class ImplicitAnalysis(Process):
         if settings.verbose:
             print(f"Residual analysis '{self.tag}' called with track_history enabled. "
                   "History returned will be single forward pass with final input values.")
-            
+
         r_st, r_sys, r_setts = self(state, system, settings)
         f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, initialize=initialize, track_history=True)
         return f_st, f_sys, f_setts, history
-        
 
-        
+

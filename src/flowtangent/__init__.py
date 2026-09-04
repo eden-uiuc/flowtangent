@@ -20,26 +20,26 @@ from .utils.backend import numerical_environment, initialize_jax_cache
 numerical_environment()
 
 # Framework Hoists
-from .core.settings import Settings
-from .core.state_container import State, System
-from .core.base_component import Component, Node
+from .core._settings import Settings
+from .core._state import State
+from .core._systems import System
+from .core._component import Component
 
 # Utility Hoists
 from .utils import (
-    update,         
-    TreePath,       
-    field,          
-    static_field,   
-    method_field,   
+    update,
+    TreePath,
+    field,
+    static_field,
+    method_field,
     null_step,
 )
 
 # 4. Short-Name Namespace Routing
 from . import functional as F
 from . import components as comp
-from . import environment as env
-from . import datasets as data
+from . import data
 from . import analyses as solve
-from . import simulation as sim
+from . import sim
 from . import state
 from . import utils

@@ -12,13 +12,12 @@ from pathlib import Path
 
 import equinox as eqx
 import jax.numpy as jnp
-
-from flowtangent.library import units
 from flowtangent.library.components import Areas
 from flowtangent.library.components.airfoils import Airfoil
-from flowtangent.library.components.wings import Wing, Chords, WingDimensions, WingSegment, Sweeps
+from flowtangent.library.components.wings import Chords, Sweeps, Wing, WingDimensions, WingSegment
 
-from flowtangent.framework.systems import Aircraft
+from flowtangent.core._systems import Aircraft
+from flowtangent.data import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AVL Interface Functions

@@ -13,17 +13,15 @@ from typing import TYPE_CHECKING
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import System
     from flowtangent.library import Component
-
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import System
 
 import equinox as eqx
 
+from flowtangent.core._state_data._controls import Control, SurfaceControl
 from flowtangent.library.components import Wing
-
-from flowtangent.framework.state_data.controls import Control, SurfaceControl
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize

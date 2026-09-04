@@ -1,8 +1,6 @@
-from flowtangent.utils import field
-
-from flowtangent.library.methods.mass import transport as Mass
-
 from flowtangent.framework import Process, ProcessStep
+from flowtangent.library.methods.mass import transport as Mass
+from flowtangent.utils import field
 
 # from Flowtangent.Framework.Methods.Mass.Energy import tf_mass_from_SLS
 

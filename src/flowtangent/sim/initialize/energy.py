@@ -14,12 +14,10 @@ if TYPE_CHECKING:
 
 # package imports
 import equinox as eqx
-import jax.numpy as jnp
-
-from flowtangent.library.components.energy.networks import GraphNetwork
 
 # Flowtangent Imports
-from flowtangent.framework.state_data.energy import NodeState, TurbojetState, TurbofanState
+from flowtangent.core._state_data._energy import NodeState, TurbofanState, TurbojetState
+from flowtangent.library.components.energy.networks import GraphNetwork
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy
@@ -55,11 +53,11 @@ def initialize_energy(state: State, system: System, settings: Settings):
             _extract_to_flat_state(line)
 
         updated_system = updated_system.replace_subcomponent(updated_network)
-        
+
         if str(network.__class__.__name__ ) in conditions_map:
             network_state = conditions_map[str(network.__class__.__name__ )]()
             updated_state = eqx.tree_at(lambda s: s.energy, updated_state, network_state)
-        
+
         updated_state = eqx.tree_at(lambda s: s.energy.nodes, updated_state, node_states)
         updated_state = updated_state.expand_time()
 

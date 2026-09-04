@@ -7,10 +7,9 @@
 #  Imports
 # ----------------------------------------------------------------------
 
-import flowtangent.library as rcl
-from flowtangent.library import units
-
 import flowtangent.framework as rcf
+import flowtangent.library as rcl
+from flowtangent.data import units
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

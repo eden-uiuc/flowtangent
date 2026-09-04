@@ -1,18 +1,18 @@
 import csv
 import json
 import os
-
 from functools import lru_cache
 from typing import Any
 
-from flowtangent.utils import get_trace_root
 from flowtangent.library.components.energy.jets.classes import TurbojetEngine
+
+from flowtangent.utils.io import _ft_root
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Data Collection (Sourced from Mattingly)
 #-----------------------------------------------------------------------------------------------------------------------
 
-_DATA_DIR = get_trace_root() / "library/data/turbo_engines"
+_DATA_DIR = _ft_root() / "library/data/turbo_engines"
 _JSON_DIR = _DATA_DIR / "JSONs"
 
 def load_csv_as_dicts(filepath):
@@ -46,10 +46,10 @@ def process_station_data(data_dir=_DATA_DIR):
         reader = csv.reader(f)
         headers = next(reader)
         engine_names = headers[1:]  # Skip 'Parameter'
-        
+
         # Initialize dictionaries for each engine in C.4
         thermal_data = {engine: {"name": engine, "station_data": {}} for engine in engine_names}
-        
+
         for row in reader:
             param = row[0]
             for i, engine in enumerate(engine_names):
@@ -62,12 +62,12 @@ def process_station_data(data_dir=_DATA_DIR):
 
     # Dump the pivoted thermal data to JSON files
     os.makedirs('mattingly_json', exist_ok=True)
-    
+
     for engine, data in thermal_data.items():
         # Clean up filenames (e.g., F100-PW-100)
         safe_name = engine.replace(' ', '_').replace('/', '_')
         filepath = os.path.join('mattingly_json', f'{safe_name}_thermal.json')
-        
+
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=4)
         print(f"Exported: {filepath}")
@@ -81,12 +81,12 @@ def process_design_data(csv_file):
     if not os.path.exists(csv_file):
         print(f"Warning: Could not find {csv_file}. Skipping.")
         return
-    
+
     category = csv_file.stem.split('_')[0].title()
-    
+
     out_dir = _JSON_DIR
     os.makedirs(out_dir, exist_ok=True)
-    
+
     with open(csv_file, mode='r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -95,7 +95,7 @@ def process_design_data(csv_file):
             print(f"Exporting: {engine_name}")
             engine_type = csv_file.stem.split('_')[1].title()[:-1]
             safe_name = engine_name.replace('/', '_').replace(' ', '_').replace('-','_')
-            
+
             header_data = {
                 "category": category,
                 "type": engine_type
@@ -110,17 +110,17 @@ def process_design_data(csv_file):
                     clean_data['AET (F)'] = 2600.0
                 elif engine_type == "Turbofan":
                     clean_data['AET (F)'] = 3200.0
-            
+
             if category == "Civil":
                 clean_data['TIT (F)'] = 2300.0
-            
+
             # Concorde overrides for afterburning civil engine
             if "Olympus" in engine_name:
                 clean_data['AB'] = True
                 clean_data['AET (F)'] = 2600.0
                 clean_data['TIT (F)'] = 2200.0
 
-            
+
             # Write to JSON
             filepath = os.path.join(out_dir, f"{safe_name}.json")
             with open(filepath, 'w') as out_f:
@@ -130,7 +130,7 @@ def process_design_data(csv_file):
 # Engine Loading
 # -----------------------------------------------------------------------------------------------------------------------
 
-STUB_FILE = get_trace_root() / "library/components/energy/jets/data.pyi"
+STUB_FILE = _ft_root() / "library/components/energy/jets/data.pyi"
 
 @lru_cache(maxsize=None)
 def _load_engine_from_disk(name: str):
@@ -161,13 +161,13 @@ def generate_stub():
         "from .classes import TurbojetEngine",  # Update import path
         "",
     ]
-    
+
     for eng_file in _JSON_DIR.glob("*.json"):
         # Write the attribute to the stub file
         lines.append(f"{eng_file.stem}: {"TurbojetEngine"}")
 
     STUB_FILE.write_text("\n".join(lines))
-    print(f"Generated {STUB_FILE.name} with {len(lines) - 3} engines.")      
+    print(f"Generated {STUB_FILE.name} with {len(lines) - 3} engines.")
 
 
 if __name__ == "__main__":

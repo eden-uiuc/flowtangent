@@ -21,14 +21,15 @@ import jax.numpy as jnp
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import Aircraft
+
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import Aircraft
 
 # package imports
-from flowtangent.utils import inputs, outputs
+from flowtangent.library.components.wings import Sweeps, Wing, WingSegment
 
-from flowtangent.library.components.wings import Wing, WingSegment, Sweeps
+from flowtangent.utils import inputs, outputs
 
 # from Flowtangent.Library.Components.Wings import All_Moving_Surface
 

@@ -1,29 +1,31 @@
 from __future__ import annotations
-from typing import overload, Callable, TYPE_CHECKING, Any, Sequence, Optional, Self
-if TYPE_CHECKING:
-    from ..core.settings import Settings
 
+from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, overload
+
+if TYPE_CHECKING:
+    from ..core._settings import Settings
+
+import os
 from dataclasses import dataclass
 from pathlib import Path
-import os
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-import equinox as eqx
+from equinox import combine, is_array, is_array_like, partition
 
 # -----------------------------------------------------------------------------
 # UPSTREAM FACADE IMPORTS
 # -----------------------------------------------------------------------------
 from jax.tree_util import (
-    tree_map, 
-    tree_flatten, 
-    tree_unflatten, 
+    tree_flatten,
+    tree_flatten_with_path,
     tree_leaves,
+    tree_map,
     tree_map_with_path,
-    tree_flatten_with_path
+    tree_unflatten,
 )
-from equinox import partition, combine, is_array, is_array_like
 
 # -----------------------------------------------------------------------------
 # FLOWTANGENT WRAPPERS
@@ -44,26 +46,26 @@ def update(obj, where_or_updates, val=None):
     # Route 1: The Canonical Equinox Lambda
     if callable(where_or_updates):
         return eqx.tree_at(where_or_updates, obj, val)
-    
+
     # Route 2: Single Tuple or TreePath (e.g., ('aero.alpha', 3.0))
     # We check if it's a tuple where the first element is a string/tuple path
     if isinstance(where_or_updates, TreePath) or (
-        isinstance(where_or_updates, tuple) 
-        and len(where_or_updates) in (2, 3) 
+        isinstance(where_or_updates, tuple)
+        and len(where_or_updates) in (2, 3)
         and isinstance(where_or_updates[0], (str, tuple))
     ):
         paths = [TreePath.cast(where_or_updates)]
-        
+
     # Route 3: A List/Sequence of Updates
     elif isinstance(where_or_updates, (list, tuple, set)):
         paths = [TreePath.cast(u) for u in where_or_updates]
-        
+
     else:
         raise TypeError(
             "update() requires a lambda function, a TreePath, a path tuple, "
             "or a sequence of updates."
         )
-        
+
     where_fn = lambda s: get_all_targets(s, paths)
     vals = tuple(p.value for p in paths)
     return eqx.tree_at(where_fn, obj, vals)
@@ -162,33 +164,33 @@ def is_equivalent(a, b):
     """Safely checks deep equality between any two PyTrees, arrays, or scalars."""
     if type(a) != type(b):
         return False
-    
+
     try:
         a_leaves, a_treedef = tree_flatten(a)
         b_leaves, b_treedef = tree_flatten(b)
     except Exception:
         return False
-        
+
     if a_treedef != b_treedef:
         return False
-        
+
     for la, lb in zip(a_leaves, b_leaves):
         is_num_a = isinstance(la, (jnp.ndarray, np.ndarray, float, int, bool))
         is_num_b = isinstance(lb, (jnp.ndarray, np.ndarray, float, int, bool))
-        
+
         if is_num_a and is_num_b:
             arr_a = jnp.squeeze(jnp.asarray(la))
             arr_b = jnp.squeeze(jnp.asarray(lb))
-            
+
             if arr_a.shape != arr_b.shape:
                 return False
-                
+
             if not jnp.array_equal(arr_a, arr_b, equal_nan=True):
                 return False
         else:
             if la != lb:
                 return False
-                
+
     return True
 
 def compute_tree_delta(old_tree, new_tree):
@@ -239,9 +241,9 @@ def inspect_leaves(tree, mask, settings: Settings, tree_name:str="Tree", depth:i
     """Groups PyTree leaves by their hierarchical path and outputs the summary."""
     leaves_with_path, _ = tree_flatten_with_path(tree)
     mask_leaves, _ = tree_flatten(mask)
-    
+
     summary = {}
-    
+
     for (path, leaf), is_kept in zip(leaves_with_path, mask_leaves):
         path_strs = []
         for p in path:
@@ -253,35 +255,35 @@ def inspect_leaves(tree, mask, settings: Settings, tree_name:str="Tree", depth:i
                 path_strs.append(f"[{p.idx}]")
             else:
                 path_strs.append(str(p))
-                
+
         prefix = tree_name + "".join(path_strs[:depth])
         if not prefix:
             prefix = tree_name
-            
+
         if prefix not in summary:
             summary[prefix] = {"kept": 0, "pruned": 0, "types": set()}
-            
+
         if not is_kept:
             summary[prefix]["pruned"] += 1
         else:
             summary[prefix]["kept"] += 1
             summary[prefix]["types"].add(type(leaf).__name__)
-            
+
     lines = []
     header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 15 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
     lines.append(header)
     lines.append("-" * 100)
-    
+
     for prefix, counts in sorted(summary.items()):
         if counts['kept'] > 0 or counts['pruned'] > 0:
             types_str = ", ".join(sorted(list(counts['types']))[:3])
             lines.append(f"{prefix:<{35 + 15 * depth}} | {counts['kept']:<6} | {counts['pruned']:<6} | {types_str}")
-            
+
     output_text = "\n".join(lines)
-    
+
     if settings.logging.stream_ouput:
         print("\n" + output_text)
-        
+
     if settings.logging.log_dir is not None:
         output_file = Path(settings.logging.log_dir) / f"{tree_name}_structure.log"
         os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
@@ -334,10 +336,10 @@ __all__ = [
     "combine",
     "is_array",
     "is_array_like",
-    
+
     # FlowTangent API Wrappers
     "update",
-    
+
     # FlowTangent Custom Functions
     "TreePath",
     "get_parent_target",

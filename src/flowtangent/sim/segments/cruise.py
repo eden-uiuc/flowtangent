@@ -16,11 +16,10 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     from flowtangent.framework import Settings, State, System
 
-from flowtangent.utils import field
-
+from flowtangent.core._state_data._controls import Control, NamedResidual
 from flowtangent.framework import ProcessStep
-from flowtangent.framework.state_data.controls import Control, Control, NamedResidual
 from flowtangent.framework.simulation.segments import Segment
+from flowtangent.utils import field
 
 from .profiles import *
 

@@ -1,0 +1,2042 @@
+N812 Lowercase `functional` imported as non-lowercase `F`
+  --> src/flowtangent/__init__.py:39:15
+   |
+38 | # 4. Short-Name Namespace Routing
+39 | from . import functional as F
+   |               ^^^^^^^^^^^^^^^
+40 | from . import components as comp
+41 | from . import data
+   |
+
+N815 Variable `peak_CL_multiplier` in class scope should not be mixedCase
+  --> src/flowtangent/analyses/aero/vorjax/VORJAX.py:55:5
+   |
+53 |     end_blend_mach: float = 2.0
+54 |
+55 |     peak_CL_multiplier: float = 1.15
+   |     ^^^^^^^^^^^^^^^^^^
+56 |     peak_mach_number: Optional[float] = None
+57 |     _transonic_CL_blender: Callable = field(ensemble_CL_spline, as_value=True, static=True)
+   |
+
+N815 Variable `_transonic_CL_blender` in class scope should not be mixedCase
+  --> src/flowtangent/analyses/aero/vorjax/VORJAX.py:57:5
+   |
+55 |     peak_CL_multiplier: float = 1.15
+56 |     peak_mach_number: Optional[float] = None
+57 |     _transonic_CL_blender: Callable = field(ensemble_CL_spline, as_value=True, static=True)
+   |     ^^^^^^^^^^^^^^^^^^^^^
+58 |
+59 |     begin_drag_rise_mach_number: float = 0.95
+   |
+
+E501 Line too long (147 > 120)
+   --> src/flowtangent/analyses/aero/vorjax/VORJAX.py:150:121
+    |
+148 | …
+149 | …
+150 | … [wing, stab] and [4, 2] for [fuselage, nacelle]), else uses global value above
+    |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+151 | …atic=True)
+152 | …tatic=True)
+    |
+
+N801 Class name `VORJAX_Settings` should use CapWords convention
+   --> src/flowtangent/analyses/aero/vorjax/VORJAX.py:200:7
+    |
+200 | class VORJAX_Settings(eqx.Module):
+    |       ^^^^^^^^^^^^^^^
+201 |     model_fuselage: bool = field(False, static=True)
+202 |     trim_aircraft: bool = field(False, static=True)
+    |
+
+F841 Local variable `panel_ones` is assigned to but never used
+   --> src/flowtangent/analyses/aero/vorjax/aerodynamic_coefficients.py:105:5
+    |
+103 |     strip_ids = VD.strip_ids
+104 |
+105 |     panel_ones = jnp.ones_like(strip_ids, dtype=jnp.float32)
+    |     ^^^^^^^^^^
+106 |     # stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=VD.total_strips)
+    |
+help: Remove assignment to unused variable `panel_ones`
+
+F841 Local variable `cos_sweep` is assigned to but never used
+   --> src/flowtangent/analyses/aero/vorjax/induced_velocity.py:203:5
+    |
+201 |     N = U.shape[1]
+202 |     t_sq = t**2
+203 |     cos_sweep = 1.0 / jnp.sqrt(1.0 + t_sq[None, :])
+    |     ^^^^^^^^^
+204 |
+205 |     W_wave_cond = B_sq > t_sq[None, :]
+    |
+help: Remove assignment to unused variable `cos_sweep`
+
+E731 Do not assign a `lambda` expression, use a `def`
+   --> src/flowtangent/analyses/aero/vorjax/panelization.py:330:5
+    |
+328 | def validate_airfoil_resolutions(wing):
+329 |     # Semi=proofing against future Airfoil subclasses by checking name instead of isinstance
+330 |     is_airfoil = lambda node: hasattr(node, "__class__") and "Airfoil" in node.__class__.__name__
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+331 |
+332 |     # Get leaves with Airfoils as stopping points
+    |
+help: Rewrite `is_airfoil` as a `def`
+
+E501 Line too long (123 > 120)
+  --> src/flowtangent/analyses/batched.py:63:121
+   |
+61 |             else:
+62 |                 ctrls = self.analyze.controls
+63 |                 ctrl_inputs = tuple(DataPath(path=c.state_path.path, value=jnp.atleast_3d(c.initial_value)) for c in ctrls)
+   |                                                                                                                         ^^^
+64 |                 self.state_inputs = self.state_inputs + ctrl_inputs
+   |
+
+F821 Undefined name `JAXCompileFilter`
+   --> src/flowtangent/analyses/batched.py:463:22
+    |
+461 |         jax_logger.handlers.clear()
+462 |
+463 |         jax_filter = JAXCompileFilter()
+    |                      ^^^^^^^^^^^^^^^^
+464 |         for handler in self.logger.handlers:
+465 |             handler.addFilter(jax_filter)
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/analyses/batched.py:548:121
+    |
+548 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+549 | # Compression Benchmarking
+550 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/analyses/batched.py:550:121
+    |
+548 | # -----------------------------------------------------------------------------------------------------------------------
+549 | # Compression Benchmarking
+550 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+
+F403 `from flowtangent.library.methods.energy import *` used; unable to detect undefined names
+  --> src/flowtangent/analyses/energy/__init__.py:10:1
+   |
+ 8 | # ----------------------------------------------------------------------------------------------------------------------
+ 9 |
+10 | from flowtangent.library.methods.energy import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | # from . import sizing
+   |
+
+F841 Local variable `Nc_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:285:5
+    |
+283 |     c_map: CompressorMap = comp.map
+284 |
+285 |     Nc_bnds = (min(c_map.Nc_grid).item() * c_map.s_Nc * 0.5,
+    |     ^^^^^^^
+286 |                max(c_map.Nc_grid).item() * c_map.s_Nc * 1.5)
+    |
+help: Remove assignment to unused variable `Nc_bnds`
+
+F841 Local variable `Wc_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:291:5
+    |
+289 |               max(c_map.Rline_grid).item() * 1.5)
+290 |
+291 |     Wc_bnds = (jnp.min(c_map.Wc_table).item() * c_map.s_Wc * 0.5,
+    |     ^^^^^^^
+292 |                jnp.max(c_map.Wc_table).item() * c_map.s_Wc * 1.5)
+    |
+help: Remove assignment to unused variable `Wc_bnds`
+
+F841 Local variable `Wp_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:303:5
+    |
+301 |                max(t_map.PR_grid).item() * 1.5)
+302 |
+303 |     Wp_bnds = (jnp.min(t_map.Wp_table).item(),
+    |     ^^^^^^^
+304 |                jnp.max(t_map.Wp_table).item(),)
+    |
+help: Remove assignment to unused variable `Wp_bnds`
+
+F841 Local variable `lpc_Nc_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:400:5
+    |
+398 |     lpc_map: CompressorMap = lpc.map
+399 |
+400 |     lpc_Nc_bnds = (min(lpc_map.Nc_grid).item() * lpc_map.s_Nc * 0.5,
+    |     ^^^^^^^^^^^
+401 |                    max(lpc_map.Nc_grid).item() * lpc_map.s_Nc * 1.5)
+    |
+help: Remove assignment to unused variable `lpc_Nc_bnds`
+
+F841 Local variable `lpc_Wc_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:406:5
+    |
+404 |                   max(lpc_map.Rline_grid).item() * 1.5)
+405 |
+406 |     lpc_Wc_bnds = (jnp.min(lpc_map.Wc_table).item() * lpc_map.s_Wc * 0.5,
+    |     ^^^^^^^^^^^
+407 |                    jnp.max(lpc_map.Wc_table).item() * lpc_map.s_Wc * 1.5)
+    |
+help: Remove assignment to unused variable `lpc_Wc_bnds`
+
+F841 Local variable `hpc_Nc_bnds` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:414:5
+    |
+412 |     hpc_map: CompressorMap = hpc.map
+413 |
+414 |     hpc_Nc_bnds = (min(hpc_map.Nc_grid).item() * hpc_map.s_Nc * 0.5,
+    |     ^^^^^^^^^^^
+415 |                    max(hpc_map.Nc_grid).item() * hpc_map.s_Nc * 1.5)
+    |
+help: Remove assignment to unused variable `hpc_Nc_bnds`
+
+F841 Local variable `lpt` is assigned to but never used
+   --> src/flowtangent/analyses/energy/jets.py:430:5
+    |
+428 |     # LPT Map Bounds -----------------------------------------------------------
+429 |
+430 |     lpt =  network.line.engine.lpt
+    |     ^^^
+431 |     lpt_map: TurbineMap = hpt.map
+    |
+help: Remove assignment to unused variable `lpt`
+
+E501 Line too long (124 > 120)
+   --> src/flowtangent/analyses/energy/jets.py:563:121
+    |
+561 | # ----------------------------------------------------------------------------------------------------------------------
+562 |
+563 | def _design_update_batched(state: State, system: Aircraft, settings: Settings) -> tuple[State, Aircraft, Settings, Process]:
+    |                                                                                                                         ^^^^
+564 |
+565 |     engine = system.energy.line.engine
+    |
+
+E501 Line too long (125 > 120)
+   --> src/flowtangent/analyses/energy/jets.py:653:121
+    |
+651 |     d_TSFC = Residual(
+652 |         tag="Off-Design TSFC",
+653 |         get_value=lambda s: jnp.where(OD_TSFC, (s.energy.nodes['network.line.engine'].fuel.TSFC - OD_TSFC)/OD_TSFC, OD_TSFC))
+    |                                                                                                                         ^^^^^
+654 |
+655 |     def split_residuals(swap_state, swap_system, swap_settings):
+    |
+
+E402 Module level import not at top of file
+  --> src/flowtangent/analyses/implicit.py:35:1
+   |
+33 | jax.config.update("jax_enable_x64", True)
+34 |
+35 | from ...utils import field, format_array, get_target, inspect_leaves, io_partition, scan_for_invalid_JAX_types
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 | from .. import Settings, State, System
+37 | from ..processes import Process, array_barrier
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/analyses/implicit.py:36:1
+   |
+35 | from ...utils import field, format_array, get_target, inspect_leaves, io_partition, scan_for_invalid_JAX_types
+36 | from .. import Settings, State, System
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 | from ..processes import Process, array_barrier
+38 | from ..state_data.controls import Control, Residual
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/analyses/implicit.py:37:1
+   |
+35 | from ...utils import field, format_array, get_target, inspect_leaves, io_partition, scan_for_invalid_JAX_types
+36 | from .. import Settings, State, System
+37 | from ..processes import Process, array_barrier
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | from ..state_data.controls import Control, Residual
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/analyses/implicit.py:38:1
+   |
+36 | from .. import Settings, State, System
+37 | from ..processes import Process, array_barrier
+38 | from ..state_data.controls import Control, Residual
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 |
+40 | # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Move module level imports to top of file
+
+E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   --> src/flowtangent/analyses/implicit.py:154:20
+    |
+152 |             for (path, old_val), (_, new_val) in zip(old_stat, new_stat):
+153 |                 # Check both value and exact type
+154 |                 if type(old_val) != type(new_val) or old_val != new_val:
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+155 |                     print(f"  [STATIC VALUE CHANGED] {jax.tree_util.keystr(path)}")
+156 |                     print(f"    Old: {type(old_val)} {old_val} | New: {type(new_val)} {new_val}")
+    |
+
+E501 Line too long (147 > 120)
+   --> src/flowtangent/analyses/implicit.py:308:121
+    |
+306 | …
+307 | …
+308 | …l.initial_value, width=12):>12} | {format_array(jnp.asarray(control.bounds))}")
+    |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+309 | …
+310 | …
+    |
+
+E501 Line too long (132 > 120)
+   --> src/flowtangent/analyses/implicit.py:358:121
+    |
+356 |             else:
+357 |                 raise ValueError(f"Control {ctrl.tag} has no initial value: {ctrl.initial_value}."
+358 |                                 "Initial value must be a float or an array of size matching the number of analysis control points.")
+    |                                                                                                                         ^^^^^^^^^^^^
+359 |
+360 |         ctrl_state = self._update_controls(state, jnp.concatenate(control_values, axis=0), settings)
+    |
+
+E731 Do not assign a `lambda` expression, use a `def`
+   --> src/flowtangent/analyses/implicit.py:561:13
+    |
+559 |             t0 = time.time()
+560 |
+561 |             fwd_fn = lambda x: get_residuals(x, (dyn_state, dyn_system))
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+562 |             fwd_lowered = eqx.filter_jit(fwd_fn).lower(control_values)
+563 |             print(f" - Forward Lowering Time: {time.time() - t0:.2f} seconds")
+    |
+help: Rewrite `fwd_fn` as a `def`
+
+F841 Local variable `fwd_compiled` is assigned to but never used
+   --> src/flowtangent/analyses/implicit.py:572:17
+    |
+570 |             t0 = time.time()
+571 |             with track_jax_cache() as log_stream:
+572 |                 fwd_compiled = fwd_lowered.compile()
+    |                 ^^^^^^^^^^^^
+573 |             t_comp = time.time() - t0
+574 |             cache_status = get_cache_status(log_stream.getvalue())
+    |
+help: Remove assignment to unused variable `fwd_compiled`
+
+E731 Do not assign a `lambda` expression, use a `def`
+   --> src/flowtangent/analyses/implicit.py:579:13
+    |
+577 |             print("\n2. Tracing Jacobian & Lowering to HLO...")
+578 |             t0 = time.time()
+579 |             jac_fn = lambda x: jax.jacrev(fwd_fn, has_aux=True)(x)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+580 |             jac_lowered = eqx.filter_jit(jac_fn).lower(control_values)
+581 |             print(f" - Jacobian Lowering Time: {time.time() - t0:.2f} seconds")
+    |
+help: Rewrite `jac_fn` as a `def`
+
+F841 Local variable `jac_compiled` is assigned to but never used
+   --> src/flowtangent/analyses/implicit.py:590:17
+    |
+588 |             t0 = time.time()
+589 |             with track_jax_cache() as log_stream:
+590 |                 jac_compiled = jac_lowered.compile()
+    |                 ^^^^^^^^^^^^
+591 |             t_comp = time.time() - t0
+592 |             cache_status = get_cache_status(log_stream.getvalue())
+    |
+help: Remove assignment to unused variable `jac_compiled`
+
+E731 Do not assign a `lambda` expression, use a `def`
+   --> src/flowtangent/analyses/implicit.py:601:17
+    |
+599 |                   print("\n3. Tracing Full Optimistix Solver & Lowering...")
+600 |                   t0 = time.time()
+601 | /                 run_fn = lambda c, st, sy: optx.root_find(
+602 | |                     fn=get_residuals,
+603 | |                     solver=self.solver(**solver_options),
+604 | |                     y0=c,
+605 | |                     args=(st, sy),
+606 | |                     max_steps=settings.numerical.max_evaluations,
+607 | |                 )
+    | |_________________^
+608 |                   solver_lowered = eqx.filter_jit(run_fn).lower(control_values, dyn_state, dyn_system)
+609 |                   print(f" - Solver Lowering Time : {time.time() - t0:.2f} seconds")
+    |
+help: Rewrite `run_fn` as a `def`
+
+F841 Local variable `solver_compiled` is assigned to but never used
+   --> src/flowtangent/analyses/implicit.py:620:25
+    |
+618 |                     t0 = time.time()
+619 |                     with track_jax_cache() as log_stream:
+620 |                         solver_compiled = solver_lowered.compile()
+    |                         ^^^^^^^^^^^^^^^
+621 |                     t_compile = time.time() - t0
+    |
+help: Remove assignment to unused variable `solver_compiled`
+
+E501 Line too long (127 > 120)
+   --> src/flowtangent/analyses/implicit.py:628:121
+    |
+626 |                 else:
+627 |                     sys.exit(f"Graph complexity ({solver_graph_length:,}) higher than "
+628 |                              f"settings.numerical.maximum_graph_complexity ({settings.numerical.maximum_graph_complexity:,}). "
+    |                                                                                                                         ^^^^^^^
+629 |                              "Terminating.")
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/analyses/implicit.py:673:121
+    |
+672 |         # Run Solver
+673 |         with FlowtangentReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
+    |                                                                                                                         ^
+674 |                      message=f"Tracing {self.tag}..."):
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/analyses/implicit.py:727:121
+    |
+726 |         r_st, r_sys, r_setts = self(state, system, settings)
+727 |         f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, initialize=initialize, track_history=True)
+    |                                                                                                                         ^
+728 |         return f_st, f_sys, f_setts, history
+    |
+
+N812 Lowercase `transport` imported as non-lowercase `Mass`
+ --> src/flowtangent/analyses/mass/Transport.py:2:46
+  |
+1 | from flowtangent.framework import Process, ProcessStep
+2 | from flowtangent.library.methods.mass import transport as Mass
+  |                                              ^^^^^^^^^^^^^^^^^
+3 | from flowtangent.utils import field
+  |
+
+W292 [*] No newline at end of file
+  --> src/flowtangent/components/__init__.py:11:2
+   |
+ 9 |     Chords as WingChords,
+10 |     WingControlSurface as ControlSurface
+11 | )
+   |  ^
+help: Add trailing newline
+   |
+10 |     WingControlSurface as ControlSurface
+   - )
+11 + )
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src/flowtangent/components/_airfoils.py:10:1
+   |
+ 8 |   # ----------------------------------------------------------------------------------------------------------------------
+ 9 |
+10 | / from decimal import Decimal
+11 | | from functools import lru_cache
+12 | | from pathlib import Path
+13 | |
+14 | | # package imports
+15 | | import jax.numpy as jnp
+16 | | from flowtangent import Component
+17 | | from scipy.interpolate import PchipInterpolator
+18 | |
+19 | | # Flowtangent imports
+20 | | from flowtangent.utils import empty_array, field
+21 | | from flowtangent.utils.io import _ft_root
+   | |_________________________________________^
+22 |
+23 |   # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Organize imports
+   |
+15 | import jax.numpy as jnp
+   - from flowtangent import Component
+16 | from scipy.interpolate import PchipInterpolator
+17 |
+18 + from flowtangent import Component
+19 +
+20 | # Flowtangent imports
+   |
+
+F821 Undefined name `Aircraft`
+  --> src/flowtangent/components/_energy/jets/classes.py:62:46
+   |
+60 |         "state.energy.nodes['{network_ID}'].flow"
+61 |     )
+62 |     def transmit(self, state: State, system: Aircraft, settings: Settings):  # type: ignore
+   |                                              ^^^^^^^^
+63 |
+64 |         network_state   = state.energy
+   |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/components/_energy/jets/classes.py:112:121
+    |
+110 |         outputs = state_node.flow
+111 |
+112 |         outputs = eqx.tree_at(lambda o: o.mass_flow_rate, outputs,          jnp.atleast_2d(network_state.mass_flow_rate))
+    |                                                                                                                         ^
+113 |         outputs = eqx.tree_at(lambda o: o.stagnation_pressure, outputs,     jnp.atleast_2d(P_t_out))
+114 |         outputs = eqx.tree_at(lambda o: o.stagnation_temperature, outputs,  jnp.atleast_2d(T_t_out))
+    |
+
+E501 Line too long (132 > 120)
+   --> src/flowtangent/components/_energy/jets/classes.py:151:121
+    |
+149 |             raise TypeError(f"'{self.tag}' requires a CompressorMap, got {type(self.map).__name__}")
+150 |         if self.design_parameters.eff.flow == 1.0:
+151 |             map_effs = replace(self.design_parameters.eff, flow=self.map.eff_des + 0.0)  # +0.0 trick to force new memory allocation
+    |                                                                                                                         ^^^^^^^^^^^^
+152 |             map_params = replace(self.design_parameters, eff=map_effs)
+153 |             object.__setattr__(self, "design_parameters", map_params)
+    |
+
+E501 Line too long (156 > 120)
+   --> src/flowtangent/components/_energy/jets/classes.py:261:121
+    |
+260 | …
+261 | …wer()}_Rline")) # TODO: Shift to Rline scheduling on altitude, Mach number in future
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+262 | …
+263 | …calars
+    |
+
+N815 Variable `delta_SFC` in class scope should not be mixedCase
+    --> src/flowtangent/components/_energy/jets/classes.py:1184:5
+     |
+1182 |     thrust:     float = 0.0
+1183 |     SLS_thrust: float = 0.0
+1184 |     delta_SFC:  float = 0.0
+     |     ^^^^^^^^^
+1185 |
+1186 |     # Flight Conditions
+     |
+
+N815 Variable `compressor_Rline` in class scope should not be mixedCase
+    --> src/flowtangent/components/_energy/jets/classes.py:1207:5
+     |
+1205 |     FAR: float = 1e-2
+1206 |     TSFC: float = 0.0
+1207 |     compressor_Rline: float = 2.0
+     |     ^^^^^^^^^^^^^^^^
+1208 |     mass_flow_rate: float = 100 * units.kg/units.s
+1209 |     rotation_speed: float = 8_000 * units.rev/units.mins    # Single spool
+     |
+
+N815 Variable `turbine_PR` in class scope should not be mixedCase
+    --> src/flowtangent/components/_energy/jets/classes.py:1210:5
+     |
+1208 |     mass_flow_rate: float = 100 * units.kg/units.s
+1209 |     rotation_speed: float = 8_000 * units.rev/units.mins    # Single spool
+1210 |     turbine_PR: float = 5.0                                 # Single spool
+     |     ^^^^^^^^^^
+1211 |     power: float = 2e7 * units.W
+     |
+
+F841 Local variable `base_components` is assigned to but never used
+    --> src/flowtangent/components/_energy/jets/classes.py:1291:17
+     |
+1289 |                 base_components = _ABTurbojetSetup()
+1290 |             else:
+1291 |                 base_components = _TurbojetSetup()
+     |                 ^^^^^^^^^^^^^^^
+help: Remove assignment to unused variable `base_components`
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/components/_energy/jets/data.py:129:121
+    |
+127 |                 json.dump(clean_data, out_f, indent=4)
+128 |
+129 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+130 | # Engine Loading
+131 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/components/_energy/jets/data.py:131:121
+    |
+129 | # -----------------------------------------------------------------------------------------------------------------------
+130 | # Engine Loading
+131 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+132 |
+133 | STUB_FILE = _ft_root() / "library/components/energy/jets/data.pyi"
+    |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/classes.py:9:121
+   |
+ 7 | from flowtangent.utils import empty_array, field, register
+ 8 |
+ 9 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+10 | # Helper Functions
+11 | # -----------------------------------------------------------------------------------------------------------------------
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/classes.py:11:121
+   |
+ 9 | # -----------------------------------------------------------------------------------------------------------------------
+10 | # Helper Functions
+11 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/classes.py:60:121
+   |
+58 |     return z
+59 |
+60 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+61 | # Map Classes
+62 | # -----------------------------------------------------------------------------------------------------------------------
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/classes.py:62:121
+   |
+60 | # -----------------------------------------------------------------------------------------------------------------------
+61 | # Map Classes
+62 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+
+N815 Variable `s_Wc` in class scope should not be mixedCase
+  --> src/flowtangent/components/_energy/maps/classes.py:82:5
+   |
+80 |     Rline_stall: float = 1.0
+81 |
+82 |     s_Wc: float = 1.0
+   |     ^^^^
+83 |     s_PR: float = 1.0
+84 |     s_eff: float = 1.0
+   |
+
+N815 Variable `s_PR` in class scope should not be mixedCase
+  --> src/flowtangent/components/_energy/maps/classes.py:83:5
+   |
+82 |     s_Wc: float = 1.0
+83 |     s_PR: float = 1.0
+   |     ^^^^
+84 |     s_eff: float = 1.0
+85 |     s_Nc: float = 1.0
+   |
+
+N815 Variable `s_Nc` in class scope should not be mixedCase
+  --> src/flowtangent/components/_energy/maps/classes.py:85:5
+   |
+83 |     s_PR: float = 1.0
+84 |     s_eff: float = 1.0
+85 |     s_Nc: float = 1.0
+   |     ^^^^
+86 |
+87 |     Nc_des: float = 1.0
+   |
+
+N815 Variable `s_Wp` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/maps/classes.py:182:5
+    |
+181 |     # Map scaling Values
+182 |     s_Wp: float = 1.0
+    |     ^^^^
+183 |     s_PR: float = 1.0
+184 |     s_eff: float = 1.0
+    |
+
+N815 Variable `s_PR` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/maps/classes.py:183:5
+    |
+181 |     # Map scaling Values
+182 |     s_Wp: float = 1.0
+183 |     s_PR: float = 1.0
+    |     ^^^^
+184 |     s_eff: float = 1.0
+185 |     s_Np: float = 1.0
+    |
+
+N815 Variable `s_Np` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/maps/classes.py:185:5
+    |
+183 |     s_PR: float = 1.0
+184 |     s_eff: float = 1.0
+185 |     s_Np: float = 1.0
+    |     ^^^^
+186 |
+187 |     alpha_des: float = 0.0
+    |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/data.py:14:121
+   |
+12 | from flowtangent.utils.io import _ft_root
+13 |
+14 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+15 | # Map Specifications (Sourced from PyCycle)
+16 | # -----------------------------------------------------------------------------------------------------------------------
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/components/_energy/maps/data.py:16:121
+   |
+14 | # -----------------------------------------------------------------------------------------------------------------------
+15 | # Map Specifications (Sourced from PyCycle)
+16 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+17 |
+18 | _MAP_DIR = _ft_root() / "library/data/turbo_maps"
+   |
+
+N815 Variable `network_ID` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/networks.py:110:5
+    |
+109 |     tag: str = field("Network", static=True)
+110 |     network_ID: str = field("network", static=True)
+    |     ^^^^^^^^^^
+111 |
+112 |     nodes: dict[str, "GraphNode"] = field(dict)
+    |
+
+N815 Variable `network_ID` in class scope should not be mixedCase
+  --> src/flowtangent/components/_energy/nodes.py:53:5
+   |
+51 | class GraphInput(eqx.Module):
+52 |     domain: GraphDomain = field("flow", static=True)
+53 |     network_ID: str = field("network", static=True)
+   |     ^^^^^^^^^^
+54 |     primary: bool = field(False, static=True)
+55 |     _assigned: bool = field(False)
+   |
+
+N815 Variable `network_ID` in class scope should not be mixedCase
+  --> src/flowtangent/components/_energy/nodes.py:73:5
+   |
+71 | @register
+72 | class GraphNode(Component):
+73 |     network_ID: str = field("energy_node", static=True)
+   |     ^^^^^^^^^^
+74 |
+75 |     inputs: tuple[GraphInput, ...] | GraphInput = field(tuple, static=True)
+   |
+
+N815 Variable `parent_ID` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/nodes.py:237:5
+    |
+235 |     fractions_dict: dict[str, float | Callable] = field(dict)
+236 |
+237 |     parent_ID: str = field('', static=True)
+    |     ^^^^^^^^^
+238 |     grandparent_ID: str = field(tuple, static=True)
+    |
+
+N815 Variable `grandparent_ID` in class scope should not be mixedCase
+   --> src/flowtangent/components/_energy/nodes.py:238:5
+    |
+237 |     parent_ID: str = field('', static=True)
+238 |     grandparent_ID: str = field(tuple, static=True)
+    |     ^^^^^^^^^^^^^^
+239 |
+240 |     def transmit(self, state: State, system: System, settings: Settings):
+    |
+
+E501 Line too long (131 > 120)
+   --> src/flowtangent/components/_energy/nodes.py:305:121
+    |
+303 |         if add_mixer:
+304 |             parent_inputs = tuple(replace(i, network_ID="parent."+i.network_ID) for i in self.flow_inputs)
+305 |             mixer = FlowNode(tag="Mixer", inputs=parent_inputs, add_mixer=False, design_parameters=FlowOpPoint(pressure_ratio=1.0))
+    |                                                                                                                         ^^^^^^^^^^^
+306 |
+307 |             other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
+    |
+
+E501 Line too long (130 > 120)
+   --> src/flowtangent/components/_energy/nodes.py:308:121
+    |
+307 |             other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
+308 |             object.__setattr__(self, "inputs", other_inputs + (GraphInput(domain="flow", network_ID="self.mixer", primary=True),))
+    |                                                                                                                         ^^^^^^^^^^
+309 |             object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
+    |
+
+E722 Do not use bare `except`
+   --> src/flowtangent/components/_energy/nodes.py:354:13
+    |
+352 |                 p_W = self.get_primary_input_state(state, "flow", "mass_flow_rate")
+353 |                 FAR = p_FAR * p_W / W_mix
+354 |             except:
+    |             ^^^^^^
+355 |                 FAR = jnp.atleast_2d(0.0)
+    |
+
+E501 Line too long (126 > 120)
+   --> src/flowtangent/components/_energy/nodes.py:408:121
+    |
+406 |         ns_P_t = (
+407 |             PR * P_t
+408 |             * ((((gamma_in + 1.0) * (safe_M**2.0)) / ((gamma_in - 1.0) * safe_M**2.0 + 2.0)) ** (gamma_in / (gamma_in - 1.0)))
+    |                                                                                                                         ^^^^^^
+409 |             * ((gamma_in + 1.0) / (2.0 * gamma_in * safe_M**2.0 - (gamma_in - 1.0))) ** (1.0 / (gamma_in - 1.0))
+410 |         )
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src/flowtangent/components/_fuselages.py:11:1
+   |
+10 |   # package imports
+11 | / import jax.numpy as jnp
+12 | | from flowtangent.library import Areas, Component, Dimensions, Fineness
+13 | |
+14 | | # Flowtangent imports
+15 | | from flowtangent.utils import empty_array, field
+   | |________________________________________________^
+16 |
+17 |   # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Organize imports
+   |
+11 | import jax.numpy as jnp
+12 +
+13 | from flowtangent.library import Areas, Component, Dimensions, Fineness
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src/flowtangent/components/_landing_gear.py:13:1
+   |
+12 |   # Flowtangent imports
+13 | / from flowtangent.library import Component
+14 | |
+15 | | from flowtangent.utils import field
+   | |___________________________________^
+16 |
+17 |   # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Organize imports
+   |
+13 | from flowtangent.library import Component
+   -
+14 | from flowtangent.utils import field
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src/flowtangent/components/_nacelles.py:11:1
+   |
+10 |   # package imports
+11 | / import jax.numpy as jnp
+12 | | from flowtangent.library import Component, Dimensions
+13 | |
+14 | | # Flowtangent imports
+15 | | from flowtangent.utils import empty_array, field
+   | |________________________________________________^
+16 |
+17 |   # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Organize imports
+   |
+11 | import jax.numpy as jnp
+12 +
+13 | from flowtangent.library import Component, Dimensions
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> src/flowtangent/components/_wings.py:10:1
+   |
+ 8 |   # ----------------------------------------------------------------------------------------------------------------------
+ 9 |
+10 | / import equinox as eqx
+11 | | import jax
+12 | | import jax.numpy as jnp
+13 | | from flowtangent.library import Component, Dimensions
+14 | | from flowtangent.library.components.airfoils import Airfoil
+15 | |
+16 | | from flowtangent.utils import empty_array, field
+   | |________________________________________________^
+17 |
+18 |   # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Organize imports
+   |
+12 | import jax.numpy as jnp
+13 +
+14 | from flowtangent.library import Component, Dimensions
+15 | from flowtangent.library.components.airfoils import Airfoil
+   -
+16 | from flowtangent.utils import empty_array, field
+   |
+
+E701 Multiple statements on one line (colon)
+  --> src/flowtangent/core/_processes.py:90:40
+   |
+88 |             step_name = getattr(step, "__name__", "Unnamed FlowtangentFunction")
+89 |             sig = inspect.signature(step)
+90 |             if len(sig.parameters) != 3: raise ValueError(
+   |                                        ^
+91 |                 f"Process functions must take and return (State, System, Settings). "
+92 |                 f"Found function '{step_name}' with signature '{sig}'.")
+   |
+
+E701 Multiple statements on one line (colon)
+   --> src/flowtangent/core/_processes.py:323:17
+    |
+321 |                 final_st = eqx.tree_at(lambda s: s.process_jacobian, final_st, jacobian_matrix)
+322 |                 return final_st, final_sys, final_setts
+323 |             else: warnings.warn(f"Process '{self.tag}' Jacobian called with no Jacbian Map set. Jacobian will not be calculated.")
+    |                 ^
+324 |
+325 |         # Standard Execution Path
+    |
+
+E501 Line too long (130 > 120)
+   --> src/flowtangent/core/_processes.py:323:121
+    |
+321 |                 final_st = eqx.tree_at(lambda s: s.process_jacobian, final_st, jacobian_matrix)
+322 |                 return final_st, final_sys, final_setts
+323 |             else: warnings.warn(f"Process '{self.tag}' Jacobian called with no Jacbian Map set. Jacobian will not be calculated.")
+    |                                                                                                                         ^^^^^^^^^^
+324 |
+325 |         # Standard Execution Path
+    |
+
+E501 Line too long (156 > 120)
+   --> src/flowtangent/core/_processes.py:393:121
+    |
+391 | …
+392 | …
+393 | … N_o, B, T, N_o) if has_B else jnp.eye(B_total * N_o).reshape(B_total * N_o, T, N_o)
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+394 | …
+    |
+
+E501 Line too long (156 > 120)
+   --> src/flowtangent/core/_processes.py:425:121
+    |
+423 | …
+424 | …
+425 | … N_o, B, T, N_o) if has_B else jnp.eye(B_total * N_o).reshape(B_total * N_o, T, N_o)
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+426 | …
+    |
+
+E501 Line too long (128 > 120)
+   --> src/flowtangent/core/_processes.py:428:121
+    |
+426 |                     jac_sys_tuple = jax.vmap(vjp_fn)(basis_sys)
+427 |
+428 |                     # You may need to adapt this reshape depending on if System variables are constant over time or time-varying
+    |                                                                                                                         ^^^^^^^^
+429 |                     jac_sys = jac_sys_tuple[1].reshape(B, T, N_o, -1) if has_B else jac_sys_tuple[1].reshape(T, N_o, -1)
+430 |                     # Note: Concatenating State (5D) with System (4D) requires flattening the time dimensions for the solver
+    |
+
+E501 Line too long (124 > 120)
+   --> src/flowtangent/core/_processes.py:430:121
+    |
+428 |                     # You may need to adapt this reshape depending on if System variables are constant over time or time-varying
+429 |                     jac_sys = jac_sys_tuple[1].reshape(B, T, N_o, -1) if has_B else jac_sys_tuple[1].reshape(T, N_o, -1)
+430 |                     # Note: Concatenating State (5D) with System (4D) requires flattening the time dimensions for the solver
+    |                                                                                                                         ^^^^
+431 |                     batched_jacobian = (jac_st, jac_sys) # Returned as a tuple for optimal control solvers
+432 |                 else:
+    |
+
+E501 Line too long (129 > 120)
+  --> src/flowtangent/core/_settings.py:96:121
+   |
+94 |         self.outputs = tuple(DataPath(o) for o in outputs)
+95 |
+96 |         self.state_inputs = tuple(p for p in self.inputs if p.path[0].lower()=="state") if state_inputs is None else state_inputs
+   |                                                                                                                         ^^^^^^^^^
+97 |         self.system_inputs = tuple(p for p in self.inputs if p.path[0].lower()=="system") if system_inputs is None else system_inputs
+98 |         self.state_outputs = tuple(p for p in self.outputs if p.path[0].lower()=="state") if state_outputs is None else state_outputs
+   |
+
+E501 Line too long (133 > 120)
+  --> src/flowtangent/core/_settings.py:97:121
+   |
+96 | …p.path[0].lower()=="state") if state_inputs is None else state_inputs
+97 | … p.path[0].lower()=="system") if system_inputs is None else system_inputs
+   |                                                              ^^^^^^^^^^^^^
+98 | …f p.path[0].lower()=="state") if state_outputs is None else state_outputs
+99 | …if p.path[0].lower()=="system") if system_outputs is None else system_outputs
+   |
+
+E501 Line too long (133 > 120)
+  --> src/flowtangent/core/_settings.py:98:121
+   |
+96 | …p.path[0].lower()=="state") if state_inputs is None else state_inputs
+97 | … p.path[0].lower()=="system") if system_inputs is None else system_inputs
+98 | …f p.path[0].lower()=="state") if state_outputs is None else state_outputs
+   |                                                              ^^^^^^^^^^^^^
+99 | …if p.path[0].lower()=="system") if system_outputs is None else system_outputs
+   |
+
+E501 Line too long (137 > 120)
+   --> src/flowtangent/core/_settings.py:99:121
+    |
+ 97 | …path[0].lower()=="system") if system_inputs is None else system_inputs
+ 98 | ….path[0].lower()=="state") if state_outputs is None else state_outputs
+ 99 | …p.path[0].lower()=="system") if system_outputs is None else system_outputs
+    |                                                           ^^^^^^^^^^^^^^^^^
+100 | …
+101 | …
+    |
+
+E501 Line too long (152 > 120)
+   --> src/flowtangent/core/_settings.py:140:121
+    |
+139 | …
+140 | …= slice(None) else n for p, n, pth in zip(parents, new_slices, self.state_inputs)]
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+141 | …nputs), st, tuple(updated))
+    |
+
+E501 Line too long (153 > 120)
+   --> src/flowtangent/core/_settings.py:153:121
+    |
+152 | …
+153 | … slice(None) else n for p, n, pth in zip(parents, new_slices, self.system_inputs)]
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+154 | …inputs), sys, tuple(updated))
+    |
+
+E501 Line too long (129 > 120)
+   --> src/flowtangent/core/_state_data/_controls.py:121:121
+    |
+120 |         if self.initial_value is not None:
+121 |             object.__setattr__(self, "initial_value", jnp.clip(self.initial_value, self.bounds[0] * 1.10, self.bounds[1] * 0.90))
+    |                                                                                                                         ^^^^^^^^^
+
+N815 Variable `compressor_Wc` in class scope should not be mixedCase
+  --> src/flowtangent/core/_state_data/_energy.py:92:5
+   |
+91 |     # Single Spool Turbojet Residuals
+92 |     compressor_Wc: jnp.ndarray = empty_array()
+   |     ^^^^^^^^^^^^^
+93 |     turbine_Wp: jnp.ndarray = empty_array()
+   |
+
+N815 Variable `turbine_Wp` in class scope should not be mixedCase
+  --> src/flowtangent/core/_state_data/_energy.py:93:5
+   |
+91 |     # Single Spool Turbojet Residuals
+92 |     compressor_Wc: jnp.ndarray = empty_array()
+93 |     turbine_Wp: jnp.ndarray = empty_array()
+   |     ^^^^^^^^^^
+94 |
+95 |     # Dual Spool Turbofan Residuals
+   |
+
+N815 Variable `fan_Wc` in class scope should not be mixedCase
+  --> src/flowtangent/core/_state_data/_energy.py:96:5
+   |
+95 |     # Dual Spool Turbofan Residuals
+96 |     fan_Wc: jnp.ndarray = empty_array()
+   |     ^^^^^^
+97 |     lpc_Wc: jnp.ndarray = empty_array()
+98 |     hpc_Wc: jnp.ndarray = empty_array()
+   |
+
+N815 Variable `lpc_Wc` in class scope should not be mixedCase
+  --> src/flowtangent/core/_state_data/_energy.py:97:5
+   |
+95 |     # Dual Spool Turbofan Residuals
+96 |     fan_Wc: jnp.ndarray = empty_array()
+97 |     lpc_Wc: jnp.ndarray = empty_array()
+   |     ^^^^^^
+98 |     hpc_Wc: jnp.ndarray = empty_array()
+   |
+
+N815 Variable `hpc_Wc` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:98:5
+    |
+ 96 |     fan_Wc: jnp.ndarray = empty_array()
+ 97 |     lpc_Wc: jnp.ndarray = empty_array()
+ 98 |     hpc_Wc: jnp.ndarray = empty_array()
+    |     ^^^^^^
+ 99 |
+100 |     lpt_Wp: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `lpt_Wp` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:100:5
+    |
+ 98 |     hpc_Wc: jnp.ndarray = empty_array()
+ 99 |
+100 |     lpt_Wp: jnp.ndarray = empty_array()
+    |     ^^^^^^
+101 |     hpt_Wp: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `hpt_Wp` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:101:5
+    |
+100 |     lpt_Wp: jnp.ndarray = empty_array()
+101 |     hpt_Wp: jnp.ndarray = empty_array()
+    |     ^^^^^^
+102 |
+103 | @register
+    |
+
+N815 Variable `compressor_Rline` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:185:5
+    |
+183 |     mass_flow_rate: jnp.ndarray = empty_array()
+184 |     rotation_speed: jnp.ndarray = empty_array()
+185 |     compressor_Rline: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^^^^^^^^
+186 |     turbine_PR: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `turbine_PR` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:186:5
+    |
+184 |     rotation_speed: jnp.ndarray = empty_array()
+185 |     compressor_Rline: jnp.ndarray = empty_array()
+186 |     turbine_PR: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^^
+187 |
+188 |     target_thrust: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `fan_Rline` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:203:5
+    |
+201 |     HP_speed: jnp.ndarray = empty_array()
+202 |
+203 |     fan_Rline: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^
+204 |     lpc_Rline: jnp.ndarray = empty_array()
+205 |     hpc_Rline: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `lpc_Rline` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:204:5
+    |
+203 |     fan_Rline: jnp.ndarray = empty_array()
+204 |     lpc_Rline: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^
+205 |     hpc_Rline: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `hpc_Rline` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:205:5
+    |
+203 |     fan_Rline: jnp.ndarray = empty_array()
+204 |     lpc_Rline: jnp.ndarray = empty_array()
+205 |     hpc_Rline: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^
+206 |
+207 |     lpt_PR: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `lpt_PR` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:207:5
+    |
+205 |     hpc_Rline: jnp.ndarray = empty_array()
+206 |
+207 |     lpt_PR: jnp.ndarray = empty_array()
+    |     ^^^^^^
+208 |     hpt_PR: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `hpt_PR` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_energy.py:208:5
+    |
+207 |     lpt_PR: jnp.ndarray = empty_array()
+208 |     hpt_PR: jnp.ndarray = empty_array()
+    |     ^^^^^^
+209 |
+210 |     bypass_ratio: jnp.ndarray = empty_array()
+    |
+
+N815 Variable `delta_ISA` in class scope should not be mixedCase
+   --> src/flowtangent/core/_state_data/_freestream.py:102:5
+    |
+100 |     reynolds_number: jnp.ndarray = empty_array()
+101 |
+102 |     delta_ISA: jnp.ndarray = empty_array()
+    |     ^^^^^^^^^
+103 |     gamma: jnp.ndarray = empty_array()
+104 |     Cp: jnp.ndarray = empty_array()
+    |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/data/data_explorer.py:20:121
+   |
+18 | from flowtangent.core._settings import AnalysisSettings
+19 |
+20 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+21 | # Filter Functions
+22 | # -----------------------------------------------------------------------------------------------------------------------
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/data/data_explorer.py:22:121
+   |
+20 | # -----------------------------------------------------------------------------------------------------------------------
+21 | # Filter Functions
+22 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:119:121
+    |
+119 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+120 | # Wing Functions
+121 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:121:121
+    |
+119 | # -----------------------------------------------------------------------------------------------------------------------
+120 | # Wing Functions
+121 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:156:121
+    |
+156 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+157 | # Data Functions
+158 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:158:121
+    |
+156 | # -----------------------------------------------------------------------------------------------------------------------
+157 | # Data Functions
+158 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+
+NPY002 Replace legacy `np.random.seed` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:163:5
+    |
+161 | @st.cache_data
+162 | def load_mock_data():
+163 |     np.random.seed(42)
+    |     ^^^^^^^^^^^^^^
+164 |     n_points = 100
+165 |     data = {
+    |
+
+NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:166:15
+    |
+164 |     n_points = 100
+165 |     data = {
+166 |         "AR": np.random.uniform(5, 30, n_points),
+    |               ^^^^^^^^^^^^^^^^^
+167 |         "taper": np.random.uniform(0.1, 1.0, n_points),
+168 |         "QC_Sweep": np.random.uniform(0, 60, n_points),
+    |
+
+NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:167:18
+    |
+165 |     data = {
+166 |         "AR": np.random.uniform(5, 30, n_points),
+167 |         "taper": np.random.uniform(0.1, 1.0, n_points),
+    |                  ^^^^^^^^^^^^^^^^^
+168 |         "QC_Sweep": np.random.uniform(0, 60, n_points),
+169 |     }
+    |
+
+NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:168:21
+    |
+166 |         "AR": np.random.uniform(5, 30, n_points),
+167 |         "taper": np.random.uniform(0.1, 1.0, n_points),
+168 |         "QC_Sweep": np.random.uniform(0, 60, n_points),
+    |                     ^^^^^^^^^^^^^^^^^
+169 |     }
+    |
+
+NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:172:17
+    |
+171 |     # Force mock data to align with our discrete grid!
+172 |     raw_alpha = np.random.uniform(-5, 15, n_points)
+    |                 ^^^^^^^^^^^^^^^^^
+173 |     data["alpha"] = np.round(raw_alpha / 0.25) * 0.25
+    |
+
+NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+   --> src/flowtangent/data/data_explorer.py:175:16
+    |
+173 |     data["alpha"] = np.round(raw_alpha / 0.25) * 0.25
+174 |
+175 |     raw_mach = np.random.uniform(0.1, 2.0, n_points)
+    |                ^^^^^^^^^^^^^^^^^
+176 |     data["mach"] = np.round(raw_mach / 0.05) * 0.05
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:325:121
+    |
+325 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+326 | # Streamlit App
+327 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/data/data_explorer.py:327:121
+    |
+325 | # -----------------------------------------------------------------------------------------------------------------------
+326 | # Streamlit App
+327 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+328 |
+329 | # Set layout to wide mode to comfortably fit the three-frame grid
+    |
+
+E501 Line too long (136 > 120)
+   --> src/flowtangent/data/data_explorer.py:429:121
+    |
+427 | …
+428 | …
+429 | … 150, 150, 0.3); height: {VIZ_HEIGHT * 1.2}px; margin-left: 50%;'></div>",
+    |                                                            ^^^^^^^^^^^^^^^^
+430 | …
+431 | …
+    |
+
+E402 Module level import not at top of file
+  --> src/flowtangent/data/gases.py:19:1
+   |
+17 | jax.config.update("jax_enable_x64", True)
+18 |
+19 | import jax.numpy as jnp
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+20 | import numpy as np
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/data/gases.py:20:1
+   |
+19 | import jax.numpy as jnp
+20 | import numpy as np
+   | ^^^^^^^^^^^^^^^^^^
+21 |
+22 | # Flowtangent imports
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/data/gases.py:23:1
+   |
+22 | # Flowtangent imports
+23 | from flowtangent.data import units
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 | from flowtangent.utils.io import _ft_root, register
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/data/gases.py:24:1
+   |
+22 | # Flowtangent imports
+23 | from flowtangent.data import units
+24 | from flowtangent.utils.io import _ft_root, register
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | # ----------------------------------------------------------------------------------------------------------------------
+   |
+help: Move module level imports to top of file
+
+F821 Undefined name `Horizontal_Tail`
+  --> src/flowtangent/functional/mass/transport/operating_systems.py:82:29
+   |
+80 |     s_tail = 0.0
+81 |     for wing in system.wings:
+82 |         if isinstance(wing, Horizontal_Tail) or isinstance(wing, Vertical_Tail):
+   |                             ^^^^^^^^^^^^^^^
+83 |             s_tail += wing.areas.reference
+   |
+
+F821 Undefined name `Vertical_Tail`
+  --> src/flowtangent/functional/mass/transport/operating_systems.py:82:66
+   |
+80 |     s_tail = 0.0
+81 |     for wing in system.wings:
+82 |         if isinstance(wing, Horizontal_Tail) or isinstance(wing, Vertical_Tail):
+   |                                                                  ^^^^^^^^^^^^^
+83 |             s_tail += wing.areas.reference
+   |
+
+F821 Undefined name `Main_Wing`
+  --> src/flowtangent/functional/mass/transport/operating_systems.py:87:33
+   |
+85 |     if s_tail == 0:
+86 |         for wing in system.wings:
+87 |             if isinstance(wing, Main_Wing):
+   |                                 ^^^^^^^^^
+88 |                 s_tail += wing.areas.reference * 0.01
+   |
+
+F821 Undefined name `rcf`
+   --> src/flowtangent/functional/mass/transport/segmented_main_wing.py:218:13
+    |
+217 | def segmented_main_wing(
+218 |     state: "rcf.State",
+    |             ^^^
+219 |     system: "rcf.System",
+220 |     settings: "rcf.Settings",
+    |
+
+F821 Undefined name `rcf`
+   --> src/flowtangent/functional/mass/transport/segmented_main_wing.py:219:14
+    |
+217 | def segmented_main_wing(
+218 |     state: "rcf.State",
+219 |     system: "rcf.System",
+    |              ^^^
+220 |     settings: "rcf.Settings",
+221 | ):
+    |
+
+F821 Undefined name `rcf`
+   --> src/flowtangent/functional/mass/transport/segmented_main_wing.py:220:16
+    |
+218 |     state: "rcf.State",
+219 |     system: "rcf.System",
+220 |     settings: "rcf.Settings",
+    |                ^^^
+221 | ):
+    |
+
+F403 `from .profiles import *` used; unable to detect undefined names
+  --> src/flowtangent/sim/segments/cruise.py:24:1
+   |
+22 | from flowtangent.utils import field
+23 |
+24 | from .profiles import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | # ----------------------------------------------------------------------------------------------------------------------
+   |
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:27:1
+   |
+25 | first_treedef = None
+26 |
+27 | import equinox as eqx
+   | ^^^^^^^^^^^^^^^^^^^^^
+28 | import jax.numpy as jnp
+29 | from jaxopt import Broyden, GaussNewton, ScipyRootFinding
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:28:1
+   |
+27 | import equinox as eqx
+28 | import jax.numpy as jnp
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+29 | from jaxopt import Broyden, GaussNewton, ScipyRootFinding
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:29:1
+   |
+27 | import equinox as eqx
+28 | import jax.numpy as jnp
+29 | from jaxopt import Broyden, GaussNewton, ScipyRootFinding
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 |
+31 | from flowtangent.core._processes import null_step
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:31:1
+   |
+29 | from jaxopt import Broyden, GaussNewton, ScipyRootFinding
+30 |
+31 | from flowtangent.core._processes import null_step
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 | from flowtangent.core._state_data._controls import Control, Residual
+33 | from flowtangent.framework import Process, ProcessStep
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:32:1
+   |
+31 | from flowtangent.core._processes import null_step
+32 | from flowtangent.core._state_data._controls import Control, Residual
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 | from flowtangent.framework import Process, ProcessStep
+34 | from flowtangent.framework.simulation.initialize import *
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:33:1
+   |
+31 | from flowtangent.core._processes import null_step
+32 | from flowtangent.core._state_data._controls import Control, Residual
+33 | from flowtangent.framework import Process, ProcessStep
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+34 | from flowtangent.framework.simulation.initialize import *
+35 | from flowtangent.framework.simulation.update import *
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:34:1
+   |
+32 | from flowtangent.core._state_data._controls import Control, Residual
+33 | from flowtangent.framework import Process, ProcessStep
+34 | from flowtangent.framework.simulation.initialize import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 | from flowtangent.framework.simulation.update import *
+36 | from flowtangent.utils import field, scan_for_invalid_JAX_types
+   |
+help: Move module level imports to top of file
+
+F403 `from flowtangent.framework.simulation.initialize import *` used; unable to detect undefined names
+  --> src/flowtangent/sim/segments/segments.py:34:1
+   |
+32 | from flowtangent.core._state_data._controls import Control, Residual
+33 | from flowtangent.framework import Process, ProcessStep
+34 | from flowtangent.framework.simulation.initialize import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+35 | from flowtangent.framework.simulation.update import *
+36 | from flowtangent.utils import field, scan_for_invalid_JAX_types
+   |
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:35:1
+   |
+33 | from flowtangent.framework import Process, ProcessStep
+34 | from flowtangent.framework.simulation.initialize import *
+35 | from flowtangent.framework.simulation.update import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 | from flowtangent.utils import field, scan_for_invalid_JAX_types
+   |
+help: Move module level imports to top of file
+
+F403 `from flowtangent.framework.simulation.update import *` used; unable to detect undefined names
+  --> src/flowtangent/sim/segments/segments.py:35:1
+   |
+33 | from flowtangent.framework import Process, ProcessStep
+34 | from flowtangent.framework.simulation.initialize import *
+35 | from flowtangent.framework.simulation.update import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 | from flowtangent.utils import field, scan_for_invalid_JAX_types
+   |
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:36:1
+   |
+34 | from flowtangent.framework.simulation.initialize import *
+35 | from flowtangent.framework.simulation.update import *
+36 | from flowtangent.utils import field, scan_for_invalid_JAX_types
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+37 |
+38 | # Flowtangent imports
+   |
+help: Move module level imports to top of file
+
+E402 Module level import not at top of file
+  --> src/flowtangent/sim/segments/segments.py:39:1
+   |
+38 | # Flowtangent imports
+39 | from .profiles import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+40 |
+41 | if TYPE_CHECKING:
+   |
+help: Move module level imports to top of file
+
+F403 `from .profiles import *` used; unable to detect undefined names
+  --> src/flowtangent/sim/segments/segments.py:39:1
+   |
+38 | # Flowtangent imports
+39 | from .profiles import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+40 |
+41 | if TYPE_CHECKING:
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/sim/segments/segments.py:44:121
+   |
+42 |     from flowtangent.framework import Settings, State, System
+43 |
+44 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+45 | # Mission Spinner
+46 | # -----------------------------------------------------------------------------------------------------------------------
+   |
+
+E501 Line too long (121 > 120)
+  --> src/flowtangent/sim/segments/segments.py:46:121
+   |
+44 | # -----------------------------------------------------------------------------------------------------------------------
+45 | # Mission Spinner
+46 | # -----------------------------------------------------------------------------------------------------------------------
+   |                                                                                                                         ^
+
+F405 `NamedResidual` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:112:40
+    |
+110 | def _activate_residual(res: str | Residual, state):
+111 |
+112 |     if isinstance(res, str) and res in NamedResidual:
+    |                                        ^^^^^^^^^^^^^
+113 |         current_residual = getattr(state.dynamics, res)
+114 |         active_residual = replace(current_residual, active=True)
+    |
+
+F405 `expand_state` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:132:43
+    |
+130 | def _initialization_steps():
+131 |     return (
+132 |         ProcessStep(tag="State", function=expand_state),
+    |                                           ^^^^^^^^^^^^
+133 |         ProcessStep(tag="Time", function=initialize_time),
+134 |         ProcessStep(tag="Mass", function=initialize_mass),
+    |
+
+F405 `initialize_time` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:133:42
+    |
+131 |     return (
+132 |         ProcessStep(tag="State", function=expand_state),
+133 |         ProcessStep(tag="Time", function=initialize_time),
+    |                                          ^^^^^^^^^^^^^^^
+134 |         ProcessStep(tag="Mass", function=initialize_mass),
+135 |         ProcessStep(tag="Energy", function=initialize_energy),
+    |
+
+F405 `initialize_mass` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:134:42
+    |
+132 |         ProcessStep(tag="State", function=expand_state),
+133 |         ProcessStep(tag="Time", function=initialize_time),
+134 |         ProcessStep(tag="Mass", function=initialize_mass),
+    |                                          ^^^^^^^^^^^^^^^
+135 |         ProcessStep(tag="Energy", function=initialize_energy),
+136 |         ProcessStep(tag="Inertial Position", function=initialize_inertial_position),
+    |
+
+F405 `initialize_energy` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:135:44
+    |
+133 |         ProcessStep(tag="Time", function=initialize_time),
+134 |         ProcessStep(tag="Mass", function=initialize_mass),
+135 |         ProcessStep(tag="Energy", function=initialize_energy),
+    |                                            ^^^^^^^^^^^^^^^^^
+136 |         ProcessStep(tag="Inertial Position", function=initialize_inertial_position),
+137 |         ProcessStep(tag="Planetary Position", function=initialize_planetary_position),
+    |
+
+F405 `initialize_inertial_position` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:136:55
+    |
+134 |         ProcessStep(tag="Mass", function=initialize_mass),
+135 |         ProcessStep(tag="Energy", function=initialize_energy),
+136 |         ProcessStep(tag="Inertial Position", function=initialize_inertial_position),
+    |                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+137 |         ProcessStep(tag="Planetary Position", function=initialize_planetary_position),
+138 |         ProcessStep(tag="Analyses", function=null_step),
+    |
+
+F405 `initialize_planetary_position` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:137:56
+    |
+135 |         ProcessStep(tag="Energy", function=initialize_energy),
+136 |         ProcessStep(tag="Inertial Position", function=initialize_inertial_position),
+137 |         ProcessStep(tag="Planetary Position", function=initialize_planetary_position),
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+138 |         ProcessStep(tag="Analyses", function=null_step),
+139 |     )
+    |
+
+F405 `NamedResidual` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:146:29
+    |
+145 |     active_controls: tuple[str | Control, ...] = field(tuple)
+146 |     active_residuals: tuple[NamedResidual, ...] = field(tuple)
+    |                             ^^^^^^^^^^^^^
+147 |
+148 |     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
+    |
+
+F405 `update_time_differentials` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:212:56
+    |
+210 | def _default_analyses():
+211 |     return (
+212 |         ProcessStep(tag="Time Differentials", function=update_time_differentials),
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+213 |         ProcessStep(tag="Acceleration", function=update_acceleration),
+214 |         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+    |
+
+F405 `update_acceleration` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:213:50
+    |
+211 |     return (
+212 |         ProcessStep(tag="Time Differentials", function=update_time_differentials),
+213 |         ProcessStep(tag="Acceleration", function=update_acceleration),
+    |                                                  ^^^^^^^^^^^^^^^^^^^
+214 |         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+215 |         ProcessStep(tag="Freestream", function=update_freestream),
+    |
+
+F405 `update_angular_acceleration` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:214:58
+    |
+212 |         ProcessStep(tag="Time Differentials", function=update_time_differentials),
+213 |         ProcessStep(tag="Acceleration", function=update_acceleration),
+214 |         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+    |                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+215 |         ProcessStep(tag="Freestream", function=update_freestream),
+216 |         ProcessStep(tag="Orientations", function=update_orientations),
+    |
+
+F405 `update_freestream` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:215:48
+    |
+213 |         ProcessStep(tag="Acceleration", function=update_acceleration),
+214 |         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+215 |         ProcessStep(tag="Freestream", function=update_freestream),
+    |                                                ^^^^^^^^^^^^^^^^^
+216 |         ProcessStep(tag="Orientations", function=update_orientations),
+217 |         ProcessStep(tag="Energy", function=null_step),
+    |
+
+F405 `update_orientations` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:216:50
+    |
+214 |         ProcessStep(tag="Angular Acceleration", function=update_angular_acceleration),
+215 |         ProcessStep(tag="Freestream", function=update_freestream),
+216 |         ProcessStep(tag="Orientations", function=update_orientations),
+    |                                                  ^^^^^^^^^^^^^^^^^^^
+217 |         ProcessStep(tag="Energy", function=null_step),
+218 |         ProcessStep(tag="Aerodynamics", function=null_step),
+    |
+
+F405 `update_mass_and_weight` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:220:42
+    |
+218 |         ProcessStep(tag="Aerodynamics", function=null_step),
+219 |         ProcessStep(tag="Stability", function=null_step),
+220 |         ProcessStep(tag="Mass", function=update_mass_and_weight),
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^
+221 |         ProcessStep(tag="Forces", function=update_forces),
+222 |         ProcessStep(tag="Moments", function=update_moments),
+    |
+
+F405 `update_forces` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:221:44
+    |
+219 |         ProcessStep(tag="Stability", function=null_step),
+220 |         ProcessStep(tag="Mass", function=update_mass_and_weight),
+221 |         ProcessStep(tag="Forces", function=update_forces),
+    |                                            ^^^^^^^^^^^^^
+222 |         ProcessStep(tag="Moments", function=update_moments),
+223 |         ProcessStep(tag="Planetary Position", function=update_planetary_position),
+    |
+
+F405 `update_moments` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:222:45
+    |
+220 |         ProcessStep(tag="Mass", function=update_mass_and_weight),
+221 |         ProcessStep(tag="Forces", function=update_forces),
+222 |         ProcessStep(tag="Moments", function=update_moments),
+    |                                             ^^^^^^^^^^^^^^
+223 |         ProcessStep(tag="Planetary Position", function=update_planetary_position),
+224 |         ProcessStep(tag="Calculate Residuals", function=flight_dynamics_residuals),
+    |
+
+F405 `update_planetary_position` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:223:56
+    |
+221 |         ProcessStep(tag="Forces", function=update_forces),
+222 |         ProcessStep(tag="Moments", function=update_moments),
+223 |         ProcessStep(tag="Planetary Position", function=update_planetary_position),
+    |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+224 |         ProcessStep(tag="Calculate Residuals", function=flight_dynamics_residuals),
+225 |     )
+    |
+
+F405 `flight_dynamics_residuals` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:224:57
+    |
+222 |         ProcessStep(tag="Moments", function=update_moments),
+223 |         ProcessStep(tag="Planetary Position", function=update_planetary_position),
+224 |         ProcessStep(tag="Calculate Residuals", function=flight_dynamics_residuals),
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+225 |     )
+    |
+
+F405 `NamedResidual` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:466:29
+    |
+464 |     # Pass-through configuration for InitializeSegment
+465 |     active_controls: tuple[str | Control, ...] = field(tuple)
+466 |     active_residuals: tuple[NamedResidual, ...] = field(tuple)
+    |                             ^^^^^^^^^^^^^
+467 |     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
+    |
+
+F405 `CourseProfile` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:469:21
+    |
+467 |     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
+468 |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+    |                     ^^^^^^^^^^^^^
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+    |
+
+F405 `ConstantCourse` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:469:43
+    |
+467 |     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
+468 |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+    |                                           ^^^^^^^^^^^^^^
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+    |
+
+F405 `PositionProfile` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:470:23
+    |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+    |                       ^^^^^^^^^^^^^^^
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+    |
+
+F405 `ConstantAltitude` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:470:47
+    |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+    |                                               ^^^^^^^^^^^^^^^^
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+    |
+
+F405 `SpeedProfile` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:471:20
+    |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+    |                    ^^^^^^^^^^^^
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |
+
+F405 `ConstantSpeed` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:471:41
+    |
+469 |     course_profile: CourseProfile = field(ConstantCourse)
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+    |                                         ^^^^^^^^^^^^^
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |
+
+F405 `VelocityProfile` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:472:23
+    |
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+    |                       ^^^^^^^^^^^^^^^
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |
+
+F405 `ConstantAltitudeChangeRate` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:472:47
+    |
+470 |     position_profile: PositionProfile = field(ConstantAltitude)
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |
+
+F405 `DurationProfile` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:473:23
+    |
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |                       ^^^^^^^^^^^^^^^
+474 |
+475 |     # Global dynamics variables
+    |
+
+F405 `FixedDistance` may be undefined, or defined from star imports
+   --> src/flowtangent/sim/segments/segments.py:473:47
+    |
+471 |     speed_profile: SpeedProfile = field(ConstantSpeed)
+472 |     velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+473 |     duration_profile: DurationProfile = field(FixedDistance)
+    |                                               ^^^^^^^^^^^^^
+474 |
+475 |     # Global dynamics variables
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/sim/segments/segments.py:548:121
+    |
+548 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+549 | # Fixed/Unconverged Segments
+550 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/sim/segments/segments.py:550:121
+    |
+548 | # -----------------------------------------------------------------------------------------------------------------------
+549 | # Fixed/Unconverged Segments
+550 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/sim/segments/segments.py:595:121
+    |
+595 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+596 | # Optimal Segments
+597 | # -----------------------------------------------------------------------------------------------------------------------
+    |
+
+E501 Line too long (121 > 120)
+   --> src/flowtangent/sim/segments/segments.py:597:121
+    |
+595 | # -----------------------------------------------------------------------------------------------------------------------
+596 | # Optimal Segments
+597 | # -----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^
+
+E501 Line too long (122 > 120)
+   --> src/flowtangent/sim/segments/segments.py:674:121
+    |
+674 | # #-----------------------------------------------------------------------------------------------------------------------
+    |                                                                                                                         ^^
+675 | # # Energy Optimal Segments
+    |
+
+F841 Local variable `root_finder` is assigned to but never used
+  --> src/flowtangent/sim/update/converge_roots.py:24:5
+   |
+22 | ):
+23 |
+24 |     root_finder = Settings.root_finder
+   |     ^^^^^^^^^^^
+help: Remove assignment to unused variable `root_finder`
+
+E701 Multiple statements on one line (colon)
+  --> src/flowtangent/utils/base.py:44:36
+   |
+42 |         annotations = namespace.get('__annotations__', {})
+43 |         for key, hint in annotations.items():
+44 |             if key.startswith("__"): continue
+   |                                    ^
+45 |
+46 |             hint_str = str(hint)
+   |
+
+E701 Multiple statements on one line (colon)
+   --> src/flowtangent/utils/io.py:129:34
+    |
+128 |         for k, v in obj.__dict__.items():
+129 |             if k.startswith("__"): continue
+    |                                  ^
+130 |
+131 |             if has_default:
+    |
+
+E501 Line too long (148 > 120)
+   --> src/flowtangent/utils/io.py:198:121
+    |
+197 | …
+198 | …e_path}" if name else f"Successfully saved {type(obj).__name__} to {file_path}")
+    |                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+199 | …
+200 | …
+    |
+
+E501 Line too long (152 > 120)
+   --> src/flowtangent/utils/io.py:206:121
+    |
+204 | …
+205 | …
+206 | …lename}" if name else f"Successfully loaded {type(obj).__name__} from {filename}")
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+207 | …
+    |
+
+E731 Do not assign a `lambda` expression, use a `def`
+  --> src/flowtangent/utils/tree.py:69:5
+   |
+67 |         )
+68 |
+69 |     where_fn = lambda s: get_all_targets(s, paths)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+70 |     vals = tuple(p.value for p in paths)
+71 |     return eqx.tree_at(where_fn, obj, vals)
+   |
+help: Rewrite `where_fn` as a `def`
+
+E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   --> src/flowtangent/utils/tree.py:165:8
+    |
+163 | def is_equivalent(a, b):
+164 |     """Safely checks deep equality between any two PyTrees, arrays, or scalars."""
+165 |     if type(a) != type(b):
+    |        ^^^^^^^^^^^^^^^^^^
+166 |         return False
+    |
+
+E501 Line too long (131 > 120)
+   --> src/flowtangent/utils/tree.py:273:121
+    |
+272 |     lines = []
+273 |     header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 15 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
+    |                                                                                                                         ^^^^^^^^^^^
+274 |     lines.append(header)
+275 |     lines.append("-" * 100)
+    |
+
+Found 188 errors.
+[*] 6 fixable with the `--fix` option (19 hidden fixes can be enabled with the `--unsafe-fixes` option).

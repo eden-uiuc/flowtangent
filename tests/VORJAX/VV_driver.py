@@ -30,7 +30,7 @@ from plotly.subplots import make_subplots
 
 import flowtangent.utils as tu
 
-from flowtangent.library import units
+from flowtangent.data import units
 from flowtangent.library.components import Areas
 from flowtangent.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
 from flowtangent.library.components.airfoils import Airfoil, Airfoil_Data
@@ -38,8 +38,8 @@ from flowtangent.library.components.airfoils import Airfoil, Airfoil_Data
 from flowtangent.library.methods.aero.Transonic import ensemble_CL_spline
 
 from flowtangent.framework import Process, State, Aircraft, Settings, JacobianMap, System
-from flowtangent.framework.settings import AnalysisSettings
-from flowtangent.framework.state_data import Time
+from flowtangent.core._settings import AnalysisSettings
+from flowtangent.core._state_data import Time
 
 from flowtangent.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from flowtangent.framework.analyses.batched import ShardedDatasetGenerator

@@ -16,9 +16,10 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings
     from flowtangent.framework.methods.aero.VORJAX.panelization import VortexDistribution
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import System
+
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import System
 
 from flowtangent.utils import inputs, outputs
 

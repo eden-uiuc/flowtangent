@@ -16,13 +16,14 @@ import jax.numpy as jnp
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import System
 
-from flowtangent.utils import inputs, outputs
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import System
 
 from flowtangent.library.methods.aero.Shocks import oblique_shock, theta_beta_mach
+
+from flowtangent.utils import inputs, outputs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation

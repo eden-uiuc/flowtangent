@@ -1,11 +1,11 @@
-import os
 import gzip
-import json
-import string
 import itertools
+import json
+import os
+import string
 import warnings
-from typing import Callable, Any
 from pathlib import Path
+from typing import Any, Callable
 
 import jax.numpy as jnp
 import numpy as np
@@ -32,9 +32,9 @@ def outputs(*outputs: str):
 def parse_io(io_string: str, var_map: dict | Any) -> set:
     io_parts = io_string.split(":")
     io_string = io_parts[0].strip()
-    
+
     required_keys = [
-        tup[1] for tup in string.Formatter().parse(io_string) 
+        tup[1] for tup in string.Formatter().parse(io_string)
         if tup[1] is not None
     ]
 
@@ -70,12 +70,12 @@ def parse_io(io_string: str, var_map: dict | Any) -> set:
 
     keys = list(normalized_map.keys())
     value_lists = list(normalized_map.values())
-    
+
     resolved_paths = set()
     for combination in itertools.product(*value_lists):
         combo_dict = dict(zip(keys, combination))
         resolved_paths.add(io_string.format(**combo_dict))
-            
+
     return resolved_paths
 
 def jax_path_string(jax_path: tuple) -> str:
@@ -113,40 +113,40 @@ def serialize_node(obj):
         if obj.size == 1:
             return obj.item()
         return {"__type__": "ndarray", "data": obj.tolist()}
-        
+
     elif type(obj).__name__ in FlowTangent_REGISTRY:
         cls = type(obj)
         state = {}
-        
+
         try:
             default_obj = cls()
             has_default = True
         except TypeError:
             default_obj = None
             has_default = False
-            
+
         for k, v in obj.__dict__.items():
             if k.startswith("__"): continue
-                
+
             if has_default:
                 default_v = getattr(default_obj, k, None)
                 if is_equivalent(v, default_v):
                     continue
-                    
+
             state[k] = serialize_node(v)
-            
+
         return {"__class__": cls.__name__, "state": state}
-        
+
     elif isinstance(obj, list):
         return {"__type__": "list", "data": [serialize_node(i) for i in obj]}
     elif isinstance(obj, tuple):
         return {"__type__": "tuple", "data": [serialize_node(i) for i in obj]}
     elif isinstance(obj, dict):
         return {"__type__": "dict", "data": {k: serialize_node(v) for k, v in obj.items()}}
-        
+
     elif isinstance(obj, (int, float, str, bool, type(None))):
         return obj
-        
+
     else:
         name = getattr(obj, "name", str(obj))
         warnings.warn(f"Attempted to save '{name}' with unregistered class {type(obj).__name__}.", UserWarning)
@@ -155,23 +155,23 @@ def serialize_node(obj):
 def deserialize_node(data):
     if not isinstance(data, dict):
         return data
-        
+
     if "__class__" in data:
         cls_name = data["__class__"]
         if cls_name not in FlowTangent_REGISTRY:
             raise ValueError(f"Class '{cls_name}' is not registered and cannot be loaded.")
-            
+
         cls = FlowTangent_REGISTRY[cls_name]
         try:
             instance = cls()
         except TypeError:
             instance = object.__new__(cls)
-        
+
         for k, v in data["state"].items():
             object.__setattr__(instance, k, deserialize_node(v))
-            
+
         return instance
-        
+
     elif data.get("__type__") == "ndarray":
         return jnp.array(data["data"])
     elif data.get("__type__") == "list":
@@ -180,7 +180,7 @@ def deserialize_node(data):
         return tuple(deserialize_node(i) for i in data["data"])
     elif data.get("__type__") == "dict":
         return {k: deserialize_node(v) for k, v in data["data"].items()}
-        
+
     return data
 
 def save_data(obj, filename: str | Path):
@@ -190,17 +190,17 @@ def save_data(obj, filename: str | Path):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         payload = serialize_node(obj)
-    
+
     with gzip.open(file_path, 'wt', encoding='utf-8') as f:
         json.dump(payload, f)
-        
+
     name = getattr(obj, "name", "")
     print(f"Successfully saved {type(obj).__name__} '{name}' to {file_path}" if name else f"Successfully saved {type(obj).__name__} to {file_path}")
 
 def load_data(filename: str | Path) -> Any:
     with gzip.open(filename, 'rt', encoding='utf-8') as f:
         payload = json.load(f)
-        
+
     obj = deserialize_node(payload)
     name = getattr(obj, "name", "")
     print(f"Successfully loaded {type(obj).__name__} '{name}' from {filename}" if name else f"Successfully loaded {type(obj).__name__} from {filename}")

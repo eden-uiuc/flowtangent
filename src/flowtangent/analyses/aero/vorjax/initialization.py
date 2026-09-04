@@ -16,9 +16,9 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     from flowtangent.library.components.wings import Wing
 
-    from flowtangent.framework.settings import Settings
-    from flowtangent.framework.state import State
-    from flowtangent.framework.systems import Aircraft
+    from flowtangent.core._settings import Settings
+    from flowtangent.core._state import State
+    from flowtangent.core._systems import Aircraft
 
 from flowtangent.utils import inputs, outputs
 

@@ -3,7 +3,7 @@
 
 import os
 import sys
-import time
+
 
 def numerical_environment():
     """Configures hardware and NUMA affinity before JAX initializes."""
@@ -13,7 +13,7 @@ def numerical_environment():
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
     os.environ["JAX_PLATFORM_NAME"] = "gpu"
-    
+
     if sys.platform == "linux":
         cpu_count = os.cpu_count() or 1
         if cpu_count > 16:
@@ -22,7 +22,7 @@ def numerical_environment():
                 os.sched_setaffinity(0, node_0_cores)
                 os.environ["OMP_PROC_BIND"] = "true"
                 os.environ["OMP_PLACES"] = "cores"
-                print(f"Hardware Config: NUMA affinity set to Node 0 (16 cores).")
+                print("Hardware Config: NUMA affinity set to Node 0 (16 cores).")
             except Exception as e:
                 print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
 
@@ -42,7 +42,7 @@ def initialize_jax_cache(cache_dir="~/.eden_trace/jax_cache", max_size_gb=2.0, m
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):
     # (Paste your exact _prune_cache logic here from the old utils.py)
-    pass 
+    pass
 
 def configure_environment(settings):
     """Configures global JAX and XLA compiler flags at runtime."""
@@ -51,7 +51,7 @@ def configure_environment(settings):
         os.environ["JAX_LOGGING_LEVEL"] = "DEBUG"
         os.environ["JAX_DEBUG_LOG_MODULES"] = "jax._src.compiler, jax._src.lru_cache"
         os.environ["JAX_EXPLAIN_CACHE_MISSES"] = "1"
-        
+
     if settings.DEBUG_MODE:
         jax.config.update("jax_disable_jit", True)
         jax.config.update("jax_debug_nans", True)

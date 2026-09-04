@@ -28,13 +28,12 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 
-from flowtangent.utils import field, scan_for_invalid_JAX_types
-
+from flowtangent.core._processes import null_step
+from flowtangent.core._state_data._controls import Control, Residual
 from flowtangent.framework import Process, ProcessStep
-from flowtangent.framework.state_data.controls import Control, Residual
 from flowtangent.framework.simulation.initialize import *
 from flowtangent.framework.simulation.update import *
-from flowtangent.framework.processes import null_step
+from flowtangent.utils import field, scan_for_invalid_JAX_types
 
 # Flowtangent imports
 from .profiles import *

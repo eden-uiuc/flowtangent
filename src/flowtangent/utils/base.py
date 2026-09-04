@@ -1,8 +1,10 @@
 # src/eden_trace/utils/base.py
-from typing import Any, dataclass_transform
 from functools import partial
+from typing import Any, dataclass_transform
+
 import equinox as eqx
 import jax.numpy as jnp
+
 
 def null_step(*args):
     """A generic no-op function that returns its inputs unchanged."""
@@ -40,11 +42,11 @@ class StateDataMeta(type(eqx.Module)):
         annotations = namespace.get('__annotations__', {})
         for key, hint in annotations.items():
             if key.startswith("__"): continue
-            
+
             hint_str = str(hint)
             if ("ndarray" in hint_str or "Array" in hint_str) and key not in namespace:
                 namespace[key] = empty_array()
-                
+
         return super().__new__(mcs, name, bases, namespace)
 
 class StateData(Module, metaclass=StateDataMeta):

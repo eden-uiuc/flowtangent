@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+
 @jax.jit
 def cubic_spline_blender(x, start, end):
     """Smoothly blends values between 0.0 and 1.0 using a cubic spline."""
