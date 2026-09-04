@@ -29,6 +29,27 @@ from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_pare
 #  Settings
 # ----------------------------------------------------------------------------------------------------------------------
 
+class StaticModuleMeta(type(eqx.Module)):
+    def __new__(mcs, name, bases, namespace):
+        annotations = namespace.get('__annotations__', {})
+        for key in annotations:
+            # Skip internal python/equinox variables
+            if key.startswith("__"): continue
+            
+            # If they provided a default (e.g. `val: int = 5`), wrap it
+            if key in namespace:
+                val = namespace[key]
+                # Don't double-wrap if they're already fields
+                if not getattr(val, 'metadata', None): 
+                    namespace[key] = init_field(val, static=True)
+            # If there's no default (e.g. `val: int`), inject an empty static field
+            else:
+                namespace[key] = eqx.field(static=True)
+                
+        return super().__new__(mcs, name, bases, namespace)
+
+class StaticModule(eqx.Module, metaclass=StaticModuleMeta):
+    pass
 
 # Analysis Settings ----------------------------------------------------------------------------------------------------
 
@@ -36,31 +57,31 @@ from eden_trace.utils import init_field, DataPath, get_all_targets, get_all_pare
 # Mass Analysis ----------------------------------------------------------------
 
 
-class ReductionFactors(eqx.Module):
-    main_wing: float = 0.0
-    fuselage: float = 0.0
-    empennage: float = 0.0
-    systems: float = 0.0
+class ReductionFactors(StaticModule):
+    main_wing:  float = 0.0
+    fuselage:   float = 0.0
+    empennage:  float = 0.0
+    systems:    float = 0.0
 
 
-class SizingFractions(eqx.Module):
-    rudder_sizing: float = 0.25
+class SizingFractions(StaticModule):
+    rudder_sizing: float = init_field(0.25, static=True)
 
 
-class MassAnalysisSettings(eqx.Module):
+class MassAnalysisSettings(StaticModule):
     reduction_factors: ReductionFactors = init_field(ReductionFactors)
     sizing_fractions: SizingFractions = init_field(SizingFractions)
 
 # Energy Analysis --------------------------------------------------------------
 
-class EnergyAnalysisSettings(eqx.Module):
+class EnergyAnalysisSettings(StaticModule):
     report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)
 
     build_network: bool = init_field(True)
     clear_nodes: bool = init_field(True)
 
 
-class AnalysisSettings[E_Type: EnergyAnalysisSettings](eqx.Module):
+class AnalysisSettings[E_Type: EnergyAnalysisSettings](StaticModule):
     aerodynamics: Optional[eqx.Module] = None
     energy: E_Type = init_field(EnergyAnalysisSettings)
     mass: MassAnalysisSettings = init_field(MassAnalysisSettings)
@@ -68,7 +89,7 @@ class AnalysisSettings[E_Type: EnergyAnalysisSettings](eqx.Module):
 
 #  Numerical Settings --------------------------------------------------------------------------------------------------
 
-class JacobianMap(eqx.Module):
+class JacobianMap(StaticModule):
     inputs: tuple[DataPath, ...] = eqx.field(static=True)
     outputs: tuple[DataPath, ...] = eqx.field(static=True)
 
@@ -170,8 +191,13 @@ class JacobianMap(eqx.Module):
         else:
             return jnp.concatenate([out.reshape(-1) for out in outputs], axis=-1)
 
+class JacobianSettings(StaticModule):
 
-class NumericalSettings(eqx.Module):
+    calculate: bool = init_field(False, static=True)
+    couple_time: bool = init_field(True, static=True)
+    mapping: Optional[JacobianMap] = init_field(None, static=True)
+
+class NumericalSettings(StaticModule):
     
     relative_tolerance: float = init_field(1e-5, static=True)
     absolute_tolerance: float = init_field(1e-5, static=True)
@@ -186,8 +212,8 @@ class NumericalSettings(eqx.Module):
     maximum_graph_complexity: int = init_field(1e6, static=True)
 
     sum_residuals: bool = init_field(False, static=True)
-    calculate_jacobian: bool = init_field(False, static=True)
-    jacobian_map: Optional[JacobianMap] = init_field(None, static=True)
+
+    jacobian: JacobianSettings = init_field(JacobianSettings, static=True)
 
 #  Numerical Settings --------------------------------------------------------------------------------------------------
 
@@ -227,7 +253,7 @@ class JAXCompileFilter(logging.Filter):
         return True
 
 
-class LoggingSettings(eqx.Module):
+class LoggingSettings(StaticModule):
 
     handle: Optional[str] = init_field(None, static=True)
     log_dir: Optional[str | Path] = init_field(None, static=True)
@@ -288,7 +314,7 @@ class LoggingSettings(eqx.Module):
 
 #  Full Settings -------------------------------------------------------------------------------------------------------
 
-class Settings(eqx.Module):
+class Settings(StaticModule):
     tag: str = init_field("Settings", static=True)
 
     report_units: Literal["SI", "Imperial"] = init_field("SI", static=True)

@@ -24,6 +24,7 @@ from eden_trace.library.planets import Earth, Planet
 #  Atmospheres
 # ----------------------------------------------------------------------------------------------------------------------
 
+# TODO: Convert Atmospheres to Standardized Tables Like Gases
 
 class AtmosphericBreakpoints(eqx.Module):
     altitude: jnp.ndarray

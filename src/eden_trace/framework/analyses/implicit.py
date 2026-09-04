@@ -234,6 +234,7 @@ class ImplicitAnalysis(Process):
             **kwds
         ) -> None:
         super().__init__(**kwds)
+
         self.analyze = analyze
         self.solver = solver
         self.solver_options = solver_options
@@ -341,7 +342,7 @@ class ImplicitAnalysis(Process):
     
             return control_state
 
-    def _initialize_controls(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
+    def initialize_controls(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
         control_values = []
         
         for ctrl in self.controls:
@@ -715,7 +716,7 @@ class ImplicitAnalysis(Process):
 
         if initialize:
             state, system, settings = array_barrier(state, system, settings)
-            state, system, settings = self._initialize_controls(state, system, settings)
+            state, system, settings = self.initialize_controls(state, system, settings)
 
         if not track_history:
             return self(state, system, settings)

@@ -32,9 +32,10 @@ from eden_trace.library import units
 
 from ..maps import data as map_data
 from ..maps.classes import CompressorMap, TurbineMap
-from ..nodes import GraphInput, GraphNode, Splitter, FlowNode, FlowDesign, BleedFlow
-from eden_trace.library.gases import Air, BurnedJetA, Gas
-from eden_trace.library.propellants import JetA, Propellant
+from ..nodes import GraphInput, GraphNode, Splitter, FlowNode, FlowOpPoint, BleedFlow
+from ....gases import Air, BurnedJetA, Gas
+from ....propellants import JetA, Propellant
+from ....atmospheres import USStandard1976
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Turbojet Components
@@ -681,7 +682,7 @@ class Turbine(FlowNode):
         else:
             eng_des = system.energy.line.engine.design_parameters
         W_des = eng_des.mass_flow_rate
-        Wp_res = (W - state.energy.mass_flow_rate)/W_des
+        Wp_res = (W / (1. + FAR) - state.energy.mass_flow_rate)/W_des
         updated_state = eqx.tree_at(
             lambda s: getattr(s.energy.residual, f"{self.tag.lower()}_Wp"),
             updated_state,
@@ -1118,10 +1119,10 @@ def _engine_performance(
     safe_F_actual = jnp.maximum(F_actual, 1e-9)
     
     I_sp = F_actual / (safe_mdot_fuel * g)
-    TSFC = (safe_mdot_fuel / safe_F_actual) * (1.0 - delta_SFC) / units.hr
+    TSFC = (safe_mdot_fuel / safe_F_actual) * (1.0 - delta_SFC) #/ units.hr
     
     # Fuel flow in kg/hr
-    ff = mdot_fuel * units.parse('kg/hr')
+    ff = mdot_fuel #* units.parse('kg/hr')
     
     specific_thrust_core = F_actual / mdot_core
 
@@ -1173,17 +1174,17 @@ class JetKinematics(eqx.Module):
     turbine: float = 0.4
 
 @register
-class TurbojetDesign[KinType: JetKinematics | FanKinematics](FlowDesign):
+class TurbojetOpPoint[KinType: JetKinematics | FanKinematics](FlowOpPoint):
     
     tag: str = init_field("TOC", static=True) # Top-of-Climb design point by default
     
     # Performance Parameters
-    thrust: float = 0.0
+    thrust:     float = 0.0
     SLS_thrust: float = 0.0
-    delta_SFC: float = 0.0
+    delta_SFC:  float = 0.0
 
     # Flight Conditions
-    altitude: float = 0.0
+    altitude:    float = 0.0
     mach_number: float = 1e-6
 
     temperature: float = 288.15  # Kelvin
@@ -1200,8 +1201,10 @@ class TurbojetDesign[KinType: JetKinematics | FanKinematics](FlowDesign):
     turbine_intake_temperature: float = 0.0
     afterburner_exit_temperature: float = 0.0
     
-    # Control Values
+    # Control/Residual Values
+    FAR: float = 1e-2
     TSFC: float = 0.0
+    compressor_Rline: float = 2.0
     mass_flow_rate: float = 100 * units.kg/units.s
     rotation_speed: float = 8_000 * units.rev/units.mins    # Single spool
     turbine_PR: float = 5.0                                 # Single spool
@@ -1209,15 +1212,42 @@ class TurbojetDesign[KinType: JetKinematics | FanKinematics](FlowDesign):
 
     exit_mach_numbers: KinType = init_field(JetKinematics, static=True)
 
+    def update_state(self, state: State):
+        a0 = state.freestream.atmosphere.compute_speed_of_sound(self.altitude)
+        M0 = self.mach_number
+
+        op_state = eqx.tree_at(
+                lambda s: (
+                    s.frames.inertial.position_vector,
+                    s.freestream.mach_number,
+                    s.frames.inertial.velocity_vector,
+                    s.energy.target_thrust,
+                    s.energy.target_temperature
+                ),
+                state,
+                (
+                    jnp.array([[0., 0., -self.altitude]]),
+                    jnp.atleast_2d(self.mach_number),
+                    jnp.atleast_2d(jnp.array([[(a0 * M0).item(), 0.0, 0.0]])),
+                    jnp.atleast_2d(self.thrust),
+                    jnp.atleast_2d(self.turbine_intake_temperature)
+                ),
+            )
+        op_state = op_state.expand_time()
+
+        return op_state
+
+        
+
 @register
-class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
+class TurbojetEngine(FlowNode[TurbojetOpPoint]):
     tag: str = init_field("Engine", static=True)
     subcomponents: tuple = init_field(_TurbojetSetup)
 
     plug_diameter: float = 0.0
 
     working_fluid: Gas = init_field(Air)
-    design_parameters: TurbojetDesign | tuple = init_field(TurbojetDesign)
+    design_parameters: TurbojetOpPoint = init_field(TurbojetOpPoint)
 
     inputs: tuple | GraphInput = init_field(
         (
@@ -1379,7 +1409,7 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
                     GraphInput("fuel", "self.burner"),
                     GraphInput("residual", "self.turboshaft"),
                 ),
-                design_parameters=TurbojetDesign(
+                design_parameters=TurbojetOpPoint(
                     mach_number=1e-6,
                     altitude=0.0,
                     thrust=data.get("Takeoff Thrust (lbf)", 0.0) * units.lbf,
@@ -1388,6 +1418,63 @@ class TurbojetEngine(FlowNode[TurbojetDesign | tuple]):
                     turbine_intake_temperature=(data.get("TIT (F)", 2300.0) + 459.67) * units.R,
                     mass_flow_rate=data.get("Takeoff Airflow (lbm/s)", 0.0) * units.lbm / units.s,
                 ))
+
+    def design_update(self):
+
+        des = self.design_parameters
+
+        OPR = des.overall_pressure_ratio
+        if isinstance(des, TurbofanDesign):
+            k = (OPR / 240.0 ) ** (1.0 / 3.0)
+            fan_PR = 3.0 * k
+            LPC_PR = 4.0 * k
+            HPC_PR = 20.0 * k
+            
+            des_engine = eqx.tree_at(lambda e: (
+                e.inlet.design_parameters.pressure_recovery,
+                e.fan.design_parameters.rotation_speed,
+                e.fan.design_parameters.pressure_ratio,
+                e.lpc.design_parameters.rotation_speed,
+                e.lpc.design_parameters.pressure_ratio,
+                e.hpc.design_parameters.rotation_speed,
+                e.hpc.design_parameters.pressure_ratio,
+                e.burner.design_parameters.pressure_ratio,
+                e.burner.design_parameters.output_temperature,
+                e.hpt.design_parameters.rotation_speed,
+                e.lpt.design_parameters.rotation_speed,
+            ),
+            self,(
+                des.inlet_pressure_recovery,
+                des.lp_rotation_speed,
+                fan_PR,
+                des.lp_rotation_speed,
+                LPC_PR,
+                des.hp_rotation_speed,
+                HPC_PR,
+                des.burner_pressure_ratio,
+                des.turbine_intake_temperature,
+                des.hp_rotation_speed,
+                des.lp_rotation_speed,
+            ))
+        else:
+            des_engine = eqx.tree_at(lambda e: (
+                e.compressor.design_parameters.rotation_speed,
+                e.compressor.design_parameters.pressure_ratio,
+                e.burner.design_parameters.pressure_ratio,
+                e.burner.design_parameters.output_temperature,
+                e.turbine.design_parameters.rotation_speed,
+                e.turbine.design_parameters.pressure_ratio
+            ),
+            self,(
+                des.rotation_speed,
+                OPR,
+                des.burner_pressure_ratio,
+                des.turbine_intake_temperature,
+                des.rotation_speed,
+                des.turbine_PR
+            ))
+
+        return des_engine
 
     @tu.inputs(
         "state.freestream",
@@ -1623,7 +1710,7 @@ class FanKinematics(eqx.Module):
     core_nozzle_duct: float = 0.45
 
 @register
-class TurbofanDesign(TurbojetDesign[FanKinematics]):
+class TurbofanDesign(TurbojetOpPoint[FanKinematics]):
 
     # Control Values
     bypass_ratio: float = 0.0

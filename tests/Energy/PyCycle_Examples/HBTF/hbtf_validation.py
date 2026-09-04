@@ -16,7 +16,7 @@ from pathlib import Path
 from eden_trace.utils import save_data, load_data, format_array
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.nodes import FlowDesign
+from eden_trace.library.components.energy.nodes import FlowOpPoint
 from eden_trace.library.components.energy.nodes import Efficiencies as Eff
 
 from eden_trace.library.components.energy.networks import TurbofanNetwork
@@ -38,14 +38,14 @@ def system_setup():
             bypass_ratio=5.105))
     
     # Inlet & Fan
-    inlet_des = FlowDesign(exit_mach_number=0.751, pressure_recovery=0.999)
-    fan_des = FlowDesign(
+    inlet_des = FlowOpPoint(exit_mach_number=0.751, pressure_recovery=0.999)
+    fan_des = FlowOpPoint(
         pressure_ratio=1.685,
         exit_mach_number=0.4578,
         eff=Eff(flow=0.8948))
     
-    c_duct_des = FlowDesign(pressure_ratio=(1-0.0048), exit_mach_number=0.3121)
-    f_duct_des = FlowDesign(pressure_ratio=(1-0.0149), exit_mach_number=0.4589)
+    c_duct_des = FlowOpPoint(pressure_ratio=(1-0.0048), exit_mach_number=0.3121)
+    f_duct_des = FlowOpPoint(pressure_ratio=(1-0.0149), exit_mach_number=0.4589)
 
     engine = eqx.tree_at(lambda e: (
         e.inlet.design_parameters,
@@ -55,21 +55,21 @@ def system_setup():
     ), engine, (inlet_des, fan_des, c_duct_des, f_duct_des))
     
     # Compressors
-    lpc_des = FlowDesign(
+    lpc_des = FlowOpPoint(
             pressure_ratio=1.935,
             rotation_speed=5000. * units.rev/units.mins,
             exit_mach_number=0.3059,
             eff=Eff(flow=0.9243),)
 
-    c_stat_des = FlowDesign(pressure_ratio=(1-0.0101), exit_mach_number=0.3563)
+    c_stat_des = FlowOpPoint(pressure_ratio=(1-0.0101), exit_mach_number=0.3563)
 
-    hpc_des = FlowDesign(
+    hpc_des = FlowOpPoint(
             pressure_ratio=9.369,
             rotation_speed=15000. * units.rev/units.mins,
             exit_mach_number=0.2442,
             eff = Eff(flow=0.8707))
     
-    cool_des = FlowDesign(exit_mach_number=0.3)
+    cool_des = FlowOpPoint(exit_mach_number=0.3)
 
     engine = eqx.tree_at(lambda e: (
         e.lpc.design_parameters,
@@ -79,7 +79,7 @@ def system_setup():
     ), engine, (lpc_des, c_stat_des, hpc_des, cool_des))
     
     # Combustor
-    burn_des = FlowDesign(
+    burn_des = FlowOpPoint(
         output_temperature=2857 * units.R,
         pressure_ratio=(1.0 - 0.054),
         exit_mach_number=0.1025,)
@@ -90,14 +90,14 @@ def system_setup():
         burn_des)
     
     # Turbines
-    hpt_des = FlowDesign(
+    hpt_des = FlowOpPoint(
         eff=Eff(flow=0.8888),
         rotation_speed=15000. * units.rev/units.mins,
         exit_mach_number=0.3650,)
     
-    t_stat_des = FlowDesign(pressure_ratio=(1-0.0051), exit_mach_number=0.3063)
+    t_stat_des = FlowOpPoint(pressure_ratio=(1-0.0051), exit_mach_number=0.3063)
     
-    lpt_des = FlowDesign(
+    lpt_des = FlowOpPoint(
         rotation_speed=5000. * units.rev/units.mins,
         exit_mach_number=0.4127,
         eff=Eff(flow=0.8996),)
@@ -109,10 +109,10 @@ def system_setup():
     ), engine, (hpt_des, t_stat_des, lpt_des))
 
     # Nozzles
-    cn_duct_des = FlowDesign(pressure_ratio=(1-0.0107), exit_mach_number=0.4463)
-    cn_des = FlowDesign(eff=Eff(flow=0.9933))
+    cn_duct_des = FlowOpPoint(pressure_ratio=(1-0.0107), exit_mach_number=0.4463)
+    cn_des = FlowOpPoint(eff=Eff(flow=0.9933))
     
-    fn_des = FlowDesign(eff=Eff(flow=0.9939))
+    fn_des = FlowOpPoint(eff=Eff(flow=0.9939))
 
     engine = eqx.tree_at(lambda e: (
         e.core_nozzle_duct.design_parameters,

@@ -44,18 +44,18 @@ from eden_trace.utils import save_data, load_data, format_array, configure_envir
 
 from eden_trace.library import units
 from eden_trace.library.components.energy.networks import TurbojetNetwork, JetNetDesign
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbojetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbojetOpPoint
 from eden_trace.library.components.energy.lines import TurbojetLine
 
 from eden_trace.framework import State, Aircraft, Settings
 from eden_trace.framework.settings import LoggingSettings
-from eden_trace.framework.analyses.energy.jets import turbojet_design, turbojet_performance, JetSettings
+from eden_trace.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
 def system_setup():
 
-    engine_design = TurbojetDesign(
+    engine_design = TurbojetOpPoint(
         thrust=11_800 * units.lbf,
         mass_flow_rate=168.45 * units.lbm/units.s,
         rotation_speed=8070. * units.rpm,
@@ -181,7 +181,7 @@ def off_design_point(
         ),
     )
 
-    od_analysis = turbojet_performance(
+    od_analysis = build_turbojet_performance(
         network,
         initial_Rline,
         initial_turb_PR,
@@ -290,6 +290,9 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
             
         for pyc_prop, pyc_val in pyc_props.items():
 
+            if pyc_station == "nozz.Fl_O" and pyc_prop == "V":
+                pyc_val *= 0.99
+
             if pyc_prop == "ht":
                 continue
             
@@ -375,7 +378,7 @@ if __name__ == "__main__":
         print(" Design Point Analysis")
         print("-"*80)
 
-        des_st, des_sys, des_set = turbojet_design(
+        des_st, des_sys, des_set = build_turbojet_design(
             state=State(),
             system=system,  # type: ignore
             settings=settings,

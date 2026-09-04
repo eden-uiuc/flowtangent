@@ -24,7 +24,7 @@ from .graph_network import build_analysis_from_network
 from eden_trace.utils import DataPath, init_field
 
 from eden_trace.library import units
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetOpPoint
 
 from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis
@@ -52,7 +52,7 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     network: TurbojetNetwork | TurbofanNetwork = system.energy
     engine: TurbojetEngine = network.line.engine
-    des: TurbojetDesign | TurbofanDesign = engine.design_parameters
+    des: TurbojetOpPoint | TurbofanDesign = engine.design_parameters
     if isinstance(des, tuple):
         des = des[0]
 
@@ -167,12 +167,12 @@ def _design_update(state: State, system: Aircraft, settings: Settings) -> tuple[
 
     return des_state, des_system, des_settings, base_analysis
 
-def turbojet_design(state: State, system: Aircraft, settings: Settings, initialize: bool = False):
+def build_turbojet_design(state: State, system: Aircraft, settings: Settings):
 
     # Setup test state according to design parameters
 
     des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
-    des: TurbojetDesign = des_system.energy.line.engine.design_parameters
+    des: TurbojetOpPoint = des_system.energy.line.engine.design_parameters
 
     mass_ctrl = Control(
         tag="Mass Flow Rate",
@@ -208,7 +208,7 @@ def turbojet_design(state: State, system: Aircraft, settings: Settings, initiali
         residuals=(d_thrust, d_power),
     )
 
-    return design_analysis.run(des_state, des_system, des_settings, initialize=initialize)
+    return des_state, des_system, des_settings, design_analysis
 
 def turbofan_design(state: State, system: Aircraft, settings: Settings) -> ImplicitAnalysis:
 
@@ -271,14 +271,12 @@ def turbofan_design(state: State, system: Aircraft, settings: Settings) -> Impli
 #  Off-Design Performance Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
-def turbojet_performance(
+def build_turbojet_performance(
         network: TurbojetNetwork,
-        initial_Rline: float | jnp.ndarray = 2.0,
-        initial_turb_PR: float | jnp.ndarray = 5.0,
-        initial_RPM: float | jnp.ndarray = 10_000 * units.rev / units.mins,
-        initial_MFR: float | jnp.ndarray = 100 * units.kg / units.s,
-        initial_FAR: float | jnp.ndarray = 1e-2,
+        operating_parameters:  TurbojetOpPoint
     ):
+
+    op = operating_parameters
 
     # Compressor Map Bounds ----------------------------------------------------
 
@@ -315,7 +313,7 @@ def turbojet_performance(
     Rline = Control(
         tag="Rline",
         state_path=DataPath(("energy", "compressor_Rline")),
-        initial_value=initial_Rline,
+        initial_value=op.compressor_Rline,
         bounds=R_bnds,
         scaling='logistic'
     )
@@ -323,7 +321,7 @@ def turbojet_performance(
     turb_PR = Control(
         tag="Turbine Pressure Ratio",
         state_path=DataPath(("energy", "turbine_PR")),
-        initial_value=initial_turb_PR,
+        initial_value=op.turbine_PR,
         bounds=PR_bnds,
         scaling='logistic'
     )
@@ -331,23 +329,23 @@ def turbojet_performance(
     N = Control(
         tag="Rotation Speed",
         state_path=DataPath(("energy", "rotation_speed")),
-        initial_value=initial_RPM,
-        bounds=(initial_RPM * 0.5, initial_RPM * 2.0),
+        initial_value=op.rotation_speed,
+        bounds=(op.rotation_speed * 0.5, op.rotation_speed * 2.0),
         scaling='logistic'
     )
 
     W = Control(
         tag="Mass Flow Rate",
         state_path=DataPath(("energy", "mass_flow_rate")),
-        initial_value=initial_MFR,
-        bounds=(initial_MFR * 0.5, initial_MFR * 2.0),
+        initial_value=op.mass_flow_rate,
+        bounds=(op.mass_flow_rate * 0.5, op.mass_flow_rate * 2.0),
         scaling='logistic'
     )
 
     FAR = Control(
         tag="Fuel Air Ratio",
         state_path=DataPath(("energy", "fuel_air_ratio")),
-        initial_value=initial_FAR,
+        initial_value=op.FAR,
         bounds=FAR_bnds,
         scaling='logistic'
     )

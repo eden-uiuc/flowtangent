@@ -8,7 +8,7 @@ def numerical_environment():
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
-    os.environ["JAX_PLATFORM_NAME"] = "cpu"
+    os.environ["JAX_PLATFORM_NAME"] = "gpu"
     
     # 2. NUMA / Hardware Auto-Detection
     if sys.platform == "linux":
@@ -50,6 +50,7 @@ import equinox as eqx
 
 from tqdm import tqdm
 from pathlib import Path
+from dataclasses import replace
 
 import warnings
 from openmdao.utils.om_warnings import OpenMDAOWarning, SolverWarning
@@ -64,17 +65,17 @@ warnings.filterwarnings('ignore', category=SolverWarning)
 from simple_turbojet import Turbojet
 from turbojet_validation import system_setup as ft_turbojet
 
-from eden_trace.utils import configure_environment
-from eden_trace.framework import State, Settings
-from eden_trace.framework.settings import NumericalSettings
+from eden_trace.utils import DataPath, configure_environment
+from eden_trace.framework import State, Settings, Process
+from eden_trace.framework.settings import NumericalSettings, JacobianMap
 from eden_trace.framework.analyses.batched import BatchedAnalysis
-from eden_trace.framework.analyses.energy.jets import _design_update, turbojet_design, turbojet_performance, JetSettings
+from eden_trace.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
 from eden_trace.framework.simulation.update import update_freestream
 
 from eden_trace.library import units
 from eden_trace.library.atmospheres import USStandard1976
-from eden_trace.library.components.energy.jets.classes import TurbojetDesign
+from eden_trace.library.components.energy.jets.classes import TurbojetOpPoint
 
 pact_primal_calls = 0
 pact_vjp_calls = 0
@@ -916,112 +917,97 @@ def run_flowtangent_benchmark(N_points):
     #---------------------------------------------------------------------------
     t_setup_start = time.perf_counter()
 
-    # Design Point Setup -----------------------------------
     state = State()
     system = ft_turbojet()
     settings = eqx.tree_at(
-        lambda s: s.analysis.energy,
-        Settings(DEBUG_MODE=False),
-        JetSettings(design_mode=True, statics=False)
+        lambda s: (s.analysis.energy, s.numerical),
+        Settings(DEBUG_MODE=True),
+        (
+            JetSettings(design_mode=True, statics=False),
+            NumericalSettings(
+                batch_size=N_points,
+                calculate_jacobian=True,
+                jacobian_map=JacobianMap(
+                    system_inputs=(DataPath((
+                        "energy",
+                        "nodes",
+                        "network.line.engine.compressor",
+                        "design_parameters",
+                        "pressure_ratio")),),
+                    state_outputs=(DataPath((
+                        "energy",
+                        "nodes",
+                        "network.line.engine",
+                        "fuel",
+                        "TSFC"
+                    )),)
+                )),
+        )
     )
-
     configure_environment(settings)
 
-    des_state, des_system, des_settings, base_analysis = _design_update(state, system, settings)
-    des: TurbojetDesign = des_system.energy.line.engine.design_parameters
+    # Design Point Setup -----------------------------------
+    des_state, des_system, des_settings, design_node = build_turbojet_design(
+        state,
+        system,
+        settings
+    )
+
+    if settings.DEBUG_MODE:
+        debug_des = design_node.run(des_state, des_system, des_settings)
 
     # Off-Design Point Setup -------------------------------
 
-    alt     = 5_000 * units.ft
-    M0      = 0.2
-    atmo    = USStandard1976()
-    a0      = atmo.compute_speed_of_sound(alt)
-
-    od_state = eqx.tree_at(
-        lambda s: (
-            s.frames.inertial.position_vector,
-            s.freestream.mach_number,
-            s.frames.inertial.velocity_vector,
-        ),
-        State().expand_time(1),
-        (
-            jnp.array([[0., 0., -alt]]),
-            jnp.atleast_2d(M0),
-            jnp.atleast_2d(jnp.array([[(a0 * M0).item(), 0.0, 0.0]])),
-        ),
+    od = TurbojetOpPoint(
+        altitude=5_000 * units.ft,
+        mach_number=0.2,
+        thrust=8_000 * units.lbf,
+        mass_flow_rate=168.453135137 * units.parse('lbm/s'),
+        rotation_speed=8197.38 * units.rpm,
+        turbine_PR=4.669,
+        FAR=0.0168
     )
 
-    od_settings = eqx.tree_at(
-        lambda s: (s.analysis.energy, s.numerical),
-        Settings(DEBUG_MODE=False),
-        (
-            JetSettings(design_mode=False, statics=False),
-            NumericalSettings(batch_size=N_points),
-        )
-    )
+    od_state = od.update_state(des_state)
 
-    od_state, _, _ = initialize_energy(od_state, system, od_settings)
-    od_state, _, _ = update_freestream(od_state, system, od_settings)
-    od_state = eqx.tree_at(
-            lambda s: (
-                s.energy.target_thrust,
-            ),
-            od_state,
-            (
-                jnp.atleast_2d(8_000 * units.lbf),
+    od_state, _, _ = update_freestream(od_state, des_system, settings)
+    od_base_analysis = build_turbojet_performance(des_system.energy, od)
+    od_node = BatchedAnalysis(tag="Off-Design Analysis", analyze=od_base_analysis)
+
+    def design_handover(swap_state, swap_system, swap_settings):
+    
+            updated_settings = eqx.tree_at(
+                lambda s: s.analysis.energy,
+                swap_settings,
+                replace(swap_settings.analysis.energy, design_mode=False)
             )
-        )
 
-    od_base_analysis = turbojet_performance(
-        network=system.energy,
-        initial_Rline=2.0,
-        initial_turb_PR=4.669,
-        initial_RPM=8197.38 * units.rpm,
-        initial_MFR=168.453135137 * units.parse('lbm/s'),
-        initial_FAR=0.0168,
-        )
+            new_state, new_system, new_settings = od_node.initialize(od_state, swap_system, updated_settings)
+            
+            return new_state, new_system, new_settings
 
-    od_analysis = BatchedAnalysis(tag="Off-Design Analysis", analyze=od_base_analysis)
+    pact_process = Process(
+        tag='PACT Benchmark',
+        steps=(design_node, design_handover, od_node),
+        initialize=design_node.initialize_controls
+        )
 
     def cycle_objective(comp_pr):
-        obj_sys = eqx.tree_at(lambda s:
-            (
-                s.energy.line.engine.design_parameters.overall_pressure_ratio,
-                s.energy.line.engine.compressor.design_parameters.pressure_ratio,
-            ),
-            system,
-            (comp_pr, comp_pr)
-        )
-
-        des_st, des_sys, des_set = turbojet_design(
-            state,
-            obj_sys,
-            settings,
-            initialize=True)
-
-
-        # debug_base = od_base_analysis.run(od_state, des_sys, od_settings, initialize=True)
-
-        od_st, od_sys, od_set = od_analysis.run(
-            od_state,
-            des_sys,
-            od_settings,
-            initialize=True
-        )
-
-        return jnp.mean(od_st.energy.nodes['network.line.engine'].fuel.TSFC)
+        f_st, f_sys, f_set = pact_process.run(des_state, des_system, des_settings)
+        return f_st.process_jacobian
 
     t_setup_end = time.perf_counter()
 
-    # debug_tsfc = cycle_objective(13.5)
+    if des_settings.DEBUG_MODE:
+        debug_tsfc = cycle_objective(1000.0)
 
     #---------------------------------------------------------------------------
     # Compilation
     #---------------------------------------------------------------------------
 
     t_comp_start = time.perf_counter()
-    grad_func = jax.jit(jax.value_and_grad(cycle_objective))
-    _ = grad_func.lower(13.5).compile()
+    grad_func = jax.jit(pact_process.__call__)
+    _ = grad_func.lower(des_state, des_system, des_settings).compile()
     t_comp_end = time.perf_counter()
 
     #---------------------------------------------------------------------------
@@ -1029,7 +1015,9 @@ def run_flowtangent_benchmark(N_points):
     #---------------------------------------------------------------------------
 
     t_exec_start = time.perf_counter()
-    mean_tsfc, grad = grad_func(13.5)
+    f_st, f_sys, f_set = pact_process.run(des_state, des_system, des_settings)
+    grad = f_st.process_jacobian / units.parse('lbm/(hr*lbf)')
+    mean_tsfc = f_st.energy.nodes['network.line.engine'].fuel.TSFC
     mean_tsfc.block_until_ready()
     t_exec_end = time.perf_counter()
 
@@ -1059,9 +1047,6 @@ def run_flowtangent_benchmark(N_points):
         primal_calls, 
         jac_calls
     )
-    
-
-        
 
 #===============================================================================
 # HELPER FUNCTIONS
@@ -1161,7 +1146,7 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         ("MAUD Monolithic", run_monolithic_benchmark, 'r-o'),
         ("Hybrid PACT", run_pact_hybrid_benchmark, 'b-o'),
         ("Python PACT", run_pact_python_benchmark, 'm-o'),
-        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o')
+        ("FlowTangent GPU", run_flowtangent_benchmark, 'g-o')
         # ("MAUD Opaque AD", run_maud_opaque_ad_benchmark, 'g-o'),
         # ("MAUD Opaque FD", run_maud_opaque_fd_benchmark, 'm-o'),
     ]
@@ -1210,6 +1195,8 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
 
 if __name__ == "__main__":
-    N_array = [1, 2, 5, 10, 20, 30, 40, 50]
+    N_array = [1,
+            #    2, 5, 10, 20, 30, 40, 50
+               ]
     fig_fn = test_dir / 'architecture_scaling_benchmark.png'
     Compare_Architectures(N_array, fig_fn)

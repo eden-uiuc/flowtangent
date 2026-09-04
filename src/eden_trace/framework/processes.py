@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 import os
 import re
+import math
 import time
 import inspect
 import warnings
@@ -167,6 +168,13 @@ class ProcessStep(eqx.Module):
 
 def array_barrier(state:State, system:System, settings:Settings):
 
+    """
+    Forces every numerical leaf of state (at least 2d) and system (at least 1d) to become JAX arrays.
+    This both standardizes the shape of the arrays and ensures they don't share memory
+    (e.g. Python may cache every instance of 0.0 to be the same memory address) so that when
+    they're partitioned based on memory ID for tracing, there's no collisions.
+    """
+
     def _to_array(leaf, ndim: int = 1):
         # 1. Check if it's a raw scalar, a list/tuple of scalars, OR already an array
         is_scalar = isinstance(leaf, (float, int, complex))
@@ -201,7 +209,7 @@ class Process(ProcessStep):
     tag: str = init_field("Process", static=True)
     steps: tuple[ProcessStep, ...] = ()
     
-    initialize: TraceFunction = init_field(array_barrier, static=True)
+    initialize: TraceFunction = init_field(null_step, static=True)
     initial_step: int = init_field(0, static=True)
 
     _initial_state: Optional[State] = init_field(None)
@@ -218,7 +226,7 @@ class Process(ProcessStep):
         self,
         steps: Sequence[ProcessStep | TraceFunction] = (),
         tag: str = "Process",
-        initialize: TraceFunction = array_barrier,
+        initialize: TraceFunction = null_step,
         initial_step: int = 0,
         _initial_state: Optional[State] = None,
         _initial_system: Optional[System] = None,
@@ -299,7 +307,7 @@ class Process(ProcessStep):
                     flat_st, flat_sys, state, system, settings
                 )
                 
-                final_st = eqx.tree_at(lambda s: s.numerics.jacobian, final_st, jacobian_matrix)
+                final_st = eqx.tree_at(lambda s: s.process_jacobian, final_st, jacobian_matrix)
                 return final_st, final_sys, final_setts
             else: warnings.warn(f"Process '{self.tag}' Jacobian called with no Jacbian Map set. Jacobian will not be calculated.")
 
@@ -315,7 +323,7 @@ class Process(ProcessStep):
 
     def _run_with_raw_history(self, state, system, settings):
         if settings.DEBUG_MODE or settings._DEV_MODE:
-            print(f"Beginning Process: '{se.lf.tag}'")
+            print(f"Beginning Process: '{self.tag}'")
         history = [(state, system, settings)]
 
         for step in self.steps[self.initial_step :]:
@@ -345,35 +353,76 @@ class Process(ProcessStep):
             out_array, vjp_fn, aux = jax.vjp(
                 objective_fn, flat_st, flat_sys, base_state, base_system, base_settings, has_aux=True
             )
-            has_B = (flat_st.ndim == 2)
+            
+            is_coupled_time = getattr(base_settings.numerical, 'coupled_time_jacobian', False)
+            
+            # Determine shapes based on your strict (B, T, F) or (T, F) rules
+            ndim = out_array.ndim
+            N_o = out_array.shape[-1]
+            has_B = (ndim == 3)
+            
+            B = out_array.shape[0] if has_B else 1
+            T = out_array.shape[1] if has_B else out_array.shape[0]
 
-            if has_B:
-                B, N_o = out_array.shape
+            if not is_coupled_time:
+                # =========================================================
+                # PATH A: FAST BLOCK-DIAGONAL (Independent Time Steps)
+                # Cost: O(N_o) VJP passes
+                # =========================================================
+                basis_st = jnp.eye(N_o).reshape(N_o, 1, 1, N_o) if has_B else jnp.eye(N_o).reshape(N_o, 1, N_o)
+                basis_st = jnp.broadcast_to(basis_st, (N_o, B, T, N_o) if has_B else (N_o, T, N_o))
                 
-                # 1. State Jacobian (Fast Block-Diagonal O(N_o) Pass)
-                basis_st = jnp.broadcast_to(jnp.eye(N_o)[:, None, :], (N_o, B, N_o))
-                jac_tuple = jax.vmap(vjp_fn, out_axes=(1, 0, 0, 0, 0))(basis_st)
-                jac_st = jac_tuple[0]  # (B, N_o, N_st)
-
-                # 2. System Jacobian (Dense O(B * N_o) Pass, only if System inputs exist)
+                jac_tuple = jax.vmap(vjp_fn)(basis_st)
+                
+                jac_st = jnp.moveaxis(jac_tuple[0], 0, -2) # -> (B, T, N_o, N_st) or (T, N_o, N_st)
+                
                 if flat_sys.size > 0:
-                    basis_sys = jnp.eye(B * N_o).reshape(B * N_o, B, N_o)
+                    # System is usually dense across the batch
+                    B_total = B * T
+                    basis_sys = jnp.eye(B_total * N_o).reshape(B_total * N_o, B, T, N_o) if has_B else jnp.eye(B_total * N_o).reshape(B_total * N_o, T, N_o)
                     jac_sys_tuple = jax.vmap(vjp_fn)(basis_sys)
-                    # Reshape the 1D gradients back to batched layout
-                    jac_sys = jac_sys_tuple[1].reshape(B, N_o, -1)
+                    
+                    jac_sys = jac_sys_tuple[1].reshape(B, T, N_o, -1) if has_B else jac_sys_tuple[1].reshape(T, N_o, -1)
                     batched_jacobian = jnp.concatenate([jac_st, jac_sys], axis=-1)
                 else:
                     batched_jacobian = jac_st
+
             else:
-                # Unbatched O(N_o) Pass
-                N_o = out_array.shape[0]
-                basis = jnp.eye(N_o)
-                jac_tuple = jax.vmap(vjp_fn)(basis)
-                jac_st, jac_sys = jac_tuple[0], jac_tuple[1]
+                # =========================================================
+                # PATH B: DENSE TEMPORAL (Optimal Control)
+                # Cost: O(T * N_o) VJP passes
+                # =========================================================
+                # We map over (T * N_o) to capture cross-time sensitivities
+                T_No = T * N_o
                 
-                batched_jacobian = jnp.concatenate([jac_st, jac_sys], axis=-1) if flat_sys.size > 0 else jac_st
+                if has_B:
+                    # Independent across batches, fully dense across time
+                    basis_st = jnp.eye(T_No).reshape(T_No, 1, T, N_o)
+                    basis_st = jnp.broadcast_to(basis_st, (T_No, B, T, N_o))
+                    
+                    jac_tuple = jax.vmap(vjp_fn)(basis_st) # Output: (T*N_o, B, T, N_st)
+                    jac_st = jnp.moveaxis(jac_tuple[0], 1, 0) # -> (B, T*N_o, T, N_st)
+                    jac_st = jac_st.reshape(B, T, N_o, T, -1) # -> (B, T_out, N_o, T_in, N_st)
+                else:
+                    basis_st = jnp.eye(T_No).reshape(T_No, T, N_o)
+                    jac_tuple = jax.vmap(vjp_fn)(basis_st) # Output: (T*N_o, T, N_st)
+                    jac_st = jac_tuple[0].reshape(T, N_o, T, -1) # -> (T_out, N_o, T_in, N_st)
+
+                if flat_sys.size > 0:
+                    # System is dense across everything
+                    B_total = B * T if has_B else T
+                    basis_sys = jnp.eye(B_total * N_o).reshape(B_total * N_o, B, T, N_o) if has_B else jnp.eye(B_total * N_o).reshape(B_total * N_o, T, N_o)
+                    jac_sys_tuple = jax.vmap(vjp_fn)(basis_sys)
+                    
+                    # You may need to adapt this reshape depending on if System variables are constant over time or time-varying
+                    jac_sys = jac_sys_tuple[1].reshape(B, T, N_o, -1) if has_B else jac_sys_tuple[1].reshape(T, N_o, -1)
+                    # Note: Concatenating State (5D) with System (4D) requires flattening the time dimensions for the solver
+                    batched_jacobian = (jac_st, jac_sys) # Returned as a tuple for optimal control solvers
+                else:
+                    batched_jacobian = jac_st
 
             return batched_jacobian, aux[0], aux[1], aux[2]
+
 
         return batched_jacrev_fn
 
@@ -394,6 +443,8 @@ class Process(ProcessStep):
         state: State, system: System, settings: Settings, *,
         initialize: bool = True, track_history: bool = False
     ):
+
+        state, system, settings = array_barrier(state, system, settings)
 
         if initialize:
             state, system, settings = self.initialize(state, system, settings)

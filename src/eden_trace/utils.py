@@ -66,6 +66,62 @@ def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
     """Syntactic sugar for an empty JAX array in an Equinox module."""
     return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
+class StaticModuleMeta(type(eqx.Module)):
+    def __new__(mcs, name, bases, namespace):
+        annotations = namespace.get('__annotations__', {})
+        for key in annotations:
+            # Skip internal python/equinox variables
+            if key.startswith("__"): continue
+            
+            # If they provided a default (e.g. `val: int = 5`), wrap it
+            if key in namespace:
+                val = namespace[key]
+                # Don't double-wrap if they're already fields
+                if not getattr(val, 'metadata', None): 
+                    namespace[key] = init_field(val, static=True)
+            # If there's no default (e.g. `val: int`), inject an empty static field
+            else:
+                namespace[key] = eqx.field(static=True)
+                
+        return super().__new__(mcs, name, bases, namespace)
+
+class StaticModule(eqx.Module, metaclass=StaticModuleMeta):
+    pass
+
+class StateDataMeta(type(eqx.Module)):
+    
+    def __new__(mcs, name, bases, namespace):
+        # 1. Intercept annotations before the class is built
+        annotations = namespace.get('__annotations__', {})
+        
+        for key, hint in annotations.items():
+            if key.startswith("__"): 
+                continue
+            
+            # Safely convert the type hint to a string to catch both 
+            # literal types (jnp.ndarray) and stringified future annotations
+            hint_str = str(hint)
+            is_array = "ndarray" in hint_str or "Array" in hint_str
+            
+            # If it's an array type and they didn't provide a default
+            if is_array and key not in namespace:
+                # Inject the empty array into the class definition
+                namespace[key] = empty_array()
+                
+        # Hand the modified namespace back to Equinox to finish building the class
+        return super().__new__(mcs, name, bases, namespace)
+
+    def __init__(cls, name, bases, namespace):
+        super().__init__(name, bases, namespace)
+        
+        # 2. Automatically register the class after it is built
+        # We check the name so we don't accidentally register the base class itself
+        if name != "StateData":
+            if name in FlowTangent_REGISTRY:
+                raise ValueError(f"FlowTangent class '{name}' is already registered.")
+            FlowTangent_REGISTRY[name] = cls
+
+class StateData(eqx.Module, metaclass=StateDataMeta)
 
 # ---------------------------------------------------------
 # Programmatic Helpers
@@ -281,11 +337,11 @@ def get_parent_target(obj, path_tuple: DataPath):
     return obj
 
 
-def get_target(obj, path_tuple: DataPath):
+def get_target(obj, data_path: DataPath):
     """Gets the target and applies the slice if one exists."""
-    parent = get_parent_target(obj, path_tuple)
-    if hasattr(parent, "__getitem__") and path_tuple.path_slice != slice(None):
-        return parent[path_tuple.path_slice]
+    parent = get_parent_target(obj, data_path)
+    if hasattr(parent, "__getitem__") and data_path.path_slice != slice(None):
+        return parent[data_path.path_slice]
     return parent
 
 def get_all_parents(s, input_map: Sequence[DataPath]):
@@ -462,16 +518,16 @@ def inspect_leaves(tree, mask, settings, tree_name:str="Tree", depth:int=3):
 # Saving and Loading
 #----------------------------------------------------------
 
-Trace_REGISTRY = {}
+FlowTangent_REGISTRY = {}
 
 def register(cls):
     """Decorator to safely register any Trace class for standalone serialization."""
-    if cls.__name__ in Trace_REGISTRY:
+    if cls.__name__ in FlowTangent_REGISTRY:
         raise ValueError(f"Trace class '{cls.__name__}' is already registered.")
-    Trace_REGISTRY[cls.__name__] = cls
+    FlowTangent_REGISTRY[cls.__name__] = cls
     return cls
 
-def serialize_Trace_node(obj):
+def serialize_node(obj):
     """Recursively walks data, skipping attributes that match class defaults."""
     
     # 1. JAX or Numpy Array
@@ -482,7 +538,7 @@ def serialize_Trace_node(obj):
             return {"__type__": "ndarray", "data": obj.tolist()}
         
     # 2. Registered Trace Class
-    elif type(obj).__name__ in Trace_REGISTRY:
+    elif type(obj).__name__ in FlowTangent_REGISTRY:
         cls = type(obj)
         state = {}
         
@@ -505,17 +561,17 @@ def serialize_Trace_node(obj):
                 if is_equivalent(v, default_v):
                     continue  # SKIP SAVING! Massive file size reduction.
                     
-            state[k] = serialize_Trace_node(v)
+            state[k] = serialize_node(v)
             
         return {"__class__": cls.__name__, "state": state}
         
     # 3. Standard Python Containers
     elif isinstance(obj, list):
-        return {"__type__": "list", "data": [serialize_Trace_node(i) for i in obj]}
+        return {"__type__": "list", "data": [serialize_node(i) for i in obj]}
     elif isinstance(obj, tuple):
-        return {"__type__": "tuple", "data": [serialize_Trace_node(i) for i in obj]}
+        return {"__type__": "tuple", "data": [serialize_node(i) for i in obj]}
     elif isinstance(obj, dict):
-        return {"__type__": "dict", "data": {k: serialize_Trace_node(v) for k, v in obj.items()}}
+        return {"__type__": "dict", "data": {k: serialize_node(v) for k, v in obj.items()}}
         
     # 4. Standard Scalars
     elif isinstance(obj, (int, float, str, bool, type(None))):
@@ -532,19 +588,19 @@ def serialize_Trace_node(obj):
                 "Trace will be unable to load this data until the class is registered.", UserWarning)
         return {"__type__": "unknown", "data": str(obj)}
 
-def deserialize_Trace_node(data):
+def deserialize_node(data):
     """Unpacks JSON, relying on default initializers to fill in missing attributes."""
     if not isinstance(data, dict):
         return data
         
-    # 1. Reconstruct Trace Classes
+    # 1. Reconstruct Flowtangent Classes
     if "__class__" in data:
         cls_name = data["__class__"]
         
-        if cls_name not in Trace_REGISTRY:
-            raise ValueError(f"Class '{cls_name}' is not a registered Trace class and cannot be loaded.")
+        if cls_name not in FlowTangent_REGISTRY:
+            raise ValueError(f"Class '{cls_name}' is not a registered FlowTangent class and cannot be loaded.")
             
-        cls = Trace_REGISTRY[cls_name]
+        cls = FlowTangent_REGISTRY[cls_name]
         
         # Conjure the instance
         try:
@@ -557,7 +613,7 @@ def deserialize_Trace_node(data):
         
         # Overwrite defaults with any saved differences
         for k, v in data["state"].items():
-            object.__setattr__(instance, k, deserialize_Trace_node(v))
+            object.__setattr__(instance, k, deserialize_node(v))
             
         return instance
         
@@ -567,11 +623,11 @@ def deserialize_Trace_node(data):
         
     # 3. Reconstruct Containers
     elif data.get("__type__") == "list":
-        return [deserialize_Trace_node(i) for i in data["data"]]
+        return [deserialize_node(i) for i in data["data"]]
     elif data.get("__type__") == "tuple":
-        return tuple(deserialize_Trace_node(i) for i in data["data"])
+        return tuple(deserialize_node(i) for i in data["data"])
     elif data.get("__type__") == "dict":
-        return {k: deserialize_Trace_node(v) for k, v in data["data"].items()}
+        return {k: deserialize_node(v) for k, v in data["data"].items()}
         
     return data
 
@@ -585,7 +641,7 @@ def save_data(obj, filename:str | Path):
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-        payload = serialize_Trace_node(obj)
+        payload = serialize_node(obj)
     
     with gzip.open(filename, 'wt', encoding='utf-8') as f:
         json.dump(payload, f)
@@ -595,7 +651,6 @@ def save_data(obj, filename:str | Path):
     else:
         print(f"Successfully saved {type(obj).__name__} to {file_path}")
 
-
 def load_data(filename: str | Path) -> Any:
     """
     Loads any Trace data structure from a file.
@@ -604,7 +659,7 @@ def load_data(filename: str | Path) -> Any:
     with gzip.open(filename, 'rt', encoding='utf-8') as f:
         payload = json.load(f)
         
-    obj = deserialize_Trace_node(payload)
+    obj = deserialize_node(payload)
     
     if hasattr(obj, "tag") and obj.tag:
         print(f"Successfully loaded {type(obj).__name__} '{obj.tag}' from {filename}")

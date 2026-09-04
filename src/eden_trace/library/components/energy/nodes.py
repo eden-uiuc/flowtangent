@@ -36,13 +36,13 @@ from eden_trace.library.gases import Air, Gas
 
 @register
 class Efficiencies(eqx.Module):
-    total: float = 1.0
+    total: float | jax.Array = 1.0
 
-    mechanical: float = 1.0
-    electrical: float = 1.0
-    fuel: float = 1.0
-    flow: float = 1.0
-    force: float = 1.0
+    mechanical: float | jax.Array = 1.0
+    electrical: float | jax.Array = 1.0
+    fuel:       float | jax.Array = 1.0
+    flow:       float | jax.Array = 1.0
+    force:      float | jax.Array = 1.0
 
 
 GraphDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "residual"]
@@ -210,21 +210,21 @@ class Splitter(GraphNode):
 #  Flow Nodes
 # ----------------------------------------------------------------------------------------------------------------------
 @register
-class FlowDesign(eqx.Module):
-    pressure_ratio: float = 1.0
-    pressure_recovery: float = 1.0
+class FlowOpPoint(eqx.Module):
+    pressure_ratio:     float | jax.Array = 1.0
+    pressure_recovery:  float | jax.Array = 1.0
     
-    intake_temperature: float = 298.15
-    output_temperature: float = 298.15
+    intake_temperature: float | jax.Array = 298.15
+    output_temperature: float | jax.Array = 298.15
     
-    A_intake: float = 1.0
-    A_throat: float = 1.0
-    A_exit: float = 1.0
+    A_intake:   float | jax.Array = 1.0
+    A_throat:   float | jax.Array = 1.0
+    A_exit:     float | jax.Array = 1.0
 
-    exit_mach_number: float = 1e-6
+    exit_mach_number: float | jax.Array = 1e-6
     
-    rotation_speed: float = 0.0
-    noise_speed: float = 0.0
+    rotation_speed: float | jax.Array = 0.0
+    noise_speed:    float | jax.Array = 0.0
 
     eff: Efficiencies = init_field(Efficiencies)
 
@@ -278,10 +278,10 @@ class BleedFlow(GraphNode):
 
 
 @register
-class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
+class FlowNode[DesignType: FlowOpPoint | tuple](GraphNode):
     
-    design_parameters: DesignType = init_field(FlowDesign)
-    working_fluid: IdealGas = init_field(Air)
+    design_parameters: DesignType = init_field(FlowOpPoint)
+    working_fluid: Gas = init_field(Air)
     add_mixer: bool = init_field(False)
 
     output_bleeds: tuple[BleedFlow,...] = init_field(tuple)
@@ -302,13 +302,13 @@ class FlowNode[DesignType: FlowDesign | tuple](GraphNode):
 
         if add_mixer:
             parent_inputs = tuple(replace(i, network_ID="parent."+i.network_ID) for i in self.flow_inputs)
-            mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False, design_parameters=FlowDesign(pressure_ratio=1.0))
+            mixer = FlowNode(tag=f"Mixer", inputs=parent_inputs, add_mixer=False, design_parameters=FlowOpPoint(pressure_ratio=1.0))
             
             other_inputs = tuple(i for i in self.inputs if i not in self.flow_inputs)
             object.__setattr__(self, "inputs", other_inputs + (GraphInput(domain="flow", network_ID="self.mixer", primary=True),))
             object.__setattr__(self, "subcomponents", self.subcomponents + (mixer,))
     
-    def mix_inputs(self, state: State) -> tuple[MixedGas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    def mix_inputs(self, state: State) -> tuple[Gas, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
 
         M = self.get_primary_input_state(state, "flow", "mach_number")
 
