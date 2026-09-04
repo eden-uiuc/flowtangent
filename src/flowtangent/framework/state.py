@@ -1,7 +1,7 @@
-# Trace/Framework/State.py
+# flowtangent/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 # Modified: Mar 2026, J.Smart
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -15,10 +15,10 @@ import equinox as eqx
 # package imports
 import jax.numpy as jnp
 
-from eden_trace.framework.state_data import StateData, Aerodynamics, NetworkState, Freestream, Mass, StabilityData, Time
-from eden_trace.utils import field, get_target, empty_array, register
+from flowtangent.framework.state_data import StateData, Aerodynamics, NetworkState, Freestream, Mass, StabilityData, Time
+from flowtangent.utils import field, get_target, empty_array, register
 
-from eden_trace.framework.state_data import (
+from flowtangent.framework.state_data import (
     FrameData,
 )
 

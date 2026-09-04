@@ -1,7 +1,7 @@
-# Trace/Library/Gases.py
+# flowtangent/Library/Gases.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Trace Team
+# Created: Apr 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -19,10 +19,10 @@ import jax.numpy as jnp
 import numpy as np
 
 
-from eden_trace.utils import get_trace_root, register
+from flowtangent.utils import get_trace_root, register
 
-# Trace imports
-from eden_trace.library import units
+# Flowtangent imports
+from flowtangent.library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Thermo Database
@@ -143,8 +143,8 @@ class Gas(eqx.Module):
             self.mass_fractions = jnp.zeros(len(SPECIES_LIST), dtype=jnp.float64)
 
     def __repr__(self) -> str:
-        if isinstance(self.mass_fractions, jax.core.Tracer):
-            return "Gas(Traced Composition)"
+        if isinstance(self.mass_fractions, jax.core.Flowtangentr):
+            return "Gas(Flowtangentd Composition)"
 
         # Convert to standard numpy. 
         # This is fast and prevents JAX from trying to trace the formatting logic.

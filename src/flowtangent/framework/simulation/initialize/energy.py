@@ -1,6 +1,6 @@
-# Trace/Framework/Missions/Initialization/energy.py
+# flowtangent/Framework/Missions/Initialization/energy.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -10,16 +10,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.library.components.energy.networks import GraphNetwork
+from flowtangent.library.components.energy.networks import GraphNetwork
 
-# Trace Imports
-from eden_trace.framework.state_data.energy import NodeState, TurbojetState, TurbofanState
+# Flowtangent Imports
+from flowtangent.framework.state_data.energy import NodeState, TurbojetState, TurbofanState
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Energy

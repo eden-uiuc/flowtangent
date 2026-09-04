@@ -13,18 +13,18 @@ import pandas as pd
 
 from pathlib import Path
 
-from eden_trace.utils import save_data, load_data, format_array
+from flowtangent.utils import save_data, load_data, format_array
 
-from eden_trace.library import units
-from eden_trace.library.components.energy.nodes import FlowOpPoint
-from eden_trace.library.components.energy.nodes import Efficiencies as Eff
+from flowtangent.library import units
+from flowtangent.library.components.energy.nodes import FlowOpPoint
+from flowtangent.library.components.energy.nodes import Efficiencies as Eff
 
-from eden_trace.library.components.energy.networks import TurbofanNetwork
-from eden_trace.library.components.energy.jets.classes import TurbofanEngine, TurbofanDesign
-from eden_trace.library.components.energy.lines import TurbofanLine
+from flowtangent.library.components.energy.networks import TurbofanNetwork
+from flowtangent.library.components.energy.jets.classes import TurbofanEngine, TurbofanDesign
+from flowtangent.library.components.energy.lines import TurbofanLine
 
-from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.analyses.energy.jets import turbofan_design
+from flowtangent.framework import State, Aircraft, Settings
+from flowtangent.framework.analyses.energy.jets import turbofan_design
 
 test_dir = Path("./tests/PyCycle/PyCycle_Examples/HBTF")
 

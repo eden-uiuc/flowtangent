@@ -5,8 +5,8 @@ import os
 from functools import lru_cache
 from typing import Any
 
-from eden_trace.utils import get_trace_root
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine
+from flowtangent.utils import get_trace_root
+from flowtangent.library.components.energy.jets.classes import TurbojetEngine
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Data Collection (Sourced from Mattingly)
@@ -136,7 +136,7 @@ STUB_FILE = get_trace_root() / "library/components/energy/jets/data.pyi"
 def _load_engine_from_disk(name: str):
     file_path = _JSON_DIR / f"{name}.json"
     if not file_path.exists():
-        raise AttributeError(f"Engine {name} not found in Trace library ({_DATA_DIR}).")
+        raise AttributeError(f"Engine {name} not found in Flowtangent library ({_DATA_DIR}).")
 
     return TurbojetEngine.from_json(filepath=file_path)
 

@@ -13,15 +13,15 @@ from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
 
-from eden_trace.utils import DataPath
+from flowtangent.utils import DataPath
 
-from eden_trace.library import units
-from eden_trace.library.components.wings import Wing, Chords, WingDimensions, Sweeps
+from flowtangent.library import units
+from flowtangent.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
-from eden_trace.framework import Aircraft, Settings, JacobianMap
-from eden_trace.framework.settings import AnalysisSettings
-from eden_trace.framework.analyses.batched import ShardedDatasetGenerator
-from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
+from flowtangent.framework import Aircraft, Settings, JacobianMap
+from flowtangent.framework.settings import AnalysisSettings
+from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
+from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data

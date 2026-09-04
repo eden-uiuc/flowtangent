@@ -4,6 +4,10 @@ from functools import partial
 import equinox as eqx
 import jax.numpy as jnp
 
+def null_step(*args):
+    """A generic no-op function that returns its inputs unchanged."""
+    return args
+
 def field(initializer: Any, as_value: bool = False, **kwargs):
     """Smart wrapper for eqx.field that auto-routes default vs default_factory."""
     if as_value:

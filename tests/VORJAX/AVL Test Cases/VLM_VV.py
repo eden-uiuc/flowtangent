@@ -17,21 +17,21 @@ import numpy as np
 from tqdm import trange
 from plotly.subplots import make_subplots
 
-import eden_trace.utils as tu
+import flowtangent.utils as tu
 
-from eden_trace.library import units
-from eden_trace.library.components import Areas
-from eden_trace.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
-from eden_trace.library.components.airfoils import Airfoil
+from flowtangent.library import units
+from flowtangent.library.components import Areas
+from flowtangent.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
+from flowtangent.library.components.airfoils import Airfoil
 
-from eden_trace.framework import Process, State, Settings, JacobianMap
-from eden_trace.framework.systems import Aircraft
-from eden_trace.framework.state_data import Time
+from flowtangent.framework import Process, State, Settings, JacobianMap
+from flowtangent.framework.systems import Aircraft
+from flowtangent.framework.state_data import Time
 
-from eden_trace.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
+from flowtangent.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
-from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
-from eden_trace.framework.plotting import plot_vlm_panels
+from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
+from flowtangent.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -331,13 +331,13 @@ def VORJAX_ONERA_M6():
             percent_span_location=0.0,
             root_chord_percent=1.0,
             sweeps=Sweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file("/home/jordan/dev/Trace/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/flowtangent/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
         ),
         WingSegment(
             tag="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file("/home/jordan/dev/Trace/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
+            airfoil=Airfoil.from_file("/home/jordan/dev/flowtangent/Templates/Tests/VORJAX/SU2 Test Cases/onera_airfoil.txt")
         )
     )
     
@@ -435,7 +435,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     # Convert error to a percentage for cleaner reading
     error_percent = np.array(error) * 100.0
 
-    # 2. Add Trace: AD Gradient (Primary Y)
+    # 2. Add Flowtangent: AD Gradient (Primary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -448,7 +448,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 3. Add Trace: Analytical Truth (Primary Y)
+    # 3. Add Flowtangent: Analytical Truth (Primary Y)
     # Drawing a line from the first to the last x-coordinate
     fig.add_trace(
         go.Scatter(
@@ -461,7 +461,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 4. Add Trace: Relative Error (Secondary Y)
+    # 4. Add Flowtangent: Relative Error (Secondary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -528,7 +528,7 @@ def plot_fd_v_curve_plotly(step_sizes, fd_errors):
     
     fig = go.Figure()
 
-    # 1. Add Trace: FD Absolute Error
+    # 1. Add Flowtangent: FD Absolute Error
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -626,7 +626,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
 
     fig = go.Figure()
 
-    # 1. Add Trace: FD Relative Error vs Theory
+    # 1. Add Flowtangent: FD Relative Error vs Theory
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -639,7 +639,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
         )
     )
 
-    # 2. Add Trace: AD Relative Error vs Theory (Flat Line)
+    # 2. Add Flowtangent: AD Relative Error vs Theory (Flat Line)
     fig.add_trace(
         go.Scatter(
             x=[min(step_sizes), max(step_sizes)],
@@ -868,10 +868,10 @@ def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_
 if __name__ == "__main__":
 
 
-    # geometry_file = '/home/jordan/dev/Trace/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
+    # geometry_file = '/home/jordan/dev/flowtangent/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
 
     # avl_b737_data = parse_avl_file(Path(geometry_file))
-    # vehicle = convert_to_Trace(avl_b737_data)
+    # vehicle = convert_to_Flowtangent(avl_b737_data)
     
 
     # AVL_basic_test(geometry_file, oper_mode="st")

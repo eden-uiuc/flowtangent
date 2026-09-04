@@ -7,9 +7,9 @@ from typing import Any
 
 import pycycle.api as pyc
 
-from eden_trace.utils import get_trace_root
-from eden_trace.library import units
-from eden_trace.library.components.energy.maps.classes import CompressorMap, TurbineMap
+from flowtangent.utils import get_trace_root
+from flowtangent.library import units
+from flowtangent.library.components.energy.maps.classes import CompressorMap, TurbineMap
 # -----------------------------------------------------------------------------------------------------------------------
 # Map Specifications (Sourced from PyCycle)
 # -----------------------------------------------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ def _load_map_from_disk(name: str):
     """Hidden helper that does the disk I/O, safely cached, and routes by type."""
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in Trace library ({_MAP_DIR}).")
+        raise AttributeError(f"Map '{name}' not found in Flowtangent library ({_MAP_DIR}).")
 
     # 1. Peek inside the JSON to grab the metadata
     with open(file_path, "r") as f:

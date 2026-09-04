@@ -94,6 +94,11 @@ def jax_path_string(jax_path: tuple) -> str:
 # Saving and Loading
 # ----------------------------------------------------------
 
+def _ft_root() -> Path:
+    """Returns the absolute path to the src/flowtangent directory."""
+    # .parent steps up from src/flowtangent/utils to src/flowtangent
+    return Path(os.path.dirname(os.path.abspath(__file__))).resolve().parent
+
 FlowTangent_REGISTRY = {}
 
 def register(cls):

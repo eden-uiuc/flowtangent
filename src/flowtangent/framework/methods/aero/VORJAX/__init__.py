@@ -1,4 +1,4 @@
-from eden_trace.library.methods.aero.Vortex_Lattice.check_freestream import (
+from flowtangent.library.methods.aero.Vortex_Lattice.check_freestream import (
     check_freestream_stateful as check_freestream,
 )
 

@@ -1,7 +1,7 @@
-# Trace/Framework/Settings.py
+# flowtangent/Framework/Settings.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -22,8 +22,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np # For calculating Jacobian shape on JAX array metadata
 
-# Trace imports
-from eden_trace.utils import field, static_field, DataPath, get_all_targets, get_all_parents
+# Flowtangent imports
+from flowtangent.utils import field, static_field, DataPath, get_all_targets, get_all_parents
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Settings

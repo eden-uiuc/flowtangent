@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
+from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
 
 if __name__ == "__main__":
 
@@ -31,6 +31,6 @@ if __name__ == "__main__":
 
     avl_data = {k: v for k, v in avl_data.items() if filter_test_cases(v['name'])}
 
-    vehicles = {k: convert_to_Trace(data) for k, data in avl_data.items()}
+    vehicles = {k: convert_to_Flowtangent(data) for k, data in avl_data.items()}
 
     print("Done!")

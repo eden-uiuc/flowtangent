@@ -1,4 +1,4 @@
-# Trace/Framework/Methods/Aerodynamics/VLM/initialization
+# flowtangent/Framework/Methods/Aerodynamics/VLM/initialization
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -14,13 +14,13 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.library.components.wings import Wing
+    from flowtangent.library.components.wings import Wing
 
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import Aircraft
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import Aircraft
 
-from eden_trace.utils import inputs, outputs
+from flowtangent.utils import inputs, outputs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Initialization
@@ -43,7 +43,7 @@ def initialize_VORJAX_data(state: "State", system: "Aircraft", settings: "Settin
     if "VORJAX" not in settings.analysis.aerodynamics.__class__.__name__:
         raise ValueError(
             "settings.analysis.aerodynamics are not VORJAX Settings."
-            "Please use Trace.Framework.Analysis.Vortex_Lattice.VLMSettings"
+            "Please use Flowtangent.Framework.Analysis.Vortex_Lattice.VLMSettings"
         )
 
     # Standard Python Control Flow (Safe outside of @jax.jit)

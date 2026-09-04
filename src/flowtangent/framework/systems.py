@@ -1,7 +1,7 @@
-# Trace/Framework/State.py
+# flowtangent/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,16 +14,16 @@ import equinox as eqx
 # package imports
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field, register
+# Flowtangent imports
+from flowtangent.utils import empty_array, field, register
 
-from eden_trace.library import Component, MassProperties
-from eden_trace.library.attributes import AircraftClass, MediumRange
-from eden_trace.library.components.energy.networks import GraphNetwork
-from eden_trace.library.components.fuselages import Fuselage
-from eden_trace.library.components.landing_gear import LandingGear
-from eden_trace.library.components.nacelles import Nacelle
-from eden_trace.library.components.wings import Wing
+from flowtangent.library import Component, MassProperties
+from flowtangent.library.attributes import AircraftClass, MediumRange
+from flowtangent.library.components.energy.networks import GraphNetwork
+from flowtangent.library.components.fuselages import Fuselage
+from flowtangent.library.components.landing_gear import LandingGear
+from flowtangent.library.components.nacelles import Nacelle
+from flowtangent.library.components.wings import Wing
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components

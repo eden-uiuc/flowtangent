@@ -1,4 +1,4 @@
-# Trace/Framework/Methods/Aerodynamics/VLM/boundary_conditions.py
+# flowtangent/Framework/Methods/Aerodynamics/VLM/boundary_conditions.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -14,13 +14,13 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from eden_trace.framework.methods.aero.VORJAX.panelization import VortexDistribution
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import System
+    from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings
+    from flowtangent.framework.methods.aero.VORJAX.panelization import VortexDistribution
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import System
 
-from eden_trace.utils import inputs, outputs
+from flowtangent.utils import inputs, outputs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Boundary Conditions (Vortex Strength Right Hand Side Matrix)
@@ -76,7 +76,7 @@ def compute_boundary_conditions(state: "State", system: "System", settings: "Set
     v_total = v_fs[:, None, :] + v_rot
     if vlm_settings.model_propeller_wake:
         # TODO: Convert BEMT and add wake calculation to VLM Process
-        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in Trace.")
+        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in Flowtangent.")
         v_total = v_total + system.analysis_data["induced_wake"]  # type: ignore
 
     # Take the Dot Product with the Panel Normals

@@ -1,7 +1,7 @@
-# Trace/Framework/Components/Wing.py
+# flowtangent/Framework/Components/Wing.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Sep, 2024, Trace Team
+# Created: Sep, 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -11,10 +11,10 @@ import jax
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import empty_array, field
+from flowtangent.utils import empty_array, field
 
-from eden_trace.library import Component, Dimensions
-from eden_trace.library.components.airfoils import Airfoil
+from flowtangent.library import Component, Dimensions
+from flowtangent.library.components.airfoils import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing

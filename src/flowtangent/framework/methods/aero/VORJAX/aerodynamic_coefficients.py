@@ -1,4 +1,4 @@
-# Trace/Framework/Methods/Aerodynamics/VLM/aerodynamic_coefficients.py
+# flowtangent/Framework/Methods/Aerodynamics/VLM/aerodynamic_coefficients.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -15,14 +15,14 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import System
+    from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import System
 
-from eden_trace.utils import inputs, outputs
+from flowtangent.utils import inputs, outputs
 
-from eden_trace.library.methods.aero.Shocks import oblique_shock, theta_beta_mach
+from flowtangent.library.methods.aero.Shocks import oblique_shock, theta_beta_mach
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Lift and Drag Calculation

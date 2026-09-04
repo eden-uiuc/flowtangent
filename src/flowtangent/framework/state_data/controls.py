@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Conditions/Controls.py
+# flowtangent/Framework/Missions/Conditions/Controls.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,13 +14,13 @@ from typing import Optional, Callable, Literal
 import jax
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import DataPath, field
+# Flowtangent imports
+from flowtangent.utils import DataPath, field
 
-from eden_trace.library import Component
+from flowtangent.library import Component
 
-from eden_trace.framework.state_data import StateData
-from eden_trace.framework.state_data.stability import StabilityData
+from flowtangent.framework.state_data import StateData
+from flowtangent.framework.state_data.stability import StabilityData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Controls

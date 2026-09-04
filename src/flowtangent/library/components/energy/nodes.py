@@ -1,4 +1,4 @@
-# Trace/Library/Components/Energy/Nodes.py
+# flowtangent/Library/Components/Energy/Nodes.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart
@@ -12,8 +12,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Callable, Iterable, get_args, cast
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.framework import State, System, Settings
-    from eden_trace.framework.analyses.energy.jets import JetSettings
+    from flowtangent.framework import State, System, Settings
+    from flowtangent.framework.analyses.energy.jets import JetSettings
 
 import warnings
 import equinox as eqx
@@ -23,10 +23,10 @@ import jax.numpy as jnp
 from dataclasses import replace
 from functools import reduce
 
-from eden_trace.utils import field, register
+from flowtangent.utils import field, register
 
-from eden_trace.library import Component
-from eden_trace.library.gases import Air, Gas
+from flowtangent.library import Component
+from flowtangent.library.gases import Air, Gas
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Nodes

@@ -1,7 +1,7 @@
-# Trace/Library/Components/Energy/Propulsors.py
+# flowtangent/Library/Components/Energy/Propulsors.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Trace Team
+# Created: May 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable, Literal, Optional
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
-    from eden_trace.framework.state_data.energy import TurbojetState
-    from eden_trace.framework.analyses.energy.jets import JetSettings
+    from flowtangent.framework import Settings, State, System
+    from flowtangent.framework.state_data.energy import TurbojetState
+    from flowtangent.framework.analyses.energy.jets import JetSettings
 
 import json
 import warnings
@@ -24,11 +24,11 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-import eden_trace.utils as tu
+import flowtangent.utils as tu
 
-# Trace imports
-from eden_trace.utils import field, register
-from eden_trace.library import units
+# Flowtangent imports
+from flowtangent.utils import field, register
+from flowtangent.library import units
 
 from ..maps import data as map_data
 from ..maps.classes import CompressorMap, TurbineMap

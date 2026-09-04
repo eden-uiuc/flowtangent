@@ -1,7 +1,7 @@
-# Trace/Library/Planets.py
+# flowtangent/Library/Planets.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Trace Team
+# Created: May 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,9 +10,9 @@
 # package imports
 import equinox as eqx
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-from eden_trace.library import units
+from flowtangent.library import units
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Planets

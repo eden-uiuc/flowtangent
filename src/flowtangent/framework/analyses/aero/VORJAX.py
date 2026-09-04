@@ -1,7 +1,7 @@
-# Trace/Framework/Analyses/Aerodynamics/VLM.py
+# flowtangent/Framework/Analyses/Aerodynamics/VLM.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: May 2025, Trace Team
+# Created: May 2025, Flowtangent Team
 # Modified: Mar 2026, J. Smart
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -23,15 +23,15 @@ import jax.numpy as jnp
 # package imports
 import sklearn
 
-# Trace imports
-from eden_trace.utils import DataPath, field
+# Flowtangent imports
+from flowtangent.utils import DataPath, field
 
-from eden_trace.library import units
-from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
+from flowtangent.library import units
+from flowtangent.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
 
-from eden_trace.framework import Process, ProcessStep
-from eden_trace.framework.analyses import BatchedAnalysis
-from eden_trace.framework.methods.aero.VORJAX import (
+from flowtangent.framework import Process, ProcessStep
+from flowtangent.framework.analyses import BatchedAnalysis
+from flowtangent.framework.methods.aero.VORJAX import (
     apply_aerodynamic_forces,
     check_freestream,
     compute_boundary_conditions,
@@ -42,7 +42,7 @@ from eden_trace.framework.methods.aero.VORJAX import (
     discretize_surfaces,
     initialize_VORJAX_data,
 )
-from eden_trace.framework.simulation.initialize import initialize_aerodynamics
+from flowtangent.framework.simulation.initialize import initialize_aerodynamics
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  VLM Settings

@@ -1,10 +1,10 @@
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-from eden_trace.library.methods.mass import transport as Mass
+from flowtangent.library.methods.mass import transport as Mass
 
-from eden_trace.framework import Process, ProcessStep
+from flowtangent.framework import Process, ProcessStep
 
-# from Trace.Framework.Methods.Mass.Energy import tf_mass_from_SLS
+# from Flowtangent.Framework.Methods.Mass.Energy import tf_mass_from_SLS
 
 
 def _default_transport_steps() -> tuple[ProcessStep, ...]:

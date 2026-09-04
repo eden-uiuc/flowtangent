@@ -1,7 +1,7 @@
-# Trace/Library/Atmospheres.py
+# flowtangent/Library/Atmospheres.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Trace Team
+# Created: May 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,11 +14,11 @@ import numpy as np      # For precomputing atmospheric tables
 import equinox as eqx
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import field
+# Flowtangent imports
+from flowtangent.utils import field
 
-from eden_trace.library.gases import Air, Gas
-from eden_trace.library.planets import Earth, Planet
+from flowtangent.library.gases import Air, Gas
+from flowtangent.library.planets import Earth, Planet
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Atmospheres

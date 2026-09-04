@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Mass/Correlation/Transport/fuselage.py
+# flowtangent/Library/Methods/Mass/Correlation/Transport/fuselage.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 # Created:  May 2024, J. Smart
 # Modified:
@@ -8,10 +8,10 @@
 
 import jax.numpy as np
 
-import eden_trace.library as rcl
-from eden_trace.library import units
+import flowtangent.library as rcl
+from flowtangent.library import units
 
-import eden_trace.framework as rcf
+import flowtangent.framework as rcf
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Update/freestream.py
+# flowtangent/Framework/Missions/Update/freestream.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -9,7 +9,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
 # package imports
 import equinox as eqx

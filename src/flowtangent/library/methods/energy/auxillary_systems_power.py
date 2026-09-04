@@ -1,7 +1,7 @@
-# Trace/Library/Methods/Energy/Auxillary_Systems/auxillary_systems_power.py
+# flowtangent/Library/Methods/Energy/Auxillary_Systems/auxillary_systems_power.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # compute_payload_power_consumption

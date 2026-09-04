@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Conditions/Mass.py
+# flowtangent/Framework/Missions/Conditions/Mass.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -11,10 +11,10 @@
 # package imports
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field, register
+# Flowtangent imports
+from flowtangent.utils import empty_array, field, register
 
-from eden_trace.framework.state_data import StateData
+from flowtangent.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Mass

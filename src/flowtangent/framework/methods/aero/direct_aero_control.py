@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Aerodynamics/Test_Aero/test_aero.py
+# flowtangent/Library/Methods/Aerodynamics/Test_Aero/test_aero.py
 # (c) Copyright 2026 Aerospace Research Community LLC#
 # Created:  Jan 2026, J. Smart
 # Modified:
@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING
 # package imports
 import equinox as eqx
 
-# Trace Imports
+# Flowtangent Imports
 
 if TYPE_CHECKING:
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import System
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import System
 
 
 # -------------------------------------------------------------------------------

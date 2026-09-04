@@ -65,17 +65,17 @@ warnings.filterwarnings('ignore', category=SolverWarning)
 from simple_turbojet import Turbojet
 from turbojet_validation import system_setup as ft_turbojet
 
-from eden_trace.utils import DataPath, configure_environment
-from eden_trace.framework import State, Settings, Process
-from eden_trace.framework.settings import NumericalSettings, JacobianSettings, JacobianMap
-from eden_trace.framework.analyses.batched import BatchedAnalysis
-from eden_trace.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
-from eden_trace.framework.simulation.initialize import initialize_energy
-from eden_trace.framework.simulation.update import update_freestream
+from flowtangent.utils import DataPath, configure_environment
+from flowtangent.framework import State, Settings, Process
+from flowtangent.framework.settings import NumericalSettings, JacobianSettings, JacobianMap
+from flowtangent.framework.analyses.batched import BatchedAnalysis
+from flowtangent.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
+from flowtangent.framework.simulation.initialize import initialize_energy
+from flowtangent.framework.simulation.update import update_freestream
 
-from eden_trace.library import units
-from eden_trace.library.atmospheres import USStandard1976
-from eden_trace.library.components.energy.jets.classes import TurbojetOpPoint
+from flowtangent.library import units
+from flowtangent.library.atmospheres import USStandard1976
+from flowtangent.library.components.energy.jets.classes import TurbojetOpPoint
 
 pact_primal_calls = 0
 pact_vjp_calls = 0

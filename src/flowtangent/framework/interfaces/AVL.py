@@ -1,7 +1,7 @@
-# Trace/Framework/Interfaces/AVL.py
+# flowtangent/Framework/Interfaces/AVL.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: Apr 2026, Trace Team
+# Created: Apr 2026, Flowtangent Team
 # Modified:
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -13,12 +13,12 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.library import units
-from eden_trace.library.components import Areas
-from eden_trace.library.components.airfoils import Airfoil
-from eden_trace.library.components.wings import Wing, Chords, WingDimensions, WingSegment, Sweeps
+from flowtangent.library import units
+from flowtangent.library.components import Areas
+from flowtangent.library.components.airfoils import Airfoil
+from flowtangent.library.components.wings import Wing, Chords, WingDimensions, WingSegment, Sweeps
 
-from eden_trace.framework.systems import Aircraft
+from flowtangent.framework.systems import Aircraft
 
 # ----------------------------------------------------------------------------------------------------------------------
 # AVL Interface Functions
@@ -125,9 +125,9 @@ def parse_avl_file(filepath: str | Path) -> dict:
     return avl_data
 
 
-def convert_to_Trace(avl_data: dict) -> Aircraft:
+def convert_to_Flowtangent(avl_data: dict) -> Aircraft:
     """
-    Converts a parsed AVL data dictionary into an Trace Aircraft system,
+    Converts a parsed AVL data dictionary into an Flowtangent Aircraft system,
     translating Cartesian coordinates into parametric fractions.
     """
     sref, cref, bref = avl_data["reference_area"]
@@ -231,7 +231,7 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
             aerodynamic_center=jnp.array([[xref, yref, zref]]),
         )
 
-        # 4. Trigger Trace's internal geometry engine to fill in the rest
+        # 4. Trigger Flowtangent's internal geometry engine to fill in the rest
         wing = wing.update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
         vehicle = vehicle.add_subcomponent(wing)
@@ -241,4 +241,4 @@ def convert_to_Trace(avl_data: dict) -> Aircraft:
 
 def read_and_convert(file_path: str | Path) -> Aircraft:
     avl_data = parse_avl_file(file_path)
-    return convert_to_Trace(avl_data)
+    return convert_to_Flowtangent(avl_data)

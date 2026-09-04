@@ -1,7 +1,7 @@
-# Trace/Framework/__init__.py
+# flowtangent/Framework/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""Trace Package Setup"""
+"""Flowtangent Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

@@ -1,4 +1,4 @@
-# Trace/Framework/Analyses/residual.py
+# flowtangent/Framework/Analyses/residual.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart
@@ -10,7 +10,7 @@
 from typing import TYPE_CHECKING, Optional, Any, Callable, Literal, overload
 
 if TYPE_CHECKING:
-    from eden_trace.framework import State, System, Settings
+    from flowtangent.framework import State, System, Settings
 
 import contextlib
 import io
@@ -30,7 +30,7 @@ import equinox as eqx
 import numpy as np
 import optimistix as optx
 
-from jax.core import Tracer
+from jax.core import Flowtangentr
 from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
@@ -43,7 +43,7 @@ from ..processes import Process, array_barrier
 #  Helper/Diagnostic Functions
 # ----------------------------------------------------------------------------------------------------------------------
 
-class TraceReadout:
+class FlowtangentReadout:
     def __init__(self, message="Tracing ...", enabled=True):
         self.spinner_chars = "|/-\\"
         self.message = message
@@ -122,7 +122,7 @@ def diff_args(args):
 
     dynamic_leaves = jax.tree_util.tree_leaves(dynamic)
     if len(dynamic_leaves) > 0:
-        if isinstance(dynamic_leaves[0], Tracer):
+        if isinstance(dynamic_leaves[0], Flowtangentr):
             print("  [EXECUTION MODE] TRACING (JAX Compiler / AD is active)")
         else:
             print("  [EXECUTION MODE] EAGER PYTHON (JIT is disabled, actual numbers flowing)")
@@ -167,7 +167,7 @@ def diff_args(args):
 def analyze_compute_graph(func, *args):
     print("Tracing AD graph to count operations...")
     
-    # Trace the Jacobian
+    # Flowtangent the Jacobian
     jaxpr_obj = jax.make_jaxpr(jax.jacfwd(func))(*args)
     
     source_counts = Counter()
@@ -672,7 +672,7 @@ class ImplicitAnalysis(Process):
         initial_control_values = self._get_control_array(state, settings)
 
         # Run Solver
-        with TraceReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
+        with FlowtangentReadout(enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
                      message=f"Tracing {self.tag}..."):
             
             f_ctrls, opt_state, f_st, f_sys = self._run_solver(

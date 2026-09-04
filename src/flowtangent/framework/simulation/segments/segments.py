@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Mission.py
+# flowtangent/Framework/Missions/Mission.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -28,19 +28,19 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 
-from eden_trace.utils import field, scan_for_invalid_JAX_types
+from flowtangent.utils import field, scan_for_invalid_JAX_types
 
-from eden_trace.framework import Process, ProcessStep
-from eden_trace.framework.state_data.controls import Control, Residual
-from eden_trace.framework.simulation.initialize import *
-from eden_trace.framework.simulation.update import *
-from eden_trace.framework.processes import null_step
+from flowtangent.framework import Process, ProcessStep
+from flowtangent.framework.state_data.controls import Control, Residual
+from flowtangent.framework.simulation.initialize import *
+from flowtangent.framework.simulation.update import *
+from flowtangent.framework.processes import null_step
 
-# Trace imports
+# Flowtangent imports
 from .profiles import *
 
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Mission Spinner
@@ -239,7 +239,7 @@ def find_circular_references(obj, path="root", visited=None):
     # Skip basic types and arrays (they don't hold other objects)
     if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
         return
-    if type(obj).__name__ in ("ndarray", "ArrayImpl", "DynamicJaxprTracer"):
+    if type(obj).__name__ in ("ndarray", "ArrayImpl", "DynamicJaxprFlowtangentr"):
         return
 
     obj_id = id(obj)

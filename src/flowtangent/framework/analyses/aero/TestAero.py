@@ -1,17 +1,17 @@
-# Trace/Framework/Analyses/Aerodynamics/Test_Aero.py
+# flowtangent/Framework/Analyses/Aerodynamics/Test_Aero.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: Jan, 2026, Trace Team
+# Created: Jan, 2026, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-from eden_trace.framework import Process, ProcessStep
-from eden_trace.framework.methods.aero.Test_Aero import direct_aero
+from flowtangent.framework import Process, ProcessStep
+from flowtangent.framework.methods.aero.Test_Aero import direct_aero
 
 
 # 1. Define the builder function outside the class

@@ -1,7 +1,7 @@
-# Trace/Library/Components/Energy/Network.py
+# flowtangent/Library/Components/Energy/Network.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Trace Team
+# Created: Apr 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -11,9 +11,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from eden_trace.framework import State, System, Settings
-    from eden_trace.framework.state_data.controls import Control, Residual
-    from eden_trace.library.atmospheres import Atmosphere
+    from flowtangent.framework import State, System, Settings
+    from flowtangent.framework.state_data.controls import Control, Residual
+    from flowtangent.library.atmospheres import Atmosphere
 
 from dataclasses import replace
 from graphlib import CycleError, TopologicalSorter
@@ -23,12 +23,12 @@ import jax.numpy as jnp
 import equinox as eqx
 
 
-# Trace imports
-import eden_trace.utils as tu
-from eden_trace.utils import field, register
+# Flowtangent imports
+import flowtangent.utils as tu
+from flowtangent.utils import field, register
 
-from eden_trace.library import units
-from eden_trace.library.atmospheres import USStandard1976
+from flowtangent.library import units
+from flowtangent.library.atmospheres import USStandard1976
 
 from .nodes import GraphDomain, GraphInput, GraphNode, BleedFlow
 from .lines import EnergyLine, TurbojetLine, TurbofanLine

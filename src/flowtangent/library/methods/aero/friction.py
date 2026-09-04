@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Aerodynamics/flat_plate_drag.py
+# flowtangent/Library/Methods/Aerodynamics/flat_plate_drag.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart

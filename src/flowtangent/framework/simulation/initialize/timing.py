@@ -1,6 +1,6 @@
-# Trace/Framework/Missions/Initialization/time.py
+# flowtangent/Framework/Missions/Initialization/time.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -10,8 +10,8 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-# Trace Imports
-import eden_trace.framework as rcf
+# Flowtangent Imports
+import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Time

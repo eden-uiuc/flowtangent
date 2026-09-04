@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Update/angular_acceleration.py
+# flowtangent/Framework/Missions/Update/angular_acceleration.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -11,8 +11,8 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-# Trace imports
-import eden_trace.framework as rcf
+# Flowtangent imports
+import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Angular Acceleration

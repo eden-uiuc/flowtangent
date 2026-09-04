@@ -1,7 +1,7 @@
-# Trace/Library/Methods/Propulsors/moment.py
+# flowtangent/Library/Methods/Propulsors/moment.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Trace Team
+# Created: Apr 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -9,13 +9,13 @@
 
 # package imports
 
-# Trace imports
+# Flowtangent imports
 from typing import TYPE_CHECKING
 
 import jax.numpy as np
 
 if TYPE_CHECKING:
-    import eden_trace.framework as rcf
+    import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Turbofan Moment

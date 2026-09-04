@@ -1,7 +1,7 @@
-# Trace/Library/Propellants.py
+# flowtangent/Library/Propellants.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Trace Team
+# Created: Apr 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,11 +10,11 @@
 # package imports
 import equinox as eqx
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-# Trace imports
-from eden_trace.library import units
-from eden_trace.library.gases import O2, Gas, BurnedJetA
+# Flowtangent imports
+from flowtangent.library import units
+from flowtangent.library.gases import O2, Gas, BurnedJetA
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Propellants

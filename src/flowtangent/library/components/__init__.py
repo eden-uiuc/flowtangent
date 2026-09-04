@@ -1,7 +1,7 @@
-# Trace/Library/Components/__init__.py
+# flowtangent/Library/Components/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""Trace Package Setup"""
+"""Flowtangent Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 from os import path
 from pathlib import Path
 
-from eden_trace.library.component import *
+from flowtangent.library.component import *
 
 # Component Types
 # from . import Energy, airfoils, fuselages, landing_gear, nacelles, wings

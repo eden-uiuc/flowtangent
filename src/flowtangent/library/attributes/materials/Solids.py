@@ -1,4 +1,4 @@
-# Trace/Library/Attributes/Solids/Solid.py
+# flowtangent/Library/Attributes/Solids/Solid.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
 # -------------------------------------------------------------------------------
@@ -8,7 +8,7 @@
 # package imports
 import equinox as eqx
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
 # -------------------------------------------------------------------------------
 # Solid Data Class

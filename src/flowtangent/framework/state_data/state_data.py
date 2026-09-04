@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Conditions/Conditions.py
+# flowtangent/Framework/Missions/Conditions/Conditions.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -16,7 +16,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions

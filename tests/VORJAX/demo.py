@@ -1,18 +1,18 @@
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.framework.analyses.aero.VORJAX import InitializeVORJAX, VORJAX, Vortices, VORJAX_Settings
-from eden_trace.library.components.wings import Wing, WingSegment, Sweeps, Chords, WingDimensions
-from eden_trace.framework.systems import Aircraft
-from eden_trace.library.components import Areas
-from eden_trace.library import units
+from flowtangent.framework.analyses.aero.VORJAX import InitializeVORJAX, VORJAX, Vortices, VORJAX_Settings
+from flowtangent.library.components.wings import Wing, WingSegment, Sweeps, Chords, WingDimensions
+from flowtangent.framework.systems import Aircraft
+from flowtangent.library.components import Areas
+from flowtangent.library import units
 
-from eden_trace.utils import configure_environment, DataPath
+from flowtangent.utils import configure_environment, DataPath
 
-from eden_trace.framework import State, Settings, Process
-from eden_trace.framework.settings import JacobianMap, NumericalSettings
+from flowtangent.framework import State, Settings, Process
+from flowtangent.framework.settings import JacobianMap, NumericalSettings
 
-from eden_trace.framework.plotting.VLM import plot_vlm_panels
+from flowtangent.framework.plotting.VLM import plot_vlm_panels
 
 if __name__ == "__main__":
 

@@ -1,4 +1,4 @@
-# Trace/Framework/Missions/Segments/profiles.py
+# flowtangent/Framework/Missions/Segments/profiles.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -16,11 +16,11 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     pass
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-from eden_trace.library import units
+from flowtangent.library import units
 
-from eden_trace.framework import ProcessStep
+from flowtangent.framework import ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Segment Profiles

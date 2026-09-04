@@ -40,18 +40,18 @@ import pandas as pd
 from pathlib import Path
 from dataclasses import replace
 
-from eden_trace.utils import save_data, load_data, format_array, configure_environment
+from flowtangent.utils import save_data, load_data, format_array, configure_environment
 
-from eden_trace.library import units
-from eden_trace.library.components.energy.networks import TurbojetNetwork, JetNetDesign
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbojetOpPoint
-from eden_trace.library.components.energy.lines import TurbojetLine
+from flowtangent.library import units
+from flowtangent.library.components.energy.networks import TurbojetNetwork, JetNetDesign
+from flowtangent.library.components.energy.jets.classes import TurbojetEngine, TurbojetOpPoint
+from flowtangent.library.components.energy.lines import TurbojetLine
 
-from eden_trace.framework import State, Aircraft, Settings
-from eden_trace.framework.settings import LoggingSettings
-from eden_trace.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
-from eden_trace.framework.simulation.initialize import initialize_energy
-from eden_trace.framework.simulation.update import update_freestream
+from flowtangent.framework import State, Aircraft, Settings
+from flowtangent.framework.settings import LoggingSettings
+from flowtangent.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
+from flowtangent.framework.simulation.initialize import initialize_energy
+from flowtangent.framework.simulation.update import update_freestream
 
 def system_setup():
 
@@ -208,16 +208,16 @@ def off_design_point(
 
     return od_state, od_system, od_settings
 
-def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Design"):
+def validate_design_point(pycycle_json_path, Flowtangent_state, point_name: str="Design"):
     """
-    Loads PyCycle JSON results and compares them against the Trace state.
+    Loads PyCycle JSON results and compares them against the Flowtangent state.
     """
     
     # 1. Load the JSON
     with open(pycycle_json_path, 'r') as f:
         pycycle_data = json.load(f)
         
-    # 2. Map PyCycle flow stations to Trace network IDs
+    # 2. Map PyCycle flow stations to Flowtangent network IDs
     station_map = {
         # 'fc.Fl_O':     'freestream',
         'inlet.Fl_O':  'network.line.engine.inlet',
@@ -227,7 +227,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
         'nozz.Fl_O':   'network.line.engine.core_nozzle'
     }
     
-    # 3. Map PyCycle properties to Trace tags
+    # 3. Map PyCycle properties to Flowtangent tags
     property_map = {
         'W':     ('mass_flow_rate', units.lbm/units.s),
         'Pt':    ('stagnation_pressure', units.psi),
@@ -240,7 +240,7 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     }
 
     # User-defined extraction function
-    def get_Trace_value(state, network_id, prop_tag):
+    def get_Flowtangent_value(state, network_id, prop_tag):
 
         node = state.energy.nodes[network_id]
         value = np.asarray(getattr(node.flow, prop_tag))
@@ -261,22 +261,22 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
         
         if pyc_prop in property_map:
             prop_tag, pyc_units = property_map[pyc_prop]
-            value = getattr(Trace_state.freestream, prop_tag)
-            Trace_val = np.asarray(value).item()
+            value = getattr(Flowtangent_state.freestream, prop_tag)
+            Flowtangent_val = np.asarray(value).item()
 
             pyc_val *= pyc_units
-            diff = Trace_val - pyc_val
+            diff = Flowtangent_val - pyc_val
 
             if abs(pyc_val) > 1e-12:
                     rel_error = (diff / pyc_val)
             else:
-                rel_error = np.nan if abs(Trace_val) > 1e-12 else 0.0
+                rel_error = np.nan if abs(Flowtangent_val) > 1e-12 else 0.0
             
             records.append({
                 'Station': "fc",
                 'Property': pyc_prop,
                 'PyCycle Val': pyc_val,
-                'FlowTan Val': Trace_val,
+                'FlowTan Val': Flowtangent_val,
                 'Diff': diff,
                 'Rel. Error': rel_error,
                 'Mag. Error': np.abs(rel_error)
@@ -284,8 +284,8 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
     
     for pyc_station, pyc_props in pycycle_data.get('flow_stations', {}).items():
         
-        Trace_node_id = station_map.get(pyc_station)
-        if not Trace_node_id:
+        Flowtangent_node_id = station_map.get(pyc_station)
+        if not Flowtangent_node_id:
             continue
             
         for pyc_prop, pyc_val in pyc_props.items():
@@ -296,29 +296,29 @@ def validate_design_point(pycycle_json_path, Trace_state, point_name: str="Desig
             if pyc_prop == "ht":
                 continue
             
-            Trace_tag, pyc_units = property_map.get(pyc_prop, (None, None))
-            if not Trace_tag or pyc_val is None:
+            Flowtangent_tag, pyc_units = property_map.get(pyc_prop, (None, None))
+            if not Flowtangent_tag or pyc_val is None:
                 continue
                 
-            # Grab the Trace value
-            Trace_val = get_Trace_value(Trace_state, Trace_node_id, Trace_tag)
-            if Trace_val is not None:
+            # Grab the Flowtangent value
+            Flowtangent_val = get_Flowtangent_value(Flowtangent_state, Flowtangent_node_id, Flowtangent_tag)
+            if Flowtangent_val is not None:
                 # Calculate metrics
                 pyc_val *= pyc_units
-                diff = Trace_val - pyc_val
+                diff = Flowtangent_val - pyc_val
                 
                 # Protect against divide-by-zero if PyCycle value is exactly 0.0 (like altitude or Mn=0)
                 if abs(pyc_val) > 1e-12:
                     rel_error = (diff / pyc_val)
                 else:
                     # If PyCycle is 0, use absolute difference as the "error" metric visually, or set to NaN
-                    rel_error = np.nan if abs(Trace_val) > 1e-12 else 0.0
+                    rel_error = np.nan if abs(Flowtangent_val) > 1e-12 else 0.0
                     
                 records.append({
                     'Station': pyc_station.split('.')[0],
                     'Property': pyc_prop,
                     'PyCycle Val': pyc_val,
-                    'FlowTan Val': Trace_val,
+                    'FlowTan Val': Flowtangent_val,
                     'Diff': diff,
                     'Rel. Error': rel_error,
                     'Mag. Error': np.abs(rel_error)

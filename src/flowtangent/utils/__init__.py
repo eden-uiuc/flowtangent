@@ -1,7 +1,7 @@
 # src/eden_trace/utils/__init__.py
 
 # 1. Base / Syntax
-from .base import field, static_field, method_field, empty_array, Module, StateData
+from .base import null_step, field, static_field, method_field, empty_array, Module, StateData
 
 # 2. PyTree Facade
 from .tree import (

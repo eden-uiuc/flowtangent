@@ -1,7 +1,7 @@
-# Trace/Library/Components/Landing_Gear.py
+# flowtangent/Library/Components/Landing_Gear.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May, 2025, Trace Team
+# Created: May, 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -9,10 +9,10 @@
 
 # package imports
 
-# Trace imports
-from eden_trace.utils import field
+# Flowtangent imports
+from flowtangent.utils import field
 
-from eden_trace.library import Component
+from flowtangent.library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Landing_Gear

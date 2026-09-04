@@ -7,10 +7,10 @@
 #  Imports
 # ----------------------------------------------------------------------
 
-import eden_trace.library as rcl
-from eden_trace.library import units
+import flowtangent.library as rcl
+from flowtangent.library import units
 
-import eden_trace.framework as rcf
+import flowtangent.framework as rcf
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

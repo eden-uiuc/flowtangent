@@ -75,16 +75,10 @@ indent-style = "space"
 section-order = [
     "future",
     "standard-library",   # Native Python (os, sys, etc.)
-    "third-party",        # Non-Trace packages (jax, equinox, numpy, etc.)
-    "first-party",        # Catch-all for any other Trace imports
+    "third-party",        # Non-FT packages (jax, equinox, numpy, etc.)
+    "first-party",        # FT imports
     "local-folder"        # Relative imports (e.g., from . import utils)
 ]
-
-# Custom Import Sections
-[tool.ruff.lint.isort.sections]
-"trace-utils" = ["eden_trace.utils"] 
-"trace-library" = ["eden_trace.Library"]
-"trace-framework" = ["eden_trace.Framework"]
 
 # Catch numpy tracer errors (Brilliant addition, by the way)
 [tool.ruff.lint.flake8-tidy-imports.banned-api]

@@ -1,7 +1,7 @@
 # $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Trace Team
+# Created: Apr 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,10 +10,10 @@
 # package imports
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field
+# Flowtangent imports
+from flowtangent.utils import empty_array, field
 
-from eden_trace.library import Component, Dimensions
+from flowtangent.library import Component, Dimensions
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Nacelle

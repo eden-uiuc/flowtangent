@@ -1,7 +1,7 @@
-# Trace/__init__.py
+# flowtangent/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""Trace Package Setup"""
+"""Flowtangent Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 from .utils.backend import initialize_jax_cache
 
 initialize_jax_cache(
-    cache_dir="~/.eden_trace/jax_cache",
+    cache_dir="~/.flowtangent/jax_cache",
     max_size_gb=2.0,
     max_age_days=30,
 )
@@ -19,17 +19,19 @@ initialize_jax_cache(
 from .utils.backend import numerical_environment, initialize_jax_cache
 numerical_environment()
 
-# 2. Core Framework Hoists
+# Framework Hoists
 from .core.settings import Settings
 from .core.state_container import State, System
 from .core.base_component import Component, Node
 
-# 3. Critical Utility Hoists (The 80% Rule applied to utils)
+# Utility Hoists
 from .utils import (
-    update,          # ft.update(obj, ...)
-    TreePath,        # ft.TreePath(...)
-    field,           # ft.field(...)
-    static_field,    # ft.static_field(...)
+    update,         
+    TreePath,       
+    field,          
+    static_field,   
+    method_field,   
+    null_step,
 )
 
 # 4. Short-Name Namespace Routing

@@ -1,4 +1,4 @@
-# Trace/Framework/Missions/Initialize/controls.py
+# flowtangent/Framework/Missions/Initialize/controls.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J.
@@ -13,17 +13,17 @@ from typing import TYPE_CHECKING
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.library import Component
+    from flowtangent.library import Component
 
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import System
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import System
 
 import equinox as eqx
 
-from eden_trace.library.components import Wing
+from flowtangent.library.components import Wing
 
-from eden_trace.framework.state_data.controls import Control, SurfaceControl
+from flowtangent.framework.state_data.controls import Control, SurfaceControl
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize

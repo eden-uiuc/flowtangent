@@ -28,24 +28,24 @@ from jax import Array
 from tqdm import trange
 from plotly.subplots import make_subplots
 
-import eden_trace.utils as tu
+import flowtangent.utils as tu
 
-from eden_trace.library import units
-from eden_trace.library.components import Areas
-from eden_trace.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
-from eden_trace.library.components.airfoils import Airfoil, Airfoil_Data
+from flowtangent.library import units
+from flowtangent.library.components import Areas
+from flowtangent.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
+from flowtangent.library.components.airfoils import Airfoil, Airfoil_Data
 
-from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline
+from flowtangent.library.methods.aero.Transonic import ensemble_CL_spline
 
-from eden_trace.framework import Process, State, Aircraft, Settings, JacobianMap, System
-from eden_trace.framework.settings import AnalysisSettings
-from eden_trace.framework.state_data import Time
+from flowtangent.framework import Process, State, Aircraft, Settings, JacobianMap, System
+from flowtangent.framework.settings import AnalysisSettings
+from flowtangent.framework.state_data import Time
 
-from eden_trace.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
-from eden_trace.framework.analyses.batched import ShardedDatasetGenerator
+from flowtangent.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
+from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
 
-from eden_trace.framework.interfaces.AVL import parse_avl_file, convert_to_Trace
-from eden_trace.framework.plotting import plot_vlm_panels
+from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
+from flowtangent.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -549,7 +549,7 @@ def plot_avl_validation_mpl(alpha, cl_vjx, cd_vjx, cm_vjx, cl_avl, cd_avl, cm_av
     plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
     plt.rcParams['font.size'] = 10
 
-    # Trace styling
+    # Flowtangent styling
     avl_style = dict(color='black', linestyle='-', linewidth=1.5, label='AVL (Baseline)')
     vjx_style = dict(color='black', linestyle='None', marker='o', markersize=5,
                      markerfacecolor='none', markeredgecolor='black', label='VORJAX')
@@ -648,11 +648,11 @@ def plot_spanwise_loading_mpl(eta, gamma, CL, b, AR, v_inf):
     # 3. Initialize Figure (3.5 inch width for AIAA standard single column)
     _, ax = plt.subplots(figsize=(3.5, 2.6))
 
-    # 4. Add Trace: Theoretical Distribution (Smooth Dashed Line)
+    # 4. Add Flowtangent: Theoretical Distribution (Smooth Dashed Line)
     ax.plot(eta_dense, gamma_dense, color='black', linestyle='--', linewidth=1.5, 
             label='Lifting Surface Theory')
 
-    # 5. Add Trace: VORJAX Actual Results (Scatter points, no connecting line)
+    # 5. Add Flowtangent: VORJAX Actual Results (Scatter points, no connecting line)
     ax.plot(eta, gamma, color='black', linestyle='None', marker='o', 
             markersize=5, markerfacecolor='black', label='VORJAX Integration')
 
@@ -695,17 +695,17 @@ def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide. 3.5 x 2.6 is a good aspect ratio)
     _, ax1 = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Trace: AD Gradient (Primary Y) - Solid line, filled circles
+    # 2. Add Flowtangent: AD Gradient (Primary Y) - Solid line, filled circles
     ax1.plot(n_segments, grad_AD, color='black', linestyle='-', linewidth=1.5, 
              marker='o', markersize=5, markerfacecolor='black', label='VORJAX AD Gradient')
 
-    # 3. Add Trace: Analytical Truth (Primary Y) - Dashed line, no markers
+    # 3. Add Flowtangent: Analytical Truth (Primary Y) - Dashed line, no markers
     ax1.axhline(y=grad_truth, color='black', linestyle='--', linewidth=1.5, label="Hembold's Equation")
 
     # 4. Initialize Secondary Y-axis
     ax2 = ax1.twinx()
 
-    # 5. Add Trace: Relative Error (Secondary Y) - Dotted line, open squares
+    # 5. Add Flowtangent: Relative Error (Secondary Y) - Dotted line, open squares
     ax2.plot(n_segments, error_percent, color='black', linestyle=':', linewidth=1.5, 
              marker='s', markersize=5, markerfacecolor='none', markeredgecolor='black', 
              label='Relative Error')
@@ -755,17 +755,17 @@ def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide. 3.5 x 2.6 is a good aspect ratio)
     _, ax1 = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Trace: AD Gradient (Primary Y) - Solid line, filled circles
+    # 2. Add Flowtangent: AD Gradient (Primary Y) - Solid line, filled circles
     ax1.plot(n_segments, grad_AD, color='black', linestyle='-', linewidth=1.5, 
              marker='o', markersize=5, markerfacecolor='black', label='VORJAX AD Gradient')
 
-    # 3. Add Trace: Analytical Truth (Primary Y) - Dashed line, no markers
+    # 3. Add Flowtangent: Analytical Truth (Primary Y) - Dashed line, no markers
     ax1.axhline(y=grad_truth, color='black', linestyle='--', linewidth=1.5, label="Munk's Stagger Thm.")
 
     # 4. Initialize Secondary Y-axis
     ax2 = ax1.twinx()
 
-    # 5. Add Trace: Relative Error (Secondary Y) - Dotted line, open squares
+    # 5. Add Flowtangent: Relative Error (Secondary Y) - Dotted line, open squares
     ax2.plot(n_segments, error_percent, color='black', linestyle=':', linewidth=1.5, 
              marker='s', markersize=5, markerfacecolor='none', markeredgecolor='black', 
              label='Relative Error')
@@ -806,7 +806,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     # Convert error to a percentage for cleaner reading
     error_percent = np.array(error) * 100.0
 
-    # 2. Add Trace: AD Gradient (Primary Y)
+    # 2. Add Flowtangent: AD Gradient (Primary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -819,7 +819,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 3. Add Trace: Analytical Truth (Primary Y)
+    # 3. Add Flowtangent: Analytical Truth (Primary Y)
     # Drawing a line from the first to the last x-coordinate
     fig.add_trace(
         go.Scatter(
@@ -832,7 +832,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 4. Add Trace: Relative Error (Secondary Y)
+    # 4. Add Flowtangent: Relative Error (Secondary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -899,7 +899,7 @@ def plot_fd_v_curve_plotly(step_sizes, fd_errors):
     
     fig = go.Figure()
 
-    # 1. Add Trace: FD Absolute Error
+    # 1. Add Flowtangent: FD Absolute Error
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -998,12 +998,12 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide)
     fig, ax = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Trace: FD Absolute Error (Solid line, filled circles)
+    # 2. Add Flowtangent: FD Absolute Error (Solid line, filled circles)
     ax.loglog(step_sizes, fd_errors, color='black', linestyle='-', linewidth=1.2,
               marker='o', markersize=4, markerfacecolor='black', 
               label='Central Difference Error')
 
-    # 3. Add Trace: AD Error Bound (Dotted line, no markers)
+    # 3. Add Flowtangent: AD Error Bound (Dotted line, no markers)
     # Using 1e-16 as the theoretical machine zero floor
     ax.axhline(y=1e-16, color='black', linestyle=':', linewidth=1.5, 
                label='VORJAX AD Error Bound (Machine Zero)')
@@ -1058,7 +1058,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
 
     fig = go.Figure()
 
-    # 1. Add Trace: FD Relative Error vs Theory
+    # 1. Add Flowtangent: FD Relative Error vs Theory
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -1071,7 +1071,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
         )
     )
 
-    # 2. Add Trace: AD Relative Error vs Theory (Flat Line)
+    # 2. Add Flowtangent: AD Relative Error vs Theory (Flat Line)
     fig.add_trace(
         go.Scatter(
             x=[min(step_sizes), max(step_sizes)],
@@ -1474,7 +1474,7 @@ def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
         marker=dict(color='red', size=8, symbol='diamond', line=dict(width=1, color='darkred'))
     ))
     
-    # --- The Invisible Hover Trace ---
+    # --- The Invisible Hover Flowtangent ---
     fig.add_trace(go.Scatter(
         x=mach_su2_masked, y=cl_su2_masked, # Align with SU2 points
         mode='markers', name='Spline Error',
@@ -1594,7 +1594,7 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
 if __name__ == "__main__":
 
-    os.chdir(tu.get_Trace_root())
+    os.chdir(tu.get_Flowtangent_root())
 
     mach_path   = tu.DataPath(("freestream", "mach_number"), tag="M")
     alpha_path  = tu.DataPath(("aerodynamics", "angles", "alpha"), tag="a")

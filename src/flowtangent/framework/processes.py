@@ -1,7 +1,7 @@
-# Trace/Framework/Process.py
+# flowtangent/Framework/Process.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -32,7 +32,7 @@ import jax.numpy as jnp
 import networkx as nx
 import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizers
 
-# Trace imports
+# Flowtangent imports
 from .state import State
 from .systems import System
 from .settings import Settings
@@ -43,11 +43,11 @@ from ..utils import MERMAID_STYLES, DataPath, field, compute_tree_delta, null_st
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
 
-TraceFunction: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
+FlowtangentFunction: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
 
 
 class ProcessStep(eqx.Module):
-    function: TraceFunction = field(null_step, static=True, as_value=True)
+    function: FlowtangentFunction = field(null_step, static=True, as_value=True)
     tag: str = field("Process Step", static=True)
 
     _state_delta: Optional[State] = field(None)
@@ -57,7 +57,7 @@ class ProcessStep(eqx.Module):
     def __init__(
         self,
         tag: str = "Process Step",
-        function: TraceFunction | ProcessStep = null_step,
+        function: FlowtangentFunction | ProcessStep = null_step,
         _state_delta: Optional[State] = None,
         _system_delta: Optional[System] = None,
         _settings_delta: Optional[Settings] = None,
@@ -74,7 +74,7 @@ class ProcessStep(eqx.Module):
         if isinstance(step, ProcessStep):
             return step
         elif callable(step):
-            step_name = getattr(step, "__name__", "Unnamed TraceFunction")
+            step_name = getattr(step, "__name__", "Unnamed FlowtangentFunction")
             sig = inspect.signature(step)
             if len(sig.parameters) != 3: raise ValueError(
                 f"Process functions must take and return (State, System, Settings). "
@@ -209,7 +209,7 @@ class Process(ProcessStep):
     tag: str = field("Process", static=True)
     steps: tuple[ProcessStep, ...] = ()
     
-    initialize: TraceFunction = field(null_step, static=True)
+    initialize: FlowtangentFunction = field(null_step, static=True)
     initial_step: int = field(0, static=True)
 
     _initial_state: Optional[State] = field(None)
@@ -224,9 +224,9 @@ class Process(ProcessStep):
 
     def __init__(
         self,
-        steps: Sequence[ProcessStep | TraceFunction] = (),
+        steps: Sequence[ProcessStep | FlowtangentFunction] = (),
         tag: str = "Process",
-        initialize: TraceFunction = null_step,
+        initialize: FlowtangentFunction = null_step,
         initial_step: int = 0,
         _initial_state: Optional[State] = None,
         _initial_system: Optional[System] = None,
@@ -528,7 +528,7 @@ class Process(ProcessStep):
             return self.steps.index(value)
 
         else:
-            raise ValueError("Trace processes can only be indexed by name, function, or ProcessStep object.")
+            raise ValueError("Flowtangent processes can only be indexed by name, function, or ProcessStep object.")
 
     def insert(self, step: ProcessStep, index: int):
         new_steps = self.steps[:index] + (step,) + self.steps[index:]
@@ -903,7 +903,7 @@ class Process(ProcessStep):
 
 
 class OptimizerInterface:
-    """Interface with legacy optimizers to separate value and gradient function for Trace Processes."""
+    """Interface with legacy optimizers to separate value and gradient function for Flowtangent Processes."""
 
     def __init__(
         self,

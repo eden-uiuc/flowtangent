@@ -5,7 +5,7 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import empty_array, field, register
+from flowtangent.utils import empty_array, field, register
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions

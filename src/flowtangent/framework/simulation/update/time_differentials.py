@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Update/time_differentials.py
+# flowtangent/Framework/Missions/Update/time_differentials.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,8 +10,8 @@
 # package imports
 import equinox as eqx
 
-# Trace imports
-import eden_trace.framework as rcf
+# Flowtangent imports
+import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Update Time Differentials

@@ -1,7 +1,7 @@
-# Trace/Compoments/Fuselages/Fuselage.py
+# flowtangent/Compoments/Fuselages/Fuselage.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,10 +10,10 @@
 # package imports
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field
+# Flowtangent imports
+from flowtangent.utils import empty_array, field
 
-from eden_trace.library import Component, Areas, Dimensions, Fineness
+from flowtangent.library import Component, Areas, Dimensions, Fineness
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Fuselage

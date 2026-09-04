@@ -1,7 +1,7 @@
-# Trace/Framework/Missions/Conditions/Stability.py
+# flowtangent/Framework/Missions/Conditions/Stability.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Import
@@ -11,9 +11,9 @@
 # package imports
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field, register
-from eden_trace.framework.state_data import StateData
+# Flowtangent imports
+from flowtangent.utils import empty_array, field, register
+from flowtangent.framework.state_data import StateData
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Stability

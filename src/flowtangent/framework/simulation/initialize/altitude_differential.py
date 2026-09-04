@@ -1,4 +1,4 @@
-# Trace/Framework/Missions/Initialize/altitude_differential.py
+# flowtangent/Framework/Missions/Initialize/altitude_differential.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  Sep 2025, J. Smart
 # Modified:
@@ -10,8 +10,8 @@
 
 import jax.numpy as jnp
 
-# Trace Imports
-import eden_trace.framework as rcf
+# Flowtangent Imports
+import flowtangent.framework as rcf
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

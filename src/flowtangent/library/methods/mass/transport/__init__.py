@@ -1,7 +1,7 @@
-# Trace/Methods/Weights/Correlations/Transport/__init__.py
+# flowtangent/Methods/Weights/Correlations/Transport/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""Trace Package Setup"""
+"""Flowtangent Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

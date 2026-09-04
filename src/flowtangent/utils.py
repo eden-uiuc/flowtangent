@@ -1,4 +1,4 @@
-# Trace/utils.py
+# flowtangent/utils.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Apr 2026, J. Smart
@@ -503,9 +503,9 @@ def inspect_leaves(tree, mask, settings, tree_name:str="Tree", depth:int=3):
 FlowTangent_REGISTRY = {}
 
 def register(cls):
-    """Decorator to safely register any Trace class for standalone serialization."""
+    """Decorator to safely register any Flowtangent class for standalone serialization."""
     if cls.__name__ in FlowTangent_REGISTRY:
-        raise ValueError(f"Trace class '{cls.__name__}' is already registered.")
+        raise ValueError(f"Flowtangent class '{cls.__name__}' is already registered.")
     FlowTangent_REGISTRY[cls.__name__] = cls
     return cls
 
@@ -519,7 +519,7 @@ def serialize_node(obj):
         else:
             return {"__type__": "ndarray", "data": obj.tolist()}
         
-    # 2. Registered Trace Class
+    # 2. Registered Flowtangent Class
     elif type(obj).__name__ in FlowTangent_REGISTRY:
         cls = type(obj)
         state = {}
@@ -563,11 +563,11 @@ def serialize_node(obj):
         if hasattr(obj, "tag") and obj.tag:
             warnings.warn(
                 f"Attempted to save '{obj.tag}' with unregisterd class {type(obj).__name__}. "
-                "Trace will be unable to load this data until the class is registered.", UserWarning)
+                "Flowtangent will be unable to load this data until the class is registered.", UserWarning)
         else:
             warnings.warn(
                 f"Attempted to save '{obj}' with unregisterd class {type(obj).__name__}. "
-                "Trace will be unable to load this data until the class is registered.", UserWarning)
+                "Flowtangent will be unable to load this data until the class is registered.", UserWarning)
         return {"__type__": "unknown", "data": str(obj)}
 
 def deserialize_node(data):
@@ -615,7 +615,7 @@ def deserialize_node(data):
 
 def save_data(obj, filename:str | Path):
     """
-    Serializes any registered Trace data structure and compresses it to a file.
+    Serializes any registered Flowtangent data structure and compresses it to a file.
     """
 
     file_path = Path(filename).resolve()
@@ -635,7 +635,7 @@ def save_data(obj, filename:str | Path):
 
 def load_data(filename: str | Path) -> Any:
     """
-    Loads any Trace data structure from a file.
+    Loads any Flowtangent data structure from a file.
     No setup scripts or templates are required.
     """
     with gzip.open(filename, 'rt', encoding='utf-8') as f:
@@ -720,13 +720,13 @@ def scan_for_invalid_JAX_types(pytree, name="PyTree") -> None:
 # ---------------------------------------------------------
 
 def initialize_jax_cache(
-    cache_dir="~/.eden_trace/jax_cache", 
+    cache_dir="~/.flowtangent/jax_cache", 
     max_size_gb=2.0, 
     max_age_days=30
 ):
     """
     Initializes the JAX persistent compilation cache and prunes old entries.
-    Safe to call every time Trace is imported.
+    Safe to call every time Flowtangent is imported.
     """
     # 1. Resolve the absolute path and ensure it exists
     cache_path = os.path.expanduser(cache_dir)
@@ -740,7 +740,7 @@ def initialize_jax_cache(
         _prune_cache(cache_path, max_size_gb, max_age_days)
     except Exception as e:
         # Never let a cache cleanup error crash the main physics library
-        print(f"Trace Warning: Failed to prune JAX compilation cache - {e}")
+        print(f"Flowtangent Warning: Failed to prune JAX compilation cache - {e}")
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):
     """

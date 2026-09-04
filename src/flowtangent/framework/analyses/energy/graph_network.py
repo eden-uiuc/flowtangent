@@ -1,4 +1,4 @@
-# Trace/Framework/Analyses/Energy/GraphNetwork.py
+# flowtangent/Framework/Analyses/Energy/GraphNetwork.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart
@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 
 import networkx as nx
 
-from eden_trace.utils import field, inputs, outputs, parse_io
+from flowtangent.utils import field, inputs, outputs, parse_io
 
-from eden_trace.library.components.energy.networks import GraphNetwork
+from flowtangent.library.components.energy.networks import GraphNetwork
 
-from eden_trace.framework import Process, ProcessStep
+from flowtangent.framework import Process, ProcessStep
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Energy Network Analysis

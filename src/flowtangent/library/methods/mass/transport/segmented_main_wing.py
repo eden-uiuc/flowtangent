@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Mass/Correlation/Transport/segmented_main_wing.py
+# flowtangent/Library/Methods/Mass/Correlation/Transport/segmented_main_wing.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
 # Created:  May 2024, J. Smart
@@ -10,7 +10,7 @@
 
 import jax.numpy as np
 
-from eden_trace.library import units
+from flowtangent.library import units
 
 # -----------------------------------------------------------------------
 # Functional/Library Version

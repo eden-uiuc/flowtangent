@@ -1,4 +1,4 @@
-# Trace/Framework/analyses/energy/turbojets.py
+# flowtangent/Framework/analyses/energy/turbojets.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J Smart
@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.library.components.energy.networks import TurbojetNetwork, TurbofanNetwork
-    from eden_trace.library.components.energy.maps.classes import CompressorMap, TurbineMap
+    from flowtangent.library.components.energy.networks import TurbojetNetwork, TurbofanNetwork
+    from flowtangent.library.components.energy.maps.classes import CompressorMap, TurbineMap
 
 from dataclasses import replace
 
@@ -21,10 +21,10 @@ import equinox as eqx
 
 from .graph_network import build_analysis_from_network
 
-from eden_trace.utils import DataPath, field
+from flowtangent.utils import DataPath, field
 
-from eden_trace.library import units
-from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetOpPoint
+from flowtangent.library import units
+from flowtangent.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetOpPoint
 
 from ..implicit import ImplicitAnalysis
 from ..batched import BatchedAnalysis

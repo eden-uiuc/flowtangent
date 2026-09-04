@@ -1,15 +1,15 @@
-# Trace/Framework/Missions/Initialization/mass.py
+# flowtangent/Framework/Missions/Initialization/mass.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Trace Imports
+# Flowtangent Imports
 import equinox as eqx
 
-import eden_trace.framework as rcf
+import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Mass

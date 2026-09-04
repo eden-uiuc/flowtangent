@@ -1,4 +1,4 @@
-# Trace/Framework/Analyses/Batched.py
+# flowtangent/Framework/Analyses/Batched.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Jun 2026, J. Smart
@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Tuple, Sequence
 
 if TYPE_CHECKING:
-    from eden_trace.framework import System, Settings
+    from flowtangent.framework import System, Settings
 
 import logging
 import os
@@ -33,8 +33,8 @@ from numcodecs import Blosc
 from tqdm import tqdm, trange
 
 
-from eden_trace.utils import field, get_all_targets, DataPath
-from eden_trace.framework import Process, Settings, State, System
+from flowtangent.utils import field, get_all_targets, DataPath
+from flowtangent.framework import Process, Settings, State, System
 
 from .implicit import ImplicitAnalysis
 
@@ -344,7 +344,7 @@ class BatchedAnalysis(Process):
 
 
 class ShardManager:
-    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="Trace_dataset.manager"):
+    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="Flowtangent_dataset.manager"):
         self.local_dir = Path(cache_dir)
         self.hdd_dir = Path(storage_dir)
         self.max_rows = max_rows
@@ -409,7 +409,7 @@ class ShardManager:
 
 class ShardedDatasetGenerator:
     """
-    Orchestrates batched runs for any Trace BatchProcess.
+    Orchestrates batched runs for any Flowtangent BatchProcess.
     Slices total design space into manageable shards, executes them locally,
     and offloads them to medium-term storage.
     """

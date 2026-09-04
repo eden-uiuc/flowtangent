@@ -1,6 +1,6 @@
-# Trace/Framework/Missions/Initialization/planetary_position.py
+# flowtangent/Framework/Missions/Initialization/planetary_position.py
 # (c) Copyright 2024 Aerospace Research Community LLC
-# Created: Aug 2024, Trace Team
+# Created: Aug 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Imports
@@ -9,8 +9,8 @@
 # package imports
 import equinox as eqx
 
-# Trace Imports
-import eden_trace.framework as rcf
+# Flowtangent Imports
+import flowtangent.framework as rcf
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Initialize Planetary Position

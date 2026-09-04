@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import field, outputs, register
-from eden_trace.utils import inputs as func_inputs
+from flowtangent.utils import field, outputs, register
+from flowtangent.utils import inputs as func_inputs
 
 from .nodes import GraphInput, GraphNode, Splitter, EnergyStore, FuelTank
 from .jets.classes import TurbojetEngine, TurbofanEngine

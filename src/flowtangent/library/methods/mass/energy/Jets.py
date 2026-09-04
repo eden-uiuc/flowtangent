@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Mass/Propulsion/Jet_Mass_from_SLS.py
+# flowtangent/Library/Methods/Mass/Propulsion/Jet_Mass_from_SLS.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  May 2025, J. Smart
 # Modified:
@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
 # package imports
 
-# Trace Imports
-# from Trace.Library.Components.Energy.Propulsors import TurbofanEngine
+# Flowtangent Imports
+# from Flowtangent.Library.Components.Energy.Propulsors import TurbofanEngine
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

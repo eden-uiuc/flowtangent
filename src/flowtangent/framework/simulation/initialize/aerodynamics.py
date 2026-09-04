@@ -1,4 +1,4 @@
-# Trace/Framework/Methods/Aerodynamics/initialization.py
+# flowtangent/Framework/Methods/Aerodynamics/initialization.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: Mar 2026, J. Smart
@@ -15,13 +15,13 @@ import jax.numpy as jnp
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
-    from eden_trace.framework.settings import Settings
-    from eden_trace.framework.state import State
-    from eden_trace.framework.systems import Aircraft
+    from flowtangent.framework.settings import Settings
+    from flowtangent.framework.state import State
+    from flowtangent.framework.systems import Aircraft
 
-from eden_trace.utils import inputs, outputs
+from flowtangent.utils import inputs, outputs
 
-from eden_trace.framework.state_data.aero import ComponentCoeffs
+from flowtangent.framework.state_data.aero import ComponentCoeffs
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Initialize Aerodynamic Conditions

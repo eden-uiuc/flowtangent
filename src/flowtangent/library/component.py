@@ -1,7 +1,7 @@
-# Trace/Library/Compoments/Component.py
+# flowtangent/Library/Compoments/Component.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Trace Team
+# Created: Jul 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -16,10 +16,10 @@ from typing import Any, Optional
 import equinox as eqx
 import jax.numpy as jnp
 
-# Trace imports
-from eden_trace.utils import empty_array, field, register
+# Flowtangent imports
+from flowtangent.utils import empty_array, field, register
 
-from eden_trace.library.attributes.materials import Aluminum, Solid
+from flowtangent.library.attributes.materials import Aluminum, Solid
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component

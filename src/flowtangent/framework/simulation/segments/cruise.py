@@ -1,7 +1,7 @@
 # $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Oct 2025, Trace Team
+# Created: Oct 2025, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,13 +14,13 @@ import equinox as eqx
 import jax.numpy as jnp
 
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
-from eden_trace.utils import field
+from flowtangent.utils import field
 
-from eden_trace.framework import ProcessStep
-from eden_trace.framework.state_data.controls import Control, Control, NamedResidual
-from eden_trace.framework.simulation.segments import Segment
+from flowtangent.framework import ProcessStep
+from flowtangent.framework.state_data.controls import Control, Control, NamedResidual
+from flowtangent.framework.simulation.segments import Segment
 
 from .profiles import *
 

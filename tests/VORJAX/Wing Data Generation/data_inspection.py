@@ -13,14 +13,14 @@ from dask import compute as dc
 
 from tqdm import tqdm
 
-from eden_trace.library.components.wings import Wing, Chords, WingDimensions, Sweeps
+from flowtangent.library.components.wings import Wing, Chords, WingDimensions, Sweeps
 
-from eden_trace.framework import Aircraft, State, Settings
-from eden_trace.framework.settings import AnalysisSettings
-from eden_trace.framework.plotting import plot_vlm_panels
+from flowtangent.framework import Aircraft, State, Settings
+from flowtangent.framework.settings import AnalysisSettings
+from flowtangent.framework.plotting import plot_vlm_panels
 
-from eden_trace.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
-from eden_trace.framework.methods.aero.VORJAX import discretize_surfaces
+from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices
+from flowtangent.framework.methods.aero.VORJAX import discretize_surfaces
 
 def get_zarr_root():
     """

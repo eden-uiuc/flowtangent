@@ -1,4 +1,4 @@
-# Trace/Framework/Missions/residuals.py
+# flowtangent/Framework/Missions/residuals.py
 # (c) Copyright 2025 Aerospace Research Community LLC#
 # Created:  Sep 2025, J. Smart
 # Modified:
@@ -10,12 +10,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from eden_trace.framework import Settings, State, System
+    from flowtangent.framework import Settings, State, System
 
 # package imports
 import equinox as eqx
 
-# Trace Imports
+# Flowtangent Imports
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

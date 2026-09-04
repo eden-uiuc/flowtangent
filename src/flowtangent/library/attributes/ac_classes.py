@@ -1,4 +1,4 @@
-# Trace/Library/Attributes/AC_Classes.py
+# flowtangent/Library/Attributes/AC_Classes.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
 # Created:  May 2024, J. Smart
@@ -13,10 +13,10 @@ from typing import Literal
 # package imports
 import equinox as eqx
 
-# Trace imports
-from eden_trace.utils import field
+# Flowtangent imports
+from flowtangent.utils import field
 
-from eden_trace.library import units
+from flowtangent.library import units
 
 # -------------------------------------------------------------------------------
 # Aircraft Classes

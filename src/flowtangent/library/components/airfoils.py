@@ -1,7 +1,7 @@
-# Trace/Framework/Components/Airfoil.py
+# flowtangent/Framework/Components/Airfoil.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Sep 2024, Trace Team
+# Created: Sep 2024, Flowtangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -15,10 +15,10 @@ from pathlib import Path
 import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
-# Trace imports
-from eden_trace.utils import empty_array, get_trace_root, field
+# Flowtangent imports
+from flowtangent.utils import empty_array, get_trace_root, field
 
-from eden_trace.library import Component
+from flowtangent.library import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -272,7 +272,7 @@ def _load_map_from_disk(name: str):
     """Hidden helper that does the disk I/O, safely cached, and routes by type."""
     file_path = _AF_DIR / f"{name}.txt"
     if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in Trace library ({_AF_DIR}).")
+        raise AttributeError(f"Map '{name}' not found in Flowtangent library ({_AF_DIR}).")
 
     return Airfoil.from_file(file_path)
 

@@ -38,7 +38,7 @@ def initialize_jax_cache(cache_dir="~/.eden_trace/jax_cache", max_size_gb=2.0, m
     try:
         _prune_cache(cache_path, max_size_gb, max_age_days)
     except Exception as e:
-        print(f"Trace Warning: Failed to prune JAX compilation cache - {e}")
+        print(f"Flowtangent Warning: Failed to prune JAX compilation cache - {e}")
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):
     # (Paste your exact _prune_cache logic here from the old utils.py)

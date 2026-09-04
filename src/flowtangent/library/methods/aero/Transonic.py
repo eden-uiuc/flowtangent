@@ -1,4 +1,4 @@
-# Trace/Library/Methods/Aerodynamics/transonic_spline.py
+# flowtangent/Library/Methods/Aerodynamics/transonic_spline.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
 # Created: May 2026, J. Smart
