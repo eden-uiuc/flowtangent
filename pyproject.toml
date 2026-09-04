@@ -30,6 +30,7 @@ dev = [
     "pycycle",
     "pytest",
     "nvidia-ml-py",
+    "om-pycycle"
 ]
 
 [tool.ruff]
@@ -75,9 +76,6 @@ section-order = [
     "future",
     "standard-library",   # Native Python (os, sys, etc.)
     "third-party",        # Non-Trace packages (jax, equinox, numpy, etc.)
-    "trace-utils",        # Custom section 1
-    "trace-library",      # Custom section 2
-    "trace-framework",    # Custom section 3
     "first-party",        # Catch-all for any other Trace imports
     "local-folder"        # Relative imports (e.g., from . import utils)
 ]
