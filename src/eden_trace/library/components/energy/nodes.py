@@ -23,7 +23,7 @@ import jax.numpy as jnp
 from dataclasses import replace
 from functools import reduce
 
-from eden_trace.utils import init_field, register
+from eden_trace.utils import field, register
 
 from eden_trace.library import Component
 from eden_trace.library.gases import Air, Gas
@@ -49,10 +49,10 @@ GraphDomain = Literal["flow", "mechanical", "electrical", "fuel", "force", "resi
 
 @register
 class GraphInput(eqx.Module):
-    domain: GraphDomain = init_field("flow", static=True)
-    network_ID: str = init_field("network", static=True)
-    primary: bool = init_field(False, static=True)
-    _assigned: bool = init_field(False)
+    domain: GraphDomain = field("flow", static=True)
+    network_ID: str = field("network", static=True)
+    primary: bool = field(False, static=True)
+    _assigned: bool = field(False)
 
     # Define iter to make castable to tuple as (self,)
     def __iter__(self):
@@ -70,9 +70,9 @@ class GraphInput(eqx.Module):
 
 @register
 class GraphNode(Component):
-    network_ID: str = init_field("energy_node", static=True)
+    network_ID: str = field("energy_node", static=True)
 
-    inputs: tuple[GraphInput, ...] | GraphInput = init_field(tuple, static=True)
+    inputs: tuple[GraphInput, ...] | GraphInput = field(tuple, static=True)
 
     def __post_init__(self):
         if isinstance(self.inputs, GraphInput):
@@ -155,8 +155,8 @@ class GraphNode(Component):
 @register
 class Splitter(GraphNode):
 
-    values: str | tuple[str] = init_field(tuple, static=True)
-    fractions: float | Callable | tuple[float | Callable] = init_field(tuple, static=True)
+    values: str | tuple[str] = field(tuple, static=True)
+    fractions: float | Callable | tuple[float | Callable] = field(tuple, static=True)
 
     def __post_init__(self):
         
@@ -226,16 +226,16 @@ class FlowOpPoint(eqx.Module):
     rotation_speed: float | jax.Array = 0.0
     noise_speed:    float | jax.Array = 0.0
 
-    eff: Efficiencies = init_field(Efficiencies)
+    eff: Efficiencies = field(Efficiencies)
 
 @register
 class BleedFlow(GraphNode):
 
-    tag: str = init_field("Bleed Flow", static=True)
-    fractions_dict: dict[str, float | Callable] = init_field(dict)
+    tag: str = field("Bleed Flow", static=True)
+    fractions_dict: dict[str, float | Callable] = field(dict)
 
-    parent_ID: str = init_field('', static=True)
-    grandparent_ID: str = init_field(tuple, static=True)
+    parent_ID: str = field('', static=True)
+    grandparent_ID: str = field(tuple, static=True)
 
     def transmit(self, state: State, system: System, settings: Settings):
         
@@ -280,13 +280,13 @@ class BleedFlow(GraphNode):
 @register
 class FlowNode[DesignType: FlowOpPoint | tuple](GraphNode):
     
-    design_parameters: DesignType = init_field(FlowOpPoint)
-    working_fluid: Gas = init_field(Air)
-    add_mixer: bool = init_field(False)
+    design_parameters: DesignType = field(FlowOpPoint)
+    working_fluid: Gas = field(Air)
+    add_mixer: bool = field(False)
 
-    output_bleeds: tuple[BleedFlow,...] = init_field(tuple)
+    output_bleeds: tuple[BleedFlow,...] = field(tuple)
 
-    _bookkeeping: dict = init_field(lambda: {"bleeds": BleedFlow}, static=True)
+    _bookkeeping: dict = field(lambda: {"bleeds": BleedFlow}, static=True)
 
     def __post_init__(self):
         super(FlowNode, self).__post_init__()
@@ -553,7 +553,7 @@ class FlowNode[DesignType: FlowOpPoint | tuple](GraphNode):
 
 @register
 class EnergyStore(GraphNode):
-    tag: str = init_field("Energy Store", static=True)
+    tag: str = field("Energy Store", static=True)
 
     max_energy: float = 0.0
 
@@ -567,7 +567,7 @@ class EnergyStore(GraphNode):
 
 @register
 class FuelTank(EnergyStore):
-    tag: str = init_field("Fuel Tank", static=True)
+    tag: str = field("Fuel Tank", static=True)
 
     selector_ratio: float = 1.0
     secondary_fuel_flow: float = 0.0
@@ -594,7 +594,7 @@ class RagoneParameters(eqx.Module):
 
 @register
 class Battery(EnergyStore):
-    tag: str = init_field("Battery", static=True)
+    tag: str = field("Battery", static=True)
 
     max_energy: float = 0.0
     max_power: float = 0.0
@@ -602,7 +602,7 @@ class Battery(EnergyStore):
 
     resistance: float = 0.0
 
-    ragone: RagoneParameters = init_field(RagoneParameters)
+    ragone: RagoneParameters = field(RagoneParameters)
 
 if __name__ == "__main__":
 

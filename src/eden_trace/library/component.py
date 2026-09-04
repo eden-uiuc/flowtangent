@@ -17,7 +17,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.library.attributes.materials import Aluminum, Solid
 
@@ -39,7 +39,7 @@ class Fineness(eqx.Module):
 @register
 class Dimensions(eqx.Module):
     # Attribute         Type    Default Value
-    ordinal_direction: bool = init_field(False, static=True)
+    ordinal_direction: bool = field(False, static=True)
 
     reference: float = 0.0
     total: float = 0.0
@@ -83,9 +83,9 @@ class Areas(eqx.Module):
 @register
 class MaterialProperties(eqx.Module):
     # Attribute                 Type        Default Value
-    tensile_stress_carrier: Solid = init_field(Aluminum)
-    torsional_stress_carrier: Solid = init_field(Aluminum)
-    shear_stress_carrier: Solid = init_field(Aluminum)
+    tensile_stress_carrier: Solid = field(Aluminum)
+    torsional_stress_carrier: Solid = field(Aluminum)
+    shear_stress_carrier: Solid = field(Aluminum)
 
     def __repr__(self):
         return ""
@@ -101,9 +101,9 @@ class MassProperties(eqx.Module):
     volume: float = 1.0
     density: float = 0.0
 
-    center_of_gravity: jnp.ndarray = init_field(lambda: jnp.zeros((1, 3)))
-    moments_of_inertia: jnp.ndarray = init_field(lambda: jnp.zeros((3, 3)))
-    subcomponent_moments_of_inertia: jnp.ndarray = init_field(lambda: jnp.zeros((3, 3)))
+    center_of_gravity: jnp.ndarray = field(lambda: jnp.zeros((1, 3)))
+    moments_of_inertia: jnp.ndarray = field(lambda: jnp.zeros((3, 3)))
+    subcomponent_moments_of_inertia: jnp.ndarray = field(lambda: jnp.zeros((3, 3)))
 
     def __repr__(self):
         return ""
@@ -111,27 +111,27 @@ class MassProperties(eqx.Module):
 
 @register
 class Component(eqx.Module):
-    tag: str = init_field("Component", static=True)
-    is_control_component: bool = init_field(False, static=True)
+    tag: str = field("Component", static=True)
+    is_control_component: bool = field(False, static=True)
 
-    segments: tuple[Component, ...] = init_field(tuple)
-    subcomponents: tuple[Component, ...] = init_field(tuple)
-    origin: jnp.ndarray = init_field(lambda: jnp.zeros((1, 3)))
+    segments: tuple[Component, ...] = field(tuple)
+    subcomponents: tuple[Component, ...] = field(tuple)
+    origin: jnp.ndarray = field(lambda: jnp.zeros((1, 3)))
 
     # ---------------------------------------------------AREAS----------------------------------------------------------
-    areas: Areas = init_field(Areas)
+    areas: Areas = field(Areas)
 
     # -------------------------------------------------DIMENSIONS-------------------------------------------------------
-    lengths: Dimensions = init_field(Dimensions)
-    widths: Dimensions = init_field(Dimensions)
-    heights: Dimensions = init_field(Dimensions)
-    diameters: Dimensions = init_field(Dimensions)
+    lengths: Dimensions = field(Dimensions)
+    widths: Dimensions = field(Dimensions)
+    heights: Dimensions = field(Dimensions)
+    diameters: Dimensions = field(Dimensions)
 
     # -----------------------------------------------MASS & MATERIALS---------------------------------------------------
-    mass_properties: MassProperties = init_field(MassProperties)
-    material_properties: MaterialProperties = init_field(MaterialProperties)
+    mass_properties: MassProperties = field(MassProperties)
+    material_properties: MaterialProperties = field(MaterialProperties)
 
-    _bookkeeping: dict[str, Any] = init_field(dict, static=True)
+    _bookkeeping: dict[str, Any] = field(dict, static=True)
 
     def __repr__(self):
         repr_str = self.tag + " - Subcomponents: (" + ", ".join([sc.tag for sc in self.subcomponents]) + ")"
@@ -238,6 +238,6 @@ class Component(eqx.Module):
 
 
 class ControlComponent(Component):
-    is_control_component: bool = init_field(True, static=True)
-    control_path: tuple[str, ...] | None = init_field(tuple, static=True)
-    control_path_indices: tuple | None = init_field(lambda: (slice(None), 0), static=True)
+    is_control_component: bool = field(True, static=True)
+    control_path: tuple[str, ...] | None = field(tuple, static=True)
+    control_path_indices: tuple | None = field(lambda: (slice(None), 0), static=True)

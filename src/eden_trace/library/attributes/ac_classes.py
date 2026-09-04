@@ -14,7 +14,7 @@ from typing import Literal
 import equinox as eqx
 
 # Trace imports
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library import units
 
@@ -26,29 +26,29 @@ ControlType = Literal["full_powered", "partially_powered", "full_aerodynamic"]
 
 
 class FixedMasses(eqx.Module):
-    flight_crew_mass: float = init_field(0.0, static=True)
-    flight_attendants_mass: float = init_field(0.0, static=True)
-    instruments_mass: float = init_field(0.0, static=True)
-    avionics_mass: float = init_field(0.0, static=True)
-    apu_mass: float = init_field(0.0, static=True)
-    flight_control_mass: float = init_field(0.0, static=True)
-    hyd_pnu_mass: float = init_field(0.0, static=True)
+    flight_crew_mass: float = field(0.0, static=True)
+    flight_attendants_mass: float = field(0.0, static=True)
+    instruments_mass: float = field(0.0, static=True)
+    avionics_mass: float = field(0.0, static=True)
+    apu_mass: float = field(0.0, static=True)
+    flight_control_mass: float = field(0.0, static=True)
+    hyd_pnu_mass: float = field(0.0, static=True)
 
 
 class PerSeatMasses(eqx.Module):
-    operating_items_mass: float = init_field(0.0, static=True)
-    electrical_equipment_mass: float = init_field(0.0, static=True)
-    environmental_mass: float = init_field(0.0, static=True)
-    furnishings_mass: float = init_field(0.0, static=True)
+    operating_items_mass: float = field(0.0, static=True)
+    electrical_equipment_mass: float = field(0.0, static=True)
+    environmental_mass: float = field(0.0, static=True)
+    furnishings_mass: float = field(0.0, static=True)
 
 
 class AircraftClass(eqx.Module):
-    tag: str = init_field("Aircraft Class", static=True)
+    tag: str = field("Aircraft Class", static=True)
 
-    control_type: ControlType = init_field("full_powered", static=True)
+    control_type: ControlType = field("full_powered", static=True)
 
-    fixed_masses: FixedMasses = init_field(FixedMasses, static=True)
-    per_seat_masses: PerSeatMasses = init_field(PerSeatMasses, static=True)
+    fixed_masses: FixedMasses = field(FixedMasses, static=True)
+    per_seat_masses: PerSeatMasses = field(PerSeatMasses, static=True)
 
 
 # -------------------------------------------------------------------------------
@@ -78,10 +78,10 @@ def _BizJetPer():
 
 
 class BusinessJet(AircraftClass):
-    tag: str = init_field("Business Jet", static=True)
+    tag: str = field("Business Jet", static=True)
 
-    fixed_masses: FixedMasses = init_field(_BizJetFixed, static=True)
-    per_seat_masses: PerSeatMasses = init_field(_BizJetPer, static=True)
+    fixed_masses: FixedMasses = field(_BizJetFixed, static=True)
+    per_seat_masses: PerSeatMasses = field(_BizJetPer, static=True)
 
 
 # -------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def _MRPer():
 
 
 class MediumRange(AircraftClass):
-    tag: str = init_field("Medium Range Jet", static=True)
+    tag: str = field("Medium Range Jet", static=True)
 
-    fixed_masses: FixedMasses = init_field(_MRFixed, static=True)
-    per_seat_masses: PerSeatMasses = init_field(_MRPer, static=True)
+    fixed_masses: FixedMasses = field(_MRFixed, static=True)
+    per_seat_masses: PerSeatMasses = field(_MRPer, static=True)

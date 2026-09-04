@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import equinox as eqx
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.framework.state_data import StateData
 
@@ -35,12 +35,12 @@ class NumericalTime(StateData):
 
 @register
 class Time(StateData):
-    tag: str = init_field("Time", static=True)
+    tag: str = field("Time", static=True)
 
-    N: int = init_field(1, static=True)
+    N: int = field(1, static=True)
     
-    dimensionless: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensionless Time"))
-    dimensional: NumericalTime = init_field(lambda: NumericalTime(tag="Dimensional Time"))
+    dimensionless: NumericalTime = field(lambda: NumericalTime(tag="Dimensionless Time"))
+    dimensional: NumericalTime = field(lambda: NumericalTime(tag="Dimensional Time"))
 
     def update_chebyshev_matrices(
         self,

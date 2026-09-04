@@ -16,7 +16,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Conditions
@@ -28,7 +28,7 @@ def _is_static_node(node):
         return hasattr(node, "__class__") and node.__class__.__name__ in STATIC_DATA
 
 class StateData(eqx.Module):
-    tag: str = init_field("Conditions", static=True)
+    tag: str = field("Conditions", static=True)
 
     @property
     def subconditions(self) -> tuple:

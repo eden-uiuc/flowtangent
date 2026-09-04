@@ -36,7 +36,7 @@ import numpy as np  # Used only for OptimizerInterface class w/ legacy optimizer
 from .state import State
 from .systems import System
 from .settings import Settings
-from ..utils import MERMAID_STYLES, DataPath, init_field, compute_tree_delta, null_step, get_target
+from ..utils import MERMAID_STYLES, DataPath, field, compute_tree_delta, null_step, get_target
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -47,12 +47,12 @@ TraceFunction: TypeAlias = Callable[[State, System, Settings], Tuple[State, Syst
 
 
 class ProcessStep(eqx.Module):
-    function: TraceFunction = init_field(null_step, static=True, as_value=True)
-    tag: str = init_field("Process Step", static=True)
+    function: TraceFunction = field(null_step, static=True, as_value=True)
+    tag: str = field("Process Step", static=True)
 
-    _state_delta: Optional[State] = init_field(None)
-    _system_delta: Optional[System] = init_field(None)
-    _settings_delta: Optional[Settings] = init_field(None)
+    _state_delta: Optional[State] = field(None)
+    _system_delta: Optional[System] = field(None)
+    _settings_delta: Optional[Settings] = field(None)
 
     def __init__(
         self,
@@ -206,19 +206,19 @@ def array_barrier(state:State, system:System, settings:Settings):
 
 class Process(ProcessStep):
 
-    tag: str = init_field("Process", static=True)
+    tag: str = field("Process", static=True)
     steps: tuple[ProcessStep, ...] = ()
     
-    initialize: TraceFunction = init_field(null_step, static=True)
-    initial_step: int = init_field(0, static=True)
+    initialize: TraceFunction = field(null_step, static=True)
+    initial_step: int = field(0, static=True)
 
-    _initial_state: Optional[State] = init_field(None)
-    _initial_system: Optional[System] = init_field(None)
-    _initial_settings: Optional[Settings] = init_field(None)
+    _initial_state: Optional[State] = field(None)
+    _initial_system: Optional[System] = field(None)
+    _initial_settings: Optional[Settings] = field(None)
 
-    _val_and_jac_fn: Optional[Callable] = init_field(None, static=True)
-    _cached_grad_map: Optional[JacobianMap] = init_field(None, static=True)
-    _filter_map: dict = init_field(lambda _:{
+    _val_and_jac_fn: Optional[Callable] = field(None, static=True)
+    _cached_grad_map: Optional[JacobianMap] = field(None, static=True)
+    _filter_map: dict = field(lambda _:{
             "energy": r"state\.energy\.nodes\.\[*\]."
         }, static=True)
 
@@ -295,8 +295,8 @@ class Process(ProcessStep):
             start_time = datetime.fromtimestamp(time.time()).strftime(settings.logging.date_format)
             print(f"Beginning Process: '{self.tag}' | {start_time}") 
         
-        if settings.numerical.calculate_jacobian:
-            jac_map = settings.numerical.jacobian_map
+        if settings.numerical.jacobian.calculate_jacobian:
+            jac_map = settings.numerical.jacobian.mapping
             
             if jac_map is not None:
                 # Returns the two distinct flat arrays

@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.framework import Process, ProcessStep
 from eden_trace.framework.methods.aero.Test_Aero import direct_aero
@@ -21,5 +21,5 @@ def _build_test_aero_steps():
 
 
 class TestAero(Process):
-    tag: str = init_field("Aerodynamics", static=True)
-    steps: tuple = init_field(_build_test_aero_steps)
+    tag: str = field("Aerodynamics", static=True)
+    steps: tuple = field(_build_test_aero_steps)

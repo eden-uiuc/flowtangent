@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.library.atmospheres import Atmosphere, USStandard1976
 from eden_trace.library.planets import Earth, Planet
@@ -78,9 +78,9 @@ class Freestream(StateData):
     All attributes are initialized as zero arrays of shape (1, 1) by default.
     """
 
-    tag: str = init_field("Freestream", static=True)
-    atmosphere: Atmosphere = init_field(USStandard1976)
-    planet: Planet = init_field(Earth)
+    tag: str = field("Freestream", static=True)
+    atmosphere: Atmosphere = field(USStandard1976)
+    planet: Planet = field(Earth)
 
     speed: jnp.ndarray = empty_array()
     altitude: jnp.ndarray = empty_array()

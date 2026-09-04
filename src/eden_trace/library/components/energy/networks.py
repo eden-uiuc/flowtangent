@@ -25,7 +25,7 @@ import equinox as eqx
 
 # Trace imports
 import eden_trace.utils as tu
-from eden_trace.utils import init_field, register
+from eden_trace.utils import field, register
 
 from eden_trace.library import units
 from eden_trace.library.atmospheres import USStandard1976
@@ -43,7 +43,7 @@ class NetworkDesign(eqx.Module):
     altitude: float = 0.0
     mach_number: float = 0.01
     thrust: float = 1.0 * units.N
-    atmosphere_model: Atmosphere = init_field(USStandard1976)
+    atmosphere_model: Atmosphere = field(USStandard1976)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Networks
@@ -107,18 +107,18 @@ def _resolve_namespaces(node, parent_prefix=""):
 @register
 class GraphNetwork[DesignType: NetworkDesign](GraphNode):
     
-    tag: str = init_field("Network", static=True)
-    network_ID: str = init_field("network", static=True)
+    tag: str = field("Network", static=True)
+    network_ID: str = field("network", static=True)
     
-    nodes: dict[str, "GraphNode"] = init_field(dict)
-    domains: tuple[GraphDomain, ...] = init_field(tuple, static=True)
-    design_parameters: DesignType = init_field(NetworkDesign)
+    nodes: dict[str, "GraphNode"] = field(dict)
+    domains: tuple[GraphDomain, ...] = field(tuple, static=True)
+    design_parameters: DesignType = field(NetworkDesign)
 
-    _bookkeeping: dict = init_field(lambda: {"lines": EnergyLine}, static=True)
-    _execution_order: tuple[str, ...] = init_field(tuple, static=True)
+    _bookkeeping: dict = field(lambda: {"lines": EnergyLine}, static=True)
+    _execution_order: tuple[str, ...] = field(tuple, static=True)
 
-    controls: tuple[Control, ...] = init_field(tuple, static=True)
-    residuals: tuple[Residual, ...] = init_field(tuple, static=True)
+    controls: tuple[Control, ...] = field(tuple, static=True)
+    residuals: tuple[Residual, ...] = field(tuple, static=True)
 
     def _rebalance_flow_splitters(self) -> "GraphNetwork":
         """Rebalances fractions directly within the subcomponents tree."""
@@ -245,7 +245,7 @@ class _JetNetwork[DesignType: JetNetDesign](GraphNetwork[DesignType]):
     Jet network shell without design parameters.
     """
 
-    inputs: tuple | GraphInput = init_field(
+    inputs: tuple | GraphInput = field(
         (
             GraphInput("force", "network.line"),
             GraphInput("residual", "network.line"),
@@ -296,12 +296,12 @@ def _TurbojetNetworkSetup():
 @register
 class JetNetDesign(NetworkDesign):
 
-    number_of_engines: int = init_field(1, static=True)
+    number_of_engines: int = field(1, static=True)
 
 @register
 class TurbojetNetwork(_JetNetwork[JetNetDesign]):
-    subcomponents: tuple = init_field(_TurbojetNetworkSetup)
-    design_parameters: JetNetDesign = init_field(JetNetDesign)
+    subcomponents: tuple = field(_TurbojetNetworkSetup)
+    design_parameters: JetNetDesign = field(JetNetDesign)
 
 
 # Turbofan ---------------------------------------------------------------------
@@ -312,4 +312,4 @@ def _TurbofanNetworkSetup():
 
 @register
 class TurbofanNetwork(_JetNetwork[JetNetDesign]):
-    subcomponents: tuple = init_field(_TurbofanNetworkSetup)
+    subcomponents: tuple = field(_TurbofanNetworkSetup)

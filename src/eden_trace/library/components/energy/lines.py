@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import init_field, outputs, register
+from eden_trace.utils import field, outputs, register
 from eden_trace.utils import inputs as func_inputs
 
 from .nodes import GraphInput, GraphNode, Splitter, EnergyStore, FuelTank
@@ -20,8 +20,8 @@ from .jets.classes import TurbojetEngine, TurbofanEngine
 
 @register
 class EnergyLine(GraphNode):
-    tag: str = init_field("Line", static=True)
-    _bookkeeping: dict = init_field(
+    tag: str = field("Line", static=True)
+    _bookkeeping: dict = field(
         lambda: {
             "splitters": Splitter,
             "stores": EnergyStore,
@@ -42,9 +42,9 @@ def _TurbojetLineSetup():
 @register
 class TurbojetLine(EnergyLine):
 
-    subcomponents: tuple = init_field(_TurbojetLineSetup)
+    subcomponents: tuple = field(_TurbojetLineSetup)
     
-    inputs: tuple | GraphInput = init_field(
+    inputs: tuple | GraphInput = field(
         (
             GraphInput("fuel", "self.engine"),
             GraphInput("force", "self.engine"),
@@ -53,9 +53,9 @@ class TurbojetLine(EnergyLine):
         static=True,
     )
 
-    tank_draw_ratios: tuple[float, ...] = init_field((1.0,))
+    tank_draw_ratios: tuple[float, ...] = field((1.0,))
 
-    _bookkeeping: dict = init_field(
+    _bookkeeping: dict = field(
         lambda: {
             "engines": TurbojetEngine,
             "stores": FuelTank,

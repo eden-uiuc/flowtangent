@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, field
 
 from eden_trace.library import Component, Areas, Dimensions, Fineness
 
@@ -33,7 +33,7 @@ class FuselageLengths(Dimensions):
     cabin: float = 0.0
     fore_space: float = 0.0
     aft_space: float = 0.0
-    ordinal_direction: bool = init_field(True, static=True)
+    ordinal_direction: bool = field(True, static=True)
 
 
 class FuselageSegment(Component):
@@ -44,16 +44,16 @@ class FuselageSegment(Component):
 class Fuselage(Component):
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
-    number_of_seats: int = init_field(1, static=True)
-    seats_abreast: int = init_field(0, static=True)
-    seat_pitch: float = init_field(0.0, static=True)
-    differential_pressure: float = init_field(0.0, static=True)
+    number_of_seats: int = field(1, static=True)
+    seats_abreast: int = field(0, static=True)
+    seat_pitch: float = field(0.0, static=True)
+    differential_pressure: float = field(0.0, static=True)
 
-    heights: Dimensions = init_field(FuselageHeights)
-    lengths: Dimensions = init_field(FuselageLengths)
+    heights: Dimensions = field(FuselageHeights)
+    lengths: Dimensions = field(FuselageLengths)
 
-    diameters: Dimensions = init_field(Dimensions)
-    fineness: Fineness = init_field(Fineness)
+    diameters: Dimensions = field(Dimensions)
+    fineness: Fineness = field(Fineness)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -66,8 +66,8 @@ class BWBAreas(Areas):
 
 
 class BWBFuselage(Fuselage):
-    tag: str = init_field("BWB Fuselage", static=True)
+    tag: str = field("BWB Fuselage", static=True)
 
-    aft_centerbody_taper: float = init_field(0.0, static=True)
+    aft_centerbody_taper: float = field(0.0, static=True)
 
-    areas: BWBAreas = init_field(BWBAreas)  # type: ignore
+    areas: BWBAreas = field(BWBAreas)  # type: ignore

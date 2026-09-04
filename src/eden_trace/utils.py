@@ -22,7 +22,7 @@ import time
 import warnings
 
 from dataclasses import dataclass
-from functools import reduce
+from functools import partial
 from pathlib import Path
 
 import equinox as eqx
@@ -40,7 +40,7 @@ import numpy as np
 # ----------------------------------------------------------
 
 
-def init_field(initializer: Any, as_value: bool = False, **kwargs):
+def field(initializer: Any, as_value: bool = False, **kwargs):
     """
     Smart wrapper for eqx.field that automatically routes the initializer
     to `default` (for immutables) or `default_factory` (for classes/callables).
@@ -61,32 +61,13 @@ def init_field(initializer: Any, as_value: bool = False, **kwargs):
     # Handle static/immutable defaults (e.g., 'Aircraft', 0.0, (1, 2))
     return eqx.field(default=initializer, **kwargs)
 
+static_field = partial(field, static=True)
+method_field = partial(field, as_value=True, static=True)
 
 def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
     """Syntactic sugar for an empty JAX array in an Equinox module."""
-    return init_field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
+    return field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
-class StaticModuleMeta(type(eqx.Module)):
-    def __new__(mcs, name, bases, namespace):
-        annotations = namespace.get('__annotations__', {})
-        for key in annotations:
-            # Skip internal python/equinox variables
-            if key.startswith("__"): continue
-            
-            # If they provided a default (e.g. `val: int = 5`), wrap it
-            if key in namespace:
-                val = namespace[key]
-                # Don't double-wrap if they're already fields
-                if not getattr(val, 'metadata', None): 
-                    namespace[key] = init_field(val, static=True)
-            # If there's no default (e.g. `val: int`), inject an empty static field
-            else:
-                namespace[key] = eqx.field(static=True)
-                
-        return super().__new__(mcs, name, bases, namespace)
-
-class StaticModule(eqx.Module, metaclass=StaticModuleMeta):
-    pass
 
 class StateDataMeta(type(eqx.Module)):
     
@@ -121,7 +102,8 @@ class StateDataMeta(type(eqx.Module)):
                 raise ValueError(f"FlowTangent class '{name}' is already registered.")
             FlowTangent_REGISTRY[name] = cls
 
-class StateData(eqx.Module, metaclass=StateDataMeta)
+class StateData(eqx.Module, metaclass=StateDataMeta):
+    pass
 
 # ---------------------------------------------------------
 # Programmatic Helpers

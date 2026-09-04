@@ -21,7 +21,7 @@ import equinox as eqx
 
 from .graph_network import build_analysis_from_network
 
-from eden_trace.utils import DataPath, init_field
+from eden_trace.utils import DataPath, field
 
 from eden_trace.library import units
 from eden_trace.library.components.energy.jets.classes import TurbojetEngine, TurbofanDesign, TurbojetOpPoint
@@ -41,8 +41,8 @@ from ...simulation.update import update_freestream
 
 class JetSettings(EnergyAnalysisSettings):
 
-    design_mode: bool = init_field(False, static=True)
-    statics: bool = init_field(False, static=True)
+    design_mode: bool = field(False, static=True)
+    statics: bool = field(False, static=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Single Point Design Analysis

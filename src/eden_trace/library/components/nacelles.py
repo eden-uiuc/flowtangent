@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, field
 
 from eden_trace.library import Component, Dimensions
 
@@ -25,10 +25,10 @@ class NacelleDiameters(Dimensions):
 
 
 class Nacelle(Component):
-    tag: str = init_field("Nacelle", static=True)
-    flow_through: bool = init_field(False, static=True)
-    fuselage_integrated: bool = init_field(False, static=True)
-    has_pylon: bool = init_field(True)
+    tag: str = field("Nacelle", static=True)
+    flow_through: bool = field(False, static=True)
+    fuselage_integrated: bool = field(False, static=True)
+    has_pylon: bool = field(True)
 
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
     orientation_euler_angles: jnp.ndarray = empty_array((0, 3))
@@ -36,4 +36,4 @@ class Nacelle(Component):
     airfoil: Component | None = None
     cowling_airfoil_angle: float = 0.0
 
-    diameters: NacelleDiameters = init_field(NacelleDiameters)  # type: ignore
+    diameters: NacelleDiameters = field(NacelleDiameters)  # type: ignore

@@ -15,7 +15,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library.gases import Air, Gas
 from eden_trace.library.planets import Earth, Planet
@@ -34,13 +34,13 @@ class AtmosphericBreakpoints(eqx.Module):
 
 
 class Atmosphere(eqx.Module):
-    tag: str = init_field("Atmosphere", static=True)
+    tag: str = field("Atmosphere", static=True)
 
-    fluid: Gas = init_field(Air)
+    fluid: Gas = field(Air)
 
-    planet: Planet = init_field(Earth)
+    planet: Planet = field(Earth)
 
-    breaks: AtmosphericBreakpoints = init_field(AtmosphericBreakpoints)
+    breaks: AtmosphericBreakpoints = field(AtmosphericBreakpoints)
 
     def __repr__(self):
         return self.tag
@@ -137,8 +137,8 @@ def generate_us_standard_atmosphere(max_alt=84852.0, step=10.0):
     )
 
 class USStandard1976(Atmosphere):
-    tag: str = init_field("US Standard Atmosphere, 1976", static=True)
-    breaks: AtmosphericBreakpoints = init_field(generate_us_standard_atmosphere)
+    tag: str = field("US Standard Atmosphere, 1976", static=True)
+    breaks: AtmosphericBreakpoints = field(generate_us_standard_atmosphere)
 
 def _ConstantTempBreaks(self):
     return AtmosphericBreakpoints(
@@ -152,5 +152,5 @@ def _ConstantTempBreaks(self):
 
 
 class ConstantTemperature(Atmosphere):
-    tag: str = init_field("Constant Temprerature Atmosphere", static=True)
-    breaks: AtmosphericBreakpoints = init_field(_ConstantTempBreaks)
+    tag: str = field("Constant Temprerature Atmosphere", static=True)
+    breaks: AtmosphericBreakpoints = field(_ConstantTempBreaks)

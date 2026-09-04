@@ -11,7 +11,7 @@ import jax
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import empty_array, init_field
+from eden_trace.utils import empty_array, field
 
 from eden_trace.library import Component, Dimensions
 from eden_trace.library.components.airfoils import Airfoil
@@ -38,9 +38,9 @@ class Chords(WingDimensions):
 
 
 class WingSegment(Component):
-    tag: str = init_field("Wing Segment", static=True)
+    tag: str = field("Wing Segment", static=True)
     airfoil: Airfoil | None = None
-    control_surfaces: tuple = init_field(tuple)
+    control_surfaces: tuple = field(tuple)
 
     # Specialty Attributes
 
@@ -50,8 +50,8 @@ class WingSegment(Component):
     twist: float | jax.Array = 0.0
     dihedral_outboard: float | jax.Array = 0.0
 
-    sweeps: Sweeps = init_field(Sweeps)
-    chords: Chords = init_field(Chords)
+    sweeps: Sweeps = field(Sweeps)
+    chords: Chords = field(Chords)
 
     @property
     def taper(self):
@@ -71,7 +71,7 @@ class WingSegment(Component):
 
 
 class WingControlSurface(Component):
-    tag: str = init_field("Wing Control Surface", static=True)
+    tag: str = field("Wing Control Surface", static=True)
 
     span_fraction_start: float = 0.0
     span_fraction_end: float = 0.0
@@ -84,7 +84,7 @@ class WingControlSurface(Component):
 
     sign_duplicate: float = 1.0
     deflection: float = 0.0
-    configuration_type: str = init_field("single_slotted", static=True)
+    configuration_type: str = field("single_slotted", static=True)
 
     gain: float = 1.0  # deflection multiplier used only for AVL
 
@@ -98,20 +98,20 @@ class WingControlSurface(Component):
 
 
 class Wing(Component):
-    tag: str = init_field("Wing", static=True)
+    tag: str = field("Wing", static=True)
     airfoil: Airfoil | None = None
 
-    _bookkeeping: dict = init_field(lambda: {"control_surfaces": WingControlSurface}, static=True)
+    _bookkeeping: dict = field(lambda: {"control_surfaces": WingControlSurface}, static=True)
 
     # Specialty Attributes
 
-    symmetric: bool = init_field(True, static=True)
-    vertical: bool = init_field(False, static=True)
-    t_tail: bool = init_field(False, static=True)
-    high_lift: bool = init_field(False, static=True)
-    symbolic: bool = init_field(False, static=True)
-    high_mach: bool = init_field(False, static=True)
-    vortex_lift: bool = init_field(False, static=True)
+    symmetric: bool = field(True, static=True)
+    vertical: bool = field(False, static=True)
+    t_tail: bool = field(False, static=True)
+    high_lift: bool = field(False, static=True)
+    symbolic: bool = field(False, static=True)
+    high_mach: bool = field(False, static=True)
+    vortex_lift: bool = field(False, static=True)
 
     taper: float = 0.0
     dihedral: float = 0.0
@@ -128,10 +128,10 @@ class Wing(Component):
 
     aerodynamic_center: jnp.ndarray = empty_array((0, 3))
 
-    spans: WingDimensions = init_field(lambda: WingDimensions(ordinal_direction=True))
-    twists: WingDimensions = init_field(WingDimensions)
-    chords: Chords = init_field(WingDimensions)
-    sweeps: Sweeps = init_field(Sweeps)
+    spans: WingDimensions = field(lambda: WingDimensions(ordinal_direction=True))
+    twists: WingDimensions = field(WingDimensions)
+    chords: Chords = field(WingDimensions)
+    sweeps: Sweeps = field(Sweeps)
 
     def __post_init__(self):
         new_taper, new_chords = self.validate_chords()

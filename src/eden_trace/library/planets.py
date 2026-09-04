@@ -10,7 +10,7 @@
 # package imports
 import equinox as eqx
 
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library import units
 
@@ -20,9 +20,9 @@ from eden_trace.library import units
 
 
 class Planet(eqx.Module):
-    mass: float = init_field(0.0, static=True)
-    mean_radius: float = init_field(0.0, static=True)
-    sea_level_gravity: float = init_field(0.0, static=True)
+    mass: float = field(0.0, static=True)
+    mean_radius: float = field(0.0, static=True)
+    sea_level_gravity: float = field(0.0, static=True)
 
     def compute_gravity(self, altitude: float = 0.0) -> float:
 
@@ -30,7 +30,7 @@ class Planet(eqx.Module):
 
 
 class Earth(Planet):
-    mass: float = init_field(5.972e24 * units.kg, static=True)
-    mean_radius: float = init_field(6371e3 * units.m, static=True)
-    sea_level_gravity: float = init_field(9.80665 * units.parse("m / s**2"), static=True)
-    HitchHikersGuide: str = init_field("MostlyHarmless", static=True)
+    mass: float = field(5.972e24 * units.kg, static=True)
+    mean_radius: float = field(6371e3 * units.m, static=True)
+    sea_level_gravity: float = field(9.80665 * units.parse("m / s**2"), static=True)
+    HitchHikersGuide: str = field("MostlyHarmless", static=True)

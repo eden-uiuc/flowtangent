@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 import networkx as nx
 
-from eden_trace.utils import init_field, inputs, outputs, parse_io
+from eden_trace.utils import field, inputs, outputs, parse_io
 
 from eden_trace.library.components.energy.networks import GraphNetwork
 
@@ -28,7 +28,7 @@ from eden_trace.framework import Process, ProcessStep
 
 
 class PACTNetwork(Process):
-    analysis_network: GraphNetwork = init_field(GraphNetwork)
+    analysis_network: GraphNetwork = field(GraphNetwork)
 
     def __init__(self, analysis_network: GraphNetwork, **kwargs):
         super().__init__(**kwargs)

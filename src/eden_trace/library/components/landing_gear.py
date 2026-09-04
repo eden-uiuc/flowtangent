@@ -10,7 +10,7 @@
 # package imports
 
 # Trace imports
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library import Component
 
@@ -20,12 +20,12 @@ from eden_trace.library import Component
 
 
 class LandingGear(Component):
-    tag: str = init_field("Landing Gear", static=True)
+    tag: str = field("Landing Gear", static=True)
 
     deployed: bool = False
 
-    number_of_units: int = init_field(1, static=True)
-    number_of_wheels: int = init_field(0, static=True)
+    number_of_units: int = field(1, static=True)
+    number_of_wheels: int = field(0, static=True)
 
     strut_length: float = 0.0
     tire_diameter: float = 0.0

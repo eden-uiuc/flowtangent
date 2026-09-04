@@ -15,7 +15,7 @@ import jax
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import DataPath, init_field
+from eden_trace.utils import DataPath, field
 
 from eden_trace.library import Component
 
@@ -44,15 +44,15 @@ def get_active(cond: StateData) -> tuple[StateData, ...]:
 
 
 class Residual(StateData):
-    tag: str = init_field("Dynamic Residual", static=True)
+    tag: str = field("Dynamic Residual", static=True)
     
-    get_value: Callable = init_field(lambda state: jnp.empty(0), as_value=True, static=True)
+    get_value: Callable = field(lambda state: jnp.empty(0), as_value=True, static=True)
 
-    _active: bool = init_field(False, static=True)
+    _active: bool = field(False, static=True)
 
 class DynamicsConditions(StateData):
 
-    tag: str = init_field("Dynamics", static=True)
+    tag: str = field("Dynamics", static=True)
 
     @property
     def active_residuals(self) -> tuple[Residual, ...]:
@@ -81,16 +81,16 @@ class Control(StateData):
         The current value of the control variable. Initialized as a 1x1 zero array.
 
     """
-    tag: str = init_field("Control", static=True)
+    tag: str = field("Control", static=True)
 
-    state_path: DataPath = init_field(DataPath, static=True)
+    state_path: DataPath = field(DataPath, static=True)
     
     # Inital values aren't actually optional, but an unset one will be flagged in initialize_controls
     initial_value: Optional[float | jnp.ndarray] = None
-    bounds: tuple[float, ...] = init_field(tuple((-1e6, 1e6)), static=True)
-    scaling: Literal["linear", "logistic"] = init_field("logistic", static=True)
+    bounds: tuple[float, ...] = field(tuple((-1e6, 1e6)), static=True)
+    scaling: Literal["linear", "logistic"] = field("logistic", static=True)
 
-    _active: bool = init_field(False, static=True)
+    _active: bool = field(False, static=True)
 
     def get_field_name(self):
         return self.tag.replace(" ", "_").lower()
@@ -148,16 +148,16 @@ class SurfaceControl(Control):
     """
 
     # Attribute          Type                        Default Value
-    tag: str = init_field("Surface Control Variable", static=True)
+    tag: str = field("Surface Control Variable", static=True)
     surfaces: tuple[Component] | None = None
 
-    stability: StabilityData = init_field(StabilityData)
+    stability: StabilityData = field(StabilityData)
 
 
 class ControlsConditions(StateData):
-    tag: str = init_field("Controls", static=True)
+    tag: str = field("Controls", static=True)
 
-    _default_paths: dict = init_field(lambda: {
+    _default_paths: dict = field(lambda: {
         "bank_angle": (("frames", "body", "inertial_rotations"), slice(None)),
         "body_angle": (("frames", "body", "inertial_rotations"), slice(None)),
         "velocity": (("frames", "inertial", "velocity_vector"), slice(None)),

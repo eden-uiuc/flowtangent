@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from scipy.interpolate import PchipInterpolator
 
 # Trace imports
-from eden_trace.utils import empty_array, get_trace_root, init_field
+from eden_trace.utils import empty_array, get_trace_root, field
 
 from eden_trace.library import Component
 
@@ -26,7 +26,7 @@ from eden_trace.library import Component
 
 
 class Airfoil(Component):
-    tag: str = init_field("Airfoil", static=True)
+    tag: str = field("Airfoil", static=True)
 
     thickness_to_chord: float = 0.0
     max_thickness: float = 0.0

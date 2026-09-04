@@ -12,7 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.framework.state_data import StateData
 
@@ -51,7 +51,7 @@ class Mass(StateData):
     """
 
     # Attribute             Type        Default Value
-    tag: str = init_field("Mass Conditions", static=True)
+    tag: str = field("Mass Conditions", static=True)
 
     total: jnp.ndarray = empty_array(())
     rate_of_change: jnp.ndarray = empty_array(())
@@ -60,4 +60,4 @@ class Mass(StateData):
     center_of_gravity: jnp.ndarray = empty_array((0, 3))
     moments_of_inertia: jnp.ndarray = empty_array((0, 3, 3))
 
-    breakdown: StateData = init_field(lambda: StateData(tag="Mass Breakdown"))
+    breakdown: StateData = field(lambda: StateData(tag="Mass Breakdown"))

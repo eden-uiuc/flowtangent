@@ -24,7 +24,7 @@ import jax.numpy as jnp
 import sklearn
 
 # Trace imports
-from eden_trace.utils import DataPath, init_field
+from eden_trace.utils import DataPath, field
 
 from eden_trace.library import units
 from eden_trace.library.methods.aero.Transonic import ensemble_CL_spline, peaked_CL_spline
@@ -55,7 +55,7 @@ class SupersonicSettings(eqx.Module):
 
     peak_CL_multiplier: float = 1.15
     peak_mach_number: Optional[float] = None
-    _transonic_CL_blender: Callable = init_field(ensemble_CL_spline, as_value=True, static=True)
+    _transonic_CL_blender: Callable = field(ensemble_CL_spline, as_value=True, static=True)
 
     begin_drag_rise_mach_number: float = 0.95
     end_drag_rise_mach_number: float = 1.2
@@ -63,12 +63,12 @@ class SupersonicSettings(eqx.Module):
     transonic_drag_multiplier: float = 1.25
     volume_wave_drag_scaling: float = 3.2
 
-    cross_section_type: str = init_field("Fixed", static=True)
-    wave_drag_type: str = init_field("Raymer", static=True)
+    cross_section_type: str = field("Fixed", static=True)
+    wave_drag_type: str = field("Raymer", static=True)
 
     def __post_init__(self):
         if self.peak_mach_number is not None:
-            object.__setattr__(self, "_transonic_CL_blender", init_field(peaked_CL_spline, as_value=True, static=True))
+            object.__setattr__(self, "_transonic_CL_blender", field(peaked_CL_spline, as_value=True, static=True))
 
     def transonic_CL_blender(self, M, val_sub, val_sup):
         return self._transonic_CL_blender(
@@ -83,8 +83,8 @@ class SupersonicSettings(eqx.Module):
 
 
 class CorrectionFactors(eqx.Module):
-    suction: bool = init_field(True, static=True)
-    shock: bool = init_field(True, static=True)
+    suction: bool = field(True, static=True)
+    shock: bool = field(True, static=True)
 
     fuselage_lift: float = 1.14
     trim_drag: float = 1.02
@@ -104,27 +104,27 @@ class FormFactors(eqx.Module):
 
 
 class Surrogate(eqx.Module):
-    surrogate: Optional[Any] = init_field(sklearn.gaussian_process.GaussianProcessRegressor, static=True)
+    surrogate: Optional[Any] = field(sklearn.gaussian_process.GaussianProcessRegressor, static=True)
 
     blend_transonic: bool = True
 
-    angle_of_attack: jnp.ndarray = init_field(lambda: jnp.linspace(-5.0, 15.0, 40) * units.deg)
-    sideslip_angle: jnp.ndarray = init_field(lambda: jnp.linspace(0.0, 15.0, 30) * units.deg)
-    mach: jnp.ndarray = init_field(lambda: jnp.linspace(0.0, 0.85, 20))
+    angle_of_attack: jnp.ndarray = field(lambda: jnp.linspace(-5.0, 15.0, 40) * units.deg)
+    sideslip_angle: jnp.ndarray = field(lambda: jnp.linspace(0.0, 15.0, 30) * units.deg)
+    mach: jnp.ndarray = field(lambda: jnp.linspace(0.0, 0.85, 20))
 
-    aileron_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
-    elevator_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
-    rudder_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
-    flap_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
-    slat_deflection: jnp.ndarray = init_field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    aileron_deflection: jnp.ndarray = field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    elevator_deflection: jnp.ndarray = field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    rudder_deflection: jnp.ndarray = field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    flap_deflection: jnp.ndarray = field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
+    slat_deflection: jnp.ndarray = field(lambda: jnp.array([30, 10.0, 1e-12]) * units.deg)
 
-    u: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
-    v: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
-    w: jnp.ndarray = init_field(lambda: jnp.array([0.2, 0.1, 1e-12]))
+    u: jnp.ndarray = field(lambda: jnp.array([0.2, 0.1, 1e-12]))
+    v: jnp.ndarray = field(lambda: jnp.array([0.2, 0.1, 1e-12]))
+    w: jnp.ndarray = field(lambda: jnp.array([0.2, 0.1, 1e-12]))
 
-    pitch_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
-    roll_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
-    yaw_rate: jnp.ndarray = init_field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
+    pitch_rate: jnp.ndarray = field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
+    roll_rate: jnp.ndarray = field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
+    yaw_rate: jnp.ndarray = field(lambda: jnp.array([0.3, 0.15, 0.0]) * units.rad / units.s)
 
     def fit(self, *args, **kwargs):
         return self.surrogate.fit(*args, **kwargs)
@@ -134,26 +134,26 @@ class Surrogate(eqx.Module):
 
 
 class Vortices(eqx.Module):
-    model_fuselage: bool = init_field(False, static=True)
-    verbose: bool = init_field(False, static=True)
+    model_fuselage: bool = field(False, static=True)
+    verbose: bool = field(False, static=True)
 
     # Discretization Inputs (Optional, so the user can choose which to define)
-    spanwise_cosine: bool = init_field(True, static=True)
-    chordwise_cosine: bool = init_field(False, static=True)  # Currently unsupported
+    spanwise_cosine: bool = field(True, static=True)
+    chordwise_cosine: bool = field(False, static=True)  # Currently unsupported
 
-    n_spanwise: Optional[Iterable[int] | int] = init_field(
+    n_spanwise: Optional[Iterable[int] | int] = field(
         8, static=True
     )  # Min value is number of wing segments (possibly more for control surfaces)
-    n_chordwise: Optional[Iterable[int] | int] = init_field(
+    n_chordwise: Optional[Iterable[int] | int] = field(
         3, static=True
     )  # Min value 3 to allow front and rear control surfaces
 
     # Can set separate values for each wing/fuselage (ex. [8, 4] for [wing, stab] and [4, 2] for [fuselage, nacelle]), else uses global value above
-    wings_n_spanwise: Optional[Iterable[int] | int] = init_field(None, static=True)
-    wings_n_chordwise: Optional[Iterable[int] | int] = init_field(None, static=True)
+    wings_n_spanwise: Optional[Iterable[int] | int] = field(None, static=True)
+    wings_n_chordwise: Optional[Iterable[int] | int] = field(None, static=True)
 
-    bodies_n_spanwise: Optional[Iterable[int] | int] = init_field(None, static=True)
-    bodies_n_chordwise: Optional[Iterable[int] | int] = init_field(None, static=True)
+    bodies_n_spanwise: Optional[Iterable[int] | int] = field(None, static=True)
+    bodies_n_chordwise: Optional[Iterable[int] | int] = field(None, static=True)
 
     def __post_init__(self):
         """Validates discretization inputs and resolves global vs separate routing."""
@@ -199,12 +199,12 @@ class Vortices(eqx.Module):
 
 
 class VORJAX_Settings(eqx.Module):
-    model_fuselage: bool = init_field(False, static=True)
-    trim_aircraft: bool = init_field(False, static=True)
+    model_fuselage: bool = field(False, static=True)
+    trim_aircraft: bool = field(False, static=True)
 
-    recalculate_wetted_area: bool = init_field(False, static=True)
-    model_propeller_wake: bool = init_field(False, static=True)
-    near_field_drag: bool = init_field(False, static=True)
+    recalculate_wetted_area: bool = field(False, static=True)
+    model_propeller_wake: bool = field(False, static=True)
+    near_field_drag: bool = field(False, static=True)
 
     CL_max: float = jnp.inf
     CD_increment: float = 0.0
@@ -212,12 +212,12 @@ class VORJAX_Settings(eqx.Module):
 
     # Sub-Settings
 
-    vortices: Vortices = init_field(Vortices)
+    vortices: Vortices = field(Vortices)
 
-    supersonic: SupersonicSettings = init_field(SupersonicSettings)
-    corrections: CorrectionFactors = init_field(CorrectionFactors)
-    form_factors: FormFactors = init_field(FormFactors)
-    surrogate: Surrogate = init_field(Surrogate)
+    supersonic: SupersonicSettings = field(SupersonicSettings)
+    corrections: CorrectionFactors = field(CorrectionFactors)
+    form_factors: FormFactors = field(FormFactors)
+    surrogate: Surrogate = field(Surrogate)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -234,8 +234,8 @@ def _default_VORJAX_init_steps():
 
 
 class InitializeVORJAX(Process):
-    tag: str = init_field("Initialize VORJAX", static=True)
-    steps: tuple = init_field(_default_VORJAX_init_steps)
+    tag: str = field("Initialize VORJAX", static=True)
+    steps: tuple = field(_default_VORJAX_init_steps)
 
     def __init__(self, tag="Initialize VORJAX", steps = _default_VORJAX_init_steps()) -> None:
         super().__init__(tag=tag, steps=steps)
@@ -260,8 +260,8 @@ def _default_VORJAX_compute_steps():
 
 
 class ComputeVORJAX(Process):
-    tag: str = init_field("Compute VORJAX", static=True)
-    steps: tuple = init_field(_default_VORJAX_compute_steps)
+    tag: str = field("Compute VORJAX", static=True)
+    steps: tuple = field(_default_VORJAX_compute_steps)
 
     def __init__(
             self,
@@ -272,8 +272,8 @@ class ComputeVORJAX(Process):
 
 
 class VORJAX(Process):
-    tag: str = init_field("Aerodynamics", static=True)
-    steps: tuple = init_field(lambda: (InitializeVORJAX(), ComputeVORJAX()))
+    tag: str = field("Aerodynamics", static=True)
+    steps: tuple = field(lambda: (InitializeVORJAX(), ComputeVORJAX()))
 
     def __init__(self,
                  tag: str = "Aerodynamics",

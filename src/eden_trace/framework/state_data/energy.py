@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.library.gases import Gas, Air
 from eden_trace.framework.state_data import StateData
@@ -22,7 +22,7 @@ from eden_trace.framework.state_data import StateData
 
 @register
 class MechanicalOutputs(StateData):
-    tag: str = init_field("Mechanical Outputs", static=True)
+    tag: str = field("Mechanical Outputs", static=True)
 
     work: jnp.ndarray = empty_array()
     power: jnp.ndarray = empty_array()
@@ -30,7 +30,7 @@ class MechanicalOutputs(StateData):
 
 @register
 class ElectricalOutputs(StateData):
-    tag: str = init_field("Electrical Outputs", static=True)
+    tag: str = field("Electrical Outputs", static=True)
 
     power: jnp.ndarray = empty_array()
     voltage: jnp.ndarray = empty_array()
@@ -39,7 +39,7 @@ class ElectricalOutputs(StateData):
 
 @register
 class FuelOutputs(StateData):
-    tag: str = init_field("Fuel Outputs", static=True)
+    tag: str = field("Fuel Outputs", static=True)
 
     TSFC: jnp.ndarray = empty_array()
     flow_rate: jnp.ndarray = empty_array()
@@ -47,8 +47,8 @@ class FuelOutputs(StateData):
 
 @register
 class FlowOutputs(StateData):
-    tag: str = init_field("Flow Outputs", static=True)
-    fluid: Gas = init_field(Air)
+    tag: str = field("Flow Outputs", static=True)
+    fluid: Gas = field(Air)
 
     speed: jnp.ndarray = empty_array()
     speed_of_sound: jnp.ndarray = empty_array()
@@ -77,7 +77,7 @@ class FlowOutputs(StateData):
 
 @register
 class ResidualOutputs(StateData):
-    tag: str = init_field("Residual Outputs", static=True)
+    tag: str = field("Residual Outputs", static=True)
 
     mass: jnp.ndarray = empty_array()
     mass_flow_rate: jnp.ndarray = empty_array()
@@ -102,7 +102,7 @@ class ResidualOutputs(StateData):
 
 @register
 class ForceOutputs(StateData):
-    tag: str = init_field("Force Outputs", static=True)
+    tag: str = field("Force Outputs", static=True)
 
     thrust: jnp.ndarray = empty_array()
     nondimensional_thrust: jnp.ndarray = empty_array()
@@ -111,14 +111,14 @@ class ForceOutputs(StateData):
 
 @register
 class NodeState(StateData):
-    tag: str = init_field("Node Outputs", static=True)
+    tag: str = field("Node Outputs", static=True)
 
-    mechanical: MechanicalOutputs = init_field(MechanicalOutputs)
-    electrical: ElectricalOutputs = init_field(ElectricalOutputs)
-    fuel: FuelOutputs = init_field(FuelOutputs)
-    flow: FlowOutputs = init_field(FlowOutputs)
-    force: ForceOutputs = init_field(ForceOutputs)
-    residual: ResidualOutputs = init_field(ResidualOutputs)
+    mechanical: MechanicalOutputs = field(MechanicalOutputs)
+    electrical: ElectricalOutputs = field(ElectricalOutputs)
+    fuel: FuelOutputs = field(FuelOutputs)
+    flow: FlowOutputs = field(FlowOutputs)
+    force: ForceOutputs = field(ForceOutputs)
+    residual: ResidualOutputs = field(ResidualOutputs)
 
     mass: jnp.ndarray = empty_array()
 
@@ -129,11 +129,11 @@ class NodeState(StateData):
 @register
 class BatteryCellConditions(NodeState):
     # Attribute                 Type        Default Value
-    tag: str = init_field("Battery Cell", static=True)
+    tag: str = field("Battery Cell", static=True)
 
-    cycle_in_day: int = init_field(0, static=True)
-    resistance_growth_factor: float = init_field(0.0, static=True)
-    capacity_fade_factor: float = init_field(0.0, static=True)
+    cycle_in_day: int = field(0, static=True)
+    resistance_growth_factor: float = field(0.0, static=True)
+    capacity_fade_factor: float = field(0.0, static=True)
 
     temperature: jnp.ndarray = empty_array()
     charge_throughput: jnp.ndarray = empty_array()
@@ -143,11 +143,11 @@ class BatteryCellConditions(NodeState):
 @register
 class BatteryPackConditions(NodeState):
     # Attribute             Type                    Default Value
-    tag: str = init_field("Battery Pack", static=True)
+    tag: str = field("Battery Pack", static=True)
 
-    maximum_total_energy: float = init_field(0.0, static=True)
+    maximum_total_energy: float = field(0.0, static=True)
 
-    cell: BatteryCellConditions = init_field(BatteryCellConditions)
+    cell: BatteryCellConditions = field(BatteryCellConditions)
 
     temperature: jnp.ndarray = empty_array()
 
@@ -159,9 +159,9 @@ class BatteryPackConditions(NodeState):
 
 @register
 class NetworkState(NodeState):
-    tag: str = init_field("Energy Network", static=True)
+    tag: str = field("Energy Network", static=True)
 
-    nodes: dict = init_field(dict)
+    nodes: dict = field(dict)
 
     total_energy: jnp.ndarray = empty_array()
     total_efficiency: jnp.ndarray = empty_array()
@@ -176,7 +176,7 @@ class NetworkState(NodeState):
 @register
 class TurbojetState(NetworkState):
     
-    tag: str = init_field("Turbojet Network", static=True)
+    tag: str = field("Turbojet Network", static=True)
 
     # Control hooks
     fuel_air_ratio: jnp.ndarray = empty_array()
@@ -191,7 +191,7 @@ class TurbojetState(NetworkState):
 @register
 class TurbofanState(NetworkState):
 
-    tag: str = init_field("Turbofan Network", static=True)
+    tag: str = field("Turbofan Network", static=True)
 
     # Control hooks
     fuel_air_ratio: jnp.ndarray = empty_array()

@@ -11,7 +11,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.framework.state_data import StateData
 
@@ -28,7 +28,7 @@ from eden_trace.framework.state_data import StateData
 
 @register
 class ComponentCoeffs(StateData):
-    tag: str = init_field("Component Coefficients", static=True)
+    tag: str = field("Component Coefficients", static=True)
 
     total: jnp.ndarray = empty_array()
 
@@ -44,12 +44,12 @@ class ComponentCoeffs(StateData):
 @register
 class LiftCoeffs(StateData):
     # Attribute     Type            Default Value
-    tag: str = init_field("Lift Coefficients", static=True)
+    tag: str = field("Lift Coefficients", static=True)
 
     total: jnp.ndarray = empty_array((0,))
 
-    inviscid: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Inviscid Lift"))
-    compressible: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Compressible Lift"))
+    inviscid: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Inviscid Lift"))
+    compressible: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Compressible Lift"))
 
 
 # Drag Coefficients ----------------------------------------
@@ -58,29 +58,29 @@ class LiftCoeffs(StateData):
 @register
 class InducedDrag(StateData):
     # Attribute   Type            Default Value
-    tag: str = init_field("Induced Drag", static=True)
+    tag: str = field("Induced Drag", static=True)
 
     total: jnp.ndarray = empty_array()
 
-    inviscid: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Inviscid Induced Drag"))
-    viscous: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Viscous Induced Drag"))
-    near_field: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Near-Field Induced Drag"))
-    far_field: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Far-Field Induced Drag"))
+    inviscid: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Inviscid Induced Drag"))
+    viscous: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Viscous Induced Drag"))
+    near_field: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Near-Field Induced Drag"))
+    far_field: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Far-Field Induced Drag"))
 
 
 @register
 class DragCoeffs(StateData):
     # Attribute     Type            Default Value
-    tag: str = init_field("Drag Coefficients", static=True)
+    tag: str = field("Drag Coefficients", static=True)
 
     total: jnp.ndarray = empty_array()
 
-    parasite: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Parasite Drag"))
-    compressible: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Compressible Drag"))
-    miscellaneous: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Miscellaneous Drag"))
-    spoiler: ComponentCoeffs = init_field(lambda: ComponentCoeffs(tag="Spoiler Drag"))
+    parasite: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Parasite Drag"))
+    compressible: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Compressible Drag"))
+    miscellaneous: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Miscellaneous Drag"))
+    spoiler: ComponentCoeffs = field(lambda: ComponentCoeffs(tag="Spoiler Drag"))
 
-    induced: InducedDrag = init_field(InducedDrag)
+    induced: InducedDrag = field(InducedDrag)
 
 
 # Moment Coefficients --------------------------------------
@@ -89,7 +89,7 @@ class DragCoeffs(StateData):
 @register
 class MomentCoeffs(StateData):
     # Attribute         Type            Default Value
-    tag: str = init_field("Moment Coefficients", static=True)
+    tag: str = field("Moment Coefficients", static=True)
 
     pitch: jnp.ndarray = empty_array()
     roll: jnp.ndarray = empty_array()
@@ -102,12 +102,12 @@ class MomentCoeffs(StateData):
 @register
 class Coefficients(StateData):
     # Attribute         Type                Default Value
-    tag: str = init_field("Aerodynamic Coefficients", static=True)
+    tag: str = field("Aerodynamic Coefficients", static=True)
 
-    lift: LiftCoeffs = init_field(LiftCoeffs)
-    drag: DragCoeffs = init_field(DragCoeffs)
+    lift: LiftCoeffs = field(LiftCoeffs)
+    drag: DragCoeffs = field(DragCoeffs)
 
-    moments: MomentCoeffs = init_field(MomentCoeffs)
+    moments: MomentCoeffs = field(MomentCoeffs)
 
     X: jnp.ndarray = empty_array()
     Y: jnp.ndarray = empty_array()
@@ -122,7 +122,7 @@ class Coefficients(StateData):
 @register
 class Angles(StateData):
     # Attribute         Type        Default Value
-    tag: str = init_field("Aerodynamic Angles", static=True)
+    tag: str = field("Aerodynamic Angles", static=True)
 
     alpha: jnp.ndarray = empty_array()  # Y-axis / angle of attack
     beta: jnp.ndarray = empty_array()  # Z-axis / sideslip angle
@@ -137,8 +137,8 @@ class Angles(StateData):
 @register
 class Aerodynamics(StateData):
     # Attribute     Type                    Default Value
-    tag: str = init_field("Aerodynamics", static=True)
+    tag: str = field("Aerodynamics", static=True)
 
-    angles: Angles = init_field(Angles)
+    angles: Angles = field(Angles)
 
-    coefficients: Coefficients = init_field(Coefficients)
+    coefficients: Coefficients = field(Coefficients)

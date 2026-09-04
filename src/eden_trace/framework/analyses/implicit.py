@@ -35,7 +35,7 @@ from scipy.optimize import root
 
 jax.config.update("jax_enable_x64", True)
 
-from ...utils import init_field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
+from ...utils import field, get_target, scan_for_invalid_JAX_types, format_array, io_partition, inspect_leaves
 from .. import Settings, State, System
 from ..state_data.controls import Control, Residual
 from ..processes import Process, array_barrier
@@ -215,14 +215,14 @@ def analyze_compute_graph(func, *args):
 
 class ImplicitAnalysis(Process):
 
-    tag: str = init_field("Implicit Analysis")
+    tag: str = field("Implicit Analysis")
 
-    analyze: Process = init_field(Process)
-    solver: Any | str = init_field(optx.LevenbergMarquardt, as_value=True, static=True)
-    solver_options: Optional[dict] = init_field(None, static=True)
+    analyze: Process = field(Process)
+    solver: Any | str = field(optx.LevenbergMarquardt, as_value=True, static=True)
+    solver_options: Optional[dict] = field(None, static=True)
 
-    controls: tuple[Control, ...] = init_field(tuple)
-    residuals: tuple[Residual, ...] = init_field(tuple)
+    controls: tuple[Control, ...] = field(tuple)
+    residuals: tuple[Residual, ...] = field(tuple)
 
     def __init__(
             self,

@@ -28,7 +28,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxopt import Broyden, GaussNewton, ScipyRootFinding
 
-from eden_trace.utils import init_field, scan_for_invalid_JAX_types
+from eden_trace.utils import field, scan_for_invalid_JAX_types
 
 from eden_trace.framework import Process, ProcessStep
 from eden_trace.framework.state_data.controls import Control, Residual
@@ -143,12 +143,12 @@ def _initialization_steps():
 class InitializeSegment(Process):
     tag: str = "Segment Initialization"
 
-    active_controls: tuple[str | Control, ...] = init_field(tuple)
-    active_residuals: tuple[NamedResidual, ...] = init_field(tuple)
+    active_controls: tuple[str | Control, ...] = field(tuple)
+    active_residuals: tuple[NamedResidual, ...] = field(tuple)
 
     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
 
-    steps: tuple[ProcessStep, ...] = init_field(_initialization_steps)
+    steps: tuple[ProcessStep, ...] = field(_initialization_steps)
 
     def __call__(self, state: State, system: System, settings: Settings, validate_controls=False):
 
@@ -227,9 +227,9 @@ def _default_analyses():
 
 
 class AnalyzeSegment(Process):
-    tag: str = init_field("Segment Analysis", static=True)
+    tag: str = field("Segment Analysis", static=True)
 
-    steps: tuple[ProcessStep, ...] = init_field(_default_analyses)
+    steps: tuple[ProcessStep, ...] = field(_default_analyses)
 
 
 def find_circular_references(obj, path="root", visited=None):
@@ -280,8 +280,8 @@ def find_circular_references(obj, path="root", visited=None):
 
 
 class IterateSegment(Process):
-    tag: str = init_field("Segment Convergence", static=True)
-    analyze: Process = init_field(AnalyzeSegment)
+    tag: str = field("Segment Convergence", static=True)
+    analyze: Process = field(AnalyzeSegment)
 
     def _get_residuals(self, unknowns, state: "State", system: "System", settings: "Settings"):
 
@@ -450,8 +450,8 @@ def _default_finalize():
 
 
 class FinalizeSegment(Process):
-    tag: str = init_field("Segment Finalization", static=True)
-    steps: tuple[ProcessStep, ...] = init_field(_default_finalize)
+    tag: str = field("Segment Finalization", static=True)
+    steps: tuple[ProcessStep, ...] = field(_default_finalize)
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -460,18 +460,18 @@ class FinalizeSegment(Process):
 
 
 class Segment(Process):
-    tag: str = init_field("Segment", static=True)
+    tag: str = field("Segment", static=True)
 
     # Pass-through configuration for InitializeSegment
-    active_controls: tuple[str | Control, ...] = init_field(tuple)
-    active_residuals: tuple[NamedResidual, ...] = init_field(tuple)
+    active_controls: tuple[str | Control, ...] = field(tuple)
+    active_residuals: tuple[NamedResidual, ...] = field(tuple)
     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (0.0, 0.0)
 
-    course_profile: CourseProfile = init_field(ConstantCourse)
-    position_profile: PositionProfile = init_field(ConstantAltitude)
-    speed_profile: SpeedProfile = init_field(ConstantSpeed)
-    velocity_profile: VelocityProfile = init_field(ConstantAltitudeChangeRate)
-    duration_profile: DurationProfile = init_field(FixedDistance)
+    course_profile: CourseProfile = field(ConstantCourse)
+    position_profile: PositionProfile = field(ConstantAltitude)
+    speed_profile: SpeedProfile = field(ConstantSpeed)
+    velocity_profile: VelocityProfile = field(ConstantAltitudeChangeRate)
+    duration_profile: DurationProfile = field(FixedDistance)
 
     # Global dynamics variables
     sideslip_angle: float = 0.0
@@ -479,7 +479,7 @@ class Segment(Process):
     true_course: float = 0.0
 
     # Start with an empty tuple. We will populate it securely in __post_init__
-    steps: tuple = init_field(tuple)
+    steps: tuple = field(tuple)
 
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones
@@ -552,7 +552,7 @@ class Segment(Process):
 
 
 class FixedSegment(Segment):
-    tag: str = init_field("Fixed Segment", static=True)
+    tag: str = field("Fixed Segment", static=True)
 
     def __post_init__(self):
         # Only build the default steps if the user didn't explicitly provide custom ones

@@ -5,7 +5,7 @@ from pathlib import Path
 import equinox as eqx
 import jax.numpy as jnp
 
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions
@@ -65,7 +65,7 @@ def interp_2d_extrapolate(x, y, x_grid, y_grid, z_table):
 
 @register
 class CompressorMap(eqx.Module):
-    tag: str = init_field("Compressor Map", static=True)
+    tag: str = field("Compressor Map", static=True)
 
     # 1D Grid Axes
     alpha_grid: jnp.ndarray = empty_array()  # FADEC Inlet Guide Vane Angle
@@ -168,7 +168,7 @@ class CompressorMap(eqx.Module):
 
 @register
 class TurbineMap(eqx.Module):
-    tag: str = init_field("Turbine Map", static=True)
+    tag: str = field("Turbine Map", static=True)
 
     # 1D Grid Axes
     alpha_grid: jnp.ndarray = empty_array()  # Turbine Nozzle Ratio

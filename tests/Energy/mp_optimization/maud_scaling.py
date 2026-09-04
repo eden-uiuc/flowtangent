@@ -67,7 +67,7 @@ from turbojet_validation import system_setup as ft_turbojet
 
 from eden_trace.utils import DataPath, configure_environment
 from eden_trace.framework import State, Settings, Process
-from eden_trace.framework.settings import NumericalSettings, JacobianMap
+from eden_trace.framework.settings import NumericalSettings, JacobianSettings, JacobianMap
 from eden_trace.framework.analyses.batched import BatchedAnalysis
 from eden_trace.framework.analyses.energy.jets import build_turbojet_design, build_turbojet_performance, JetSettings
 from eden_trace.framework.simulation.initialize import initialize_energy
@@ -926,21 +926,23 @@ def run_flowtangent_benchmark(N_points):
             JetSettings(design_mode=True, statics=False),
             NumericalSettings(
                 batch_size=N_points,
-                calculate_jacobian=True,
-                jacobian_map=JacobianMap(
-                    system_inputs=(DataPath((
-                        "energy",
-                        "nodes",
-                        "network.line.engine.compressor",
-                        "design_parameters",
-                        "pressure_ratio")),),
-                    state_outputs=(DataPath((
-                        "energy",
-                        "nodes",
-                        "network.line.engine",
-                        "fuel",
-                        "TSFC"
-                    )),)
+                jacobian=JacobianSettings(
+                    calculate=True,
+                    couple_time=False,
+                    mapping=JacobianMap(
+                        system_inputs=(DataPath((
+                            "energy",
+                            "nodes",
+                            "network.line.engine.compressor",
+                            "design_parameters",
+                            "pressure_ratio")),),
+                        state_outputs=(DataPath((
+                            "energy",
+                            "nodes",
+                            "network.line.engine",
+                            "fuel",
+                            "TSFC"
+                        )),))
                 )),
         )
     )

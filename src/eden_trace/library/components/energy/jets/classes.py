@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import eden_trace.utils as tu
 
 # Trace imports
-from eden_trace.utils import init_field, register
+from eden_trace.utils import field, register
 from eden_trace.library import units
 
 from ..maps import data as map_data
@@ -45,7 +45,7 @@ from ....atmospheres import USStandard1976
 
 @register
 class Inlet(FlowNode):
-    tag: str = init_field("inlet", static=True)
+    tag: str = field("inlet", static=True)
 
     @tu.inputs(
         "state.freestream",
@@ -136,13 +136,13 @@ def _alpha_c(Nc, Nc_design):
 
 @register
 class Compressor(FlowNode):
-    tag: str = init_field("compressor", static=True)
+    tag: str = field("compressor", static=True)
 
-    inputs: tuple | GraphInput = init_field(GraphInput("flow", "inlet"), static=True)
+    inputs: tuple | GraphInput = field(GraphInput("flow", "inlet"), static=True)
 
-    map: CompressorMap = init_field(map_data.AXI5)
+    map: CompressorMap = field(map_data.AXI5)
 
-    alpha_schedule: Callable = init_field(_alpha_c, as_value=True, static=True)
+    alpha_schedule: Callable = field(_alpha_c, as_value=True, static=True)
 
     def __post_init__(self):
         if not isinstance(self.map, CompressorMap):
@@ -389,10 +389,10 @@ def _burner_performance(
 
 @register
 class Burner(FlowNode):
-    tag: str = init_field("Burner", static=True)
+    tag: str = field("Burner", static=True)
 
-    inputs: tuple | GraphInput = init_field(GraphInput("flow", "Compressor"), static=True)
-    fuel: Propellant = init_field(JetA)
+    inputs: tuple | GraphInput = field(GraphInput("flow", "Compressor"), static=True)
+    fuel: Propellant = field(JetA)
 
     @tu.inputs(
         "state.energy.target_temperature",
@@ -499,13 +499,13 @@ class Burner(FlowNode):
 
 @register
 class Turbine(FlowNode):
-    tag: str = init_field("Turbine", static=True)
+    tag: str = field("Turbine", static=True)
 
-    map: TurbineMap = init_field(map_data.LPT2269)
+    map: TurbineMap = field(map_data.LPT2269)
 
-    alpha_schedule: Callable = init_field(lambda Np, Np_des: jnp.full_like(Np, 1.0), as_value=True, static=True)
+    alpha_schedule: Callable = field(lambda Np, Np_des: jnp.full_like(Np, 1.0), as_value=True, static=True)
 
-    inputs: tuple | GraphInput = init_field(
+    inputs: tuple | GraphInput = field(
         (
             GraphInput("flow", "Burner"),
         ), static=True,
@@ -897,9 +897,9 @@ def _variable_nozzle_performance(
 
 @register
 class Nozzle(FlowNode):
-    tag: str = init_field("Core Nozzle", static=True)
-    variable_exit: bool = init_field(False, static=True)
-    diverging_section: bool = init_field(False, static=True)
+    tag: str = field("Core Nozzle", static=True)
+    variable_exit: bool = field(False, static=True)
+    diverging_section: bool = field(False, static=True)
 
     inputs: tuple | GraphInput = (
         GraphInput("flow", "Turbine"),
@@ -1037,7 +1037,7 @@ class Nozzle(FlowNode):
 
 @register
 class Turboshaft(GraphNode):
-    tag: str = init_field("Turboshaft", static=True)
+    tag: str = field("Turboshaft", static=True)
 
     inputs: tuple | GraphInput = (
         GraphInput("mechanical", "compressor"),
@@ -1176,7 +1176,7 @@ class JetKinematics(eqx.Module):
 @register
 class TurbojetOpPoint[KinType: JetKinematics | FanKinematics](FlowOpPoint):
     
-    tag: str = init_field("TOC", static=True) # Top-of-Climb design point by default
+    tag: str = field("TOC", static=True) # Top-of-Climb design point by default
     
     # Performance Parameters
     thrust:     float = 0.0
@@ -1210,7 +1210,7 @@ class TurbojetOpPoint[KinType: JetKinematics | FanKinematics](FlowOpPoint):
     turbine_PR: float = 5.0                                 # Single spool
     power: float = 2e7 * units.W
 
-    exit_mach_numbers: KinType = init_field(JetKinematics, static=True)
+    exit_mach_numbers: KinType = field(JetKinematics, static=True)
 
     def update_state(self, state: State):
         a0 = state.freestream.atmosphere.compute_speed_of_sound(self.altitude)
@@ -1241,15 +1241,15 @@ class TurbojetOpPoint[KinType: JetKinematics | FanKinematics](FlowOpPoint):
 
 @register
 class TurbojetEngine(FlowNode[TurbojetOpPoint]):
-    tag: str = init_field("Engine", static=True)
-    subcomponents: tuple = init_field(_TurbojetSetup)
+    tag: str = field("Engine", static=True)
+    subcomponents: tuple = field(_TurbojetSetup)
 
     plug_diameter: float = 0.0
 
-    working_fluid: Gas = init_field(Air)
-    design_parameters: TurbojetOpPoint = init_field(TurbojetOpPoint)
+    working_fluid: Gas = field(Air)
+    design_parameters: TurbojetOpPoint = field(TurbojetOpPoint)
 
-    inputs: tuple | GraphInput = init_field(
+    inputs: tuple | GraphInput = field(
         (
             GraphInput("flow", "self.core_nozzle"),
             GraphInput("fuel", "self.burner"),
@@ -1258,9 +1258,9 @@ class TurbojetEngine(FlowNode[TurbojetOpPoint]):
         static=True,
     )
 
-    installation_geometry: JetGeometry = init_field(JetGeometry)
+    installation_geometry: JetGeometry = field(JetGeometry)
 
-    _bookkeeping: dict = init_field(lambda: {
+    _bookkeeping: dict = field(lambda: {
         "compressors": Compressor,
         "turbines": Turbine,
         "nozzles": Nozzle | Nozzle,
@@ -1556,7 +1556,7 @@ class TurbojetEngine(FlowNode[TurbojetOpPoint]):
 # Makes BPR split serializable for save/load
 @register
 class BPRSplit(eqx.Module):
-    is_bypass: bool = init_field(True, static=True)
+    is_bypass: bool = field(True, static=True)
 
     def __call__(self, state):
         bpr = state.energy.bypass_ratio
@@ -1722,7 +1722,7 @@ class TurbofanDesign(TurbojetOpPoint[FanKinematics]):
     HPT_PR: float = 5.0
     LPT_PR: float = 3.0
 
-    exit_mach_numbers: FanKinematics = init_field(FanKinematics, static=True)
+    exit_mach_numbers: FanKinematics = field(FanKinematics, static=True)
     
 
 def TurbofanEngine(**kwargs):

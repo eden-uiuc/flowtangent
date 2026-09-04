@@ -12,7 +12,7 @@
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.framework.state_data import StateData
 
@@ -23,7 +23,7 @@ from eden_trace.framework.state_data import StateData
 @register
 class Frame(StateData):
     # Attribute             Type        Default Value
-    tag: str = init_field("Frame", static=True)
+    tag: str = field("Frame", static=True)
 
     transform_to_inertial: jnp.ndarray = empty_array((0, 3))
 
@@ -33,7 +33,7 @@ class Frame(StateData):
 @register
 class Inertial(Frame):
     # Attribute                     Type        Default Value
-    tag: str = init_field("Inertial Frame", static=True)
+    tag: str = field("Inertial Frame", static=True)
 
     position_vector: jnp.ndarray = empty_array((0, 3))
 
@@ -51,7 +51,7 @@ class Inertial(Frame):
 @register
 class Body(Frame):
     # Attribute             Type        Default Value
-    tag: str = init_field("Body Frame", static=True)
+    tag: str = field("Body Frame", static=True)
 
     inertial_rotations: jnp.ndarray = empty_array((0, 3))
     thrust_force_vector: jnp.ndarray = empty_array((0, 3))
@@ -60,7 +60,7 @@ class Body(Frame):
 @register
 class Wind(Frame):
     # Attribute         Type            Default Value
-    tag: str = init_field("Wind Frame", static=True)
+    tag: str = field("Wind Frame", static=True)
 
     body_rotations: jnp.ndarray = empty_array((0, 3))
     transform_to_body: jnp.ndarray = empty_array((0, 3))
@@ -72,21 +72,21 @@ class Wind(Frame):
 @register
 class Planet(Frame):
     # Attribute     Type            Default Value
-    tag: str = init_field("Planet Frame", static=True)
+    tag: str = field("Planet Frame", static=True)
     start_time: jnp.ndarray = empty_array()
 
     # Default to takeoff at JFK
-    latitude: jnp.ndarray = init_field(lambda: jnp.array([40.6446]))
-    longitude: jnp.ndarray = init_field(lambda: jnp.array([73.7797]))
+    latitude: jnp.ndarray = field(lambda: jnp.array([40.6446]))
+    longitude: jnp.ndarray = field(lambda: jnp.array([73.7797]))
 
     true_course: jnp.ndarray = empty_array()
 
 @register
 class FrameData(StateData):
     # Attribute     Type            Default Value
-    tag: str = init_field("Dynamic Frames", static=True)
+    tag: str = field("Dynamic Frames", static=True)
 
-    inertial: Inertial = init_field(Inertial)
-    body: Body = init_field(Body)
-    wind: Wind = init_field(Wind)
-    planet: Planet = init_field(Planet)
+    inertial: Inertial = field(Inertial)
+    body: Body = field(Body)
+    wind: Wind = field(Wind)
+    planet: Planet = field(Planet)

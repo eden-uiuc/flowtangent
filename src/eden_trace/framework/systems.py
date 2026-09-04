@@ -15,7 +15,7 @@ import equinox as eqx
 import jax.numpy as jnp
 
 # Trace imports
-from eden_trace.utils import empty_array, init_field, register
+from eden_trace.utils import empty_array, field, register
 
 from eden_trace.library import Component, MassProperties
 from eden_trace.library.attributes import AircraftClass, MediumRange
@@ -42,9 +42,9 @@ class VehicleEnvelope(eqx.Module):
 
 @register
 class System(Component):
-    tag: str = init_field("System", static=True)
+    tag: str = field("System", static=True)
 
-    configurations: Component = init_field(lambda: Component(tag="Configurations"))
+    configurations: Component = field(lambda: Component(tag="Configurations"))
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -69,23 +69,23 @@ class AircraftMassProperties(MassProperties):
 @register
 class AircraftDesign(eqx.Module):
 
-    ac_class: AircraftClass = init_field(MediumRange, static=True)
-    envelope: VehicleEnvelope = init_field(VehicleEnvelope, static=True)
+    ac_class: AircraftClass = field(MediumRange, static=True)
+    envelope: VehicleEnvelope = field(VehicleEnvelope, static=True)
     
-    passengers: int = init_field(0, static=True)
+    passengers: int = field(0, static=True)
 
-    mach_number: float = init_field(0.0, static=True)
-    range: float = init_field(0.0, static=True)
-    cruise_alt: float = init_field(0.0, static=True)
+    mach_number: float = field(0.0, static=True)
+    range: float = field(0.0, static=True)
+    cruise_alt: float = field(0.0, static=True)
 
 @register
 class Aircraft[EnergyType: GraphNetwork](System):
-    tag: str = init_field("Aircraft", static=True)
+    tag: str = field("Aircraft", static=True)
 
-    mass_properties: AircraftMassProperties = init_field(AircraftMassProperties)  # type: ignore
-    design_parameters: AircraftDesign = init_field(AircraftDesign)
+    mass_properties: AircraftMassProperties = field(AircraftMassProperties)  # type: ignore
+    design_parameters: AircraftDesign = field(AircraftDesign)
 
-    _bookkeeping: dict = init_field(
+    _bookkeeping: dict = field(
         lambda: {
             "energy_networks": GraphNetwork,
             "wings": Wing,
@@ -100,8 +100,8 @@ class Aircraft[EnergyType: GraphNetwork](System):
     def energy(self) -> EnergyType:
         return self.energy_networks[0]
 
-    reference_geometry: AircraftReferenceGeometry = init_field(AircraftReferenceGeometry)
-    analysis_data: dict = init_field(dict)
+    reference_geometry: AircraftReferenceGeometry = field(AircraftReferenceGeometry)
+    analysis_data: dict = field(dict)
 
     def update_network_topology(self) -> Aircraft:
         sorted_network = self.energy.update_node_topology()

@@ -16,7 +16,7 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     pass
 
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library import units
 
@@ -30,7 +30,7 @@ from eden_trace.framework import ProcessStep
 
 
 class ConstantCourse(ProcessStep):
-    tag: str = init_field("Set Constant Course", static=True)
+    tag: str = field("Set Constant Course", static=True)
 
     true_course: float = 0.0 * units.deg
 
@@ -47,7 +47,7 @@ CourseProfile = ConstantCourse
 
 
 class ConstantAltitude(ProcessStep):
-    tag: str = init_field("Set Constant Altitude", static=True)
+    tag: str = field("Set Constant Altitude", static=True)
     altitude: float = 1.0 * units.km
 
     def __call__(self, state, system, settings):
@@ -65,7 +65,7 @@ class ConstantAltitude(ProcessStep):
 
 
 class AltitudeChange(ProcessStep):
-    tag: str = init_field("Set Altitude Change", static=True)
+    tag: str = field("Set Altitude Change", static=True)
     initial_altitude: float = 1.0 * units.km
     final_altitude: float = 10.0 * units.km
 
@@ -91,7 +91,7 @@ PositionProfile = ConstantAltitude | AltitudeChange
 
 
 class ConstantSpeed(ProcessStep):
-    tag: str = init_field("Set Constant Speed", static=True)
+    tag: str = field("Set Constant Speed", static=True)
     speed: float = 1.0 * units.m / units.s
 
     def __call__(self, state, system, settings):
@@ -107,7 +107,7 @@ class ConstantSpeed(ProcessStep):
 
 
 class ConstantMach(ProcessStep):
-    tag: str = init_field("Set Constant Mach Number", static=True)
+    tag: str = field("Set Constant Mach Number", static=True)
 
     mach_number: float = 0.5
 
@@ -132,7 +132,7 @@ SpeedProfile = ConstantSpeed | ConstantMach
 
 
 class ConstantAltitudeChangeRate(ProcessStep):
-    tag: str = init_field("Set Constant Alt. Change Rate", static=True)
+    tag: str = field("Set Constant Alt. Change Rate", static=True)
 
     change_rate: float = 0.0 * units.m / units.s
 
@@ -154,7 +154,7 @@ VelocityProfile = ConstantAltitudeChangeRate
 
 
 class FixedDistance(ProcessStep):
-    tag: str = init_field("Set Fixed Distance Duration", static=True)
+    tag: str = field("Set Fixed Distance Duration", static=True)
     distance: float = 1.0 * units.km
 
     def __call__(self, state, system, settings):
@@ -172,7 +172,7 @@ class FixedDistance(ProcessStep):
 
 
 class FixedTime(ProcessStep):
-    tag: str = init_field("Set Fixed Time Duration", static=True)
+    tag: str = field("Set Fixed Time Duration", static=True)
     time: float = 1.0 * units.s
 
     def __call__(self, state, system, settings):

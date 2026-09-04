@@ -1,4 +1,4 @@
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.library.methods.mass import transport as Mass
 
@@ -22,5 +22,5 @@ def _default_transport_steps() -> tuple[ProcessStep, ...]:
 
 
 class Transport(Process):
-    tag: str = init_field("Transport Mass Analysis", static=True)
-    steps: tuple[ProcessStep, ...] = init_field(_default_transport_steps)
+    tag: str = field("Transport Mass Analysis", static=True)
+    steps: tuple[ProcessStep, ...] = field(_default_transport_steps)

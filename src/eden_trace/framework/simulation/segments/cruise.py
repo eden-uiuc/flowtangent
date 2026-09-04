@@ -16,7 +16,7 @@ import jax.numpy as jnp
 if TYPE_CHECKING:
     from eden_trace.framework import Settings, State, System
 
-from eden_trace.utils import init_field
+from eden_trace.utils import field
 
 from eden_trace.framework import ProcessStep
 from eden_trace.framework.state_data.controls import Control, Control, NamedResidual
@@ -110,8 +110,8 @@ class TestCSACruise(Cruise):
     altitude: float = 1.0
     air_speed: float = 1.0
 
-    active_controls: tuple[str | Control, ...] = init_field(_test_cruise_controls)
-    active_residuals: tuple[NamedResidual, ...] = init_field(("force_x", "force_z"), static=True)
+    active_controls: tuple[str | Control, ...] = field(_test_cruise_controls)
+    active_residuals: tuple[NamedResidual, ...] = field(("force_x", "force_z"), static=True)
     controls_initial_guess: tuple[jnp.ndarray | float, ...] = (1.0, 0.05)
 
     def __post_init__(self):

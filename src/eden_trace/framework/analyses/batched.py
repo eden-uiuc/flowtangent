@@ -33,7 +33,7 @@ from numcodecs import Blosc
 from tqdm import tqdm, trange
 
 
-from eden_trace.utils import init_field, get_all_targets, DataPath
+from eden_trace.utils import field, get_all_targets, DataPath
 from eden_trace.framework import Process, Settings, State, System
 
 from .implicit import ImplicitAnalysis
@@ -44,10 +44,10 @@ from .implicit import ImplicitAnalysis
 
 class BatchedAnalysis(Process):
 
-    tag: str = init_field("Batched Analysis")
+    tag: str = field("Batched Analysis")
 
-    analyze: Process = init_field(Process)
-    state_inputs: tuple[DataPath, ...] = init_field(())
+    analyze: Process = field(Process)
+    state_inputs: tuple[DataPath, ...] = field(())
 
     def __init__(
                 self,
@@ -162,179 +162,180 @@ class BatchedAnalysis(Process):
 
         return f_st, system, settings
 
-class BatchAnalysis:
-    def __init__(
-        self,
-        tag: str = "Batched Analysis",
-        initialize: Process = Process(),
-        compute: Process = Process(),
-        inputs: dict = {},
-        outputs: dict = {},
-        db_path: Optional[str | Path] = None,
-    ):
+# Old BatchAnalysis Class
+# class BatchAnalysis:
+#     def __init__(
+#         self,
+#         tag: str = "Batched Analysis",
+#         initialize: Process = Process(),
+#         compute: Process = Process(),
+#         inputs: dict = {},
+#         outputs: dict = {},
+#         db_path: Optional[str | Path] = None,
+#     ):
 
-        self.tag = tag
+#         self.tag = tag
 
-        # Path mapping and default settings.
-        self.input_mappings = inputs
-        self.output_mappings = outputs
+#         # Path mapping and default settings.
+#         self.input_mappings = inputs
+#         self.output_mappings = outputs
 
-        self.initialization_process = initialize
-        self.compute_process = compute
-        self._compiled_step = eqx.filter_jit(self.compute_process.run)
+#         self.initialization_process = initialize
+#         self.compute_process = compute
+#         self._compiled_step = eqx.filter_jit(self.compute_process.run)
 
-        self.db_path = db_path
+#         self.db_path = db_path
 
-    def run(
-        self,
-        system: System,
-        settings: Settings,
-        mode="zip",
-        handle: Optional[str] = None,
-        **kwargs,
-    ):  
+#     def run(
+#         self,
+#         system: System,
+#         settings: Settings,
+#         mode="zip",
+#         handle: Optional[str] = None,
+#         **kwargs,
+#     ):  
 
-        if handle is not None:  # Inherit logger from dataset generator
-            logger = logging.getLogger(handle)
-        else:  # Self logging
-            logger = logging.getLogger(self.tag + "_Logger")
+#         if handle is not None:  # Inherit logger from dataset generator
+#             logger = logging.getLogger(handle)
+#         else:  # Self logging
+#             logger = logging.getLogger(self.tag + "_Logger")
 
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.INFO)
+#             ch = logging.StreamHandler()
+#             ch.setLevel(logging.INFO)
 
-            formatter = logging.Formatter("[%(asctime)s] - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-            ch.setFormatter(formatter)
-            logger.addHandler(ch)
+#             formatter = logging.Formatter("[%(asctime)s] - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+#             ch.setFormatter(formatter)
+#             logger.addHandler(ch)
 
-        # Set up base state
-        state = State()
-        initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
-        base_state = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
+#         # Set up base state
+#         state = State()
+#         initials = eqx.tree_at(lambda s: s.initials, state, None, is_leaf=lambda x: x is None)
+#         base_state = eqx.tree_at(lambda s: s.initials, state, initials, is_leaf=lambda x: x is None)
 
-        batch_size = settings.numerical.batch_size
+#         batch_size = settings.numerical.batch_size
 
-        input_keys = []
-        active_keys = []
-        target_map = []
-        raw_arrays = []
+#         input_keys = []
+#         active_keys = []
+#         target_map = []
+#         raw_arrays = []
 
-        # Validate inputs, convert to JAX arrays
-        all_outputs = {k: [] for k in self.output_mappings.keys()}
-        all_grads = defaultdict(list)
-        all_inputs = defaultdict(list)
-        jac_arr = None
+#         # Validate inputs, convert to JAX arrays
+#         all_outputs = {k: [] for k in self.output_mappings.keys()}
+#         all_grads = defaultdict(list)
+#         all_inputs = defaultdict(list)
+#         jac_arr = None
 
-        for k, v in kwargs.items():
-            if k.lower() not in self.input_mappings:
-                logger.warning(
-                    f"Unrecognized variable {k} ignored. Allowed variables: {list(self.input_mappings.keys())}"
-                )
-            else:
-                input_keys.append(k.lower())
-                active_keys.append(k.lower())
-                target_map.append(self.input_mappings[k.lower()][0])
-                raw_arrays.append(jnp.atleast_1d(v))
+#         for k, v in kwargs.items():
+#             if k.lower() not in self.input_mappings:
+#                 logger.warning(
+#                     f"Unrecognized variable {k} ignored. Allowed variables: {list(self.input_mappings.keys())}"
+#                 )
+#             else:
+#                 input_keys.append(k.lower())
+#                 active_keys.append(k.lower())
+#                 target_map.append(self.input_mappings[k.lower()][0])
+#                 raw_arrays.append(jnp.atleast_1d(v))
 
-        if len(active_keys) == 0:
-            raise ValueError("No valid inputs provided.")
-        for k, v in self.input_mappings.items():
-            if k not in active_keys:
-                active_keys.append(k)
-                target_map.append(v[0])
-                raw_arrays.append(jnp.atleast_1d(v[1]))
+#         if len(active_keys) == 0:
+#             raise ValueError("No valid inputs provided.")
+#         for k, v in self.input_mappings.items():
+#             if k not in active_keys:
+#                 active_keys.append(k)
+#                 target_map.append(v[0])
+#                 raw_arrays.append(jnp.atleast_1d(v[1]))
 
-        # Get all flight states
-        if mode == "zip":
-            processed_arrays = jnp.broadcast_arrays(*raw_arrays)
-        elif mode == "mesh":
-            grids = jnp.meshgrid(*raw_arrays, indexing="ij")
-            processed_arrays = [g.ravel().reshape(-1, 1) for g in grids]
-        else:
-            raise ValueError(f"Invalid mode {mode}. Supported modes: 'zip', 'mesh'.")
+#         # Get all flight states
+#         if mode == "zip":
+#             processed_arrays = jnp.broadcast_arrays(*raw_arrays)
+#         elif mode == "mesh":
+#             grids = jnp.meshgrid(*raw_arrays, indexing="ij")
+#             processed_arrays = [g.ravel().reshape(-1, 1) for g in grids]
+#         else:
+#             raise ValueError(f"Invalid mode {mode}. Supported modes: 'zip', 'mesh'.")
 
-        total_states = len(processed_arrays[0])
+#         total_states = len(processed_arrays[0])
 
-        # Prepare for grads if provided
-        if settings.analysis.gradient_map is not None:
-            g_map = settings.analysis.gradient_map
-            inp = g_map.state_inputs
-            out = g_map.state_outputs
+#         # Prepare for grads if provided
+#         if settings.analysis.gradient_map is not None:
+#             g_map = settings.analysis.gradient_map
+#             inp = g_map.state_inputs
+#             out = g_map.state_outputs
 
-            grad_pairs = product(out, inp)
-            grad_keys = [f"d{p[0].tag}_d{p[1].tag}" for p in grad_pairs]
-            grad_idxs = list(product(range(len(out)), range(len(inp))))
+#             grad_pairs = product(out, inp)
+#             grad_keys = [f"d{p[0].tag}_d{p[1].tag}" for p in grad_pairs]
+#             grad_idxs = list(product(range(len(out)), range(len(inp))))
 
-        # Initialize Analysis once
-        init_results = self.initialization_process.run(base_state.expand_rows(batch_size), system, settings)
-        state = init_results[0]
-        system = init_results[1]
-        settings = init_results[2]
+#         # Initialize Analysis once
+#         init_results = self.initialization_process.run(base_state.expand_rows(batch_size), system, settings)
+#         state = init_results[0]
+#         system = init_results[1]
+#         settings = init_results[2]
 
-        # Batch over computation
-        if handle is not None:
-            pbar = range(0, total_states, batch_size)
-        else:
-            pbar = trange(0, total_states, batch_size, desc=f"Running {self.tag} Analysis")
-        for i in pbar:
-            batch_arrays = tuple(arr[i : i + batch_size].reshape(-1, 1) for arr in processed_arrays)
-            actual_size = len(batch_arrays[0])
+#         # Batch over computation
+#         if handle is not None:
+#             pbar = range(0, total_states, batch_size)
+#         else:
+#             pbar = trange(0, total_states, batch_size, desc=f"Running {self.tag} Analysis")
+#         for i in pbar:
+#             batch_arrays = tuple(arr[i : i + batch_size].reshape(-1, 1) for arr in processed_arrays)
+#             actual_size = len(batch_arrays[0])
 
-            clean_batch_arrays = jax.device_get(batch_arrays)
-            for j, ik in enumerate(input_keys):
-                all_inputs[ik].append(clean_batch_arrays[j])
+#             clean_batch_arrays = jax.device_get(batch_arrays)
+#             for j, ik in enumerate(input_keys):
+#                 all_inputs[ik].append(clean_batch_arrays[j])
 
-            if actual_size < batch_size:
-                pad_length = ((0, batch_size - actual_size), (0, 0))
-                batch_arrays = tuple(jnp.pad(arr, pad_length, mode="edge") for arr in batch_arrays)
+#             if actual_size < batch_size:
+#                 pad_length = ((0, batch_size - actual_size), (0, 0))
+#                 batch_arrays = tuple(jnp.pad(arr, pad_length, mode="edge") for arr in batch_arrays)
 
-            batch_state = eqx.tree_at(lambda s: ru.get_all_targets(s, target_map), state, batch_arrays)
+#             batch_state = eqx.tree_at(lambda s: ru.get_all_targets(s, target_map), state, batch_arrays)
 
-            try:
-                res = self._compiled_step(batch_state, system, settings)
+#             try:
+#                 res = self._compiled_step(batch_state, system, settings)
 
-                raw_output_arrs = jax.device_get(ru.get_all_targets(res[0], self.output_mappings.values()))
-                clean_output_arrs = [arr[:actual_size] for arr in raw_output_arrs]
+#                 raw_output_arrs = jax.device_get(ru.get_all_targets(res[0], self.output_mappings.values()))
+#                 clean_output_arrs = [arr[:actual_size] for arr in raw_output_arrs]
 
-                for l, key in enumerate(self.output_mappings.keys()):
-                    all_outputs[key].append(clean_output_arrs[l])
+#                 for l, key in enumerate(self.output_mappings.keys()):
+#                     all_outputs[key].append(clean_output_arrs[l])
 
-                if settings.analysis.gradient_map is not None:
-                    jac_arr = jax.device_get(res[3])
-                    for i, key in enumerate(grad_keys):
-                        out_idx, in_idx = grad_idxs[i]
-                        v_np = jac_arr[:actual_size, out_idx, in_idx]
-                        all_grads[key].append(v_np)
+#                 if settings.analysis.gradient_map is not None:
+#                     jac_arr = jax.device_get(res[3])
+#                     for i, key in enumerate(grad_keys):
+#                         out_idx, in_idx = grad_idxs[i]
+#                         v_np = jac_arr[:actual_size, out_idx, in_idx]
+#                         all_grads[key].append(v_np)
 
-            except Exception:
-                logger.error(f"Failed at states {i} to {i + batch_size}. Injecting NaNs...", exc_info=True)
-                nan_array = np.full((actual_size, 1), np.nan, dtype=np.float64)
+#             except Exception:
+#                 logger.error(f"Failed at states {i} to {i + batch_size}. Injecting NaNs...", exc_info=True)
+#                 nan_array = np.full((actual_size, 1), np.nan, dtype=np.float64)
 
-                for key in self.output_mappings.keys():
-                    all_outputs[key].append(nan_array)
+#                 for key in self.output_mappings.keys():
+#                     all_outputs[key].append(nan_array)
 
-                if settings.analysis.gradient_map is not None:
-                    for key in grad_keys:
-                        all_grads[key].append(nan_array)
+#                 if settings.analysis.gradient_map is not None:
+#                     for key in grad_keys:
+#                         all_grads[key].append(nan_array)
 
-        merged_results = all_inputs | all_outputs | all_grads
+#         merged_results = all_inputs | all_outputs | all_grads
 
-        if self.db_path is not None:
-            db_root = zarr.open_group(self.db_path, mode="a", zarr_format=2)
-            for key, list_of_arrays in merged_results.items():
-                # Concatenate the individual batch arrays
-                full_array = np.concatenate(list_of_arrays, axis=0)
+#         if self.db_path is not None:
+#             db_root = zarr.open_group(self.db_path, mode="a", zarr_format=2)
+#             for key, list_of_arrays in merged_results.items():
+#                 # Concatenate the individual batch arrays
+#                 full_array = np.concatenate(list_of_arrays, axis=0)
 
-                if key not in db_root:
-                    db_root.create_array(
-                        name=key,
-                        shape=(0,) + full_array.shape[1:],
-                        chunks=(100_000,) + full_array.shape[1:],
-                        dtype=full_array.dtype,
-                        compressor=Blosc(cname="zstd", clevel=5, shuffle=Blosc.BITSHUFFLE),
-                    )
-                db_root[key].append(full_array, axis=0)
+#                 if key not in db_root:
+#                     db_root.create_array(
+#                         name=key,
+#                         shape=(0,) + full_array.shape[1:],
+#                         chunks=(100_000,) + full_array.shape[1:],
+#                         dtype=full_array.dtype,
+#                         compressor=Blosc(cname="zstd", clevel=5, shuffle=Blosc.BITSHUFFLE),
+#                     )
+#                 db_root[key].append(full_array, axis=0)
 
-        return merged_results
+#         return merged_results
 
 
 # ----------------------------------------------------------------------------------------------------------------------
