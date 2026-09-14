@@ -46,12 +46,6 @@ from flowtangent.components.energy.jets import TurbojetOpPoint
 
 from flowtangent.core._processes import array_barrier
 
-pact_primal_calls = 0
-pact_vjp_calls = 0
-opaque_fd_primal_calls = 0
-opaque_ad_primal_calls = 0
-opaque_ad_jac_calls = 0
-
 test_dir = Path(__file__).resolve().parent
 
 # ==============================================================================
@@ -120,7 +114,7 @@ def get_jac_memory(system):
             
     return None
 
-def run_monolithic_benchmark(N_points, dense: bool):
+def run_maud_benchmark(N_points, dense: bool):
     """
     Builds the PyCycle problem, converges it, and times the global adjoint solve.
     Tracks Setup, Compile (0.0s), and Execution (Forward + Adjoint) times.
@@ -184,14 +178,7 @@ def run_monolithic_benchmark(N_points, dense: bool):
     t_setup_end = time.perf_counter()
 
     # =======================================================
-    # PHASE 2: COMPILATION (Eager Python = 0.0s)
-    # =======================================================
-    t_compile_start = time.perf_counter()
-    # No AOT compilation step for OpenMDAO
-    t_compile_end = time.perf_counter()
-
-    # =======================================================
-    # PHASE 3: EXECUTION (Forward Pass + Backward Adjoint)
+    # EXECUTION (Forward Pass + Backward Adjoint)
     # =======================================================
     t_exec_start = time.perf_counter()
     
@@ -223,10 +210,10 @@ def run_monolithic_benchmark(N_points, dense: bool):
     mean_tsfc = prob.get_val('avg_tsfc')[0]
     gradient = totals['avg_tsfc', 'DESIGN.comp.PR'][0][0]
     
-    return total_mem_mb, jac_mem_mb, setup_time, compile_time, exec_time, mean_tsfc, gradient, 1 + N_points, 1 + N_points
+    return total_mem_mb, jac_mem_mb, setup_time, 0.0, exec_time, setup_time + exec_time, mean_tsfc, gradient
 
 # ==============================================================================
-# HYBRID PACT BENCHMARK
+# PACT BENCHMARKS
 # ==============================================================================
 
 COUPLED_VARS_DES = [
@@ -282,8 +269,6 @@ prob_des.set_val('comp.eff', 0.83)
 prob_des.set_val('turb.eff', 0.86)
 
 def des_primal_np(pr_arr):
-    global pact_primal_calls
-    pact_primal_calls += 1
 
     prob_des.set_val('comp.PR', pr_arr.item())
 
@@ -298,8 +283,6 @@ def des_primal_np(pr_arr):
     return np.array([prob_des.get_val(var)[0] for var in COUPLED_VARS_DES], dtype=np.float64)
 
 def des_vjp_np(pr_arr, y_bar):
-    global pact_vjp_calls
-    pact_vjp_calls += 1
     prob_des.set_val('comp.PR', pr_arr.item())
     
     # RESTORE STATE BEFORE COMPUTING DERIVATIVES
@@ -371,10 +354,7 @@ prob_od.set_val('fc.balance.Pt', 15.703)
 prob_od.set_val('fc.balance.Tt', 558.31)
 prob_od.set_val('turb.PR', 4.6690)
 
-def od_primal_np(inputs, update_count=True):
-    if update_count:
-        global pact_primal_calls
-        pact_primal_calls += 1
+def od_primal_np(inputs):
     prob_od.set_val('burner.dPqP', 0.03)
     prob_od.set_val('nozz.Cv', 0.99)
 
@@ -400,9 +380,7 @@ def od_primal_np(inputs, update_count=True):
     return np.array([prob_od.get_val('perf.TSFC')[0]], dtype=np.float64)
 
 def od_vjp_np(inputs, y_bar):
-    global pact_vjp_calls
-    pact_vjp_calls += 1
-    od_primal_np(inputs, update_count=False) # Instantly restore state
+    od_primal_np(inputs) # Instantly restore state
     
     # Explicitly request nested dict format
     J_dict = prob_od.compute_totals(of=['perf.TSFC'], wrt=COUPLED_VARS_OD, return_format='dict')
@@ -429,13 +407,14 @@ def od_bwd(res, y_bar):
 
 off_design_node.defvjp(od_fwd, od_bwd)
 
-def run_pact_hybrid_benchmark(N_points):
+# ==============================================================================
+# PACT-AD BENCHMARK
+# ==============================================================================
+
+def run_pact_ad_benchmark(N_points):
     """
     Benchmarks Hybrid PACT memory and tracks Setup, Compile, and Execution times.
     """
-    global pact_primal_calls, pact_vjp_calls
-    pact_primal_calls = 0
-    pact_vjp_calls = 0
 
     gc.collect()
     tracemalloc.start()
@@ -475,6 +454,9 @@ def run_pact_hybrid_benchmark(N_points):
     
     t_compile_end = time.perf_counter()
 
+    mem_analysis = compiled_grad_fn.memory_analysis()
+    peak_algo_ram = mem_analysis.temp_size_in_bytes
+    jac_mem_mb = peak_algo_ram / (1024 * 1024)
     
     # PHASE 3: EXECUTION (The True Compute Benchmark)
     
@@ -497,22 +479,18 @@ def run_pact_hybrid_benchmark(N_points):
     compile_time = t_compile_end - t_compile_start
     exec_time = t_exec_end - t_exec_start
     
-    jac_mem_mb = 0.0 # Bypassed by VJP chaining
     total_mem_mb = peak_mem / (1024 * 1024)
 
     mean_tsfc = total_tsfc_objective(comp_pr_init).item()
     gradient = total_grad.item()
     
-    return total_mem_mb, jac_mem_mb, setup_time, compile_time, exec_time, mean_tsfc, gradient, pact_primal_calls, pact_vjp_calls
+    return total_mem_mb, jac_mem_mb, setup_time, compile_time, exec_time, setup_time + compile_time + exec_time, mean_tsfc, gradient
 
 # ==============================================================================
 # PYTHON PACT BENCHMARK
 # ==============================================================================
 
 def run_pact_python_benchmark(N_points):
-    global pact_primal_calls, pact_vjp_calls
-    pact_primal_calls = 0
-    pact_vjp_calls = 0
     
     gc.collect()
     tracemalloc.start()
@@ -565,8 +543,11 @@ def run_pact_python_benchmark(N_points):
     
     current_mem, peak_mem = tracemalloc.get_traced_memory()
     tracemalloc.stop()
+
+    setup_time = t_setup_end - t_setup_start
+    exec_time = t_exec_end - t_exec_start
     
-    return (peak_mem / (1024*1024)), 0.0, (t_setup_end - t_setup_start), 0.0, (t_exec_end - t_exec_start), mean_tsfc, final_gradient, pact_primal_calls, pact_vjp_calls
+    return (peak_mem / (1024*1024)), 0.0, setup_time, 0.0, exec_time, setup_time + exec_time, mean_tsfc, final_gradient
 
 # ==============================================================================
 # MAUD OPAQUE AD BENCHMARK (Does not converge due to MDF constraint)
@@ -583,8 +564,6 @@ class OpaqueDesignAD(om.ExplicitComponent):
         self.declare_partials('*', 'comp_PR')
 
     def compute(self, inputs, outputs):
-        global opaque_ad_primal_calls
-        opaque_ad_primal_calls += 1
 
         pr_val = inputs['comp_PR'][0]
         # print(f"\n[DEBUG] OpaqueDesignAD received comp_PR = {pr_val}")
@@ -601,8 +580,6 @@ class OpaqueDesignAD(om.ExplicitComponent):
             outputs[safe_name] = prob_des.get_val(var)[0]
 
     def compute_partials(self, inputs, partials):
-        global opaque_ad_jac_calls
-        opaque_ad_jac_calls += 1
 
         pr_val = inputs['comp_PR'][0]
         print(f"\n[DEBUG] OpaqueDesignAD received comp_PR = {pr_val}")
@@ -638,8 +615,6 @@ class OpaqueOffDesignAD(om.ExplicitComponent):
         self.declare_partials('tsfc', self.safe_vars)
 
     def compute(self, inputs, outputs):
-        global opaque_ad_primal_calls
-        opaque_ad_primal_calls += 1
         
         prob_od.set_val('burner.dPqP', 0.03)
         prob_od.set_val('nozz.Cv', 0.99)
@@ -661,8 +636,6 @@ class OpaqueOffDesignAD(om.ExplicitComponent):
         outputs['tsfc'] = prob_od.get_val('perf.TSFC')[0]
 
     def compute_partials(self, inputs, partials):
-        global opaque_ad_jac_calls
-        opaque_ad_jac_calls += 1
         
         prob_od.set_val('burner.dPqP', 0.03)
         prob_od.set_val('nozz.Cv', 0.99)
@@ -684,9 +657,6 @@ class OpaqueOffDesignAD(om.ExplicitComponent):
             partials['tsfc', safe_name] = J_dict['perf.TSFC'][var][0][0]
 
 def run_maud_opaque_ad_benchmark(N_points):
-    global opaque_ad_primal_calls, opaque_ad_jac_calls
-    opaque_ad_primal_calls = 0
-    opaque_ad_jac_calls = 0
     
     gc.collect()
     tracemalloc.start()
@@ -765,8 +735,6 @@ class OpaqueDesignFD(om.ExplicitComponent):
         self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
-        global opaque_fd_primal_calls
-        opaque_fd_primal_calls += 1
         
         prob_des.set_val('comp.PR', inputs['comp_PR'][0])
         # (Insert your exact 11 state resets here: fc.alt, balance.FAR, etc.)
@@ -790,8 +758,6 @@ class OpaqueOffDesignFD(om.ExplicitComponent):
         self.declare_partials('*', '*', method='fd')
 
     def compute(self, inputs, outputs):
-        global opaque_fd_primal_calls
-        opaque_fd_primal_calls += 1
         
         for var in COUPLED_VARS_OD:
             safe_name = var.replace('.', '_').replace(':', '_')
@@ -807,8 +773,6 @@ class OpaqueOffDesignFD(om.ExplicitComponent):
         outputs['tsfc'] = prob_od.get_val('perf.TSFC')[0]
 
 def run_maud_opaque_fd_benchmark(N_points):
-    global opaque_fd_primal_calls
-    opaque_fd_primal_calls = 0
     gc.collect()
     tracemalloc.start()
     
@@ -875,8 +839,6 @@ def run_maud_opaque_fd_benchmark(N_points):
 # ==============================================================================
 
 def run_flowtangent_benchmark(N_points):
-    primal_calls = 1 + N_points
-    jac_calls = 1 + N_points
 
     jax.clear_caches()
     gc.collect()
@@ -1019,24 +981,20 @@ def run_flowtangent_benchmark(N_points):
     current_mem, peak_mem = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     
-    peak_mem_mb = peak_mem / (1024 * 1024)
-    jac_mem_mb = 0.0  # The graph architecture never builds a Jacobian matrix
-    
     t_setup = t_setup_end - t_setup_start
     t_comp = t_comp_end - t_comp_start
     t_exec = t_exec_end - t_exec_start
     
     # Cast JAX arrays back to standard Python floats for the summary table
     return (
+        peak_mem, 
         vram_mb, 
-        jac_mem_mb, 
         t_setup, 
         t_comp, 
-        t_exec, 
+        t_exec,
+        t_setup + t_comp + t_exec,
         float(mean_tsfc.item()), 
-        float(grad.item() if grad.ndim > 0 else grad), 
-        primal_calls, 
-        jac_calls
+        float(grad.item() if grad.ndim > 0 else grad),
     )
 
 #===============================================================================
@@ -1078,7 +1036,7 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
         print(f"{name} warmup pass complete.")
 
          # Initialize empty arrays
-        metrics = {k: [] for k in ['N_array', 'total_mem', 'jac_mem', 'setup_time', 'comp_time', 'exec_time', 'tsfc', 'grad', 'func_calls', 'jac_calls']}
+        metrics = {k: [] for k in ['N_array', 'total_mem', 'jac_mem', 'setup_time', 'comp_time', 'exec_time', 'total_time', 'tsfc', 'grad']}
         metrics['N_array'] = N_array
 
         print(f"\n{'='*130}\n EXECUTING {name.upper()} BENCHMARK\n{'-'*130}")
@@ -1092,16 +1050,15 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
                 metrics['setup_time'].append(res[2])
                 metrics['comp_time'].append(res[3])
                 metrics['exec_time'].append(res[4])
-                metrics['tsfc'].append(res[5])
-                metrics['grad'].append(res[6])
-                metrics['func_calls'].append(res[7])
-                metrics['jac_calls'].append(res[8])
+                metrics['total_time'].append(res[5])
+                metrics['tsfc'].append(res[6])
+                metrics['grad'].append(res[7])
 
     # Print Formatted Output
-    print(f"{'N Points':<10} | {'Mem (MB)':<10} | {'J.Mem (MB)':<10} | {'Setup (s)':<10} | {'Comp (s)':<10} | {'Exec (s)':<10} | {'TSFC':<10} | {'Grad':<10} | {'Primal':<10} | {'Jacobian ':<10}")
+    print(f"{'N Points':<10} | {'Mem (MB)':<10} | {'J.Mem (MB)':<10} | {'Setup (s)':<10} | {'Comp (s)':<10} | {'Exec (s)':<10} | {'Total (s)':<10} | {'TSFC':<10} | {'Grad':<10}")
     print("-" * 130)
     for i in range(len(metrics['N_array'])):
-        print(f"{metrics['N_array'][i]:<10} | {metrics['total_mem'][i]:<10.1f} | {metrics['jac_mem'][i]:<10.1f} | {metrics['setup_time'][i]:<10.2f} | {metrics['comp_time'][i]:<10.2f} | {metrics['exec_time'][i]:<10.2f} | {metrics['tsfc'][i]:<10.4f} | {metrics['grad'][i]:<10.4f} | {metrics['func_calls'][i]:<10d}  | {metrics['jac_calls'][i]:<10d}")
+        print(f"{metrics['N_array'][i]:<10} | {metrics['total_mem'][i]:<10.1f} | {metrics['jac_mem'][i]:<10.1f} | {metrics['setup_time'][i]:<10.2f} | {metrics['comp_time'][i]:<10.2f} | {metrics['exec_time'][i]:<10.2f} | {metrics['total_time'][i]:<10.2f} | {metrics['tsfc'][i]:<10.4f} | {metrics['grad'][i]:<10.4f}")
 
     save_results(cache_file, name, metrics)
     
@@ -1140,27 +1097,27 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
     
     # Easily toggle architectures by commenting them out
     architectures = [
-        ("MAUD-Dense", partial(run_monolithic_benchmark, dense=True), 'r-o'),
-        ("MAUD-Sparse", partial(run_monolithic_benchmark, dense=False), 'm-x'),
-        ("PACT-Python", run_pact_python_benchmark, 'b-o'),
-        ("PACT-Hybrid", run_pact_hybrid_benchmark, 'c-x'),
-        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o')
+        ("MAUD-Dense", partial(run_maud_benchmark, dense=True), 'r-o', 7),
+        ("MAUD-Sparse", partial(run_maud_benchmark, dense=False), 'm-x', 10),
+        ("PACT-Python", run_pact_python_benchmark, 'b-o', 10),
+        ("PACT-AD", run_pact_ad_benchmark, 'c-x', 10),
+        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o', 14)
         # ("MAUD Opaque AD", run_maud_opaque_ad_benchmark, 'g-o'),
         # ("MAUD Opaque FD", run_maud_opaque_fd_benchmark, 'm-o'),
     ]
     
     results = {}
-    for name, func, style in architectures:
-        results[name] = execute_benchmark(name, func, N_array, cache_file)
+    for name, func, style, N_max in architectures:
+        results[name] = execute_benchmark(name, func, N_array[:N_max], cache_file)
         results[name]['style'] = style
 
     # Generate Plots
     fig, axes = plt.subplots(2, 3, figsize=(24, 10))
     
     plot_configs = [
-        (axes[0, 0], 'jac_mem', 'Adjoint Matrix Memory Scaling', 'Peak Memory Allocated (MB)'),
+        (axes[0, 0], 'jac_mem', 'Adjoint Memory Scaling', 'Peak Memory Allocated (MB)'),
         (axes[0, 1], 'total_mem', 'Total Process Memory Scaling', 'Peak Memory Allocated (MB)'),
-        (axes[0, 2], 'total_calls', 'Total Engine Sub-Problem Evaluations', 'Number of Evaluations'),
+        (axes[0, 2], 'total_time', 'Total Program Runtime', 'Wall-clock Time (s)'),
         (axes[1, 0], 'setup_time', 'Problem Setup Time', 'Wall-clock Time (s)'),
         (axes[1, 1], 'comp_time', 'Problem Compilation Time', 'Wall-clock Time (s)'),
         (axes[1, 2], 'exec_time', 'Global Execution Time', 'Wall-clock Time (s)'),
@@ -1168,21 +1125,16 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
     
     for ax, key, title, ylabel in plot_configs:
         for name, res in results.items():
-            if key == 'total_calls':
-                # Dynamically calculate the total calls for the plot
-                y_data = [p + a for p, a in zip(res['func_calls'], res['jac_calls'])]
-            else:
                 y_data = res[key]
                 
-            ax.plot(res['N_array'], y_data, res['style'], linewidth=2, label=name)
+        ax.plot(res['N_array'], y_data, res['style'], linewidth=2, label=name)
         
         ax.set_title(title)
         ax.set_xlabel('Number of Off-Design Points (N)')
         ax.set_ylabel(ylabel)
         
-        # Use a logarithmic scale for the call counts since FD will be exponentially higher
-        if key == 'total_calls':
-            ax.set_yscale('log')
+        ax.set_yscale('log')
+        ax.set_xscale('log')
             
         ax.grid(True)
         ax.legend()
@@ -1193,11 +1145,11 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
 
 if __name__ == "__main__":
-    N_array = [1,
-               2, 5, 10,
-            # 20, 30,
-            # 40, 50,
-            # 100
-               ]
+    N_array = [
+        1, 2, 5, 10, 25, 50, 100, # MAUD-Dense
+        250, 500, 1000, # MAUD-Sparse, PACT-Python, PACT-AD,
+        5000, 10000, 25000, 50000 # FlowTangent
+    ]
+
     fig_fn = test_dir / 'architecture_scaling_benchmark.png'
     Compare_Architectures(N_array, fig_fn)
