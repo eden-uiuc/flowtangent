@@ -434,7 +434,7 @@ class ImplicitAnalysis(Process):
 
         all_names = [v.name for v in active_variables] + [r.name for r in active_residuals]
         # Default to 20 if empty, otherwise add 2 spaces of buffer to the longest name
-        pad = max((len(t) for t in all_names), default=20) + 2
+        pad = max((len(str(t)) for t in all_names), default=20) + 2
 
         # Run the forward pass one last time
         print("\n  Final Variable Values:")
@@ -572,7 +572,7 @@ class ImplicitAnalysis(Process):
         )
 
         if settings.DEBUG_MODE:
-            print(f"\n--- {self.name.upper()} CLOSEOUT PASS ---")
+            print(f"\n--- {str(self.name).upper()} CLOSEOUT PASS ---")
         _, (f_st, f_sys) = get_residuals(jnp.array(results.x), args)
 
         return results.x, results, f_st, f_sys
@@ -819,7 +819,7 @@ class ImplicitAnalysis(Process):
 
         # Run Solver
         with Readout(
-            enabled=not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
+            enabled=settings.verbose and not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
             message=f"Tracing {self.name}...",
         ):
             f_vars, opt_state, f_st, f_sys = self._run_solver(
