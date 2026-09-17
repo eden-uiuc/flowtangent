@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import flowtangent as ft
 
 import json
@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import openmdao.api as om
 import pycycle.api as pyc
 import scipy.sparse
+import pynvml
 
 import jax
 import jax
@@ -21,6 +22,7 @@ from functools import partial
 from tqdm import tqdm
 from pathlib import Path
 from dataclasses import replace
+from datetime import datetime
 
 import warnings
 from openmdao.utils.om_warnings import OpenMDAOWarning, SolverWarning
@@ -203,7 +205,6 @@ def run_maud_benchmark(N_points, dense: bool):
     tracemalloc.stop()
     
     setup_time = t_setup_end - t_setup_start
-    compile_time = t_compile_end - t_compile_start
     exec_time = t_exec_end - t_exec_start
     total_mem_mb = peak_mem / (1024 * 1024)
 
@@ -842,7 +843,7 @@ def run_flowtangent_benchmark(N_points):
 
     jax.clear_caches()
     gc.collect()
-    tracemalloc.start()
+    # tracemalloc.start()
 
     #---------------------------------------------------------------------------
     # Setup: Data Structures and Settings
@@ -961,7 +962,7 @@ def run_flowtangent_benchmark(N_points):
 
     mem_analysis = compiled_func.memory_analysis()
     peak_algo_vram = mem_analysis.temp_size_in_bytes
-    vram_mb = peak_algo_vram / (1024 * 1024)
+    jac_mem_mb = peak_algo_vram / (1024 * 1024)
 
     #---------------------------------------------------------------------------
     # Execution
@@ -978,8 +979,26 @@ def run_flowtangent_benchmark(N_points):
     # Metrics
     #---------------------------------------------------------------------------
 
-    current_mem, peak_mem = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+    # current_mem, peak_mem = tracemalloc.get_traced_memory()
+    # tracemalloc.stop()
+    # info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    # peak_mem = info.used / (1024 * 1024)
+    pynvml.nvmlInit()
+    handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+
+    pid = os.getpid()
+    peam_mem = 0
+
+    for proc in pynvml.nvmlDeviceGetComputeRunningProcesses(handle):
+        if proc.pid == pid:
+            peak_mem = proc.usedGpuMemory / (1024 * 1024)
+            break
+
+    pynvml.nvmlShutdown()
+
+    # device = jax.local_devices()[0]
+    # stats = device.memory_stats()
+    # peak_mem = stats.get('peak_bytes_in_use', 0) / (1024 * 1024)
     
     t_setup = t_setup_end - t_setup_start
     t_comp = t_comp_end - t_comp_start
@@ -988,7 +1007,7 @@ def run_flowtangent_benchmark(N_points):
     # Cast JAX arrays back to standard Python floats for the summary table
     return (
         peak_mem, 
-        vram_mb, 
+        jac_mem_mb, 
         t_setup, 
         t_comp, 
         t_exec,
@@ -1026,6 +1045,10 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
     
     if metrics:
         print(f"\n{'='*130}\n {name.upper()} BENCHMARK LOADED FROM CACHE\n{'-'*130}")
+        print(f"{'N Points':<10} | {'Mem (MB)':<10} | {'J.Mem (MB)':<10} | {'Setup (s)':<10} | {'Comp (s)':<10} | {'Exec (s)':<10} | {'Total (s)':<10} | {'TSFC':<10} | {'Grad':<10}")
+        print("-" * 130)
+        for i in range(len(N_array)):
+            print(f"{metrics['N_array'][i]:<10} | {metrics['total_mem'][i]:<10.1f} | {metrics['jac_mem'][i]:<10.1f} | {metrics['setup_time'][i]:<10.2f} | {metrics['comp_time'][i]:<10.2f} | {metrics['exec_time'][i]:<10.2f} | {metrics['total_time'][i]:<10.2f} | {metrics['tsfc'][i]:<10.4f} | {metrics['grad'][i]:<10.4f}")
     else:       
 
         print(f"Running {name} warmup pass...")
@@ -1039,26 +1062,23 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
         metrics = {k: [] for k in ['N_array', 'total_mem', 'jac_mem', 'setup_time', 'comp_time', 'exec_time', 'total_time', 'tsfc', 'grad']}
         metrics['N_array'] = N_array
 
-        print(f"\n{'='*130}\n EXECUTING {name.upper()} BENCHMARK\n{'-'*130}")
+        print(f"\n{'='*145}\n EXECUTING {name.upper()} BENCHMARK\n{'-'*145}")
+        print(f"{'Time':<10} | {'N Points':<10} | {'Mem (MB)':<10} | {'J.Mem (MB)':<10} | {'Setup (s)':<10} | {'Comp (s)':<10} | {'Exec (s)':<10} | {'Total (s)':<10} | {'TSFC':<10} | {'Grad':<10}")
+        print("-" * 145)
         
-        with tqdm(N_array, leave=False) as pbar:
-            for N in pbar:
-                pbar.set_description(f"{name}; N={N}")
-                res = func(N)
-                metrics['total_mem'].append(res[0])
-                metrics['jac_mem'].append(res[1])
-                metrics['setup_time'].append(res[2])
-                metrics['comp_time'].append(res[3])
-                metrics['exec_time'].append(res[4])
-                metrics['total_time'].append(res[5])
-                metrics['tsfc'].append(res[6])
-                metrics['grad'].append(res[7])
+        for N in N_array:
+            res = func(N)
+            metrics['total_mem'].append(res[0])
+            metrics['jac_mem'].append(res[1])
+            metrics['setup_time'].append(res[2])
+            metrics['comp_time'].append(res[3])
+            metrics['exec_time'].append(res[4])
+            metrics['total_time'].append(res[5])
+            metrics['tsfc'].append(res[6])
+            metrics['grad'].append(res[7])
 
-    # Print Formatted Output
-    print(f"{'N Points':<10} | {'Mem (MB)':<10} | {'J.Mem (MB)':<10} | {'Setup (s)':<10} | {'Comp (s)':<10} | {'Exec (s)':<10} | {'Total (s)':<10} | {'TSFC':<10} | {'Grad':<10}")
-    print("-" * 130)
-    for i in range(len(metrics['N_array'])):
-        print(f"{metrics['N_array'][i]:<10} | {metrics['total_mem'][i]:<10.1f} | {metrics['jac_mem'][i]:<10.1f} | {metrics['setup_time'][i]:<10.2f} | {metrics['comp_time'][i]:<10.2f} | {metrics['exec_time'][i]:<10.2f} | {metrics['total_time'][i]:<10.2f} | {metrics['tsfc'][i]:<10.4f} | {metrics['grad'][i]:<10.4f}")
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            print(f"{timestamp:<10} | {N:<10} | {res[0]:<10.1f} | {res[1]:<10.1f} | {res[2]:<10.2f} | {res[3]:<10.2f} | {res[4]:<10.2f} | {res[5]:<10.2f} | {res[6]:<10.4f} | {res[7]:<10.4f}")        
 
     save_results(cache_file, name, metrics)
     
@@ -1101,9 +1121,8 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         ("MAUD-Sparse", partial(run_maud_benchmark, dense=False), 'm-x', 10),
         ("PACT-Python", run_pact_python_benchmark, 'b-o', 10),
         ("PACT-AD", run_pact_ad_benchmark, 'c-x', 10),
-        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o', 14)
-        # ("MAUD Opaque AD", run_maud_opaque_ad_benchmark, 'g-o'),
-        # ("MAUD Opaque FD", run_maud_opaque_fd_benchmark, 'm-o'),
+        ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o', 14),
+        ("FlowTangent GPU", run_flowtangent_benchmark, 'k-x', 14)
     ]
     
     results = {}
@@ -1113,7 +1132,7 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
     # Generate Plots
     fig, axes = plt.subplots(2, 3, figsize=(24, 10))
-    
+
     plot_configs = [
         (axes[0, 0], 'jac_mem', 'Adjoint Memory Scaling', 'Peak Memory Allocated (MB)'),
         (axes[0, 1], 'total_mem', 'Total Process Memory Scaling', 'Peak Memory Allocated (MB)'),
@@ -1122,13 +1141,48 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         (axes[1, 1], 'comp_time', 'Problem Compilation Time', 'Wall-clock Time (s)'),
         (axes[1, 2], 'exec_time', 'Global Execution Time', 'Wall-clock Time (s)'),
     ]
-    
+
+    # Create a master array for extrapolation out to N=50,000
+    N_extrap = np.logspace(0, np.log10(50000), 100)
+
     for ax, key, title, ylabel in plot_configs:
         for name, res in results.items():
-                y_data = res[key]
+            N_data = np.array(res['N_array'])
+            y_data = np.array(res[key])
+            
+            # Guard: If all values are essentially 0 (e.g. MAUD compile time), skip plotting
+            if np.max(y_data) <= 1e-8:
+                continue
                 
-        ax.plot(res['N_array'], y_data, res['style'], linewidth=2, label=name)
-        
+            # Plot empirical data
+            base_line, = ax.plot(N_data, y_data, res['style'], linewidth=2, label=name)
+            
+            # Determine theoretical polynomial degree for the fit
+            if 'MAUD' in name and 'Sparse' not in name:
+                # Dense MAUD: Execution time is O(N^3), memory is strictly O(N^2)
+                degree = 3 if 'time' in key else 2
+            else:
+                # Sparse MAUD and all PACT/FT variants scale linearly O(N)
+                degree = 1
+                
+            # Fit and Extrapolate (only if we have enough points for the requested degree)
+            if len(N_data) > degree:
+                # Generate polynomial coefficients
+                coeffs = np.polyfit(N_data, y_data, degree)
+                poly = np.poly1d(coeffs)
+                
+                # Filter the projection array to only plot *past* the empirical data
+                N_proj = N_extrap[N_extrap > np.max(N_data)]
+                
+                if len(N_proj) > 0:
+                    y_proj = poly(N_proj)
+                    # Guard against numerical artifacts dipping below 0 on a log-log plot
+                    valid = y_proj > 0
+                    
+                    # Plot the projection using the same color, but dashed
+                    ax.plot(N_proj[valid], y_proj[valid], color=base_line.get_color(), 
+                            linestyle='--', linewidth=1.5, alpha=0.7)
+            
         ax.set_title(title)
         ax.set_xlabel('Number of Off-Design Points (N)')
         ax.set_ylabel(ylabel)
@@ -1136,9 +1190,10 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         ax.set_yscale('log')
         ax.set_xscale('log')
             
-        ax.grid(True)
+        # Add minor gridlines for better log-scale readability
+        ax.grid(True, which="both", ls="--", alpha=0.5)
         ax.legend()
-        
+
     plt.tight_layout()
     plt.savefig(fig_filename, dpi=300)
     print(f"\nBenchmark complete. Saved plots to {fig_filename}")
@@ -1146,7 +1201,8 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
 if __name__ == "__main__":
     N_array = [
-        1, 2, 5, 10, 25, 50, 100, # MAUD-Dense
+        1, # Testing
+        2, 5, 10, 25, 50, 100, # MAUD-Dense
         250, 500, 1000, # MAUD-Sparse, PACT-Python, PACT-AD,
         5000, 10000, 25000, 50000 # FlowTangent
     ]

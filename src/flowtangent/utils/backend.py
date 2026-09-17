@@ -12,7 +12,7 @@ def numerical_environment():
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
     os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
-    os.environ["JAX_PLATFORM_NAME"] = "cpu"
+    os.environ["JAX_PLATFORM_NAME"] = "gpu"
 
     if sys.platform == "linux":
         cpu_count = os.cpu_count() or 1
