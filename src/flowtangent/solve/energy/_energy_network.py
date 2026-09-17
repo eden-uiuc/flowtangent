@@ -23,7 +23,7 @@ import networkx as nx
 
 from ... import Process, ProcessStep
 from ...components.energy.networks import PACTNetwork
-from ...utils import field, inputs, outputs, parse_io
+from ...utils import inputs, outputs, parse_io
 
 # API
 

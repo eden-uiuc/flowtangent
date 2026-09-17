@@ -43,4 +43,4 @@ class Settings(Module):
     DEBUG_MODE: bool = static_field(False)
     JAX_device_index: int = static_field(0)
 
-    
+

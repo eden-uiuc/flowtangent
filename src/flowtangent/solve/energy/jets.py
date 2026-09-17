@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from ... import Aircraft, Process, ProcessStep, Settings, State, System
-    from ...components.energy.maps._classes import CompressorMap, TurbineMap
     from ...components.energy.jets import TurbofanNetwork, TurbojetNetwork
+    from ...components.energy.maps._classes import CompressorMap, TurbineMap
 
 from dataclasses import replace
 

@@ -15,7 +15,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from equinox import combine, is_array, is_array_like, partition, Partial
+from equinox import Partial, combine, is_array, is_array_like, partition
 
 # -----------------------------------------------------------------------------
 # UPSTREAM FACADE IMPORTS

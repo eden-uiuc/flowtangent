@@ -377,7 +377,7 @@ class ImplicitAnalysis(Process):
         _initial_system: Optional[System] = None,
         _initial_settings: Optional[Settings] = None,
         _filter_map: Optional[dict] = None,
-        
+
     ) -> None:
 
         # Standard field assignments

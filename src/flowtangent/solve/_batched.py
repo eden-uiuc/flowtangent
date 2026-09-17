@@ -19,8 +19,8 @@ import os
 import shutil
 import tempfile
 import time
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 
 import equinox as eqx
 import jax
@@ -32,7 +32,7 @@ from numcodecs import Blosc
 from tqdm import tqdm, trange
 
 from .. import Process, State, System
-from ..utils import TreePath, field, get_all_targets, update, null_step
+from ..utils import TreePath, field, get_all_targets, null_step, update
 from ._implicit import ImplicitAnalysis
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -74,7 +74,7 @@ class BatchedAnalysis(Process):
                 "energy": r"state\.energy\.nodes\.\[*\].",
             }
         )
-        
+
         self.analyze = analyze
 
         if not isinstance(self.analyze, ImplicitAnalysis):
