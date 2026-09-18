@@ -12,8 +12,8 @@ import openmdao.api as om
 import pycycle.api as pyc
 import scipy.sparse
 import pynvml
+import multiprocessing as mp
 
-import jax
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -23,6 +23,7 @@ from tqdm import tqdm
 from pathlib import Path
 from dataclasses import replace
 from datetime import datetime
+from concurrent.futures import ProcessPoolExecutor
 
 import warnings
 from openmdao.utils.om_warnings import OpenMDAOWarning, SolverWarning
@@ -961,7 +962,12 @@ def run_flowtangent_benchmark(N_points):
     t_comp_end = time.perf_counter()
 
     mem_analysis = compiled_func.memory_analysis()
-    peak_algo_vram = mem_analysis.temp_size_in_bytes
+    peak_algo_vram = (
+        mem_analysis.argument_size_in_bytes +
+        mem_analysis.output_size_in_bytes + 
+        mem_analysis.temp_size_in_bytes -
+        mem_analysis.alias_size_in_bytes
+    )
     jac_mem_mb = peak_algo_vram / (1024 * 1024)
 
     #---------------------------------------------------------------------------
@@ -1041,6 +1047,7 @@ def load_results(filepath: Path | str, architecture: str) -> dict | None:
     return data.get(architecture)
 
 def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
+
     metrics = load_results(cache_file, name)
     
     if metrics:
@@ -1067,7 +1074,10 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
         print("-" * 145)
         
         for N in N_array:
-            res = func(N)
+            ctx = mp.get_context('spawn')
+            with ProcessPoolExecutor(max_workers=1, mp_context=ctx) as executor:
+                future = executor.submit(func, N)
+                res = future.result()
             metrics['total_mem'].append(res[0])
             metrics['jac_mem'].append(res[1])
             metrics['setup_time'].append(res[2])
@@ -1122,7 +1132,7 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         ("PACT-Python", run_pact_python_benchmark, 'b-o', 10),
         ("PACT-AD", run_pact_ad_benchmark, 'c-x', 10),
         ("FlowTangent CPU", run_flowtangent_benchmark, 'g-o', 14),
-        ("FlowTangent GPU", run_flowtangent_benchmark, 'k-x', 14)
+        ("FlowTangent GPU", run_flowtangent_benchmark, 'k-x', 13)
     ]
     
     results = {}
@@ -1130,73 +1140,211 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         results[name] = execute_benchmark(name, func, N_array[:N_max], cache_file)
         results[name]['style'] = style
 
-    # Generate Plots
+    # 1. Pre-process: Combine Setup and Compile times into Initialization Time
+    for name in results:
+        results[name]['init_time'] = [
+            s + c for s, c in zip(results[name]['setup_time'], results[name]['comp_time'])
+        ]
+
+    results['FlowTangent CPU']['total_mem'] = [r + results['FlowTangent CPU']['jac_mem'][i] for i, r in enumerate(results['FlowTangent CPU']['total_mem'])]
+    results['PACT-AD']['total_mem'] = [r + results['PACT-AD']['jac_mem'][i] for i, r in enumerate(results['PACT-AD']['total_mem'])]
+
+    # Generate Plots (2x3 grid, we will hide the 6th plot)
     fig, axes = plt.subplots(2, 3, figsize=(24, 10))
 
     plot_configs = [
         (axes[0, 0], 'jac_mem', 'Adjoint Memory Scaling', 'Peak Memory Allocated (MB)'),
         (axes[0, 1], 'total_mem', 'Total Process Memory Scaling', 'Peak Memory Allocated (MB)'),
         (axes[0, 2], 'total_time', 'Total Program Runtime', 'Wall-clock Time (s)'),
-        (axes[1, 0], 'setup_time', 'Problem Setup Time', 'Wall-clock Time (s)'),
-        (axes[1, 1], 'comp_time', 'Problem Compilation Time', 'Wall-clock Time (s)'),
-        (axes[1, 2], 'exec_time', 'Global Execution Time', 'Wall-clock Time (s)'),
+        (axes[1, 0], 'init_time', 'Problem Initialization (Setup + Compile)', 'Wall-clock Time (s)'),
+        (axes[1, 1], 'exec_time', 'Global Execution Time', 'Wall-clock Time (s)'),
     ]
+    
+    axes[1, 2].axis('off') # Hide the unused 6th subplot
 
     # Create a master array for extrapolation out to N=50,000
     N_extrap = np.logspace(0, np.log10(50000), 100)
+
+    def get_fit_config(name, key):
+        """Returns (degree, min_N) based on expected analytical scaling laws."""
+        degree, min_N = 1, 1 # Default: linear fit from the start
+        
+        if 'MAUD-Dense' in name:
+            if 'mem' in key:
+                degree = 2
+            elif 'time' in key and 'init' not in key:
+                degree = 3
+                
+        elif 'PACT' in name:
+            if key == "total_mem" or key == "init_time":
+                degree = 0
+            elif key == "jac_mem":
+                degree = 1
+            min_N = 50
+                
+        elif 'FlowTangent' in name:
+            if key == 'init_time':
+                degree = 0
+                min_N = 10 # JIT Compilation time is roughly constant
+            elif key == 'exec_time' and 'GPU' in name:
+                degree = 1
+                min_N = 5000 # Wait for SM thread saturation to see the true O(N) execution slope
+            elif key == 'total_mem' and 'GPU' in name:
+                degree = 1
+                min_N = 10000 # Wait for cuSOLVER 3.6GB workspace to plateau
+                
+        return degree, min_N
+
+    # Dictionary to store the raw regression stats for LaTeX generation
+    fit_stats = {cfg[1]: [] for cfg in plot_configs}
 
     for ax, key, title, ylabel in plot_configs:
         for name, res in results.items():
             N_data = np.array(res['N_array'])
             y_data = np.array(res[key])
             
-            # Guard: If all values are essentially 0 (e.g. MAUD compile time), skip plotting
             if np.max(y_data) <= 1e-8:
                 continue
                 
-            # Plot empirical data
             base_line, = ax.plot(N_data, y_data, res['style'], linewidth=2, label=name)
+            degree, min_N = get_fit_config(name, key)
             
-            # Determine theoretical polynomial degree for the fit
-            if 'MAUD' in name and 'Sparse' not in name:
-                # Dense MAUD: Execution time is O(N^3), memory is strictly O(N^2)
-                degree = 3 if 'time' in key else 2
-            else:
-                # Sparse MAUD and all PACT/FT variants scale linearly O(N)
-                degree = 1
+            fit_mask = N_data >= min_N
+            N_fit = N_data[fit_mask]
+            y_fit = y_data[fit_mask]
                 
-            # Fit and Extrapolate (only if we have enough points for the requested degree)
-            if len(N_data) > degree:
-                # Generate polynomial coefficients
-                coeffs = np.polyfit(N_data, y_data, degree)
-                poly = np.poly1d(coeffs)
-                
-                # Filter the projection array to only plot *past* the empirical data
+            if len(N_fit) >= max(degree + 1, 1):
                 N_proj = N_extrap[N_extrap > np.max(N_data)]
                 
-                if len(N_proj) > 0:
-                    y_proj = poly(N_proj)
-                    # Guard against numerical artifacts dipping below 0 on a log-log plot
-                    valid = y_proj > 0
+                if degree == 0:
+                    plateau_val = np.mean(y_fit)
+                    y_pred = np.full_like(y_fit, plateau_val)
+                    y_proj = np.full_like(N_proj, plateau_val)
                     
-                    # Plot the projection using the same color, but dashed
+                    std_dev = np.std(y_fit)
+                    cv = (std_dev / plateau_val) * 100 if plateau_val > 0 else 0
+                    wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
+                    
+                    fit_stats[key].append({
+                        'name': name, 'degree': 0, 'coeffs': [plateau_val],
+                        'error_val': cv, 'mape': wmape, 'min_N': min_N
+                    })
+                    
+                else:
+                    coeffs = np.polyfit(N_fit, y_fit, degree)
+                    poly = np.poly1d(coeffs)
+                    y_pred = poly(N_fit)
+                    y_proj = poly(N_proj)
+                    
+                    ss_res = np.sum((y_fit - y_pred) ** 2)
+                    ss_tot = np.sum((y_fit - np.mean(y_fit)) ** 2)
+                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 1.0
+                    wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
+                    
+                    fit_stats[key].append({
+                        'name': name, 'degree': degree, 'coeffs': coeffs,
+                        'error_val': 1 - r_squared, 'mape': wmape, 'min_N': min_N  # Added min_N
+                    })
+                
+                if len(N_proj) > 0:
+                    valid = y_proj > 0
                     ax.plot(N_proj[valid], y_proj[valid], color=base_line.get_color(), 
                             linestyle='--', linewidth=1.5, alpha=0.7)
             
         ax.set_title(title)
         ax.set_xlabel('Number of Off-Design Points (N)')
         ax.set_ylabel(ylabel)
-        
         ax.set_yscale('log')
         ax.set_xscale('log')
-            
-        # Add minor gridlines for better log-scale readability
         ax.grid(True, which="both", ls="--", alpha=0.5)
         ax.legend()
 
     plt.tight_layout()
     plt.savefig(fig_filename, dpi=300)
-    print(f"\nBenchmark complete. Saved plots to {fig_filename}")
+    
+    # =========================================================================
+    # LaTeX TABLE GENERATION
+    # =========================================================================
+    
+    metric_name_dict = {
+        'jac_mem': 'Adjoint Memory',
+        'total_mem': 'Total Process Memory',
+        'init_time': 'Problem Initialization',
+        'exec_time': 'Global Execution Time',
+        'total_time': 'Total Program Runtime'
+    }
+
+    print(f"\n{'='*90}\n REGRESSION SUMMARY (LaTeX)\n{'-'*90}")
+
+    for key, title in metric_name_dict.items():
+        if key not in fit_stats or not fit_stats[key]: continue
+        
+        # Dynamically set columns based on the max degree fitted
+        max_deg = max([stat['degree'] for stat in fit_stats[key]])
+        num_coeff_cols = max_deg + 1
+        total_cols = num_coeff_cols + 4  # Name, N_min, Coeffs, and 2 Metrics
+        
+        # 'l' for Name, 'r' for N_min, 'r's for coeffs, '|rr' for metrics
+        col_spec = "lr" + "r" * num_coeff_cols + "|rr"
+        
+        coeff_headers = " & ".join([f"$C_{{{i}}}$" for i in range(max_deg, 0, -1)])
+        coeff_headers += " & $C_0$ / $\\mu$" if max_deg > 0 else "$C_0$ / $\\mu$"
+            
+        tex = f"\\begin{{table}}[hbt!]\\label{{tab:{key}_regression}}\n"
+        tex += f"\\caption{{{title} Regression Models}}\n"
+        tex += "\\centering\n"
+        tex += f"\\begin{{tabular}}{{{col_spec}}}\n\\hline\n"
+        
+        # Grouped Multicolumn Headers (shifting \cline to start at column 3)
+        tex += f" & & \\multicolumn{{{num_coeff_cols}}}{{c|}}{{Regression Coefficients}} & \\multicolumn{{2}}{{c}}{{Quality Metrics}} \\\\\\cline{{3-{total_cols}}}\n"
+        tex += f"Architecture & $N_{{min}}$ & {coeff_headers} & $1 - R^2$ / CV & wMAPE (\\%) \\\\\\hline\n"
+        
+        for stat in fit_stats[key]:
+            name = stat['name'].replace('_', '\\_')
+            deg = stat['degree']
+            coeffs = stat['coeffs']
+            min_N_val = stat['min_N']
+            
+            # Pad with missing columns if this arch has a lower degree
+            padded_coeffs = ["--"] * (max_deg - deg) + [f"{c:.3e}" for c in coeffs]
+            coeff_str = " & ".join(padded_coeffs)
+            
+            # -------------------------------------------------------------
+            # Handle microscopic errors for CV, 1-R^2, and wMAPE
+            # -------------------------------------------------------------
+            err = stat['error_val']
+            mape_val = stat['mape']
+            
+            if deg == 0:
+                err_str = "$< 10^{-4}$" if err < 1e-4 else f"{err:.2f}"
+            else:
+                err_str = "$< 10^{-6}$" if err < 1e-6 else f"{err:.2e}"
+                
+            mape_str = "$< 10^{-4}$" if mape_val < 1e-4 else f"{mape_val:.2f}"
+            # -------------------------------------------------------------
+                
+            tex += f"{name} & {min_N_val} & {coeff_str} & {err_str} & {mape_str} \\\\\n"
+            
+        tex += "\\hline\n\\end{tabular}\n\\end{table}\n"
+        print(tex)
+
+
+    print(f"\n{'='*90}\n BENCHMARK RESULTS (LaTeX)\n{'-'*90}")
+
+    for name, res in results.items():
+        table_label = name.lower().replace('-', '_')
+        tex = f"\\begin{{table}}[hbt!]\\label{{tab:{table_label}_benchmark}}\n"
+        tex += f"\\caption{{{name} Benchmark Scaling Data}}\n"
+        tex += "\\centering\n"
+        tex += "\\begin{tabular}{l|rrrrr}\n\\hline\n"
+        tex += "N & Peak (MB) & Grad. (MB) & Init. (s) & Exec. (s) & Total (s) \\\\\\hline\n"
+        
+        for i, N in enumerate(res['N_array']):
+            tex += f"{N} & {res['total_mem'][i]:.1f} & {res['jac_mem'][i]:.1f} & "
+            tex += f"{res['init_time'][i]:.2f} & {res['exec_time'][i]:.2f} & {res['total_time'][i]:.2f} \\\\\n"
+            
+        tex += "\\hline\n\\end{tabular}\n\\end{table}\n"
+        print(tex)
 
 
 if __name__ == "__main__":
@@ -1204,7 +1352,8 @@ if __name__ == "__main__":
         1, # Testing
         2, 5, 10, 25, 50, 100, # MAUD-Dense
         250, 500, 1000, # MAUD-Sparse, PACT-Python, PACT-AD,
-        5000, 10000, 25000, 50000 # FlowTangent
+        5000, 10000, 25000, # FT-GPU
+        50000 # FT-CPU
     ]
 
     fig_fn = test_dir / 'architecture_scaling_benchmark.png'
