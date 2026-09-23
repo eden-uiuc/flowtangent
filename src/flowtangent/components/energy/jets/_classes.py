@@ -35,7 +35,7 @@ from ....data.gases import Air, BurnedJetA, Gas
 from ....data.propellants import JetA, Propellant
 
 # Flowtangent imports
-from ....utils import Module, field, io, method_field, static_field, update
+from ....utils import Module, field, io, method_field, static_field, update, TreePath
 from ....utils.typing import NameType, ScalarFloat
 from ..lines import PACTLine
 from ..maps import _data as map_data
