@@ -735,31 +735,18 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
 
     return panel_vertices
 
+def generate_topology(state: State, system: Aircraft, settings: Settings):
 
-@io.inputs(
-    "settings.analysis.aerodynamics: VLMSettings",
-    "settings.analysis.aerodynamics.discretize_control_surfaces",
-    "settings.analysis.aerodynamics.vortices.wing_spanwise_vortices",
-    "settings.analysis.aerodynamics.vortices.wing_chordwise_vortices",
-    "system.wings",
-)
-@io.outputs("system.analysis_data['vortex_distribution']", "settings.analysis.aerodynamics.vortices.chordwise_cosine")
-def discretize_surfaces(state: State, system: "Aircraft", settings: Settings):
-
-    # Pre-Processing ---------------------------------------------------------------------------------------------------
-
-    # Unpacking
-    vlm_settings: VORJAXSettings = settings.analysis.aerodynamics  # type: ignore
-    updated_system = system
     VD_list = []
 
     # Reformat original wings to have at least 2 segments and additional values for processing later
     for wing_idx, wing in enumerate(system.wings):  # type: ignore
         wing: Wing
         if len(wing.segments) == 0:
-            # convert to preferred format for the panelization loop
-            new_segments = convert_to_segmented_wing(wing)
-            wing = update(wing, "segments", new_segments)
+            raise ValueError(
+                f"Found wing'{wing.name}' with no segments defined. \
+                    Define segments manually or run wing.generate_segments or wing.update_geometry."
+            )
         else:
             # TODO: Add support for All_Moving_Surface class
             for segment in wing.segments:
@@ -879,6 +866,27 @@ def discretize_surfaces(state: State, system: "Aircraft", settings: Settings):
 
         if wing.symmetric:
             VD_list.append(mirror_distribution(VD))
+
+        return VD_list
+
+@io.inputs(
+    "settings.analysis.aerodynamics: VLMSettings",
+    "settings.analysis.aerodynamics.discretize_control_surfaces",
+    "settings.analysis.aerodynamics.vortices.wing_spanwise_vortices",
+    "settings.analysis.aerodynamics.vortices.wing_chordwise_vortices",
+    "system.wings",
+)
+@io.outputs("system.analysis_data['vortex_distribution']", "settings.analysis.aerodynamics.vortices.chordwise_cosine")
+def discretize_surfaces(state: State, system: "Aircraft", settings: Settings):
+
+    # Pre-Processing ---------------------------------------------------------------------------------------------------
+
+    # Unpacking
+    vlm_settings: VORJAXSettings = settings.analysis.aerodynamics  # type: ignore
+    updated_system = system
+    VD_list = []
+
+    VD_list = generate_topology(state, system, settings)
 
     full_VD = merge_vortex_distributions(VD_list)
 
