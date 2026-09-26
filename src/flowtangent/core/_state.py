@@ -7,8 +7,8 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-from typing import Optional
 from dataclasses import replace
+from typing import Optional
 
 import jax
 
@@ -32,7 +32,7 @@ from ._state_data import (
 
 
 class State[EnergyType: NetworkState](StateData):
-    
+
     time: Time = field(Time)
 
     frames: FrameData = field(FrameData)

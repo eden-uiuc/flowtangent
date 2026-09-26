@@ -24,7 +24,9 @@ dependencies = [
     "scikit-learn",
     "scipy",
     "tqdm",
-    "zarr"
+    "zarr",
+    "dask",
+    "pyarrow"
 ]
 
 [project.optional-dependencies]

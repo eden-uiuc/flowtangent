@@ -32,7 +32,7 @@ import jax.numpy as jnp
 from ...core._component import Component
 from ...data.gases import Air, Gas
 from ...utils import Module, NameType, field, static_field, update
-from ...utils.typing import ScalarFloat, _
+from ...utils.typing import ScalarFloat
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Graph Nodes

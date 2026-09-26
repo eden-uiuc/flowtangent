@@ -27,7 +27,7 @@ import jax
 # Flowtangent imports
 from ...data import units
 from ...data.atmospheres import USStandard1976
-from ...utils import Module, field, static_field, update, NameType
+from ...utils import Module, NameType, field, static_field, update
 from .lines import PACTLine
 from .nodes import BleedFlow, GraphDomain, PACTNode
 

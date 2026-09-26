@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 
 from dataclasses import fields
-from typing import Optional, Self, Sequence
+from typing import Self, Sequence
 
 # package imports
 import jax

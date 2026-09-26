@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 from typing import (
     TYPE_CHECKING,
-    Any,
     Callable,
     Generator,
     Literal,
@@ -52,18 +51,16 @@ from ..utils import (
     MERMAID_STYLES,
     Module,
     NameType,
-    TreePath,
     Partial,
+    TreePath,
     compute_tree_delta,
     field,
-    method_field,
     get_target,
-    null_step,
-    static_field,
-    update,
-    is_array_like,
     id_partition,
     inspect_leaves,
+    is_array_like,
+    null_step,
+    update,
 )
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -87,7 +84,7 @@ class ProcessStep(Module):
         _system_delta: Optional[System] = None,
         _settings_delta: Optional[Settings] = None,
     ):
-        
+
         self.function = function
         if name is not None:
             self.name = name
@@ -382,7 +379,7 @@ class Process(ProcessStep):
                 # =========================================================
                 # Broadcast the basis to match the leading dimensions dynamically
                 basis_st = jnp.broadcast_to(
-                    jnp.eye(N_o).reshape((N_o,) + (1,) * len(L) + (N_o,)), 
+                    jnp.eye(N_o).reshape((N_o,) + (1,) * len(L) + (N_o,)),
                     (N_o,) + L + (N_o,)
                 )
                 jac_tuple_st = jax.vmap(vjp_fn)(basis_st)
@@ -404,7 +401,7 @@ class Process(ProcessStep):
                         basis_sys = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
                         jac_tuple_sys = jax.vmap(vjp_fn)(basis_sys)
                         jac_sys = jac_tuple_sys[1].reshape(L + (N_o, N_sys))
-                        
+
                     batched_jacobian = jnp.concatenate([jac_st, jac_sys], axis=-1)
                 else:
                     batched_jacobian = jac_st
@@ -414,7 +411,7 @@ class Process(ProcessStep):
                 # PATH B: DENSE TEMPORAL (Optimal Control)
                 # =========================================================
                 basis_st = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
-                jac_tuple = jax.vmap(vjp_fn)(basis_st)  
+                jac_tuple = jax.vmap(vjp_fn)(basis_st)
 
                 N_st = flat_st.shape[-1]
                 if flat_st.shape[:-1] == L:
@@ -429,8 +426,8 @@ class Process(ProcessStep):
                         jac_sys = jac_tuple[1].reshape(L + (N_o,) + L + (N_sys,))
                     else:
                         jac_sys = jac_tuple[1].reshape(L + (N_o, N_sys))
-                        
-                    batched_jacobian = (jac_st, jac_sys)  
+
+                    batched_jacobian = (jac_st, jac_sys)
                 else:
                     batched_jacobian = jac_st
 
