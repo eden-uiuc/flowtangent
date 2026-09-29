@@ -448,7 +448,6 @@ class FlowNode[DesignType: FlowOpPoint | tuple](PACTNode):
             g_out = gas.compute_gamma(T_t_out_ideal)
             g_avg = 0.5 * (g_in + g_out)
             T_t_out_ideal = T_t * (PR_actual ** ((g_avg - 1.0) / g_avg))
-            # new_T_t = jnp.reshape(new_T_t, T_t_out_ideal.shape)
             return T_t_out_ideal, None
 
         T_t_out_ideal, _ = jax.lax.scan(step, T_t_out_ideal, jnp.arange(5))

@@ -7,11 +7,9 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
-from dask import compute as dc
-from dask.diagnostics import ProgressBar
+from dask.base import compute as dc
+from dask.diagnostics.progress import ProgressBar
 from pysr import PySRRegressor
-
-dtale.global_state.cleanup()
 
 def get_zarr_root(data_dir, verbose=False):
     """
