@@ -1001,9 +1001,28 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
 
         updated_system = update(system, TreePath(("analysis_data", "vortex_distribution"), VD))
 
-        N_idx += n_sw * n_cw
+        if wing.symmetric:
+            mirror_idx = N_idx + N
+            flipped_verts = flat_vertices.at[:, :, 1].multiply(-1.0)
+            mirrored_verts = flipped_verts[:, jnp.array([3, 2, 1, 0]), :]
+            MirrorPath = lambda attr_name, val: TreePath((attr_name, slice(mirror_idx, mirror_idx + N)), val)
 
-        #TODO: Handle mirroring
+            VD = update(
+                updated_system.analysis_data['vortex_distribution'],
+                (
+                    MirrorPath("panel_vertices", mirrored_verts),
+                    MirrorPath("camber_slopes", camber_slopes.reshape(-1)),
+                    MirrorPath("wedge_angles", strip_wedge_angle.reshape(-1)),
+                    MirrorPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
+                    MirrorPath("control_surface_id", panel_cs_id.reshape(-1)),
+                    MirrorPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
+                    MirrorPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
+                )
+            )
+
+            N_idx = mirror_idx + N
+        else:
+            N_idx += N
 
     return state, updated_system, settings
 
