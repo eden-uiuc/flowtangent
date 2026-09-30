@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ... import Aircraft, Settings, State
+    from ... import Aircraft, Settings, State, System
 
 import dataclasses
 import warnings
@@ -37,6 +37,7 @@ from ...functional.aero.shocks import oblique_shock, theta_beta_mach
 from ...functional.aero.transonic import ensemble_CL_spline, peaked_CL_spline
 from ...sim.initialize import initialize_aerodynamics
 from ...utils import Module, TreePath, field, io, method_field, static_field, update
+from ...utils.typing import _
 
 # FT imports
 
@@ -155,19 +156,19 @@ class VortexDistribution(Module):
     """
 
     # --- Base Geometric State ---
-    panel_vertices: jax.Array  # (N, 4, 3), CCW from Front-Left
-    camber_slopes: jax.Array  # (N,) Camber slope at each panel
-    wedge_angles: jax.Array  # (N_s,) Leading edge wedge angle for supersonic correction
+    panel_vertices: jax.Array = _  # (N, 4, 3), CCW from Front-Left
+    camber_slopes: jax.Array = _  # (N,) Camber slope at each panel
+    wedge_angles: jax.Array = _  # (N_s,) Leading edge wedge angle for supersonic correction
 
     # --- Identity & Topology (Calculated before flattening) ---
-    surface_id: jax.Array  # (N,) ID of the originating wing/fuselage
-    control_surface_id: jax.Array  # (N,) ID of the control surface (-1 for solid wing)
-    is_leading_edge: jax.Array  # (N,) Boolean mask
-    is_trailing_edge: jax.Array  # (N,) Boolean mask
+    surface_id: jax.Array = _  # (N,) ID of the originating wing/fuselage
+    control_surface_id: jax.Array = _  # (N,) ID of the control surface (-1 for solid wing)
+    is_leading_edge: jax.Array = _  # (N,) Boolean mask
+    is_trailing_edge: jax.Array = _  # (N,) Boolean mask
 
     # --- Static Structural Integers (NOT traced by JAX) ---
-    total_panels: int = eqx.field(static=True)
-    total_strips: int = eqx.field(static=True)
+    total_panels: int = static_field(0)
+    total_strips: int = static_field(0)
 
     def __init__(
         self,
@@ -178,8 +179,8 @@ class VortexDistribution(Module):
         control_surface_id,
         is_leading_edge,
         is_trailing_edge,
-        total_panels=None,
-        total_strips=None,
+        total_panels: Optional[int] = None,
+        total_strips: Optional[int] = None,
         **kwargs,
     ):
         self.panel_vertices = panel_vertices
@@ -312,7 +313,7 @@ class VortexDistribution(Module):
         panel_ones = jnp.ones_like(strip_ids, dtype=jnp.float32)
         stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=self.total_strips)
         return stripwise_panels[strip_ids]
-
+        
 
 def mirror_distribution(vd: VortexDistribution) -> VortexDistribution:
     """Creates the symmetric left-side counterpart of a right-side wing."""
@@ -819,7 +820,7 @@ def _generate_single_wing(
         is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
     
     )    
-def generate_topology(state: State, system: Aircraft, settings: Settings):
+def generate_topology(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     VD_list = []
 
@@ -844,12 +845,14 @@ def generate_topology(state: State, system: Aircraft, settings: Settings):
         # Non-Dimensional Panelization ---------------------------------------------------------------------------------
         # non-jit
         interval_data, strip_interval_map = find_intervals(wing)
+        vlm_settings = settings.analysis.aerodynamics
         try:
             n_sw = vlm_settings.vortices.wings_n_spanwise[wing_idx]
             n_cw = vlm_settings.vortices.wings_n_chordwise[wing_idx]
         except TypeError:
-            n_sw = vlm_settings.vortices.wings_n_spanwise
-            n_cw = vlm_settings.vortices.wings_n_chordwise
+            n_sw: int = vlm_settings.vortices.wings_n_spanwise
+            n_cw: int = vlm_settings.vortices.wings_n_chordwise
+            
 
         if len(interval_data) > n_sw or n_cw < 3:  # type: ignore
             warnings.warn(
@@ -858,38 +861,82 @@ def generate_topology(state: State, system: Aircraft, settings: Settings):
                 f"Increasing number of wing spanwise vortices to prevent mesh collapse."
             )  # Handled in generation functions below
 
+        N = n_sw * n_cw
+        N_zero = jnp.zeros(N)
+        VD_topological = VortexDistribution(
+            panel_vertices=jnp.zeros((N, 4, 3)),
+            camber_slopes=N_zero,
+            wedge_angles=jnp.zeros(n_sw),
+            surface_id=N_zero,
+            control_surface_id=N_zero,
+            is_leading_edge=N_zero,
+            is_trailing_edge=N_zero,
+            total_panels=N,
+            total_strips=n_sw,
+        )
+
+        VD_list.append(VD_topological)
+        if wing.symmetric:
+            VD_list.append(VD_topological)
+
+    full_VD_topological = merge_vortex_distributions(VD_list)
+
+    updated_analysis_data = system.analysis_data | {"vortex_distribution": full_VD_topological}
+
+    updated_system = update(system, "analysis_data", updated_analysis_data)
+
+    updated_settings = update(settings, "analysis.aerodynamics", vlm_settings)
+
+    return state, updated_system, updated_settings
+
+def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:       
+
+    N_idx = 0
+
+    for wing_idx, wing in enumerate(system.wings):
+
+        interval_data, strip_interval_map = find_intervals(wing)
+        vlm_settings = settings.analysis.aerodynamics
+
+        try:
+            n_sw = vlm_settings.vortices.wings_n_spanwise[wing_idx]
+            n_cw = vlm_settings.vortices.wings_n_chordwise[wing_idx]
+        except TypeError:
+            n_sw: int = vlm_settings.vortices.wings_n_spanwise
+            n_cw: int = vlm_settings.vortices.wings_n_chordwise
+
         # Calculate strip eta (non-dimensional y-coordinate) (Shape: (n_sw +1,))
-        # eta, strip_interval_map = generate_spanwise_coordinates(
-        #     interval_data, n_sw, vlm_settings.vortices.spanwise_cosine
-        # )
+        eta, strip_interval_map = generate_spanwise_coordinates(
+            interval_data, n_sw, vlm_settings.vortices.spanwise_cosine
+        )
 
         # # Calculate strip xi (non-dimensional x-coordinate) (Shape: (n_sw, n_cw + 1))
-        # strip_le_cuts = interval_data[:, 2][strip_interval_map]
-        # strip_te_cuts = interval_data[:, 3][strip_interval_map]
+        strip_le_cuts = interval_data[:, 2][strip_interval_map]
+        strip_te_cuts = interval_data[:, 3][strip_interval_map]
 
-        # vmap_chordwise = jax.vmap(generate_chordwise_coordinates, in_axes=(0, 0, None, None))
-        # xi_grid = vmap_chordwise(
-        #     strip_le_cuts, strip_te_cuts, n_cw, False
-        # )  # Force linear chordwise spacing for Pistolesi's theorem (assumed in coefficient integration)
+        vmap_chordwise = jax.vmap(generate_chordwise_coordinates, in_axes=(0, 0, None, None))
+        xi_grid = vmap_chordwise(
+            strip_le_cuts, strip_te_cuts, n_cw, False
+        )  # Force linear chordwise spacing for Pistolesi's theorem (assumed in coefficient integration)
 
         # # Map panels to control surfaces
-        # xi_mid = (xi_grid[:, :-1] + xi_grid[:, 1:]) / 2.0
-        # strip_le_ids = interval_data[:, 4][strip_interval_map]
-        # strip_te_ids = interval_data[:, 5][strip_interval_map]
+        xi_mid = (xi_grid[:, :-1] + xi_grid[:, 1:]) / 2.0
+        strip_le_ids = interval_data[:, 4][strip_interval_map]
+        strip_te_ids = interval_data[:, 5][strip_interval_map]
 
-        # panel_cs_id = jnp.full_like(
-        #     xi_mid, -1, dtype=jnp.int32
-        # )  # Default to -1 to indicate panel belongs to wing itself
-        # panel_cs_id = jnp.where(
-        #     xi_mid < strip_le_cuts[:, None], strip_le_ids[:, None], panel_cs_id
-        # )  # If xi < LE cut, assign local LE CS ID
-        # panel_cs_id = jnp.where(
-        #     xi_mid > strip_te_cuts[:, None], strip_te_ids[:, None], panel_cs_id
-        # )  # If xi > TE cut, assign local TE CS ID
+        panel_cs_id = jnp.full_like(
+            xi_mid, -1, dtype=jnp.int32
+        )  # Default to -1 to indicate panel belongs to wing itself
+        panel_cs_id = jnp.where(
+            xi_mid < strip_le_cuts[:, None], strip_le_ids[:, None], panel_cs_id
+        )  # If xi < LE cut, assign local LE CS ID
+        panel_cs_id = jnp.where(
+            xi_mid > strip_te_cuts[:, None], strip_te_ids[:, None], panel_cs_id
+        )  # If xi > TE cut, assign local TE CS ID
 
         # Geometric Corrections ----------------------------------------------------------------------------------------
 
-        # Calculate strip zeta (non-dimensional z-coordinate) (Shape: (n_sw, n_cw + 1))
+        # # Calculate strip zeta (non-dimensional z-coordinate) (Shape: (n_sw, n_cw + 1))
         n_af_pts = validate_airfoil_resolutions(wing)
         flat_x = jnp.linspace(0.0, 1.0, n_af_pts // 2)
         flat_z = jnp.zeros(n_af_pts // 2)
@@ -906,35 +953,63 @@ def generate_topology(state: State, system: Aircraft, settings: Settings):
             [seg.airfoil.wedge_angle if getattr(seg, "airfoil", None) else 0.0 for seg in wing.segments]
         )  # type: ignore
         
-        # strip_camber_x = seg_camber_x[strip_interval_map]
-        # strip_camber_z = seg_camber_z[strip_interval_map]
-        # strip_wedge_angle = seg_wedge_angle[strip_interval_map]
+        strip_camber_x = seg_camber_x[strip_interval_map]
+        strip_camber_z = seg_camber_z[strip_interval_map]
+        strip_wedge_angle = seg_wedge_angle[strip_interval_map]
 
-        # xi_colloc = 0.25 * xi_grid[:, :-1] + 0.75 * xi_grid[:, 1:]
+        xi_colloc = 0.25 * xi_grid[:, :-1] + 0.75 * xi_grid[:, 1:]
 
-        # vmap_interp = jax.vmap(jnp.interp, in_axes=(0, 0, 0))
+        vmap_interp = jax.vmap(jnp.interp, in_axes=(0, 0, 0))
 
         # Finite difference local camber slope/incidence angle
-        # zeta_fwd = vmap_interp(xi_colloc + 1e-4, strip_camber_x, strip_camber_z)
-        # zeta_bwd = vmap_interp(xi_colloc - 1e-4, strip_camber_x, strip_camber_z)
+        zeta_fwd = vmap_interp(xi_colloc + 1e-4, strip_camber_x, strip_camber_z)
+        zeta_bwd = vmap_interp(xi_colloc - 1e-4, strip_camber_x, strip_camber_z)
 
-        # camber_slopes = (zeta_fwd - zeta_bwd) / 2e-4
+        camber_slopes = (zeta_fwd - zeta_bwd) / 2e-4
 
         # Calculate strip macro-level properties
         semispan = wing.spans.projected / 2.0 if wing.symmetric else wing.spans.projected
-        # strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist = calculate_macro_properties(wing, eta, semispan)
+        strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist = calculate_macro_properties(wing, eta, semispan)
 
-        # morph_results = morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist)
+        morph_results = morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_twist)
 
-        # if wing.vertical:
-        #     y_coords = morph_results[:, :, :, 1]
-        #     z_coords = morph_results[:, :, :, 2]
+        if wing.vertical:
+            y_coords = morph_results[:, :, :, 1]
+            z_coords = morph_results[:, :, :, 2]
 
-        #     morph_results = morph_results.at[:, :, :, 1].set(z_coords)
-        #     morph_results = morph_results.at[:, :, :, 2].set(y_coords)
+            morph_results = morph_results.at[:, :, :, 1].set(z_coords)
+            morph_results = morph_results.at[:, :, :, 2].set(y_coords)
 
         # Flatten and pack into VortexDistribution ---------------------------------------------------------------------
-        # flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
+        flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
+
+        VDPath = lambda attr_name, val: TreePath((attr_name, slice(N_idx, N_idx + N)), val)
+
+        N = n_sw * n_cw
+        VD = update(
+            system.analysis_data['vortex_distribution'],
+            (
+                VDPath("panel_vertices", flat_vertices),
+                VDPath("camber_slopes", camber_slopes.reshape(-1)),
+                VDPath("wedge_angles", strip_wedge_angle.reshape(-1)),
+                VDPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
+                VDPath("control_surface_id", panel_cs_id.reshape(-1)),
+                VDPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
+                VDPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
+            )
+        )
+
+        updated_system = update(system, TreePath(("analysis_data", "vortex_distribution"), VD))
+
+        N_idx += n_sw * n_cw
+
+        #TODO: Handle mirroring
+
+    return state, updated_system, settings
+
+
+
+
         #non-jit custom class/object
         # VD = VortexDistribution(
         #     panel_vertices=flat_vertices,
@@ -945,29 +1020,29 @@ def generate_topology(state: State, system: Aircraft, settings: Settings):
         #     is_leading_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1),
         #     is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
         # )
-        VD = _generate_single_wing(
-            wing, 
-            interval_data=jnp.asarray(interval_data),
-            strip_interval_map=jnp.asarray(strip_interval_map),
-            n_sw=int(n_sw),
-            n_cw=int(n_cw),
-            spanwise_cosine=bool(settings.vortices.spanwise_cosine),
-            seg_camber_x=seg_camber_x,
-            seg_camber_z=seg_camber_z,
-            seg_wedge_angle=seg_wedge_angle,
-            wing_origin=jnp.asarray(wing.origin),
-            wing_idx=wing_idx,
-            is_vertical=bool(wing.vertical),
-            semispan=semispan,
-            wing_spans_projected=float(wing.spans.projected),
-        )
-        #non-jit
-        VD_list.append(VD)
+    #     VD = _generate_single_wing(
+    #         wing, 
+    #         interval_data=jnp.asarray(interval_data),
+    #         strip_interval_map=jnp.asarray(strip_interval_map),
+    #         n_sw=int(n_sw),
+    #         n_cw=int(n_cw),
+    #         spanwise_cosine=bool(settings.vortices.spanwise_cosine),
+    #         seg_camber_x=seg_camber_x,
+    #         seg_camber_z=seg_camber_z,
+    #         seg_wedge_angle=seg_wedge_angle,
+    #         wing_origin=jnp.asarray(wing.origin),
+    #         wing_idx=wing_idx,
+    #         is_vertical=bool(wing.vertical),
+    #         semispan=semispan,
+    #         wing_spans_projected=float(wing.spans.projected),
+    #     )
+    #     #non-jit
+    #     VD_list.append(VD)
 
-        if wing.symmetric:
-            VD_list.append(mirror_distribution(VD))
+    #     if wing.symmetric:
+    #         VD_list.append(mirror_distribution(VD))
 
-    return VD_list
+    # return VD_list
 
 
 @io.inputs(
@@ -987,9 +1062,7 @@ def discretize_surfaces(state: State, system: "Aircraft", settings: Settings):
     updated_system = system
     VD_list = []
 
-    VD_list = generate_topology(state, system, settings)
-
-    full_VD = merge_vortex_distributions(VD_list)
+    VD_list = generate_topology(system, settings)
 
     updated_analysis_data = system.analysis_data | {"vortex_distribution": full_VD}
 
@@ -2256,7 +2329,7 @@ def _default_VORJAX_init_steps():
     return (
         ProcessStep(function=initialize_aerodynamics, name="Initialize Component Bookkeeping"),
         ProcessStep(function=initialize_VORJAX_data, name="Initialize Data Structures"),
-        ProcessStep(function=discretize_surfaces, name="Discretize Surfaces"),
+        ProcessStep(function=generate_topology, name="Generate Topology"),
     )
 
 
@@ -2286,7 +2359,7 @@ def _default_VORJAX_compute_steps():
     )
 
 
-class ComputeVORJAX(Process):
+class AnalyzeVORJAX(Process):
     name: str = field("Compute VORJAX", static=True)
     steps: tuple = field(_default_VORJAX_compute_steps)
 
@@ -2294,20 +2367,39 @@ class ComputeVORJAX(Process):
         self,
         name: str = "Compute VORJAX",
         steps: tuple = _default_VORJAX_compute_steps(),
+        include_meshing: bool = True
     ) -> None:
-        super().__init__(name=name, steps=steps)
+        if include_meshing:
+            full_steps = (
+                ProcessStep(update_mesh, name="Update Mesh"),
+            ) + steps
+        else:
+            full_steps = steps
+
+        super().__init__(name=name, steps=full_steps)
+
 
 
 class VORJAX(Process):
     name: str = static_field("Aerodynamics")
-    steps: tuple = field(lambda: (InitializeVORJAX(), ComputeVORJAX()))
+    steps: tuple = field(lambda: (InitializeVORJAX(), AnalyzeVORJAX()))
 
     def __init__(
         self,
         name: str = "Aerodynamics",
-        steps: tuple = (InitializeVORJAX(), ComputeVORJAX()),
+        steps: Optional[tuple] = None,
+        remesh: bool = True
     ) -> None:
-        super().__init__(name=name, steps=steps)
+
+        self.initialize = InitializeVORJAX()
+
+        if steps == None:
+            self.analyze = AnalyzeVORJAX(include_meshing=remesh)
+        else:
+            self.analyze = steps
+                
+                
+        super().__init__(name=name, steps = (self.analyze,))
 
     # TODO: Add full drag, trimming, stability analysis
 
