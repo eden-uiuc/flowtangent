@@ -1,5 +1,3 @@
-from ._airfoils import Airfoil
-
 from ._fuselages import Fuselage
 
 from ._landing_gear import LandingGear
@@ -19,6 +17,8 @@ from .energy.networks import (
     PACTNetwork,
     NetworkParameters,
 )
+
+from .airfoils._classes import Airfoil
 
 __all__ = [
     "Airfoil",

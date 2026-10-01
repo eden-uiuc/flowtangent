@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 # package imports
 
-# Flowtangent Imports
-# from Flowtangent.Library.Components.Energy.Propulsors import TurbofanEngine
+# FlowTangent Imports
+# from FlowTangent.Library.Components.Energy.Propulsors import TurbofanEngine
 
 # -------------------------------------------------------------------------------
 #  Functional/Library Version

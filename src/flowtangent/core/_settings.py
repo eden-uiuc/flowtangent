@@ -1,7 +1,7 @@
 # flowtangent/Framework/Settings.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -17,7 +17,7 @@ from typing import Literal, Optional
 
 from ..solve import AnalysisSettings, NumericalSettings
 
-# Flowtangent imports
+# FlowTangent imports
 from ..utils import LoggingSettings, Module, field, static_field
 
 # ----------------------------------------------------------------------------------------------------------------------

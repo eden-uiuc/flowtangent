@@ -2,7 +2,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from functools import lru_cache
+
 from pathlib import Path
 
 # package imports
@@ -11,9 +11,7 @@ import jax.numpy as jnp
 
 # FlowTangent imports
 from flowtangent.utils import empty_array, field
-from flowtangent.utils.io import _ft_root
-
-from ..core._component import Component
+from ...core._component import Component
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -305,53 +303,4 @@ class Airfoil(Component):
 def NACA(code: str, n_pts: int = 128):
     return Airfoil.from_naca(code=code, n_pts=n_pts)
 
-# ----------------------------------------------------------------------------------------------------------------------
-#  Airfoil Directory
-# ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = _ft_root() / "/data/airfoils"
-STUB_FILE = Path(__file__).resolve().
-
-
-@lru_cache(maxsize=None)
-def _load_map_from_disk(name: str):
-    """Hidden helper that does the disk I/O, safely cached, and routes by type."""
-    file_path = _AF_DIR / f"{name}.txt"
-    if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in FlowTangent library ({_AF_DIR}).")
-
-    return Airfoil.from_file(file_path)
-
-
-def __getattr__(name: str):
-    """Intercepts module-level attribute access."""
-    if name.startswith("_"):
-        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-    return _load_map_from_disk(name)
-
-
-def __dir__():
-    """Allows IDEs and the `dir()` command to see the available airfoils."""
-    if _AF_DIR.exists():
-        return [f.stem for f in _AF_DIR.glob("*.json")]
-    return []
-
-def generate_stub():
-    lines = [
-        "from typing import Any",
-        "from .classes import CompressorMap, TurbineMap",
-        "",
-    ]
-
-    for file in _AF_DIR.glob("*.dat"):
-        with open(map_file, "r") as f:
-            data = json.load(f)
-
-        map_type = data.get("type", "compressor").lower()
-        type_hint = "CompressorMap" if map_type == "compressor" else "TurbineMap"
-
-        # Write the attribute to the stub file
-        lines.append(f"{map_file.stem}: {type_hint}")
-
-    STUB_FILE.write_text("\n".join(lines))
-    print(f"Generated {STUB_FILE.name} with {len(lines) - 3} maps.")

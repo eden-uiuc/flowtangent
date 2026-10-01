@@ -2,7 +2,7 @@
 # flowtangent/Framework/Missions/Mission.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -235,7 +235,7 @@ def find_circular_references(obj, path="root", visited=None):
     # Skip basic types and arrays (they don't hold other objects)
     if obj is None or isinstance(obj, (int, float, str, bool, tuple, frozenset)):
         return
-    if type(obj).__name__ in ("ndarray", "ArrayImpl", "DynamicJaxprFlowtangentr"):
+    if type(obj).__name__ in ("ndarray", "ArrayImpl", "DynamicJaxprFlowTangentr"):
         return
 
     obj_id = id(obj)

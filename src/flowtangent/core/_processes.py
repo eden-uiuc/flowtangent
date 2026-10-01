@@ -1,7 +1,7 @@
 # flowtangent/Framework/Process.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -554,7 +554,7 @@ class Process(ProcessStep):
             return self.steps.index(value)
 
         else:
-            raise ValueError("Flowtangent processes can only be indexed by name, function, or ProcessStep object.")
+            raise ValueError("FlowTangent processes can only be indexed by name, function, or ProcessStep object.")
 
     def insert(self, step: ProcessStep, index: int):
         new_steps = self.steps[:index] + (step,) + self.steps[index:]
@@ -929,7 +929,7 @@ class Process(ProcessStep):
 
 
 class OptimizerInterface:
-    """Interface with legacy optimizers to separate value and gradient function for Flowtangent Processes."""
+    """Interface with legacy optimizers to separate value and gradient function for FlowTangent Processes."""
 
     def __init__(
         self,

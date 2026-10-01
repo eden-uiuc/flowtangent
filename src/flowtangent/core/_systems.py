@@ -1,7 +1,7 @@
 # flowtangent/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -25,7 +25,7 @@ from ..components import Fuselage, LandingGear, Nacelle, PACTNetwork, Wing
 from ..core._component import Component, MassProperties
 from ..data.ac_classes import AircraftClass, MediumRange
 
-# Flowtangent imports
+# FlowTangent imports
 from ..utils import Module, empty_array, field
 
 # ----------------------------------------------------------------------------------------------------------------------

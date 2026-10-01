@@ -22,7 +22,7 @@ import equinox as eqx
 
 from ...utils import update
 
-# Flowtangent Imports
+# FlowTangent Imports
 
 # -------------------------------------------------------------------------------
 #  Stateful/Framework Version

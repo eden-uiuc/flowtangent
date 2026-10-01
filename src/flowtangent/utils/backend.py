@@ -41,7 +41,7 @@ def initialize_jax_cache(cache_dir="~/.flowtangent/jax_cache", max_size_gb=2.0, 
     try:
         _prune_cache(cache_path, max_size_gb, max_age_days)
     except Exception as e:
-        print(f"Flowtangent Warning: Failed to prune JAX compilation cache - {e}")
+        print(f"FlowTangent Warning: Failed to prune JAX compilation cache - {e}")
 
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):

@@ -1,7 +1,7 @@
 # flowtangent/Library/Compoments/Component.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -23,7 +23,7 @@ import jax.numpy as jnp
 
 from ..data.solids import Aluminum, Solid
 
-# Flowtangent imports
+# FlowTangent imports
 from ..utils import Module, TreePathLike, field, update
 
 # ----------------------------------------------------------------------------------------------------------------------

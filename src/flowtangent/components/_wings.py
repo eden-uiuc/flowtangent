@@ -1,7 +1,7 @@
 # flowtangent/Framework/Components/Wing.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Sep, 2024, Flowtangent Team
+# Created: Sep, 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -12,7 +12,7 @@ import jax.numpy as jnp
 
 from ..core._component import Component, Dimensions
 from ..utils import empty_array, field, update
-from . import Airfoil
+from .airfoils._classes import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Wing

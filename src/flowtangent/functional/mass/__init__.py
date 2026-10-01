@@ -1,7 +1,7 @@
 # flowtangent/Library/Methods/Weights/__init__.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 
-"""Flowtangent Package Setup"""
+"""FlowTangent Package Setup"""
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

@@ -23,7 +23,7 @@ def _load_map_from_disk(name: str):
     """Hidden helper that does the disk I/O, safely cached, and routes by type."""
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
-        raise AttributeError(f"Map '{name}' not found in Flowtangent library ({_MAP_DIR}).")
+        raise AttributeError(f"Map '{name}' not found in FlowTangent library ({_MAP_DIR}).")
 
     # 1. Peek inside the JSON to grab the metadata
     with open(file_path, "r") as f:
@@ -163,7 +163,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
 def generate_stub():
     lines = [
         "from typing import Any",
-        "from .classes import CompressorMap, TurbineMap",
+        "from ._classes import CompressorMap, TurbineMap",
         "",
     ]
 

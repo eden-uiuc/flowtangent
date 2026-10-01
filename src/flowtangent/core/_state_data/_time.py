@@ -1,7 +1,7 @@
 # flowtangent/Framework/Missions/Conditions/Numerics.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,7 +14,7 @@ import jax.numpy as jnp
 
 from ...core._state_data import StateData
 
-# Flowtangent imports
+# FlowTangent imports
 from ...utils import empty_array, field, static_field, update
 
 # ----------------------------------------------------------------------------------------------------------------------

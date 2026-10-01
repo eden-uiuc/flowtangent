@@ -1,7 +1,7 @@
 # flowtangent/Library/Components/Energy/Network.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Flowtangent Team
+# Created: Apr 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -24,7 +24,7 @@ from graphlib import CycleError, TopologicalSorter
 
 import jax
 
-# Flowtangent imports
+# FlowTangent imports
 from ...data import units
 from ...data.atmospheres import USStandard1976
 from ...utils import Module, NameType, field, static_field, update

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 # package imports
 
-# Flowtangent Imports
+# FlowTangent Imports
 
 from ...utils import update
 

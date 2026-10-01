@@ -1,7 +1,7 @@
 # flowtangent/Library/Components/Energy/Propulsors.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Flowtangent Team
+# Created: May 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -34,8 +34,8 @@ from flowtangent.data import units
 from ....data.gases import Air, BurnedJetA, Gas
 from ....data.propellants import JetA, Propellant
 
-# Flowtangent imports
-from ....utils import Module, field, io, method_field, static_field, update, TreePath
+# FlowTangent imports
+from ....utils import Module, field, io, method_field, static_field, update
 from ....utils.typing import NameType, ScalarFloat
 from ..lines import PACTLine
 from ..maps import _data as map_data

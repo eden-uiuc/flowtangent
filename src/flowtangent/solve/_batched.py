@@ -199,7 +199,7 @@ class BatchedAnalysis(Process):
 
 
 class ShardManager:
-    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="Flowtangent_dataset.manager"):
+    def __init__(self, cache_dir, storage_dir, max_rows=3_000_000, handle="FlowTangent_dataset.manager"):
         self.local_dir = Path(cache_dir)
         self.hdd_dir = Path(storage_dir)
         self.max_rows = max_rows
@@ -264,7 +264,7 @@ class ShardManager:
 
 class ShardedDatasetGenerator:
     """
-    Orchestrates batched runs for any Flowtangent BatchProcess.
+    Orchestrates batched runs for any FlowTangent BatchProcess.
     Slices total design space into manageable shards, executes them locally,
     and offloads them to medium-term storage.
     """

@@ -1,8 +1,10 @@
+from pathlib import Path
+
 from ._classes import CompressorMap, TurbineMap
-from . import _data as data
+from . import _data as ref
 
 __all__ = [
     "CompressorMap",
     "TurbineMap",
-    "data",
+    "ref"
 ]

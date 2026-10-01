@@ -1,7 +1,7 @@
 # flowtangent/Library/Atmospheres.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Flowtangent Team
+# Created: May 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -18,7 +18,7 @@ import numpy as np  # For precomputing atmospheric tables
 from flowtangent.data.gases import Air, Gas
 from flowtangent.data.planets import Earth, Planet
 
-# Flowtangent imports
+# FlowTangent imports
 from ..utils import Module, field, static_field
 from ..utils.typing import NameType, ScalarFloat, _
 

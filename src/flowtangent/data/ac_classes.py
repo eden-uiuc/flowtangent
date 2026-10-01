@@ -13,7 +13,7 @@ from typing import Literal
 # package imports
 from flowtangent.data import units
 
-# Flowtangent imports
+# FlowTangent imports
 from flowtangent.utils import Module, field
 
 # -------------------------------------------------------------------------------

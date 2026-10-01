@@ -45,7 +45,7 @@ from flowtangent.core._state_data import Time
 from flowtangent.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
 from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
 
-from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
+from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_FlowTangent
 from flowtangent.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
@@ -550,7 +550,7 @@ def plot_avl_validation_mpl(alpha, cl_vjx, cd_vjx, cm_vjx, cl_avl, cd_avl, cm_av
     plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
     plt.rcParams['font.size'] = 10
 
-    # Flowtangent styling
+    # FlowTangent styling
     avl_style = dict(color='black', linestyle='-', linewidth=1.5, label='AVL (Baseline)')
     vjx_style = dict(color='black', linestyle='None', marker='o', markersize=5,
                      markerfacecolor='none', markeredgecolor='black', label='VORJAX')
@@ -649,11 +649,11 @@ def plot_spanwise_loading_mpl(eta, gamma, CL, b, AR, v_inf):
     # 3. Initialize Figure (3.5 inch width for AIAA standard single column)
     _, ax = plt.subplots(figsize=(3.5, 2.6))
 
-    # 4. Add Flowtangent: Theoretical Distribution (Smooth Dashed Line)
+    # 4. Add FlowTangent: Theoretical Distribution (Smooth Dashed Line)
     ax.plot(eta_dense, gamma_dense, color='black', linestyle='--', linewidth=1.5, 
             label='Lifting Surface Theory')
 
-    # 5. Add Flowtangent: VORJAX Actual Results (Scatter points, no connecting line)
+    # 5. Add FlowTangent: VORJAX Actual Results (Scatter points, no connecting line)
     ax.plot(eta, gamma, color='black', linestyle='None', marker='o', 
             markersize=5, markerfacecolor='black', label='VORJAX Integration')
 
@@ -696,17 +696,17 @@ def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide. 3.5 x 2.6 is a good aspect ratio)
     _, ax1 = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Flowtangent: AD Gradient (Primary Y) - Solid line, filled circles
+    # 2. Add FlowTangent: AD Gradient (Primary Y) - Solid line, filled circles
     ax1.plot(n_segments, grad_AD, color='black', linestyle='-', linewidth=1.5, 
              marker='o', markersize=5, markerfacecolor='black', label='VORJAX AD Gradient')
 
-    # 3. Add Flowtangent: Analytical Truth (Primary Y) - Dashed line, no markers
+    # 3. Add FlowTangent: Analytical Truth (Primary Y) - Dashed line, no markers
     ax1.axhline(y=grad_truth, color='black', linestyle='--', linewidth=1.5, label="Hembold's Equation")
 
     # 4. Initialize Secondary Y-axis
     ax2 = ax1.twinx()
 
-    # 5. Add Flowtangent: Relative Error (Secondary Y) - Dotted line, open squares
+    # 5. Add FlowTangent: Relative Error (Secondary Y) - Dotted line, open squares
     ax2.plot(n_segments, error_percent, color='black', linestyle=':', linewidth=1.5, 
              marker='s', markersize=5, markerfacecolor='none', markeredgecolor='black', 
              label='Relative Error')
@@ -756,17 +756,17 @@ def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide. 3.5 x 2.6 is a good aspect ratio)
     _, ax1 = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Flowtangent: AD Gradient (Primary Y) - Solid line, filled circles
+    # 2. Add FlowTangent: AD Gradient (Primary Y) - Solid line, filled circles
     ax1.plot(n_segments, grad_AD, color='black', linestyle='-', linewidth=1.5, 
              marker='o', markersize=5, markerfacecolor='black', label='VORJAX AD Gradient')
 
-    # 3. Add Flowtangent: Analytical Truth (Primary Y) - Dashed line, no markers
+    # 3. Add FlowTangent: Analytical Truth (Primary Y) - Dashed line, no markers
     ax1.axhline(y=grad_truth, color='black', linestyle='--', linewidth=1.5, label="Munk's Stagger Thm.")
 
     # 4. Initialize Secondary Y-axis
     ax2 = ax1.twinx()
 
-    # 5. Add Flowtangent: Relative Error (Secondary Y) - Dotted line, open squares
+    # 5. Add FlowTangent: Relative Error (Secondary Y) - Dotted line, open squares
     ax2.plot(n_segments, error_percent, color='black', linestyle=':', linewidth=1.5, 
              marker='s', markersize=5, markerfacecolor='none', markeredgecolor='black', 
              label='Relative Error')
@@ -807,7 +807,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     # Convert error to a percentage for cleaner reading
     error_percent = np.array(error) * 100.0
 
-    # 2. Add Flowtangent: AD Gradient (Primary Y)
+    # 2. Add FlowTangent: AD Gradient (Primary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -820,7 +820,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 3. Add Flowtangent: Analytical Truth (Primary Y)
+    # 3. Add FlowTangent: Analytical Truth (Primary Y)
     # Drawing a line from the first to the last x-coordinate
     fig.add_trace(
         go.Scatter(
@@ -833,7 +833,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 4. Add Flowtangent: Relative Error (Secondary Y)
+    # 4. Add FlowTangent: Relative Error (Secondary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -900,7 +900,7 @@ def plot_fd_v_curve_plotly(step_sizes, fd_errors):
     
     fig = go.Figure()
 
-    # 1. Add Flowtangent: FD Absolute Error
+    # 1. Add FlowTangent: FD Absolute Error
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -999,12 +999,12 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     # 1. Initialize figure (AIAA single column is ~3.5 inches wide)
     fig, ax = plt.subplots(figsize=(3.5, 2.6))
 
-    # 2. Add Flowtangent: FD Absolute Error (Solid line, filled circles)
+    # 2. Add FlowTangent: FD Absolute Error (Solid line, filled circles)
     ax.loglog(step_sizes, fd_errors, color='black', linestyle='-', linewidth=1.2,
               marker='o', markersize=4, markerfacecolor='black', 
               label='Central Difference Error')
 
-    # 3. Add Flowtangent: AD Error Bound (Dotted line, no markers)
+    # 3. Add FlowTangent: AD Error Bound (Dotted line, no markers)
     # Using 1e-16 as the theoretical machine zero floor
     ax.axhline(y=1e-16, color='black', linestyle=':', linewidth=1.5, 
                label='VORJAX AD Error Bound (Machine Zero)')
@@ -1059,7 +1059,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
 
     fig = go.Figure()
 
-    # 1. Add Flowtangent: FD Relative Error vs Theory
+    # 1. Add FlowTangent: FD Relative Error vs Theory
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -1072,7 +1072,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
         )
     )
 
-    # 2. Add Flowtangent: AD Relative Error vs Theory (Flat Line)
+    # 2. Add FlowTangent: AD Relative Error vs Theory (Flat Line)
     fig.add_trace(
         go.Scatter(
             x=[min(step_sizes), max(step_sizes)],
@@ -1475,7 +1475,7 @@ def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
         marker=dict(color='red', size=8, symbol='diamond', line=dict(width=1, color='darkred'))
     ))
     
-    # --- The Invisible Hover Flowtangent ---
+    # --- The Invisible Hover FlowTangent ---
     fig.add_trace(go.Scatter(
         x=mach_su2_masked, y=cl_su2_masked, # Align with SU2 points
         mode='markers', name='Spline Error',
@@ -1595,7 +1595,7 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
 if __name__ == "__main__":
 
-    os.chdir(ftu.get_Flowtangent_root())
+    os.chdir(ftu.get_FlowTangent_root())
 
     mach_path   = ftu.TreePath(("freestream", "mach_number"), name="M")
     alpha_path  = ftu.TreePath(("aerodynamics", "angles", "alpha"), name="a")

@@ -175,14 +175,14 @@ def batched_off_design(
 
 def validate_design_point(pycycle_json_path, ft_state, point_name: str="Design"):
     """
-    Loads PyCycle JSON results and compares them against the Flowtangent state.
+    Loads PyCycle JSON results and compares them against the FlowTangent state.
     """
     
     # 1. Load the JSON
     with open(pycycle_json_path, 'r') as f:
         pycycle_data = json.load(f)
         
-    # 2. Map PyCycle flow stations to Flowtangent network IDs
+    # 2. Map PyCycle flow stations to FlowTangent network IDs
     station_map = {
         'fc.Fl_O':     ft_state.freestream,
         'inlet.Fl_O':  ft_state.energy.nodes['network.line.engine.inlet'].flow,
@@ -201,7 +201,7 @@ def validate_design_point(pycycle_json_path, ft_state, point_name: str="Design")
         'nozz.Fl_O':   "nozz.".title(),
     }
     
-    # 3. Map PyCycle properties to Flowtangent names
+    # 3. Map PyCycle properties to FlowTangent names
     thermal_map = {
         'W':     ('mass_flow_rate', units.lbm/units.s),
         'Pt':    ('stagnation_pressure', units.psi),

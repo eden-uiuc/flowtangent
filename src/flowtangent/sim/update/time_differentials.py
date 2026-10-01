@@ -1,7 +1,7 @@
 # flowtangent/Framework/Missions/Update/time_differentials.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Flowtangent Team
+# Created: Aug 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ... import Settings, State, System
 
 # package imports
-# Flowtangent imports
+# FlowTangent imports
 from ...utils import update
 
 # ----------------------------------------------------------------------------------------------------------------------

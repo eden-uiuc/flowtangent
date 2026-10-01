@@ -1,7 +1,7 @@
 # flowtangent/Library/Components/Landing_Gear.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May, 2025, Flowtangent Team
+# Created: May, 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
@@ -9,7 +9,7 @@
 
 # package imports
 
-# Flowtangent imports
+# FlowTangent imports
 from ..core._component import Component
 from ..utils import static_field
 

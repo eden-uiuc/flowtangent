@@ -137,7 +137,7 @@ STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 def _load_engine_from_disk(name: str):
     file_path = _JSON_DIR / f"{name}.json"
     if not file_path.exists():
-        raise AttributeError(f"Engine {name} not found in Flowtangent library ({_DATA_DIR}).")
+        raise AttributeError(f"Engine {name} not found in FlowTangent library ({_DATA_DIR}).")
 
     return TurbojetEngine.from_json(filepath=file_path)
 

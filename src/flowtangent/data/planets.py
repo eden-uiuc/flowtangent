@@ -1,7 +1,7 @@
 # flowtangent/data/planets.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: May 2025, Flowtangent Team
+# Created: May 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

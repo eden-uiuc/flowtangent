@@ -1,7 +1,7 @@
 # $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Flowtangent Team
+# Created: Apr 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -12,7 +12,7 @@ import jax
 
 from flowtangent.core._component import Component, Dimensions
 
-# Flowtangent imports
+# FlowTangent imports
 from flowtangent.utils import empty_array, field
 
 # ----------------------------------------------------------------------------------------------------------------------

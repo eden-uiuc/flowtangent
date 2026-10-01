@@ -1,13 +1,13 @@
 # flowtangent/Library/Propellants.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Flowtangent Team
+# Created: Apr 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-# Flowtangent imports
+# FlowTangent imports
 from ..utils import Module, field, static_field
 from . import units
 from .gases import O2, BurnedJetA, Gas

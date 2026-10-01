@@ -1,7 +1,7 @@
 # flowtangent/Library/Methods/Propulsors/moment.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Flowtangent Team
+# Created: Apr 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -9,7 +9,7 @@
 
 # package imports
 
-# Flowtangent imports
+# FlowTangent imports
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -70,7 +70,7 @@ def initialize_VORJAX_data(state: State, system: Aircraft, settings: Settings):
     if "VORJAX" not in settings.analysis.aerodynamics.__class__.__name__:
         raise ValueError(
             "settings.analysis.aerodynamics are not VORJAX Settings."
-            "Please use Flowtangent.Framework.Analysis.Vortex_Lattice.VLMSettings"
+            "Please use FlowTangent.Framework.Analysis.Vortex_Lattice.VLMSettings"
         )
 
     # Standard Python Control Flow (Safe outside of @jax.jit)
@@ -978,7 +978,7 @@ def compute_boundary_conditions(state: State, system: Aircraft, settings: Settin
     v_total = v_fs[:, None, :] + v_rot
     if vlm_settings.model_propeller_wake:
         # TODO: Convert BEMT and add wake calculation to VLM Process
-        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in Flowtangent.")
+        raise ValueError("Propeller wake modelling is unsupported pending BEMT inclusion in FlowTangent.")
         v_total = v_total + system.analysis_data["induced_wake"]  # type: ignore
 
     # Take the Dot Product with the Panel Normals

@@ -1,7 +1,7 @@
 # $NAME.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Oct 2025, Flowtangent Team
+# Created: Oct 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

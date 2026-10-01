@@ -1,7 +1,7 @@
 # flowtangent/data/gases.py
 # (c) Copyright 2025 Aerospace Research Community LLC
 #
-# Created: Apr 2025, Flowtangent Team
+# Created: Apr 2025, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -17,7 +17,7 @@ import numpy as np
 
 from ..utils import Module, io
 
-# Flowtangent imports
+# FlowTangent imports
 from . import units
 
 jax.config.update("jax_enable_x64", True)
@@ -153,7 +153,7 @@ class Gas(Module):
 
     def __repr__(self) -> str:
         if isinstance(self.mass_fractions, jax.core.Tracer):
-            return "Gas(Flowtangentd Composition)"
+            return "Gas(FlowTangentd Composition)"
 
         # Convert to standard numpy.
         # This is fast and prevents JAX from trying to trace the formatting logic.

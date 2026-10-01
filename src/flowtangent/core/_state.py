@@ -1,7 +1,7 @@
 # flowtangent/Framework/State.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 # Modified: Mar 2026, J.Smart
 
 # ----------------------------------------------------------------------------------------------------------------------

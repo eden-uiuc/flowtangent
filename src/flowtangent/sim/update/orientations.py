@@ -1,7 +1,7 @@
 # flowtangent/Framework/Missions/Update/orientations.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Flowtangent Team
+# Created: Aug 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT

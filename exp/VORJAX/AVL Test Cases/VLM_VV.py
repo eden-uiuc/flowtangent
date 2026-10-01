@@ -31,7 +31,7 @@ from flowtangent.core._state_data import Time
 
 from flowtangent.framework.analyses.aero import VLM, VORJAX_Settings, InitializeVLM, VLMVortices, SupersonicSettings
 
-from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
+from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_FlowTangent
 from flowtangent.framework.plotting import plot_vlm_panels
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
@@ -436,7 +436,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     # Convert error to a percentage for cleaner reading
     error_percent = np.array(error) * 100.0
 
-    # 2. Add Flowtangent: AD Gradient (Primary Y)
+    # 2. Add FlowTangent: AD Gradient (Primary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -449,7 +449,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 3. Add Flowtangent: Analytical Truth (Primary Y)
+    # 3. Add FlowTangent: Analytical Truth (Primary Y)
     # Drawing a line from the first to the last x-coordinate
     fig.add_trace(
         go.Scatter(
@@ -462,7 +462,7 @@ def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
         secondary_y=False,
     )
 
-    # 4. Add Flowtangent: Relative Error (Secondary Y)
+    # 4. Add FlowTangent: Relative Error (Secondary Y)
     fig.add_trace(
         go.Scatter(
             x=n_segments, 
@@ -529,7 +529,7 @@ def plot_fd_v_curve_plotly(step_sizes, fd_errors):
     
     fig = go.Figure()
 
-    # 1. Add Flowtangent: FD Absolute Error
+    # 1. Add FlowTangent: FD Absolute Error
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -627,7 +627,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
 
     fig = go.Figure()
 
-    # 1. Add Flowtangent: FD Relative Error vs Theory
+    # 1. Add FlowTangent: FD Relative Error vs Theory
     fig.add_trace(
         go.Scatter(
             x=step_sizes, 
@@ -640,7 +640,7 @@ def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, g
         )
     )
 
-    # 2. Add Flowtangent: AD Relative Error vs Theory (Flat Line)
+    # 2. Add FlowTangent: AD Relative Error vs Theory (Flat Line)
     fig.add_trace(
         go.Scatter(
             x=[min(step_sizes), max(step_sizes)],
@@ -872,7 +872,7 @@ if __name__ == "__main__":
     # geometry_file = '/home/jordan/dev/flowtangent/Templates/Tests/V_and_V/AVL Test Cases/b737_wings_flat_no_af.avl'
 
     # avl_b737_data = parse_avl_file(Path(geometry_file))
-    # vehicle = convert_to_Flowtangent(avl_b737_data)
+    # vehicle = convert_to_FlowTangent(avl_b737_data)
     
 
     # AVL_basic_test(geometry_file, oper_mode="st")

@@ -12,7 +12,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-# Flowtangent Imports
+# FlowTangent Imports
 import flowtangent.utils as ftu
 
 from flowtangent.framework import Process, State, Settings

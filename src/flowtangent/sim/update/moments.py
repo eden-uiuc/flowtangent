@@ -1,14 +1,14 @@
 # flowtangent/Framework/Missions/Update/moments.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug, 2024, Flowtangent Team
+# Created: Aug, 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-# Flowtangent Imports
+# FlowTangent Imports
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

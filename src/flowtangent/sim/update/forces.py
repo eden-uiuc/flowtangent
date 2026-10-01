@@ -1,14 +1,14 @@
 # flowtangent/Framework/Missions/Update/forces.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug, 2024, Flowtangent Team
+# Created: Aug, 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
 # package imports
-# Flowtangent imports
+# FlowTangent imports
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -1,7 +1,7 @@
 # flowtangent/Framework/Missions/Conditions/Freestream.py
 # (c) Copyright 2024 Aerospace Research Community LLC
 #
-# Created: Aug 2024, Flowtangent Team
+# Created: Aug 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -13,7 +13,7 @@ from flowtangent.core._state_data import StateData
 from flowtangent.data.atmospheres import Atmosphere, USStandard1976
 from flowtangent.data.planets import Earth, Planet
 
-# Flowtangent imports
+# FlowTangent imports
 from ...utils import field
 from ...utils.typing import TimeScalar, _
 

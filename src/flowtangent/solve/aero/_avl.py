@@ -1,7 +1,7 @@
 # flowtangent/Framework/Interfaces/AVL.py
 # (c) Copyright 2026 Aerospace Research Community LLC
 #
-# Created: Apr 2026, Flowtangent Team
+# Created: Apr 2026, FlowTangent Team
 # Modified:
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ def parse_avl_file(filepath: str | Path) -> dict:
 
 def convert_to_flowtangent(avl_data: dict) -> Aircraft:
     """
-    Converts a parsed AVL data dictionary into an Flowtangent Aircraft system,
+    Converts a parsed AVL data dictionary into an FlowTangent Aircraft system,
     translating Cartesian coordinates into parametric fractions.
     """
     sref, cref, bref = avl_data["reference_area"]
@@ -231,7 +231,7 @@ def convert_to_flowtangent(avl_data: dict) -> Aircraft:
             aerodynamic_center=jnp.array([[xref, yref, zref]]),
         )
 
-        # 4. Trigger Flowtangent's internal geometry engine to fill in the rest
+        # 4. Trigger FlowTangent's internal geometry engine to fill in the rest
         wing = wing.update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
         vehicle = vehicle.add_subcomponent(wing)

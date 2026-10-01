@@ -1,7 +1,7 @@
 # flowtangent/Compoments/Fuselages/Fuselage.py
 # (c) Copyright 2023 Aerospace Research Community LLC
 #
-# Created: Jul 2024, Flowtangent Team
+# Created: Jul 2024, FlowTangent Team
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
@@ -10,7 +10,7 @@
 # package imports
 import jax
 
-# Flowtangent imports
+# FlowTangent imports
 from flowtangent.utils import empty_array, field
 
 from ..core._component import Areas, Component, Dimensions, Fineness

@@ -8,7 +8,7 @@
 
 # Package Imports
 
-# Flowtangent Imports
+# FlowTangent Imports
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

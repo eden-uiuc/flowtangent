@@ -170,7 +170,7 @@ def diff_args(args):
 def analyze_compute_graph(func, *args):
     print("Tracing AD graph to count operations...")
 
-    # Flowtangent the Jacobian
+    # FlowTangent the Jacobian
     jaxpr_obj = jax.make_jaxpr(jax.jacfwd(func))(*args)
 
     source_counts = Counter()
