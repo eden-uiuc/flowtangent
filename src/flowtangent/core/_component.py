@@ -133,14 +133,6 @@ class Component(Module):
 
     _bookkeeping: dict[str, Any] = field(dict, static=True)
 
-    # @property
-    # def subcomponents(self):
-    #     return tuple(
-    #         getattr(self, f.name)
-    #         for f in fields(self)
-    #         if f.name != "subcomponents" and isinstance(getattr(self, f.name), Component)
-    #     )
-
     def __repr__(self):
         repr_str = (
             getattr(self, "name", self.__class__.__name__)

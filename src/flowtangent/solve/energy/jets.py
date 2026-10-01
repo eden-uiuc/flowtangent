@@ -26,13 +26,11 @@ from dataclasses import replace
 
 import jax.numpy as jnp
 
-from flowtangent.data import units
-from flowtangent.utils import TreePath, field
-
 from ...components.energy.jets._classes import TurbofanDesign, TurbojetEngine, TurbojetOpPoint
 from ...sim.initialize import initialize_energy
 from ...sim.update import update_freestream
-from ...utils import update
+from ...utils import update, TreePath, field, static_field
+from ...data import units
 from .._batched import BatchedAnalysis
 from .._implicit import ImplicitAnalysis, Residual, Variable
 from .._settings import EnergyAnalysisSettings
@@ -56,8 +54,8 @@ __all__ = [
 
 
 class JetSettings(EnergyAnalysisSettings):
-    design_mode: bool = field(False, static=True)
-    statics: bool = field(False, static=True)
+    design_mode: bool = static_field(False)
+    statics: bool = static_field(False)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

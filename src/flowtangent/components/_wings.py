@@ -331,7 +331,7 @@ class Wing(Component):
             wing_total_length,
         )  # type: ignore
 
-    def convert_to_segmented_wing(self):
+    def generate_segments(self):
         """Returns a tuple of (root_segment, tip_segment) for unsegmented wings."""
 
         # If it already has segments, just return them as-is
@@ -377,7 +377,7 @@ class Wing(Component):
     def update_geometry(self, calculate_reference_area=False, calculate_wetted_area=False):
         """Returns a new Wing instance with all geometric properties calculated and populated."""
 
-        new_segments = self.convert_to_segmented_wing()
+        new_segments = self.generate_segments()
 
         # 1. Extract Arrays, add ghost tip segment
         span_locs = jnp.array([seg.percent_span_location for seg in new_segments] + [1.0])
