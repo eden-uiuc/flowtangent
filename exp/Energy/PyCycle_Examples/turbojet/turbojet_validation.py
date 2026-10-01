@@ -29,7 +29,7 @@ VERBOSE = True
 
 DESIGN_POINT = True
 OFF_DESIGN_0 = False
-OFF_DESIGN_1 = False
+OFF_DESIGN_1 = True
 BATCHED_OD1  = True
 
 def system_setup():
@@ -118,7 +118,7 @@ def off_design_point(
 
     new_settings = JetSettings(design_mode=False, statics=od_settings.analysis.energy.statics)
     od_settings = update(od_settings, "analysis.energy", new_settings)
-    od_state, od_system, od_settings = od_analysis.run(od_state, od_system, od_settings, initialize=True)
+    od_state, od_system, od_settings = od_analysis.run(od_state, od_system, od_settings)
 
     od_thermal, od_static = validate_design_point(
             data_dir / f"turbojet_{op_point.name}.json",

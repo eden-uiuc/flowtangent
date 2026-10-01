@@ -3,11 +3,13 @@ import os
 import flowtangent as ft
 
 import json
+import csv
 import time
 import tracemalloc
 import gc
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import openmdao.api as om
 import pycycle.api as pyc
 import scipy.sparse
@@ -1094,35 +1096,7 @@ def execute_benchmark(name: str, func, N_array: list, cache_file: Path) -> dict:
     
     return metrics
 
-def plot_error():
-    cr = om.CaseReader(test_dir / "solver_errors.sql")
-    case_keys = cr.list_cases("root.nonlinear_solver", out_stream=None)
-
-    abs_error_history = [cr.get_case(cid).abs_err for cid in case_keys]
-    rel_error_history = [cr.get_case(cid).rel_err for cid in case_keys]
-    print(f"Rel. Error: {rel_error_history}")
-    print(f"Abs. Error: {abs_error_history}")
-
-    plt.figure(figsize=(8, 5))
-    
-    # The naive guess will thrash and hit max_iter without dropping the residual
-    plt.plot(rel_error_history, 'r-x', linewidth=2, label='Rel. Error')
-    
-    # The good guess should drop to 1e-6 in 0-3 iterations
-    plt.plot(abs_error_history, 'b-o', linewidth=2, label='Abs. Error')
-    
-    plt.yscale('log')
-    plt.title('PyCycle Internal Newton Solver Convergence (Opaque MDF)')
-    plt.xlabel('Newton Iteration')
-    plt.ylabel('Absolute Residual Norm')
-    plt.axhline(1e-6, color='k', linestyle='--', label='Convergence Tolerance')
-    plt.grid(True, which="both", ls="-", alpha=0.5)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(test_dir/'error_history.png', dpi=300)
-
-
-def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
+def compare_architectures(N_array: list[int]):
     cache_file = test_dir / "benchmark_cache.json"
     
     # Easily toggle architectures by commenting them out
@@ -1149,129 +1123,248 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
     results['FlowTangent CPU']['total_mem'] = [r + results['FlowTangent CPU']['jac_mem'][i] for i, r in enumerate(results['FlowTangent CPU']['total_mem'])]
     results['PACT-AD']['total_mem'] = [r + results['PACT-AD']['jac_mem'][i] for i, r in enumerate(results['PACT-AD']['total_mem'])]
 
-    # Generate Plots (2x3 grid, we will hide the 6th plot)
-    fig, axes = plt.subplots(2, 3, figsize=(24, 10))
+    return results
 
-    plot_configs = [
-        (axes[0, 0], 'jac_mem', 'Adjoint Memory Scaling', 'Peak Memory Allocated (MB)'),
-        (axes[0, 1], 'total_mem', 'Total Process Memory Scaling', 'Peak Memory Allocated (MB)'),
-        (axes[0, 2], 'total_time', 'Total Program Runtime', 'Wall-clock Time (s)'),
-        (axes[1, 0], 'init_time', 'Problem Initialization (Setup + Compile)', 'Wall-clock Time (s)'),
-        (axes[1, 1], 'exec_time', 'Global Execution Time', 'Wall-clock Time (s)'),
-    ]
+def get_fit_config(name, key):
+    """Returns (degree, min_N) based on expected analytical scaling laws."""
+    degree, min_N = 1, 1 # Default: linear fit from the start
     
-    axes[1, 2].axis('off') # Hide the unused 6th subplot
+    if 'MAUD-Dense' in name:
+        if 'mem' in key:
+            degree = 2
+        elif 'time' in key and 'init' not in key:
+            degree = 3
+            
+    elif 'PACT' in name:
+        if key == "total_mem" or key == "init_time":
+            degree = 0
+        elif key == "jac_mem":
+            degree = 1
+        min_N = 50
+            
+    elif 'FlowTangent' in name:
+        if key == 'init_time':
+            degree = 0
+            min_N = 10 
+        elif key == 'exec_time' and 'GPU' in name:
+            degree = 1
+            min_N = 5000 
+        elif key == 'total_mem' and 'GPU' in name:
+            degree = 1
+            min_N = 10000 
+            
+    return degree, min_N
 
-    # Create a master array for extrapolation out to N=50,000
-    N_extrap = np.logspace(0, np.log10(50000), 100)
-
-    def get_fit_config(name, key):
-        """Returns (degree, min_N) based on expected analytical scaling laws."""
-        degree, min_N = 1, 1 # Default: linear fit from the start
+def plot_single_metric(ax, key, title, ylabel, results, N_extrap, fit_stats, 
+                       show_grid, show_borders, show_markers):
+    """Helper function to draw a single scaling metric onto a given axes."""
+    
+    lines = {} # Store lines for the shared legend
+    
+    for name, res in results.items():
+        N_data = np.array(res['N_array'])
+        y_data = np.array(res[key])
         
-        if 'MAUD-Dense' in name:
-            if 'mem' in key:
-                degree = 2
-            elif 'time' in key and 'init' not in key:
-                degree = 3
-                
-        elif 'PACT' in name:
-            if key == "total_mem" or key == "init_time":
-                degree = 0
-            elif key == "jac_mem":
-                degree = 1
-            min_N = 50
-                
-        elif 'FlowTangent' in name:
-            if key == 'init_time':
-                degree = 0
-                min_N = 10 # JIT Compilation time is roughly constant
-            elif key == 'exec_time' and 'GPU' in name:
-                degree = 1
-                min_N = 5000 # Wait for SM thread saturation to see the true O(N) execution slope
-            elif key == 'total_mem' and 'GPU' in name:
-                degree = 1
-                min_N = 10000 # Wait for cuSOLVER 3.6GB workspace to plateau
-                
-        return degree, min_N
-
-    # Dictionary to store the raw regression stats for LaTeX generation
-    fit_stats = {cfg[1]: [] for cfg in plot_configs}
-
-    for ax, key, title, ylabel in plot_configs:
-        for name, res in results.items():
-            N_data = np.array(res['N_array'])
-            y_data = np.array(res[key])
+        if np.max(y_data) <= 1e-8:
+            continue
             
-            if np.max(y_data) <= 1e-8:
-                continue
-                
-            base_line, = ax.plot(N_data, y_data, res['style'], linewidth=2, label=name)
-            degree, min_N = get_fit_config(name, key)
+        # Parse style string (e.g., 'r--' or 'b-o')
+        style = res.get('style', '-')
+        
+        # Plot raw data using ONLY the format string to avoid the kwarg clash
+        base_line, = ax.plot(N_data, y_data, style, markersize=4, 
+                             linewidth=2, label=name)
+        
+        # Retroactively turn off markers if requested
+        if not show_markers:
+            base_line.set_marker('None')
             
-            fit_mask = N_data >= min_N
-            N_fit = N_data[fit_mask]
-            y_fit = y_data[fit_mask]
+        lines[name] = base_line
+        
+        degree, min_N = get_fit_config(name, key)
+        
+        fit_mask = N_data >= min_N
+        N_fit = N_data[fit_mask]
+        y_fit = y_data[fit_mask]
+            
+        if len(N_fit) >= max(degree + 1, 1):
+            N_proj = N_extrap[N_extrap > np.max(N_data)]
+            
+            if degree == 0:
+                plateau_val = np.mean(y_fit)
+                y_pred = np.full_like(y_fit, plateau_val)
+                y_proj = np.full_like(N_proj, plateau_val)
                 
-            if len(N_fit) >= max(degree + 1, 1):
-                N_proj = N_extrap[N_extrap > np.max(N_data)]
+                # Stats calculation
+                cv = (np.std(y_fit) / plateau_val) * 100 if plateau_val > 0 else 0
+                wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
                 
-                if degree == 0:
-                    plateau_val = np.mean(y_fit)
-                    y_pred = np.full_like(y_fit, plateau_val)
-                    y_proj = np.full_like(N_proj, plateau_val)
-                    
-                    std_dev = np.std(y_fit)
-                    cv = (std_dev / plateau_val) * 100 if plateau_val > 0 else 0
-                    wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
-                    
-                    fit_stats[key].append({
-                        'name': name, 'degree': 0, 'coeffs': [plateau_val],
-                        'error_val': cv, 'mape': wmape, 'min_N': min_N
-                    })
-                    
-                else:
-                    coeffs = np.polyfit(N_fit, y_fit, degree)
-                    poly = np.poly1d(coeffs)
-                    y_pred = poly(N_fit)
-                    y_proj = poly(N_proj)
-                    
-                    ss_res = np.sum((y_fit - y_pred) ** 2)
-                    ss_tot = np.sum((y_fit - np.mean(y_fit)) ** 2)
-                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 1.0
-                    wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
-                    
-                    fit_stats[key].append({
-                        'name': name, 'degree': degree, 'coeffs': coeffs,
-                        'error_val': 1 - r_squared, 'mape': wmape, 'min_N': min_N  # Added min_N
-                    })
+                if key not in fit_stats: fit_stats[key] = []
+                fit_stats[key].append({
+                    'name': name, 'degree': 0, 'coeffs': [plateau_val],
+                    'error_val': cv, 'mape': wmape, 'min_N': min_N
+                })
                 
-                if len(N_proj) > 0:
-                    valid = y_proj > 0
+            else:
+                coeffs = np.polyfit(N_fit, y_fit, degree)
+                poly = np.poly1d(coeffs)
+                y_pred = poly(N_fit)
+                y_proj = poly(N_proj)
+                
+                ss_res = np.sum((y_fit - y_pred) ** 2)
+                ss_tot = np.sum((y_fit - np.mean(y_fit)) ** 2)
+                r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 1.0
+                wmape = (np.sum(np.abs(y_fit - y_pred)) / np.sum(y_fit)) * 100
+                
+                if key not in fit_stats: fit_stats[key] = []
+                fit_stats[key].append({
+                    'name': name, 'degree': degree, 'coeffs': coeffs,
+                    'error_val': 1 - r_squared, 'mape': wmape, 'min_N': min_N
+                })
+            # Plot Projections and Annotations
+            if len(N_proj) > 0:
+                valid = y_proj > 0
+                if np.any(valid):
                     ax.plot(N_proj[valid], y_proj[valid], color=base_line.get_color(), 
                             linestyle='--', linewidth=1.5, alpha=0.7)
-            
-        ax.set_title(title)
-        ax.set_xlabel('Number of Off-Design Points (N)')
-        ax.set_ylabel(ylabel)
-        ax.set_yscale('log')
-        ax.set_xscale('log')
-        ax.grid(True, which="both", ls="--", alpha=0.5)
-        ax.legend()
+                    
+                    # Add O(N) callouts at the end of the projection line
+                    # if degree == 0: label_txt = r"$\mathcal{O}(1)$"
+                    # elif degree == 1: label_txt = r"$\mathcal{O}(N)$"
+                    # else: label_txt = rf"$\mathcal{{O}}(N^{{{degree}}})$"
+                    
+                    # ax.annotate(label_txt, 
+                    #             xy=(N_proj[valid][-1], y_proj[valid][-1]), 
+                    #             xytext=(5, 0), textcoords="offset points",
+                    #             color=base_line.get_color(), fontweight='bold', fontsize=10)
 
-    plt.tight_layout()
-    plt.savefig(fig_filename, dpi=300)
+    ax.set_title(title, fontweight='bold')
+    ax.set_xlabel('Number of Off-Design Points (N)')
+    ax.set_ylabel(ylabel)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
     
-    # =========================================================================
-    # LaTeX TABLE GENERATION
-    # =========================================================================
+    # --- Custom Axis and Grid Formatting ---
+    
+    # 1. Force major ticks (and gridlines) at EVERY single decade, no auto-culling
+    major_locator_x = ticker.LogLocator(base=10.0, numticks=100)
+    major_locator_y = ticker.LogLocator(base=10.0, numticks=100)
+    ax.xaxis.set_major_locator(major_locator_x)
+    ax.yaxis.set_major_locator(major_locator_y)
+    
+    # 2. Force minor ticks to appear on both axes (no auto-culling)
+    minor_locator_x = ticker.LogLocator(base=10.0, subs=np.arange(2, 10)*0.1, numticks=1000)
+    minor_locator_y = ticker.LogLocator(base=10.0, subs=np.arange(2, 10)*0.1, numticks=1000)
+    ax.xaxis.set_minor_locator(minor_locator_x)
+    ax.yaxis.set_minor_locator(minor_locator_y)
+    
+    # 3. Apply Grid and Borders
+    if show_grid:
+        # Show major grid lines (strictly 1 per decade everywhere)
+        ax.grid(True, which="major", ls="-", alpha=0.6, color="gray")
+        # Ensure minor grid lines stay off, even though minor ticks are on the axis
+        ax.grid(False, which="minor") 
+    
+    if not show_borders:
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+    return lines
+
+def generate_scaling_plots(results, output_dir=".", 
+                           show_grid=False, show_borders=False, 
+                           show_markers=False, nrows=1, ncols=4):
+    """Generates individual metric plots and a dynamically sized master grid."""
+    
+    os.makedirs(output_dir, exist_ok=True)
+    N_extrap = np.logspace(0, np.log10(50000), 100)
+    fit_stats = {}
+    
+    plot_configs = [
+        ('jac_mem', 'Adjoint Memory Scaling', 'Peak Memory Allocated (MB)'),
+        ('total_mem', 'Total Process Memory Scaling', 'Peak Memory Allocated (MB)'),
+        ('init_time', 'Problem Initialization (Setup + Compile)', 'Wall-clock Time (s)'),
+        ('exec_time', 'Global Execution Time', 'Wall-clock Time (s)')
+    ]
+    
+    # 1. GENERATE INDIVIDUAL PLOTS
+    for key, title, ylabel in plot_configs:
+        fig, ax = plt.subplots(figsize=(8, 8)) # Square base figure
+        plot_single_metric(ax, key, title, ylabel, results, N_extrap, fit_stats, 
+                           show_grid, show_borders, show_markers)
+        ax.legend(loc='best')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "images", f"scaling_{key}.svg"), dpi=300, bbox_inches='tight', format='svg')
+        plt.close(fig)
+
+    # 2. GENERATE COMBINED GRID
+    # Dynamically scale the master figure size (8 inches per subplot dimension)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(8 * ncols, 8 * nrows))
+    
+    # Flatten the axes array to handle 1D (e.g., 1x4) or 2D (e.g., 2x2) layouts seamlessly
+    axes_flat = np.atleast_1d(axes).flatten()
+    
+    master_lines = {}
+    for i, (key, title, ylabel) in enumerate(plot_configs):
+        ax = axes_flat[i]
+        lines = plot_single_metric(ax, key, title, ylabel, results, N_extrap, fit_stats, 
+                                   show_grid, show_borders, show_markers)
+        master_lines.update(lines)
+        
+    # Hide any unused subplots (e.g., if nrows=2, ncols=3, we hide the last 2)
+    for j in range(len(plot_configs), len(axes_flat)):
+        axes_flat[j].axis('off')
+        
+    # Create a single shared legend at the bottom. 
+    # If it's a wide 1x4 row, a single row of 6 legend items looks fantastic.
+    legend_cols = min(len(master_lines), 6 if ncols >= 3 else 3)
+    
+    fig.legend(master_lines.values(), master_lines.keys(), 
+               loc='lower center', bbox_to_anchor=(0.5, 0.0), 
+               ncol=legend_cols, fontsize=14, frameon=True)
+    
+    # Adjust layout to leave room for the legend at the bottom
+    plt.tight_layout(rect=(0, 0.08, 1, 1))
+    
+    # Save with the layout in the filename for easy versioning
+    plt.savefig(os.path.join(output_dir, "images",f"scaling_master_grid_{nrows}x{ncols}.svg"), 
+                dpi=300, bbox_inches='tight',
+                format='svg')
+    plt.close(fig)
+
+    def are_dicts_equal(d1, d2):
+        """Helper to compare dicts containing numpy arrays and scalars safely."""
+        if d1.keys() != d2.keys():
+            return False
+        for k in d1:
+            v1, v2 = d1[k], d2[k]
+            if isinstance(v1, np.ndarray) or isinstance(v2, np.ndarray):
+                if not np.array_equal(v1, v2):
+                    return False
+            else:
+                if v1 != v2:
+                    return False
+        return True
+
+
+    # Clean up each list inside fit_stats
+    for key, fit_list in fit_stats.items():
+        unique_fits = []
+        for fit in fit_list:
+            # Check if an identical fit is already in our unique list
+            if not any(are_dicts_equal(fit, existing) for existing in unique_fits):
+                unique_fits.append(fit)
+        fit_stats[key] = unique_fits
+    
+    return fit_stats
+
+def generate_data_tables(results, fit_stats):
     
     metric_name_dict = {
         'jac_mem': 'Adjoint Memory',
         'total_mem': 'Total Process Memory',
         'init_time': 'Problem Initialization',
         'exec_time': 'Global Execution Time',
-        'total_time': 'Total Program Runtime'
     }
 
     print(f"\n{'='*90}\n REGRESSION SUMMARY (LaTeX)\n{'-'*90}")
@@ -1285,19 +1378,19 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
         total_cols = num_coeff_cols + 4  # Name, N_min, Coeffs, and 2 Metrics
         
         # 'l' for Name, 'r' for N_min, 'r's for coeffs, '|rr' for metrics
-        col_spec = "lr" + "r" * num_coeff_cols + "|rr"
+        col_spec = "lr|" + "r" * num_coeff_cols + "|rr"
         
         coeff_headers = " & ".join([f"$C_{{{i}}}$" for i in range(max_deg, 0, -1)])
         coeff_headers += " & $C_0$ / $\\mu$" if max_deg > 0 else "$C_0$ / $\\mu$"
             
-        tex = f"\\begin{{table}}[hbt!]\\label{{tab:{key}_regression}}\n"
+        tex = f"\\begin{{table}}[h!]\\label{{tab:{key}_regression}}\n"
         tex += f"\\caption{{{title} Regression Models}}\n"
         tex += "\\centering\n"
         tex += f"\\begin{{tabular}}{{{col_spec}}}\n\\hline\n"
         
         # Grouped Multicolumn Headers (shifting \cline to start at column 3)
-        tex += f" & & \\multicolumn{{{num_coeff_cols}}}{{c|}}{{Regression Coefficients}} & \\multicolumn{{2}}{{c}}{{Quality Metrics}} \\\\\\cline{{3-{total_cols}}}\n"
-        tex += f"Architecture & $N_{{min}}$ & {coeff_headers} & $1 - R^2$ / CV & wMAPE (\\%) \\\\\\hline\n"
+        tex += f"\\multicolumn{{2}}{{c|}}{{Architecture}} & \\multicolumn{{{num_coeff_cols}}}{{c|}}{{Regression Coefficients}} & \\multicolumn{{2}}{{c}}{{Quality Metrics}} \\\\\\cline{{3-{total_cols}}}\n"
+        tex += f"Name & $N_{{min}}$ & {coeff_headers} & $1 - R^2$ / CV & wMAPE (\\%) \\\\\\hline\n"
         
         for stat in fit_stats[key]:
             name = stat['name'].replace('_', '\\_')
@@ -1333,19 +1426,81 @@ def Compare_Architectures(N_array: list[int], fig_filename: str | Path):
 
     for name, res in results.items():
         table_label = name.lower().replace('-', '_')
-        tex = f"\\begin{{table}}[hbt!]\\label{{tab:{table_label}_benchmark}}\n"
+        tex = f"\\subsubsection{{{name}}}\n\n"
+        tex += f"\\begin{{table}}[h!]\\label{{tab:{table_label}_benchmark}}\n"
         tex += f"\\caption{{{name} Benchmark Scaling Data}}\n"
         tex += "\\centering\n"
-        tex += "\\begin{tabular}{l|rrrrr}\n\\hline\n"
-        tex += "N & Peak (MB) & Grad. (MB) & Init. (s) & Exec. (s) & Total (s) \\\\\\hline\n"
+        tex += "\\begin{tabular}{l|rr|rr}\n\\hline\n"
+        tex +=  "& \\multicolumn{2}{c|}{Memory (MB)} & \\multicolumn{2}{c}{Time (s)} \\\\\\cline{2-5}\n"
+        tex += "N & Peak & Grad. & Init. & Exec.\\\\\\hline\n"
         
         for i, N in enumerate(res['N_array']):
             tex += f"{N} & {res['total_mem'][i]:.1f} & {res['jac_mem'][i]:.1f} & "
-            tex += f"{res['init_time'][i]:.2f} & {res['exec_time'][i]:.2f} & {res['total_time'][i]:.2f} \\\\\n"
+            tex += f"{res['init_time'][i]:.2f} & {res['exec_time'][i]:.2f} \\\\\n"
             
         tex += "\\hline\n\\end{tabular}\n\\end{table}\n"
         print(tex)
 
+def json_to_csv(input_filename):
+
+    with open(input_filename, 'r') as f:
+        results = json.load(f)
+
+    for arch_name, data in results.items():
+        # Create a clean prefix for the datasets (e.g., "MAUD_Dense")
+        clean_name = arch_name.replace(' ', '_').replace('-', '_')
+        output_filename = test_dir / f"ft_data/veusz_data_{clean_name}.csv"
+        
+        # Get the dictionary keys (N_array, total_mem, etc.)
+        original_keys = list(data.keys())
+        
+        # Prefix the headers for Veusz
+        veusz_headers = [f"{clean_name}_{key}" for key in original_keys]
+        
+        # Transpose the data from a list-of-columns to a list-of-rows
+        rows = zip(*[data[key] for key in original_keys])
+        
+        # Write to CSV
+        with open(output_filename, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(veusz_headers)  # Write header row
+            writer.writerows(rows)          # Write data rows
+            
+        print(f"Exported: {output_filename}")
+
+def export_fits_to_csv(fit_stats, filename="veusz_fits.csv"):
+    # 1. Use 5000 points so the line curves perfectly smoothly on a log-log canvas
+    N_extrap = np.logspace(0, np.log10(50000), 5000)
+    
+    headers = ["N_extrap"]
+    columns = [N_extrap]
+    
+    for metric, stats_list in fit_stats.items():
+        for stat in stats_list:
+            arch_name = stat['name'].replace(' ', '_').replace('-', '_')
+            coeffs = stat['coeffs']
+            degree = stat['degree']
+            
+            # 2. Evaluate the linear-space polynomial exactly as your script did
+            if degree == 0:
+                y_fit = np.full_like(N_extrap, coeffs[0])
+            else:
+                y_fit = np.poly1d(coeffs)(N_extrap)
+            
+            # 3. CRITICAL: Mask out <= 0 values so the Veusz log-axis doesn't freak out
+            # This turns negatives into 'nan' (Not a Number), which Veusz cleanly ignores.
+            y_fit = np.where(y_fit <= 0, np.nan, y_fit)
+            
+            headers.append(f"{arch_name}_{metric}_fit")
+            columns.append(y_fit)
+            
+    # Write everything to a single CSV
+    with open(filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerows(zip(*columns))
+        
+    print(f"Exported all fit lines to {filename}")
 
 if __name__ == "__main__":
     N_array = [
@@ -1355,6 +1510,7 @@ if __name__ == "__main__":
         5000, 10000, 25000, # FT-GPU
         50000 # FT-CPU
     ]
-
-    fig_fn = test_dir / 'architecture_scaling_benchmark.png'
-    Compare_Architectures(N_array, fig_fn)
+    results = compare_architectures(N_array)
+    fit_stats = generate_scaling_plots(results, output_dir=str(test_dir), show_grid=False)
+    json_to_csv(test_dir / "benchmark_cache.json")
+    export_fits_to_csv(fit_stats, str(test_dir / "ft_data/veusz_fits.csv"))
