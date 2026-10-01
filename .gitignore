@@ -60,7 +60,6 @@ nosetests.xml
 .DS_Store
 
 *.csv
-*.dat
 *.openmdao_out
 
 # Geometry
