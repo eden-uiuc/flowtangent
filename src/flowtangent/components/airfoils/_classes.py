@@ -4,6 +4,13 @@
 
 
 from pathlib import Path
+from matplotlib import pyplot as plt
+
+plt.style.use('dark_background')
+plt.rcParams['figure.facecolor'] = 'black'
+plt.rcParams['axes.facecolor'] = 'black'
+plt.rcParams['grid.color'] = '#444444'
+plt.rcParams['font.size'] = 12
 
 # package imports
 import jax
@@ -31,14 +38,14 @@ class Airfoil(Component):
     x_coordinates: jax.Array = empty_array()
     y_coordinates: jax.Array = empty_array()
 
-    x_upper_surface: jax.Array = empty_array()
-    x_lower_surface: jax.Array = empty_array()
+    x_upper: jax.Array = empty_array()
+    x_lower: jax.Array = empty_array()
 
-    y_upper_surface: jax.Array = empty_array()
-    y_lower_surface: jax.Array = empty_array()
+    y_upper: jax.Array = empty_array()
+    y_lower: jax.Array = empty_array()
 
     @staticmethod
-    @jax.jit
+    @jax.jit(static_argnames=['n_points'])
     def _naca_4_math(m: float, p: float, t: float, n_points: int = 128):
         theta = jnp.linspace(0, jnp.pi, n_points)
         x = 0.5 * (1 - jnp.cos(theta))
@@ -59,7 +66,7 @@ class Airfoil(Component):
         return x, yc + yt, yc - yt
 
     @staticmethod
-    @jax.jit
+    @jax.jit(static_argnames=['n_points'])
     def _naca_5_math(design_cl: float, p_idx: int, q_val: int, t: float, n_points: int = 128):
         """
         design_cl: First digit * 0.15 (e.g., '2' -> 0.3)
@@ -127,7 +134,7 @@ class Airfoil(Component):
         return x, yc + yt, yc - yt
 
     @staticmethod
-    @jax.jit
+    @jax.jit(static_argnames=['n_points'])
     def _interpolate_surface(points: jax.Array, n_points: int = 128):
         """Assumes Selig Format for sorting."""
         N = points.shape[0]
@@ -187,10 +194,10 @@ class Airfoil(Component):
             coordinates=jnp.column_stack((x_loop, y_loop)),
             x_coordinates=x_loop,
             y_coordinates=y_loop,
-            x_upper_surface=x,
-            x_lower_surface=x,
-            y_upper_surface=y_up,
-            y_lower_surface=y_lo,
+            x_upper=x,
+            x_lower=x,
+            y_upper=y_up,
+            y_lower=y_lo,
         )
 
     @classmethod
@@ -299,6 +306,14 @@ class Airfoil(Component):
 
         return cls._from_surfaces(file_path.stem, x_grid, y_up_interp, y_lo_interp)
 
+
+    def plot(self):
+
+        plt.plot(self.x_upper, self.y_upper, color='#FC6255')
+        plt.plot(self.x_lower, self.y_lower, color='#FC6255')
+        plt.title(self.name)
+        plt.axis('equal')
+        plt.show()
     
 def NACA(code: str, n_pts: int = 128):
     return Airfoil.from_naca(code=code, n_pts=n_pts)
