@@ -32,21 +32,26 @@ from plotly.subplots import make_subplots
 import flowtangent.utils as ftu
 
 from flowtangent.data import units
-from flowtangent.library.components import Areas
-from flowtangent.library.components.wings import Wing, WingSegment, Chords, WingDimensions, Sweeps
-from flowtangent.library.components.airfoils import Airfoil, Airfoil_Data
+from flowtangent.core._component import Areas
+from flowtangent.components._wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from flowtangent.components._airfoils import Airfoil
 
-from flowtangent.library.methods.aero.Transonic import ensemble_CL_spline
+from flowtangent.functional.aero.transonic import ensemble_CL_spline
 
-from flowtangent.framework import Process, State, Aircraft, Settings, JacobianMap, System
-from flowtangent.core._settings import AnalysisSettings
+from flowtangent.core._processes import Process
+from flowtangent.core._state import State
+from flowtangent.core._settings import Settings, AnalysisSettings
+from flowtangent.core._systems import System, Aircraft
+
 from flowtangent.core._state_data import Time
 
-from flowtangent.framework.analyses.aero.VORJAX import ComputeVORJAX, VORJAX_Settings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors, BatchVORJAX
-from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
+from flowtangent.solve.aero._vorjax import AnalyzeVORJAX, VORJAXSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors
+from flowtangent.solve._settings import JacobianMap
+from flowtangent.solve._batched import ShardedDatasetGenerator
 
-from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
-from flowtangent.framework.plotting import plot_vlm_panels
+# from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
+from flowtangent.plots import plot_vlm_panels
+from flowtangent.utils import update
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
 
@@ -250,7 +255,7 @@ def VORJAX_straight_wing(span=10.0, chord=1.0):
 
     wing_spans = WingDimensions(projected=span)
 
-    wing_chords = Chords(root=chord, tip=chord, mean_aerodynamic=chord)
+    wing_chords = WingChords(root=chord, tip=chord, mean_aerodynamic=chord)
 
     wing_areas = Areas(reference=span * chord, wetted=2 * span * chord)
 
@@ -302,7 +307,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
             name=f"{i}", 
             percent_span_location=eta_start, 
             root_chord_percent=chord_frac_start,
-            sweeps=Sweeps(quarter_chord=sweep_c4)
+            sweeps=WingSweeps(quarter_chord=sweep_c4)
         ),)
 
     # Tip segment doesn't need a sweep since there's no geometry after it
@@ -318,7 +323,7 @@ def VORJAX_elliptical_wing(AR=10., n_segments=1):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=Chords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
+                chords=WingChords(root=c_root, tip=0.01 * c_root, mean_aerodynamic=c_root * 8.0 / (3 * jnp.pi)),
                 areas=wing_areas,
                 taper=0.01,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -348,7 +353,7 @@ def VORJAX_delta_wing(AR=2.0):
             name="Root_to_Tip",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=Sweeps(quarter_chord=sweep_c4)
+            sweeps=WingSweeps(quarter_chord=sweep_c4)
         ),
         WingSegment(
             name="Tip",
@@ -363,7 +368,7 @@ def VORJAX_delta_wing(AR=2.0):
                 segments=segments,
                 symmetric=True,
                 spans=WingDimensions(projected=span),
-                chords=Chords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
+                chords=WingChords(root=c_root, tip=c_root * c_tip_ratio, mean_aerodynamic=2.0/3.0 * c_root),
                 areas=wing_areas,
                 taper=c_tip_ratio,
                 origin=jnp.array([[0.0, 0.0, 0.0]]),
@@ -397,14 +402,14 @@ def VORJAX_ONERA_M6():
             name="ONERA M6",
             percent_span_location=0.0,
             root_chord_percent=1.0,
-            sweeps=Sweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
-            airfoil=Airfoil.from_file(Airfoil_Data/"ONERA_M6.txt")
+            sweeps=WingSweeps(leading_edge=sweep_le, quarter_chord=sweep_qc),
+            airfoil=Airfoil.from_file("ONERA_M6.txt")
         ),
         WingSegment(
             name="Tip",
             percent_span_location=1.0,
             root_chord_percent=taper,
-            airfoil=Airfoil.from_file(Airfoil_Data/"ONERA_M6.txt")
+            airfoil=Airfoil.from_file("ONERA_M6.txt")
         )
     )
     
@@ -415,7 +420,7 @@ def VORJAX_ONERA_M6():
         aspect_ratio=AR,
         taper=0.56,
         origin=jnp.array([[0.0, 0.0, 0.0]]),
-        chords=Chords(root=c_root, mean_aerodynamic=mac),
+        chords=WingChords(root=c_root, mean_aerodynamic=mac),
         spans=WingDimensions(projected=2 * semispan),
     ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
@@ -436,7 +441,8 @@ def VORJAX_test_run(
     debug_mode=False
 ) -> tuple[State, System, Settings, Array | None, Process | None]:
 
-    state = State(time=Time(number_of_control_points=1, calculate_integration=False))
+    # state = State(time=Time(number_of_control_points=1, calculate_integration=False))
+    state = State()
     frozen_initials = update(state, "initials", None, is_leaf=lambda x: x is None)
     state = update(state, "initials", frozen_initials, is_leaf=lambda x: x is None)
 
@@ -454,18 +460,60 @@ def VORJAX_test_run(
     else:
         alpha = jnp.array([alpha])
         Mach = jnp.array([Mach])
-    
+    beta = jnp.zeros_like(alpha)
+
     initial_state = update(initial_state, "aerodynamics.angles.alpha", alpha)
     initial_state = update(initial_state, "freestream.mach_number", Mach)
-
+    initial_state = update(initial_state, "aerodynamics.angles.beta", beta)
     initial_state = update(initial_state, "freestream.speed", jnp.array([100.0]))
     initial_state = update(initial_state, "freestream.density", jnp.array([1.0]))
     initial_state = update(initial_state, "freestream.gamma", jnp.array([1.4]))
     initial_state = update(initial_state, "freestream.temperature", jnp.array([273.15]))
     initial_state = update(initial_state, "frames.inertial.velocity_vector", jnp.array([100.0, 0., 0.]))
 
-    initial_state = initial_state.expand_rows(len(alpha))
+    initial_state = initial_state.expand_time(len(alpha))
+    N = len(alpha)
 
+    # transform_to_inertial = jnp.tile(jnp.eye(3)[None, :, :],(N, 1, 1))
+
+    # initial_state = update(initial_state,"frames.inertial.transform_to_inertial",transform_to_inertial)
+    # initial_state = update(initial_state,"frames.inertial.total_force_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.total_moment_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.position_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.angular_acceleration_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.angular_velocity_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.acceleration_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.gravity_force_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.inertial.time",jnp.zeros((N, 1)))
+    # initial_state = update(initial_state,"frames.inertial.system_range",jnp.zeros((N, 1)))
+    
+    # initial_state = update(initial_state, "frames.body.transform_to_inertial", jnp.tile(jnp.eye(3)[None, :, :], (N, 1, 1)))
+    # initial_state = update(initial_state,"frames.body.total_force_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.body.total_moment_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.body.inertial_rotations",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.body.thrust_force_vector",jnp.zeros((N, 3)))
+    # initial_state = update(initial_state,"frames.body.moment_vector",jnp.zeros((N, 3)))
+    
+    # initial_state = update(initial_state, "frames.wind.transform_to_inertial", jnp.tile(jnp.eye(3)[None, :, :], (N, 1, 1)))
+    # initial_state = update(initial_state, "frames.wind.total_force_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.wind.total_moment_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.wind.body_rotations", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.wind.transform_to_body", jnp.tile(jnp.eye(3)[None, :, :], (N, 1, 1)))
+    # initial_state = update(initial_state, "frames.wind.velocity_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.wind.force_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.wind.moment_vector", jnp.zeros((N, 3)))
+
+    # initial_state = update(initial_state, "frames.planet.transform_to_inertial", jnp.tile(jnp.eye(3)[None, :, :], (N, 1, 1)))
+    # initial_state = update(initial_state, "frames.planet.total_force_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.planet.total_moment_vector", jnp.zeros((N, 3)))
+    # initial_state = update(initial_state, "frames.planet.start_time", jnp.zeros((N, 1)))
+    # initial_state = update(initial_state, "frames.planet.latitude", jnp.full((N, 1), 40.6446))
+    # initial_state = update(initial_state, "frames.planet.longitude", jnp.full((N, 1), 73.7797))
+    # initial_state = update(initial_state, "frames.planet.true_course", jnp.zeros((N, 1)))
+    # initial_state = update(initial_state, "freestream.altitude", jnp.zeros((N, 1)))
+
+    # frozen_initials = update(initial_state, "initials", None, is_leaf=lambda x: x is None)
+    # state = update(state, "initials", frozen_initials, is_leaf=lambda x: x is None) 
     initial_system = vehicle
 
     vortices = Vortices(
@@ -485,20 +533,19 @@ def VORJAX_test_run(
         suction=suction,
     )
     
-    aero_settings = VORJAX_Settings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
+    aero_settings = VORJAXSettings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
         name="VORJAX Test Run",
         steps=(
             InitializeVORJAX(),
-            ComputeVORJAX()
+            AnalyzeVORJAX()
         ),
         _initial_state=initial_state,
         _initial_system=initial_system,
         _initial_settings=initial_settings
     )
-
     results = analysis.run(
         initial_state,
         initial_system,
@@ -521,7 +568,7 @@ class NumpyEncoder(json.JSONEncoder):
             return float(obj)
         return super(NumpyEncoder, self).default(obj)
 
-def save_plot_cache(plot_key, filepath="./tests/VORJAX/plotting.json", **kwargs):
+def save_plot_cache(plot_key, filepath="../../exp/VORJAX/plotting.json", **kwargs):
     """Saves kwargs to a JSON file under a specific plot_key."""
     cache = {}
     if os.path.exists(filepath):
@@ -534,7 +581,7 @@ def save_plot_cache(plot_key, filepath="./tests/VORJAX/plotting.json", **kwargs)
         json.dump(cache, f, cls=NumpyEncoder, indent=4)
     print(f"Cached data for '{plot_key}' to {filepath}")
 
-def load_plot_cache(key, filepath="./tests/VORJAX/plotting.json"):
+def load_plot_cache(key, filepath="../../exp/VORJAX/plotting.json"):
     """Loads the entire JSON cache dictionary."""
     if not os.path.exists(filepath):
         print(f"Warning: Cache file {filepath} not found.")
@@ -682,7 +729,10 @@ def plot_spanwise_loading_mpl(eta, gamma, CL, b, AR, v_inf):
     
     # 9. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/spanwise_loading.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "spanwise_loading.pdf", format="pdf", bbox_inches="tight")
+    # plt.savefig("./tests/VORJAX/plots/spanwise_loading.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     # Set global font to match LaTeX standard
@@ -737,7 +787,10 @@ def plot_elliptical_convergence_mpl(n_segments, grad_AD, error, grad_truth):
     
     # 10. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/elliptical_lift.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "elliptical_lift.pdf", format="pdf", bbox_inches="tight")
+    # plt.savefig("./exp/VORJAX/plots/elliptical_lift.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     # Set global font to match LaTeX standard
@@ -797,7 +850,10 @@ def plot_elliptical_drag_mpl(n_segments, grad_AD, field):
     
     # 10. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig(f"./tests/VORJAX/plots/elliptical_drag_{field}.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parent / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / f"elliptical_drag_{field}.pdf", format="pdf", bbox_inches="tight")
+    # plt.savefig(f"./exp/VORJAX/plots/elliptical_drag_{field}.pdf", format='pdf', bbox_inches='tight')
 
 def plot_elliptical_convergence_plotly(n_segments, grad_AD, error, grad_truth):
     
@@ -1049,8 +1105,10 @@ def plot_fd_v_curve_mpl(step_sizes, fd_errors):
     
     # 7. Export to native PDF vector graphic
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/fd_v_curve.pdf", format='pdf', bbox_inches='tight')
-
+    # plt.savefig("./tests/VORJAX/plots/fd_v_curve.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "fd_v_curve.pdf", format="pdf", bbox_inches="tight")
 def plot_theoretical_error_comparison_plotly(step_sizes, fd_grads, exact_grad, grad_truth):
     
     # Calculate Relative Errors against Lifting-Line Theory
@@ -1271,8 +1329,10 @@ def plot_delta_log_sweep_mpl(ARs, grad_AD):
               fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/delta_wing_ar_sweep.pdf", format='pdf', bbox_inches='tight')
-
+    # plt.savefig("./tests/VORJAX/plots/delta_wing_ar_sweep.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "delta_wing_ar_sweep.pdf", format="pdf", bbox_inches="tight")
 def plot_delta_convergence_and_memory_plotly(n_panels, grad_AD, memory_gb, grad_truth):
     
     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -1420,7 +1480,10 @@ def plot_delta_convergence_and_memory_mpl(n_panels, grad_AD, memory_gb):
     plt.title(r"Delta Wing Convergence and VRAM", fontweight='bold')
 
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/delta_convergence_memory.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "delta_convergence_memory.pdf", format="pdf", bbox_inches="tight")
+    # plt.savefig("./tests/VORJAX/plots/delta_convergence_memory.pdf", format='pdf', bbox_inches='tight')
 
 def plot_transonic_tuning(mach, cl_su2, cl_vorjax, M_sub, M_sup):
     """
@@ -1590,13 +1653,16 @@ def plot_transonic_tuning_mpl(mach, cl_su2, cl_vorjax, M_sub, M_sup):
 
     # 7. Export
     plt.tight_layout()
-    plt.savefig("./tests/VORJAX/plots/onera_transonic_spline.pdf", format='pdf', bbox_inches='tight')
+    plot_dir = Path(__file__).resolve().parents[2] / "tests" / "VORJAX" / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(plot_dir / "onera_transonic_spline.pdf", format="pdf", bbox_inches="tight")
+    # plt.savefig("./tests/VORJAX/plots/onera_transonic_spline.pdf", format='pdf', bbox_inches='tight')
 # Execution ------------------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
-    os.chdir(ftu.get_Flowtangent_root())
-
+    # os.chdir(ftu.get_Flowtangent_root())
+    os.chdir(ftu.io._ft_root())
     mach_path   = ftu.TreePath(("freestream", "mach_number"), name="M")
     alpha_path  = ftu.TreePath(("aerodynamics", "angles", "alpha"), name="a")
     beta_path   = ftu.TreePath(("aerodynamics", "angles", "beta"), name="b")
@@ -1628,16 +1694,16 @@ if __name__ == "__main__":
     )
 
     TEST_AVL        = False
-    TEST_ELLIPTICAL = False
+    TEST_ELLIPTICAL = True
     TEST_FD         = False
     TEST_METHOD     = False
     TEST_DELTA_CONV = False
     TEST_DELTA_AR   = False
     TEST_ONERA      = False
-    TEST_BATCH      = True
+    TEST_BATCH      = False
     TEST_SHARD      = False
     
-    COSINE_SPC_SW   = True
+    COSINE_SPC_SW   = False
     PLOT_WINGS      = False
     SHOCK           = True
     
@@ -1720,10 +1786,16 @@ if __name__ == "__main__":
                     debug_mode=DEBUG
                 )
                 f_st, f_sys, f_setts, jac = results
+                # print("jac shape =", jac.shape)
+                # print("jac =", jac)
+                # raise SystemExit
+                # f_st, f_sys, f_setts = results
 
                 CL.append(ftu.get_target(f_st, lift_path).item(0))
-                grad_AD.append(jac.item(0))
-                error_AD.append(abs(jac.item(0) - grad_truth)/grad_truth)
+                grad = float(jac[0, 0, 0, 1])
+                # grad_AD.append(jac.item(0))
+                grad_AD.append(grad)
+                error_AD.append(abs(grad - grad_truth) / grad_truth)
 
                 if PLOT_WINGS:
                     if n_seg == 1 or n_seg % 5 == 0:
@@ -1737,7 +1809,7 @@ if __name__ == "__main__":
             le_mask_float = VD.is_leading_edge.astype(jnp.float32)
             eta = jax.ops.segment_sum(VD.collocation_points[:, 1] * le_mask_float, VD.strip_ids, num_segments=VD.total_strips) / (AR/2.0)
             gamma=jax.ops.segment_sum(Gamma[0], VD.strip_ids, num_segments=VD.total_strips)
-
+            
             save_plot_cache(
                 "elliptical_convergence",
                 n_segments=list(range(1, max_segments+1)),
@@ -1965,6 +2037,7 @@ if __name__ == "__main__":
                 debug_mode=DEBUG
             )
             f_st, f_sys, f_setts, jac = results
+        
 
             CL  = ftu.get_target(f_st, lift_path)
             CDi = ftu.get_target(f_st, i_drag_path)
@@ -2031,7 +2104,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+            aero_settings = VORJAXSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP
@@ -2064,7 +2137,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
+            aero_settings = VORJAXSettings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP

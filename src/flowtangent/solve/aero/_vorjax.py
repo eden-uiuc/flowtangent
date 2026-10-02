@@ -165,42 +165,94 @@ class VortexDistribution(Module):
     control_surface_id: jax.Array = _  # (N,) ID of the control surface (-1 for solid wing)
     is_leading_edge: jax.Array = _  # (N,) Boolean mask
     is_trailing_edge: jax.Array = _  # (N,) Boolean mask
+    
 
     # --- Static Structural Integers (NOT traced by JAX) ---
     total_panels: int = static_field(0)
     total_strips: int = static_field(0)
 
+    # def __init__(
+    #     self,
+    #     panel_vertices,
+    #     camber_slopes,
+    #     wedge_angles,
+    #     surface_id,
+    #     control_surface_id,
+    #     is_leading_edge,
+    #     is_trailing_edge,
+    #     total_panels: Optional[int] = None,
+    #     total_strips: Optional[int] = None,
+    #     **kwargs,
+    # ):
+    #     self.panel_vertices = panel_vertices
+    #     self.camber_slopes = camber_slopes
+    #     self.wedge_angles = wedge_angles
+    #     self.surface_id = surface_id
+    #     self.control_surface_id = control_surface_id
+    #     self.is_leading_edge = is_leading_edge
+    #     self.is_trailing_edge = is_trailing_edge
+        
+        
+    #     # If passed in from mirror_distribution or unpacking, use them directly
+    #     if total_panels is not None:
+    #         self.total_panels = total_panels
+    #     else:
+    #         self.total_panels = int(panel_vertices.shape[0])
+
+    #     if total_strips is not None:
+    #         self.total_strips = total_strips
+    #     else:
+    #         self.total_strips = int(jnp.sum(self.is_leading_edge))
     def __init__(
         self,
         panel_vertices,
         camber_slopes,
         wedge_angles,
-        surface_id,
-        control_surface_id,
-        is_leading_edge,
-        is_trailing_edge,
-        total_panels: Optional[int] = None,
-        total_strips: Optional[int] = None,
+        surface_id=None,
+        control_surface_id=None,
+        is_leading_edge=None,
+        is_trailing_edge=None,
+        total_panels=None,
+        total_strips=None,
         **kwargs,
     ):
-        self.panel_vertices = panel_vertices
-        self.camber_slopes = camber_slopes
-        self.wedge_angles = wedge_angles
-        self.surface_id = surface_id
-        self.control_surface_id = control_surface_id
-        self.is_leading_edge = is_leading_edge
-        self.is_trailing_edge = is_trailing_edge
+        object.__setattr__(self, "panel_vertices", panel_vertices)
+        object.__setattr__(self, "camber_slopes", camber_slopes)
+        object.__setattr__(self, "wedge_angles", wedge_angles)
 
-        # If passed in from mirror_distribution or unpacking, use them directly
-        if total_panels is not None:
-            self.total_panels = total_panels
-        else:
-            self.total_panels = int(panel_vertices.shape[0])
+        object.__setattr__(
+            self,
+            "surface_id",
+            jnp.asarray(surface_id, dtype=jnp.int32),
+        )
 
-        if total_strips is not None:
-            self.total_strips = total_strips
-        else:
-            self.total_strips = int(jnp.sum(is_leading_edge))
+        object.__setattr__(
+            self,
+            "control_surface_id",
+            jnp.asarray(control_surface_id, dtype=jnp.int32),
+        )
+
+        object.__setattr__(
+            self,
+            "is_leading_edge",
+            jnp.asarray(is_leading_edge, dtype=bool),
+        )
+
+        object.__setattr__(
+            self,
+            "is_trailing_edge",
+            jnp.asarray(is_trailing_edge, dtype=bool),
+        )
+
+        if total_panels is None:
+            total_panels = panel_vertices.shape[0]
+
+        object.__setattr__(self, "total_panels", int(total_panels))
+
+        if total_strips is None:
+            total_strips = int(jnp.sum(jnp.asarray(is_leading_edge, dtype=bool)))
+
+        object.__setattr__(self, "total_strips", int(total_strips))
 
     # --- Derived Physics (@properties) ---
     @property
@@ -383,6 +435,25 @@ def merge_vortex_distributions(vd_list: list[VortexDistribution]) -> VortexDistr
         else:
             # Fallback for static configuration fields (assumes identical across the list)
             merged_kwargs[key] = first_val
+    merged_kwargs["surface_id"] = jnp.concatenate(
+        [vd.surface_id for vd in vd_list],
+        axis=0,
+    ).astype(jnp.int32)
+
+    merged_kwargs["control_surface_id"] = jnp.concatenate(
+        [vd.control_surface_id for vd in vd_list],
+        axis=0,
+    ).astype(jnp.int32)
+
+    merged_kwargs["is_leading_edge"] = jnp.concatenate(
+        [vd.is_leading_edge for vd in vd_list],
+        axis=0,
+    ).astype(bool)
+
+    merged_kwargs["is_trailing_edge"] = jnp.concatenate(
+        [vd.is_trailing_edge for vd in vd_list],
+        axis=0,
+    ).astype(bool)
 
     return VortexDistribution(**merged_kwargs)
 
@@ -470,8 +541,11 @@ def find_intervals(wing: Wing) -> tuple[jax.Array, jax.Array]:
     segment_boundaries = [seg.percent_span_location for seg in wing.segments] + [1.0]
     cs_span_starts = [cs.span_fraction_start for cs in wing.control_surfaces]
     cs_span_ends = [cs.span_fraction_end for cs in wing.control_surfaces]
+    
+    segment_boundaries_1d = jnp.concatenate([jnp.ravel(jnp.asarray(x)) for x in segment_boundaries])
 
-    raw_breaks = jnp.sort(jnp.array(segment_boundaries + cs_span_starts + cs_span_ends))
+    # raw_breaks = jnp.sort(jnp.array(segment_boundaries + cs_span_starts + cs_span_ends))
+    raw_breaks = jnp.sort(jnp.concatenate([jnp.ravel(jnp.asarray(x)) for x in (segment_boundaries+ cs_span_starts+ cs_span_ends)]))
 
     diffs = jnp.diff(raw_breaks)
     mask = jnp.concatenate([jnp.array([True]), diffs > 1e-6])
@@ -483,7 +557,8 @@ def find_intervals(wing: Wing) -> tuple[jax.Array, jax.Array]:
     midpoints = (eta_starts + eta_ends) / 2.0
     n_intervals = len(midpoints)
 
-    strip_segment_idx = jnp.searchsorted(jnp.array(segment_boundaries), midpoints, side="right") - 1
+    # strip_segment_idx = jnp.searchsorted(jnp.array(segment_boundaries), midpoints, side="right") - 1
+    strip_segment_idx = jnp.searchsorted(segment_boundaries_1d, midpoints,side="right") - 1
     strip_segment_idx = jnp.clip(strip_segment_idx, 0, len(wing.segments) - 1)
 
     # Escape CS handling if wing has no control surfaces
@@ -635,13 +710,19 @@ def calculate_macro_properties(wing, eta_vertices: jax.Array, semispan: float) -
     Vectorized lofting of the structural wing, directly evaluated at the computational grid.
     """
     # 1. Extract Structural Nodes (Assuming len(segments) == N_nodes)
-    seg_etas = jnp.stack([seg.percent_span_location for seg in wing.segments])
-    seg_c_fracs = jnp.stack([seg.root_chord_percent for seg in wing.segments])
-    seg_twists = jnp.stack([seg.twist for seg in wing.segments])
+    # seg_etas = jnp.stack([seg.percent_span_location for seg in wing.segments])
+    # seg_c_fracs = jnp.stack([seg.root_chord_percent for seg in wing.segments])
+    # seg_twists = jnp.stack([seg.twist for seg in wing.segments])
 
-    # Sweeps and dihedrals dictate the interval outboard of the node
-    qc_sweeps = jnp.stack([seg.sweeps.quarter_chord for seg in wing.segments])[:-1]
-    dihedrals = jnp.stack([seg.dihedral_outboard for seg in wing.segments])[:-1]
+    # # Sweeps and dihedrals dictate the interval outboard of the node
+    # qc_sweeps = jnp.stack([seg.sweeps.quarter_chord for seg in wing.segments])[:-1]
+    # dihedrals = jnp.stack([seg.dihedral_outboard for seg in wing.segments])[:-1]
+    eta_vertices = jnp.ravel(eta_vertices)
+    seg_etas = jnp.ravel(jnp.stack([seg.percent_span_location for seg in wing.segments]))
+    seg_c_fracs = jnp.ravel(jnp.stack([seg.root_chord_percent for seg in wing.segments]))
+    seg_twists = jnp.ravel(jnp.stack([seg.twist for seg in wing.segments]))
+    qc_sweeps = jnp.ravel(jnp.stack([seg.sweeps.quarter_chord for seg in wing.segments]))[:-1]
+    dihedrals = jnp.ravel(jnp.stack([seg.dihedral_outboard for seg in wing.segments]))[:-1]
 
     # 2. Calculate Physical Geometry at the Nodes
     seg_Y = seg_etas * semispan
@@ -661,7 +742,6 @@ def calculate_macro_properties(wing, eta_vertices: jax.Array, semispan: float) -
     node_Z_LE = jnp.concatenate([jnp.array([0.0]), jnp.cumsum(dZ_LE)])
 
     # Map to individual strips.
-
     strip_X_LE = jnp.interp(eta_vertices, seg_etas, node_X_LE)
     strip_Y = jnp.interp(eta_vertices, seg_etas, seg_Y)
     strip_Z_LE = jnp.interp(eta_vertices, seg_etas, node_Z_LE)
@@ -982,20 +1062,31 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
 
         # Flatten and pack into VortexDistribution ---------------------------------------------------------------------
         flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
-
-        VDPath = lambda attr_name, val: TreePath((attr_name, slice(N_idx, N_idx + N)), val)
-
         N = n_sw * n_cw
+        VD_old = system.analysis_data["vortex_distribution"]
+
+        start = N_idx
+        end = N_idx + N
+        # VDPath = lambda attr_name, val: TreePath((attr_name, slice(N_idx, N_idx + N)), val)
+        # N = n_sw * n_cw
+
         VD = update(
-            system.analysis_data['vortex_distribution'],
+            VD_old,
             (
-                VDPath("panel_vertices", flat_vertices),
-                VDPath("camber_slopes", camber_slopes.reshape(-1)),
-                VDPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                VDPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
-                VDPath("control_surface_id", panel_cs_id.reshape(-1)),
-                VDPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
-                VDPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
+                ("panel_vertices", VD_old.panel_vertices.at[start:end].set(flat_vertices)),
+                ("camber_slopes", VD_old.camber_slopes.at[start:end].set(camber_slopes.reshape(-1))),
+                ("surface_id",VD_old.surface_id.at[start:end].set(jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32))),
+                ("control_surface_id", VD_old.control_surface_id.at[start:end].set(panel_cs_id.reshape(-1).astype(jnp.int32))),
+                ("is_leading_edge", VD_old.is_leading_edge.at[start:end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1))),
+                ("is_trailing_edge", VD_old.is_trailing_edge.at[start:end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1))),
+
+                # VDPath("panel_vertices", flat_vertices),
+                # VDPath("camber_slopes", camber_slopes.reshape(-1)),
+                # VDPath("wedge_angles", strip_wedge_angle.reshape(-1)),
+                # VDPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
+                # VDPath("control_surface_id", panel_cs_id.reshape(-1)),
+                # VDPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
+                # VDPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
             )
         )
 
@@ -1006,17 +1097,28 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             flipped_verts = flat_vertices.at[:, :, 1].multiply(-1.0)
             mirrored_verts = flipped_verts[:, jnp.array([3, 2, 1, 0]), :]
             MirrorPath = lambda attr_name, val: TreePath((attr_name, slice(mirror_idx, mirror_idx + N)), val)
-
+            
+            mirror_start = mirror_idx
+            mirror_end = mirror_idx + N
+            VD_old = updated_system.analysis_data["vortex_distribution"]
             VD = update(
                 updated_system.analysis_data['vortex_distribution'],
                 (
-                    MirrorPath("panel_vertices", mirrored_verts),
-                    MirrorPath("camber_slopes", camber_slopes.reshape(-1)),
-                    MirrorPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                    MirrorPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
-                    MirrorPath("control_surface_id", panel_cs_id.reshape(-1)),
-                    MirrorPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
-                    MirrorPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
+                    ("panel_vertices",VD_old.panel_vertices.at[mirror_start:mirror_end].set(mirrored_verts),),
+                    ("camber_slopes",VD_old.camber_slopes.at[mirror_start:mirror_end].set(camber_slopes.reshape(-1)),),
+                    ("wedge_angles", VD_old.wedge_angles.at[mirror_start:mirror_end].set(strip_wedge_angle.reshape(-1)),),
+                    ("surface_id",VD_old.surface_id.at[mirror_start:mirror_end].set(jnp.full(N,wing_idx,dtype=jnp.int32,))),
+                    ("control_surface_id",VD_old.control_surface_id.at[mirror_start:mirror_end].set(panel_cs_id.reshape(-1)),),
+                    ("is_leading_edge",VD_old.is_leading_edge.at[mirror_start:mirror_end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),),
+                    ("is_trailing_edge",VD_old.is_trailing_edge.at[mirror_start:mirror_end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),)
+
+                    # MirrorPath("panel_vertices", mirrored_verts),
+                    # MirrorPath("camber_slopes", camber_slopes.reshape(-1)),
+                    # MirrorPath("wedge_angles", strip_wedge_angle.reshape(-1)),
+                    # MirrorPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
+                    # MirrorPath("control_surface_id", panel_cs_id.reshape(-1)),
+                    # MirrorPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
+                    # MirrorPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
                 )
             )
 
@@ -1024,44 +1126,14 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         else:
             N_idx += N
 
+        # Preserve both halves, and carry this wing's mesh into the next update.
+        updated_system = update(updated_system, TreePath(("analysis_data", "vortex_distribution"), VD))
+        system = updated_system
+
     return state, updated_system, settings
 
 
 
-
-        #non-jit custom class/object
-        # VD = VortexDistribution(
-        #     panel_vertices=flat_vertices,
-        #     camber_slopes=camber_slopes.reshape(-1),
-        #     wedge_angles=strip_wedge_angle.reshape(-1),
-        #     surface_id=jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32),
-        #     control_surface_id=panel_cs_id.reshape(-1),
-        #     is_leading_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1),
-        #     is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
-        # )
-    #     VD = _generate_single_wing(
-    #         wing, 
-    #         interval_data=jnp.asarray(interval_data),
-    #         strip_interval_map=jnp.asarray(strip_interval_map),
-    #         n_sw=int(n_sw),
-    #         n_cw=int(n_cw),
-    #         spanwise_cosine=bool(settings.vortices.spanwise_cosine),
-    #         seg_camber_x=seg_camber_x,
-    #         seg_camber_z=seg_camber_z,
-    #         seg_wedge_angle=seg_wedge_angle,
-    #         wing_origin=jnp.asarray(wing.origin),
-    #         wing_idx=wing_idx,
-    #         is_vertical=bool(wing.vertical),
-    #         semispan=semispan,
-    #         wing_spans_projected=float(wing.spans.projected),
-    #     )
-    #     #non-jit
-    #     VD_list.append(VD)
-
-    #     if wing.symmetric:
-    #         VD_list.append(mirror_distribution(VD))
-
-    # return VD_list
 
 
 @io.inputs(
@@ -1452,7 +1524,7 @@ def compute_C_ij(VD, Mach):
     t_sq_aft = jnp.where(VD.is_trailing_edge, 0.0, jnp.roll(t_sq, shift=-1))
 
     sonic_check = (beta_sq_exp - t_sq_fore[None, :]) * (beta_sq_exp - t_sq_aft[None, :])
-    sonic_mask = (sonic_check < 0) & VD.is_leading_edge
+    sonic_mask = (sonic_check < 0) & VD.is_leading_edge.astype(bool)
 
     # Check for singularity (Mach cone passes through panel)
     singularity_flag = jnp.where(sonic_mask, 0, 1)
@@ -1725,6 +1797,7 @@ def compute_pressure_coefficients(VD, v_total, Gamma, v_inf):
     # Local Panel Geometry (Sweep Tangents and Dihedral) ---------------------------------------------------------------
     dx = VD.chord_lengths
     strip_ids = jnp.cumsum(VD.is_leading_edge) - 1
+    strip_ids = strip_ids.astype(jnp.int32)
     strip_chord_array = jax.ops.segment_sum(dx, strip_ids, num_segments=VD.total_strips)
     strip_chord = strip_chord_array[strip_ids]
 

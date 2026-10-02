@@ -118,7 +118,19 @@ class Module(eqx.Module):
 
 class StateDataMeta(type(Module)):
     def __new__(mcs, name, bases, namespace):
+        ### ADDED
         annotations = namespace.get("__annotations__", {})
+        # Python 3.14 defers class annotations instead of putting them directly
+        # in the namespace. Resolve them before replacing placeholder defaults.
+        if not annotations and "__annotate_func__" in namespace:
+            import annotationlib
+
+            annotate = annotationlib.get_annotate_from_class_namespace(namespace)
+            if annotate is not None:
+                annotations = annotationlib.call_annotate_function(
+                    annotate, annotationlib.Format.FORWARDREF
+                )
+        #### 
         for key, hint in annotations.items():
             if key.startswith("__"):
                 continue
