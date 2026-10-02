@@ -1,14 +1,12 @@
 from typing import Any
 from ._classes import Airfoil
 
+def load_foil(name: str, interpolate: bool = True, n_pts: int = 128) -> Airfoil: ...
+
 a18: Airfoil
 a18sm: Airfoil
 a63a108c: Airfoil
 af_2032c: Airfoil
-af_30p_30n: Airfoil
-af_30p_30n_flap: Airfoil
-af_30p_30n_main: Airfoil
-af_30p_30n_slat: Airfoil
 ag03: Airfoil
 ag04: Airfoil
 ag08: Airfoil
@@ -77,7 +75,6 @@ ah93w174: Airfoil
 ah93w215: Airfoil
 ah93w257: Airfoil
 ah93w300: Airfoil
-ah93w480b: Airfoil
 ah94145: Airfoil
 ah94156: Airfoil
 ah94w301: Airfoil
@@ -520,8 +517,6 @@ fx79k144: Airfoil
 fx79l100: Airfoil
 fx79l120: Airfoil
 fx79w151a: Airfoil
-fx79w470a: Airfoil
-fx79w660a: Airfoil
 fx80080: Airfoil
 fx83w108: Airfoil
 fx83w160: Airfoil
@@ -1251,7 +1246,6 @@ naca0015: Airfoil
 naca0018: Airfoil
 naca0021: Airfoil
 naca0024: Airfoil
-naca1: Airfoil
 naca1408: Airfoil
 naca1410: Airfoil
 naca1412: Airfoil
@@ -1383,9 +1377,6 @@ r1046: Airfoil
 r1080: Airfoil
 r1082: Airfoil
 r1082t: Airfoil
-r1145ms: Airfoil
-r1145msf: Airfoil
-r1145msm: Airfoil
 r140: Airfoil
 r140sm: Airfoil
 rae100: Airfoil
@@ -1484,7 +1475,6 @@ s4062: Airfoil
 s4083: Airfoil
 s4094: Airfoil
 s4095: Airfoil
-s4096: Airfoil
 s4110: Airfoil
 s4158: Airfoil
 s4180: Airfoil
@@ -1602,11 +1592,8 @@ trainer60: Airfoil
 tsagi12: Airfoil
 tsagi8: Airfoil
 tsagi_r3a: Airfoil
-ua2_180: Airfoil
 ua2_180sm: Airfoil
 ua79sf18: Airfoil
-ua79sff: Airfoil
-ua79sfm: Airfoil
 uag8814320: Airfoil
 ui1720: Airfoil
 ultimate: Airfoil

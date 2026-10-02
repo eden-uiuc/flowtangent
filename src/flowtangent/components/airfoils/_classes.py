@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
-
+from typing import Optional
 
 from pathlib import Path
 from matplotlib import pyplot as plt
@@ -15,6 +15,7 @@ plt.rcParams['font.size'] = 12
 # package imports
 import jax
 import jax.numpy as jnp
+import numpy as np # For loading from disk
 
 # FlowTangent imports
 from flowtangent.utils import empty_array, field
@@ -175,6 +176,57 @@ class Airfoil(Component):
         
         return x_grid, y_upper_interp, y_lower_interp
 
+    @staticmethod
+    def _laplacian_smoothing(x, y, le_buffer=10, threshold_multiplier=3.0, max_passes=5):
+        """
+        Detects and smooths high-frequency facets caused by linear interpolation.
+        Uses the 3rd derivative to isolate numerical artifacts from physical geometry.
+        """
+        y_smooth = np.copy(y)
+        
+        for _ in range(max_passes):
+            # 1. Calculate physical derivatives using the actual x-coordinates
+            dy1 = np.gradient(y_smooth, x)
+            dy2 = np.gradient(dy1, x)
+            dy3 = np.gradient(dy2, x)
+            
+            # 2. Isolate the mid-chord and trailing edge
+            mid_chord_dy3 = np.abs(dy3[le_buffer:-le_buffer])
+            
+            if len(mid_chord_dy3) == 0:
+                break
+                
+            median_jerk = np.median(mid_chord_dy3)
+            std_jerk = np.std(mid_chord_dy3)
+            
+            # Dynamic threshold based on true physical jerk
+            threshold = median_jerk + (threshold_multiplier * std_jerk)
+            
+            # 3. Find anomalous nodes (ignoring the LE buffer)
+            anomalies = []
+            for i in range(le_buffer, len(y_smooth) - 1):
+                if np.abs(dy3[i]) > threshold:
+                    anomalies.append(i)
+                    
+            if not anomalies:
+                break # Cleaned
+                
+            # 4. Apply Distance-Weighted Smoothing for non-uniform grids
+            for i in anomalies:
+                dx_left = x[i] - x[i-1]
+                dx_right = x[i+1] - x[i]
+                total_dx = dx_left + dx_right
+                
+                # Weight by opposite distance (closer node has higher influence)
+                w_left = dx_right / total_dx
+                w_right = dx_left / total_dx
+                
+                # Replaces the spike with a clean, physically linear interpolation
+                # between its immediate neighbors in the cosine space.
+                y_smooth[i] = (w_left * y_smooth[i-1]) + (w_right * y_smooth[i+1])
+                
+        return jnp.array(y_smooth)
+
     @classmethod
     def _from_surfaces(cls, name: str, x: jax.Array, y_up: jax.Array, y_lo: jax.Array):
         """Internal helper to assemble the class attributes to prevent code duplication."""
@@ -227,13 +279,12 @@ class Airfoil(Component):
         return cls._from_surfaces(name, x, y_up, y_lo)
 
     @classmethod
-    def from_file(cls, file_path: str | Path, n_pts: int = 128):
+    def from_file(cls, file_path: str | Path, interpolate: bool = True, n_pts: int = 128):
         """
         Parses Selig and Lednicer format airfoil .dat files.
         Converts all inputs to standard Selig topology before utilizing 
         the JAX-native interpolator.
         """
-        import numpy as np # Standard numpy for text parsing
         
         file_path = Path(file_path)
 
@@ -279,40 +330,93 @@ class Airfoil(Component):
                 except ValueError:
                     continue
 
+        # Extract Raw Coordinates
         raw_coords = np.array(raw_coords)
+        x_raw, y_raw = raw_coords[:, 0], raw_coords[:, 1]
 
-        # Enforce Selig Topology for the JAX interpolator
+        # 1. Standardize to LE -> TE for both surfaces to apply the filter
         if is_lednicer:
-            # Lednicer provides LE->TE for both surfaces.
-            x_up, y_up = raw_coords[:n_up, 0], raw_coords[:n_up, 1]
-            x_lo, y_lo = raw_coords[n_up:n_up+n_lo, 0], raw_coords[n_up:n_up+n_lo, 1]
-
-            # Reverse upper to go TE->LE
-            x_up_rev, y_up_rev = x_up[::-1], y_up[::-1]
-            
-            # Avoid duplicate Leading Edge points when concatenating
-            if np.allclose([x_up_rev[-1], y_up_rev[-1]], [x_lo[0], y_lo[0]]):
-                x_lo, y_lo = x_lo[1:], y_lo[1:]
-
-            selig_x = np.concatenate([x_up_rev, x_lo])
-            selig_y = np.concatenate([y_up_rev, y_lo])
-            points = jnp.column_stack((selig_x, selig_y))
+            x_up, y_up = x_raw[:n_up], y_raw[:n_up]
+            x_lo, y_lo = x_raw[n_up:n_up+n_lo], y_raw[n_up:n_up+n_lo]
         else:
-            points = raw_coords
+            le_idx = np.argmin(x_raw)
+            # Reverse upper so it flows LE -> TE
+            x_up, y_up = x_raw[:le_idx+1][::-1], y_raw[:le_idx+1][::-1]
+            x_lo, y_lo = x_raw[le_idx:], y_raw[le_idx:]
 
-        # Cast to JAX array and utilize the JIT-able interpolator
-        points_jax = jnp.array(points)
+        # 2. The Trailing Edge De-Hooking Filter
+        def remove_te_hook(x, y):
+            """Detects forced closures at X=1.0 and extrapolates the natural slope."""
+            if len(x) > 3 and np.isclose(x[-1], 1.0):
+                # Calculate natural slope using the two points just before the TE
+                dx = x[-2] - x[-3]
+                dy = y[-2] - y[-3]
+                
+                # Prevent divide-by-zero if data has vertical stacked points
+                if dx > 1e-5: 
+                    linear_y = y[-2] + (dy / dx) * (1.0 - x[-2])
+                    # if np.abs(y[-1] - linear_y) > 0.001:
+                    y[-1] = linear_y
+            return x, y
+
+        # Check for closed TE, if it's open, check for a "hook" on the bottom and remove it
+        if not np.isclose(x_up[-1], x_lo[-1]) and not np.isclose(y_up[-1], y_lo[-1]):
+            x_up, y_up = remove_te_hook(x_up, y_up)
+            x_lo, y_lo = remove_te_hook(x_lo, y_lo)
+
+        # 3. Restitch into standard Selig topology (TE -> LE -> TE) for the JAX interpolator
+        # Reverse upper back to TE -> LE
+        x_up_rev, y_up_rev = x_up[::-1], y_up[::-1]
+        
+        # Prevent duplicating the exact Leading Edge point during concatenation
+        if np.allclose([x_up_rev[-1], y_up_rev[-1]], [x_lo[0], y_lo[0]]):
+            x_lo, y_lo = x_lo[1:], y_lo[1:]
+            
+        selig_x = np.concatenate([x_up_rev, x_lo])
+        selig_y = np.concatenate([y_up_rev, y_lo])
+
+        # 4. Pass clean, un-hooked data to your JIT-compiled interpolator
+        points_jax = jnp.column_stack((selig_x, selig_y))
         x_grid, y_up_interp, y_lo_interp = cls._interpolate_surface(points_jax, n_pts)
 
-        return cls._from_surfaces(file_path.stem, x_grid, y_up_interp, y_lo_interp)
+        y_up_clean = cls._laplacian_smoothing(np.array(x_grid), np.array(y_up_interp))
+        y_lo_clean = cls._laplacian_smoothing(np.array(x_grid), np.array(y_lo_interp))
+
+        # Clean up overlapping surfaces
+        y_max = jnp.maximum(y_up_clean, y_lo_clean)
+        y_min = jnp.minimum(y_up_clean, y_lo_clean)
+
+        y_up_clean = y_max
+        y_lo_clean = y_min
+
+        if interpolate:
+            return cls._from_surfaces(file_path.stem, x_grid, y_up_clean, y_lo_clean)
+        else:
+            return cls(
+                name=file_path.stem,
+                camber=jnp.asarray((y_up_clean + y_lo_clean) / 2.0),
+                max_thickness=float(jnp.max(y_up_clean - y_lo_clean)),
+                coordinates=jnp.column_stack((selig_x, selig_y)),
+                x_coordinates=jnp.asarray(selig_x),
+                y_coordinates=jnp.asarray(selig_y),
+                x_upper=jnp.asarray(x_up_rev),
+                x_lower=jnp.asarray(x_lo),
+                y_upper=jnp.asarray(y_up_rev),
+                y_lower=jnp.asarray(y_lo),
+            )
 
 
-    def plot(self):
-
+    def plot(self, title: Optional[str]=None):
+        if not title:
+            plot_title = self.name
+        else:
+            plot_title = title
+        plt.figure(figsize=(10, 6))
         plt.plot(self.x_upper, self.y_upper, color='#FC6255')
-        plt.plot(self.x_lower, self.y_lower, color='#FC6255')
-        plt.title(self.name)
+        plt.plot(self.x_lower, self.y_lower, color="#080888")
+        plt.title(plot_title)
         plt.axis('equal')
+        plt.tight_layout()
         plt.show()
     
 def NACA(code: str, n_pts: int = 128):

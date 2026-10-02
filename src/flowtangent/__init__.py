@@ -30,8 +30,13 @@ from .utils import (
     Module,
 )
 
+# Data Hoists
 from .data import units
+# from .components.airfoils import (_data as airfoils, load_foil)
+from .components.energy.maps import (_data as turbo_maps, load_map as load_turbo_map)
+from .data import gases
 
+# Analysis hoists
 from .solve import (
     BatchedAnalysis,
     ImplicitAnalysis,
@@ -66,8 +71,14 @@ __all__ = [
     "static_field",
     "method_field",
     "null_step",
-    "units",
     "array_barrier",
+    # Data sources
+    "units",
+    "airfoils",
+    "load_foil",
+    "turbo_maps",
+    "load_turbo_map",
+    "gases",
     # Analyses
     "BatchedAnalysis",
     "ImplicitAnalysis",

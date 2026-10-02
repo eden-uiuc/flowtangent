@@ -2,7 +2,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pycycle.api as pyc
 
@@ -19,8 +19,18 @@ STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 
 
 @lru_cache(maxsize=None)
-def _load_map_from_disk(name: str):
-    """Hidden helper that does the disk I/O, safely cached, and routes by type."""
+def load_map(name: str):
+    """
+    Helper that does the disk I/O, safely cached, and routes by type.
+    """
+    if Path(name).exists():
+        try:
+            with open(name, "r") as f:
+                data = json.load(f)
+        except:
+            raise AttributeError(f"Found map file {name}, but unable to load. Turbo maps must be JSONs.")
+        #TODO: Add map schema to docstring
+    
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
         raise AttributeError(f"Map '{name}' not found in FlowTangent library ({_MAP_DIR}).")
@@ -48,14 +58,14 @@ def __getattr__(name: str) -> Any:
     if name.startswith("_"):
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
-    return _load_map_from_disk(name)
+    return load_map(name)
 
 
 def __dir__():
     """Allows IDEs and the `dir()` command to see the available maps."""
     # List all .json files in the directory without their extensions
     if _MAP_DIR.exists():
-        return [f.stem for f in _MAP_DIR.glob("*.json")]
+        return [f.stem for f in _MAP_DIR.glob("*.json")] + ['load_map']
     return []
 
 
@@ -138,7 +148,7 @@ def harvest_pycycle_maps(output_dir=_MAP_DIR):
             json.dump(json_data, f, indent=4)
 
         # Update design values
-        test_map = _load_map_from_disk(map_name)
+        test_map = load_map(map_name)
         if isinstance(test_map, CompressorMap):
             PR_map, Wc_map, eff_map = test_map.evaluate(
                 alpha=test_map.alpha_des, Nc=test_map.Nc_des, Rline=test_map.Rline_des
@@ -164,6 +174,8 @@ def generate_stub():
     lines = [
         "from typing import Any",
         "from ._classes import CompressorMap, TurbineMap",
+        "",
+        "def load_map(name: str) -> CompressorMap | TurbineMap: ...",
         "",
     ]
 
