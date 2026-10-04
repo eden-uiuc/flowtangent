@@ -49,7 +49,7 @@ class State[EnergyType: NetworkState](StateData):
 
     def freeze_initials(self):
         frozen_initials = update(self, "initials", None, is_leaf=lambda x: x is None)
-        return update(self, "initials", frozen_initials)
+        return update(self, "initials", frozen_initials, is_leaf=lambda x: x is None)
 
     def expand_time(self, N: int = 0):
 

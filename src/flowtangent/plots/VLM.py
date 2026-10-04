@@ -2,7 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 
-def plot_vlm_panels(VD, panel_values=None, title="VLM Panelization"):
+def plot_panels(VD, panel_values=None, title="VLM Panelization"):
     """
     Plots a 3D interactive mesh of the VLM panels with an optional heatmap.
     If no panel_values are provided, displays light grey panels with black edges.

@@ -45,12 +45,12 @@ from flowtangent.core._systems import System, Aircraft
 
 from flowtangent.core._state_data import Time
 
-from flowtangent.solve.aero._vorjax import AnalyzeVORJAX, VORJAXSettings, InitializeVORJAX, Vortices, SupersonicSettings, CorrectionFactors
+from flowtangent.solve.aero._vorjax import AnalyzeVORJAX, VORJAXSettings, InitializeVORJAX, PanelSettings, SupersonicSettings, CorrectionFactors
 from flowtangent.solve._settings import JacobianMap
 from flowtangent.solve._batched import ShardedDatasetGenerator
 
 # from flowtangent.framework.interfaces.AVL import parse_avl_file, convert_to_Flowtangent
-from flowtangent.plots import plot_vlm_panels
+from flowtangent.plots import plot_panels
 from flowtangent.utils import update
 
 # AVL Helper Functions -------------------------------------------------------------------------------------------------
@@ -516,7 +516,7 @@ def VORJAX_test_run(
     # state = update(state, "initials", frozen_initials, is_leaf=lambda x: x is None) 
     initial_system = vehicle
 
-    vortices = Vortices(
+    vortices = PanelSettings(
         spanwise_cosine=cos_sw,
         n_spanwise=n_sw,
         n_chordwise=n_cw
@@ -533,7 +533,7 @@ def VORJAX_test_run(
         suction=suction,
     )
     
-    aero_settings = VORJAXSettings(vortices=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
+    aero_settings = VORJAXSettings(panels=vortices, supersonic=mach_settings, corrections=corr, near_field_drag=near_field)
     initial_settings = eqx.tree_at(lambda s: s.analysis.aerodynamics, Settings(DEBUG_MODE=debug_mode), aero_settings)
 
     analysis = Process(
@@ -1743,7 +1743,7 @@ if __name__ == "__main__":
             # print(f"Max dCp Error: {err_max:.5f}")
 
             if PLOT_WINGS:
-                fig = plot_vlm_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
+                fig = plot_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
                 fig.show()
 
             save_plot_cache(
@@ -1799,7 +1799,7 @@ if __name__ == "__main__":
 
                 if PLOT_WINGS:
                     if n_seg == 1 or n_seg % 5 == 0:
-                        fig = plot_vlm_panels(VD=f_sys.analysis_data['vortex_distribution'])
+                        fig = plot_panels(VD=f_sys.analysis_data['vortex_distribution'])
                         fig.show()
                 
             data = f_sys.analysis_data
@@ -2003,7 +2003,7 @@ if __name__ == "__main__":
 
                 if PLOT_WINGS:
                     if int(i) % 10 == 0:
-                        fig = plot_vlm_panels(f_sys.analysis_data['vortex_distribution'])
+                        fig = plot_panels(f_sys.analysis_data['vortex_distribution'])
                         fig.show()
 
             save_plot_cache(
@@ -2067,16 +2067,16 @@ if __name__ == "__main__":
 
             if PLOT_WINGS:
                 data = f_sys.analysis_data
-                base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
+                base_panels = plot_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
                 base_panels.show()
 
-                m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
+                m11_flags = plot_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
                 m11_flags.show()
 
-                m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
+                m11_dcp = plot_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
                 m11_dcp.show()
 
-                m20 = plot_vlm_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
+                m20 = plot_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
                 m20.show()
 
             save_plot_cache(
@@ -2104,7 +2104,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VORJAXSettings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
+            aero_settings = VORJAXSettings(panels=PanelSettings(n_spanwise=16, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP
@@ -2137,7 +2137,7 @@ if __name__ == "__main__":
 
             system = VORJAX_straight_wing(10.0, 1.0)
 
-            aero_settings = VORJAXSettings(vortices=Vortices(n_spanwise=32, n_chordwise=8))
+            aero_settings = VORJAXSettings(panels=PanelSettings(n_spanwise=32, n_chordwise=8))
             analysis_settings = AnalysisSettings(
                 aerodynamics=aero_settings,
                 gradient_map=GRAD_MAP

@@ -927,11 +927,11 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
         interval_data, strip_interval_map = find_intervals(wing)
         vlm_settings = settings.analysis.aerodynamics
         try:
-            n_sw = vlm_settings.vortices.wings_n_spanwise[wing_idx]
-            n_cw = vlm_settings.vortices.wings_n_chordwise[wing_idx]
+            n_sw = vlm_settings.panels.wings_n_spanwise[wing_idx]
+            n_cw = vlm_settings.panels.wings_n_chordwise[wing_idx]
         except TypeError:
-            n_sw: int = vlm_settings.vortices.wings_n_spanwise
-            n_cw: int = vlm_settings.vortices.wings_n_chordwise
+            n_sw: int = vlm_settings.panels.wings_n_spanwise
+            n_cw: int = vlm_settings.panels.wings_n_chordwise
             
 
         if len(interval_data) > n_sw or n_cw < 3:  # type: ignore
@@ -979,15 +979,15 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         vlm_settings = settings.analysis.aerodynamics
 
         try:
-            n_sw = vlm_settings.vortices.wings_n_spanwise[wing_idx]
-            n_cw = vlm_settings.vortices.wings_n_chordwise[wing_idx]
+            n_sw = vlm_settings.panels.wings_n_spanwise[wing_idx]
+            n_cw = vlm_settings.panels.wings_n_chordwise[wing_idx]
         except TypeError:
-            n_sw: int = vlm_settings.vortices.wings_n_spanwise
-            n_cw: int = vlm_settings.vortices.wings_n_chordwise
+            n_sw: int = vlm_settings.panels.wings_n_spanwise
+            n_cw: int = vlm_settings.panels.wings_n_chordwise
 
         # Calculate strip eta (non-dimensional y-coordinate) (Shape: (n_sw +1,))
         eta, strip_interval_map = generate_spanwise_coordinates(
-            interval_data, n_sw, vlm_settings.vortices.spanwise_cosine
+            interval_data, n_sw, vlm_settings.panels.spanwise_cosine
         )
 
         # # Calculate strip xi (non-dimensional x-coordinate) (Shape: (n_sw, n_cw + 1))
@@ -1132,18 +1132,14 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
 
     return state, updated_system, settings
 
-
-
-
-
 @io.inputs(
     "settings.analysis.aerodynamics: VLMSettings",
     "settings.analysis.aerodynamics.discretize_control_surfaces",
-    "settings.analysis.aerodynamics.vortices.wing_spanwise_vortices",
-    "settings.analysis.aerodynamics.vortices.wing_chordwise_vortices",
+    "settings.analysis.aerodynamics.panels.wing_spanwise_vortices",
+    "settings.analysis.aerodynamics.panels.wing_chordwise_vortices",
     "system.wings",
 )
-@io.outputs("system.analysis_data['vortex_distribution']", "settings.analysis.aerodynamics.vortices.chordwise_cosine")
+@io.outputs("system.analysis_data['vortex_distribution']", "settings.analysis.aerodynamics.panels.chordwise_cosine")
 def discretize_surfaces(state: State, system: "Aircraft", settings: Settings):
 
     # Pre-Processing ---------------------------------------------------------------------------------------------------
@@ -2325,7 +2321,7 @@ class Surrogate(Module):
         return self.surrogate.predict(*args, **kwargs)
 
 
-class Vortices(Module):
+class PanelSettings(Module):
     model_fuselage: bool = field(False, static=True)
     verbose: bool = field(False, static=True)
 
@@ -2404,7 +2400,7 @@ class VORJAXSettings(Module):
 
     # Sub-Settings
 
-    vortices: Vortices = field(Vortices)
+    panels: PanelSettings = field(PanelSettings)
 
     supersonic: SupersonicSettings = field(SupersonicSettings)
     corrections: CorrectionFactors = field(CorrectionFactors)

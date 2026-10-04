@@ -98,7 +98,7 @@ def update(obj, where_or_updates, val=None, **kwargs):
 class TreePath:
     path: tuple
     value: Any
-    path_slice: slice
+    path_slice: slice | tuple[slice,...]
     name: str
 
     @classmethod
@@ -133,7 +133,7 @@ class TreePath:
         self,
         path: tuple | str | "TreePath" = ("state",),
         value: Optional[Any] = None,
-        path_slice: Optional[slice] = None,
+        path_slice: Optional[slice | tuple[slice,...]] = None,
         name: Optional[str] = None,
     ):
         if isinstance(path, TreePath):

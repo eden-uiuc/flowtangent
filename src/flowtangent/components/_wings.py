@@ -6,12 +6,14 @@
 # ----------------------------------------------------------------------------------------------------------------------
 # IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
+from typing import Optional
 
 import jax
 import jax.numpy as jnp
 
 from ..core._component import Component, Dimensions
-from ..utils import empty_array, field, update
+from ..utils import empty_array, field, static_field, update
+from ..utils.typing import _
 from . import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -36,17 +38,17 @@ class WingChords(WingDimensions):
 
 
 class WingSegment(Component):
-    name: str = field("Wing Segment", static=True)
+    name: str = static_field("Wing Segment")
     airfoil: Airfoil | None = None
     control_surfaces: tuple = field(tuple)
 
     # Specialty Attributes
 
-    thickness_to_chord: float | jax.Array = 0.0
-    root_chord_percent: float | jax.Array = 0.0
-    percent_span_location: float | jax.Array = 0.0
-    twist: float | jax.Array = 0.0
-    dihedral_outboard: float | jax.Array = 0.0
+    thickness_to_chord: float = 0.0
+    root_chord_percent: float = 0.0
+    percent_span_location: float = 0.0
+    twist: float = 0.0
+    dihedral_outboard: float = 0.0
 
     sweeps: WingSweeps = field(WingSweeps)
     chords: WingChords = field(WingChords)
@@ -94,19 +96,17 @@ class ControlSurface(Component):
 
 
 class Wing(Component):
-    airfoil: Airfoil | None = None
+    airfoil: Optional[Airfoil] = None
 
     _bookkeeping: dict = field(lambda: {"control_surfaces": ControlSurface}, static=True)
 
     # Specialty Attributes
 
-    symmetric: bool = field(True, static=True)
-    vertical: bool = field(False, static=True)
-    t_tail: bool = field(False, static=True)
-    high_lift: bool = field(False, static=True)
-    symbolic: bool = field(False, static=True)
-    high_mach: bool = field(False, static=True)
-    vortex_lift: bool = field(False, static=True)
+    symmetric: bool     = static_field(True)
+    vertical: bool      = static_field(False)
+    high_lift: bool     = static_field(False)
+    high_mach: bool     = static_field(False)
+    vortex_lift: bool   = static_field(False)
 
     taper: float = 0.0
     dihedral: float = 0.0
@@ -114,38 +114,37 @@ class Wing(Component):
     thickness_to_chord: float = 0.0
     exposed_root_chord_offset: float = 0.0
 
-    single_side_aerodynamic_center: jax.Array = empty_array((0, 3))
+    aerodynamic_center: jax.Array = empty_array((0, 3))
+    half_span_aerodynamic_center: jax.Array = empty_array((0, 3))
 
     transition_x_upper: float = 0.0
     transition_x_lower: float = 0.0
 
     dynamic_pressure_ratio: float = 0.0
 
-    aerodynamic_center: jax.Array = empty_array((0, 3))
-
     spans: WingDimensions = field(lambda: WingDimensions(ordinal_direction=True))
     twists: WingDimensions = field(WingDimensions)
     chords: WingChords = field(WingChords)
     sweeps: WingSweeps = field(WingSweeps)
 
-    def __post_init__(self):
-        new_taper, new_chords = self.validate_chords()
-        object.__setattr__(self, "taper", new_taper)
-        object.__setattr__(self, "chords", new_chords)
+    # def __post_init__(self):
+    #     new_taper, new_chords = self.validate_chords()
+    #     object.__setattr__(self, "taper", new_taper)
+    #     object.__setattr__(self, "chords", new_chords)
 
-        updated_segments = []
+    #     updated_segments = []
 
-        for idx, seg in enumerate(self.segments):
-            root = new_chords.root * seg.root_chord_percent
-            if idx == len(self.segments) - 1:
-                tip = new_chords.tip
-            else:
-                tip = new_chords.root * self.segments[idx + 1].root_chord_percent
+    #     for idx, seg in enumerate(self.segments):
+    #         root = new_chords.root * seg.root_chord_percent
+    #         if idx == len(self.segments) - 1:
+    #             tip = new_chords.tip
+    #         else:
+    #             tip = new_chords.root * self.segments[idx + 1].root_chord_percent
 
-            new_seg = update(seg, "chords", WingChords(root=root, tip=tip))
-            updated_segments.append(new_seg)
+    #         new_seg = update(seg, "chords", WingChords(root=root, tip=tip))
+    #         updated_segments.append(new_seg)
 
-        object.__setattr__(self, "segments", updated_segments)
+    #     object.__setattr__(self, "segments", updated_segments)
 
     def validate_chords(self) -> tuple:
 
@@ -157,7 +156,7 @@ class Wing(Component):
         new_chords = self.chords
 
         # Count how many variables the user explicitly set
-        # (Assuming 0.0 is the default "unset" value in your legacy code)
+        # _ placeholder evaluates as equal to 0.0
         provided = sum([root != 0.0, tip != 0.0, taper != 0.0])
 
         if provided < 2:
@@ -377,6 +376,20 @@ class Wing(Component):
     def update_geometry(self, calculate_reference_area=False, calculate_wetted_area=False):
         """Returns a new Wing instance with all geometric properties calculated and populated."""
 
+        new_taper, new_chords = self.validate_chords()
+
+        updated_segments = []
+
+        for idx, seg in enumerate(self.segments):
+            root = new_chords.root * seg.root_chord_percent
+            if idx == len(self.segments) - 1:
+                tip = new_chords.tip
+            else:
+                tip = new_chords.root * self.segments[idx + 1].root_chord_percent
+
+            new_seg = update(seg, "chords", WingChords(root=root, tip=tip))
+            updated_segments.append(new_seg)
+
         new_segments = self.generate_segments()
 
         # 1. Extract Arrays, add ghost tip segment
@@ -392,7 +405,7 @@ class Wing(Component):
         dy, c_root, c_tip, tapers, macs, s_ref_seg, s_exposed_seg, s_wet_seg = self._compute_segment_properties(
             span_locs,
             root_chords_pct,
-            self.chords.root,
+            new_chords.root,
             self.spans.projected,
             symm,
             self.exposed_root_chord_offset,
@@ -424,7 +437,7 @@ class Wing(Component):
             sweeps,
             dihedrals,
             self.spans.projected,
-            symm,
+            bool(symm),
         )
 
         total_s_ref = jnp.where(calculate_reference_area, total_s_ref, self.areas.reference)
@@ -437,7 +450,8 @@ class Wing(Component):
             # Assuming you have an immutable dataclass or tree update method here
             new_seg = update(
                 seg,
-                (
+                (   
+                    ("sweeps.leading_edge", le_sweeps[i]),
                     ("chords.mean_aerodynamic", macs[i]),
                     ("areas.reference", s_ref_seg[i]),
                     ("areas.exposed", s_exposed_seg[i]),
@@ -456,14 +470,15 @@ class Wing(Component):
                 ("areas.wetted", total_s_wet),
                 ("aspect_ratio", ar),
                 ("spans.total", total_span),
+                ("chords.root", new_chords.root),
+                ("chords.tip", new_chords.tip),
                 ("chords.mean_geometric", mgc),
                 ("chords.mean_aerodynamic", global_mac),
-                ("chords.tip", c_tip[-1]),
-                ("taper", tapers[-1] * (c_root[-1] / c_root[0])),
+                ("taper", new_taper),
                 ("sweeps.quarter_chord", c_4_sweep),
                 ("sweeps.leading_edge", le_sweep_total),
                 ("aerodynamic_center", ac),
-                ("single_side_aerodynamic_center", ss_ac),
+                ("half_span_aerodynamic_center", ss_ac),
                 ("lengths.total", total_length),
             ),
         )

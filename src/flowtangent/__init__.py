@@ -28,6 +28,7 @@ from .utils import (
     method_field,
     null_step,
     Module,
+    configure_environment,
 )
 
 from .data import units
@@ -36,7 +37,12 @@ from .solve import (
     BatchedAnalysis,
     ImplicitAnalysis,
     PACTAnalysis,
+    JacobianMap,
+    NumericalSettings,
+    AnalysisSettings,
 )
+
+from .components import (Wing, Fuselage)
 
 # 4. Short-Name Namespace Routing
 from . import functional as F  # noqa: N812
@@ -54,12 +60,16 @@ __all__ = [
     "Module",
     "State",
     "System",
+    "Settings",
     "Aircraft",
     "Settings",
     "Component",
     "Process",
     "ProcessStep",
     "TreePath",
+    "JacobianMap",
+    "NumericalSettings",
+    "AnalysisSettings",
     # Key utilities
     "update",
     "field",
@@ -68,10 +78,14 @@ __all__ = [
     "null_step",
     "units",
     "array_barrier",
+    "configure_environment",
     # Analyses
     "BatchedAnalysis",
     "ImplicitAnalysis",
     "PACTAnalysis",
+    # Components
+    "Wing",
+    "Fuselage",
     # Submodules
     "F",
     "comp",

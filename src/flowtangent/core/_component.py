@@ -60,7 +60,6 @@ class Dimensions(Module):
 
 
 class Areas(Module):
-    # Attribute         Type    Default Value
     reference: float = 0.0
     total: float = 0.0
     maximum: float = 0.0

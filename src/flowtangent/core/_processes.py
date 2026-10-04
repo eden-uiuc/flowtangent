@@ -345,16 +345,16 @@ class Process(ProcessStep):
 
         return state, system, settings, tuple(history)
 
-    def _build_value_and_jacobian(self, grad_map: JacobianMap):
+    def _build_value_and_jacobian(self, jac_map: JacobianMap):
 
         def objective_fn(flat_st, flat_sys, base_state, base_system, base_settings):
-            st, sys = grad_map.update_inputs(flat_st, flat_sys, base_state, base_system)
+            st, sys = jac_map.update_inputs(flat_st, flat_sys, base_state, base_system)
 
             # Prevent recursion by temporarily disabling the Jacobian flag
             inner_setts = update(base_settings, "numerical.jacobian", replace(base_settings.numerical.jacobian, calculate=False))
 
             f_st, f_sys, f_setts = self(st, sys, inner_setts)
-            out_array = grad_map.flatten_outputs(f_st, f_sys, f_setts)
+            out_array = jac_map.flatten_outputs(f_st, f_sys, f_setts)
 
             # Restore modified setting
             f_setts = update(f_setts, "numerical.jacobian", replace(f_setts.numerical.jacobian, calculate=True))
@@ -463,32 +463,32 @@ class Process(ProcessStep):
         state, system, settings = array_barrier(state, system, settings)
         return state, system, settings
 
-    def _compute_jacobian(self, state, system, settings, grad_map):
+    def _compute_jacobian(self, state, system, settings, jac_map):
 
-        flat_st, flat_sys = grad_map.flatten_inputs(state, system)
+        flat_st, flat_sys = jac_map.flatten_inputs(state, system)
 
-        if grad_map._n_st > 0 and grad_map._n_sys > 0:
+        if jac_map._n_st > 0 and jac_map._n_sys > 0:
             def func(flat_st, flat_sys):
-                new_state, new_system = grad_map.update_inputs(flat_st, flat_sys, state, system)
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
                 f_st, f_sys, f_setts = self(new_state, new_system, settings)
-                return grad_map.flatten_outputs(f_st, f_sys, f_setts)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
 
             jac_st, jac_sys = jax.jacrev(func, argnums=(0, 1))(flat_st, flat_sys)
             jac = jnp.concatenate((jac_st, jac_sys), axis=-1)
 
-        elif grad_map._n_st > 0:
+        elif jac_map._n_st > 0:
             def func(flat_st):
-                new_state, new_system = grad_map.update_inputs(flat_st, flat_sys, state, system)
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
                 f_st, f_sys, f_setts = self(new_state, new_system, settings)
-                return grad_map.flatten_outputs(f_st, f_sys, f_setts)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
 
             jac = jax.jacrev(func)(flat_st)
 
-        elif grad_map._n_sys > 0:
+        elif jac_map._n_sys > 0:
             def func(flat_sys):
-                new_state, new_system = grad_map.update_inputs(flat_st, flat_sys, state, system)
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
                 f_st, f_sys, f_setts = self(new_state, new_system, settings)
-                return grad_map.flatten_outputs(f_st, f_sys, f_setts)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
 
             jac = jax.jacrev(func)(flat_sys)
 
@@ -513,16 +513,11 @@ class Process(ProcessStep):
     ) -> tuple[State, System, Settings]: ...
 
     def run(
-        self, state: State, system: System, settings: Settings, *, track_history: bool = False, grad_map= None,
+        self, state: State, system: System, settings: Settings, *, track_history: bool = False
     ):
 
         state, system, settings = self.initialize(state, system, settings)
-        if grad_map is not None:
-            f_st, f_sys, f_setts = self(state, system, settings)
-
-            jac = self._compute_jacobian(state,system,settings,grad_map,)
-
-            return f_st, f_sys, f_setts, jac
+        
         # Direct call if not tracking history
         if not track_history:
             return self(state, system, settings)
