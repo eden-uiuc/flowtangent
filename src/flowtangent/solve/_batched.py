@@ -89,7 +89,7 @@ class BatchedAnalysis(Process):
             # fmt: on
 
     @property
-    def steps(self): # type: ignore
+    def steps(self):  # type: ignore
         return self.analyze.steps
 
     def _batch_inputs(self, mode="mesh"):

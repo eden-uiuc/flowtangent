@@ -27,10 +27,10 @@ from dataclasses import replace
 import jax.numpy as jnp
 
 from ...components.energy.jets._classes import TurbofanDesign, TurbojetEngine, TurbojetOpPoint
+from ...data import units
 from ...sim.initialize import initialize_energy
 from ...sim.update import update_freestream
-from ...utils import update, TreePath, field, static_field
-from ...data import units
+from ...utils import TreePath, static_field, update
 from .._batched import BatchedAnalysis
 from .._implicit import ImplicitAnalysis, Residual, Variable
 from .._settings import EnergyAnalysisSettings
@@ -161,7 +161,9 @@ def _design_update(state: State, system: System, settings: Settings) -> tuple[St
     return des_state, des_system, des_settings, base_analysis
 
 
-def build_turbojet_design(state: State, system: System, settings: Settings) -> tuple[State, System, Settings, ImplicitAnalysis]:
+def build_turbojet_design(
+    state: State, system: System, settings: Settings
+) -> tuple[State, System, Settings, ImplicitAnalysis]:
 
     # Setup test state according to design parameters
 

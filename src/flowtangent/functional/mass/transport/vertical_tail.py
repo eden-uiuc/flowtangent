@@ -75,7 +75,7 @@ def func_vertical_tail(
 
     v_tail_mass = (
         2.62 * S * 1.5e-5 * vehicle_ultimate_load * b**3 * (8.0 + 0.44 * MTOW / Sref) / (tc * np.cos(qc) ** 2)
-    ) * units.lbs
+    ) * units.lbm
 
     v_tail_mass += rudder_fraction * 1.6
 

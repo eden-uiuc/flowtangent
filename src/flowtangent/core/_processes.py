@@ -59,9 +59,11 @@ from ..utils import (
     id_partition,
     inspect_leaves,
     is_array_like,
+    method_field,
     null_step,
     update,
 )
+from ..utils.typing import _Placeholder
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
@@ -69,7 +71,7 @@ from ..utils import (
 
 
 class ProcessStep(Module):
-    function: ProcessFunc = field(null_step)
+    function: ProcessFunc = method_field(null_step)
 
     _state_delta: Optional[State] = field(None)
     _system_delta: Optional[System] = field(None)
@@ -77,7 +79,7 @@ class ProcessStep(Module):
 
     def __init__(
         self,
-        function: ProcessFunc | ProcessStep  = null_step,
+        function: ProcessFunc | ProcessStep = null_step,
         name: NameType = None,
         *,
         _state_delta: Optional[State] = None,
@@ -201,6 +203,10 @@ def array_barrier(state: State, system: System, settings: Settings):
     """
 
     def _to_array(leaf, ndim: int = 1):
+
+        if isinstance(leaf, _Placeholder):
+            leaf_arr = jnp.zeros((1,) * ndim)
+            return leaf_arr
         # Check if it's a raw scalar, a list/tuple of scalars, OR already an array
         is_scalar = isinstance(leaf, (float, int, complex))
         is_iterable = isinstance(leaf, (list, tuple)) and all(isinstance(i, (float, int, complex)) for i in leaf)
@@ -345,16 +351,23 @@ class Process(ProcessStep):
 
         return state, system, settings, tuple(history)
 
-    def _build_value_and_jacobian(self, grad_map: JacobianMap):
+    def _build_value_and_jacobian(self, jac_map: JacobianMap):
 
         def objective_fn(flat_st, flat_sys, base_state, base_system, base_settings):
-            st, sys = grad_map.update_inputs(flat_st, flat_sys, base_state, base_system)
+            st, sys = jac_map.update_inputs(flat_st, flat_sys, base_state, base_system)
 
             # Prevent recursion by temporarily disabling the Jacobian flag
-            inner_setts = update(base_settings, "numerical.jacobian", replace(base_settings.numerical.jacobian, calculate=False))
+            inner_setts = update(
+                base_settings,
+                "numerical.jacobian",
+                replace(
+                    base_settings.numerical.jacobian,
+                    calculate=False,
+                ),
+            )
 
             f_st, f_sys, f_setts = self(st, sys, inner_setts)
-            out_array = grad_map.flatten_outputs(f_st, f_sys, f_setts)
+            out_array = jac_map.flatten_outputs(f_st, f_sys, f_setts)
 
             # Restore modified setting
             f_setts = update(f_setts, "numerical.jacobian", replace(f_setts.numerical.jacobian, calculate=True))
@@ -378,19 +391,20 @@ class Process(ProcessStep):
                 # PATH A: FAST BLOCK-DIAGONAL
                 # =========================================================
                 # Broadcast the basis to match the leading dimensions dynamically
-                basis_st = jnp.broadcast_to(
-                    jnp.eye(N_o).reshape((N_o,) + (1,) * len(L) + (N_o,)),
-                    (N_o,) + L + (N_o,)
-                )
+                basis_st = jnp.broadcast_to(jnp.eye(N_o).reshape((N_o,) + (1,) * len(L) + (N_o,)), (N_o,) + L + (N_o,))
                 jac_tuple_st = jax.vmap(vjp_fn)(basis_st)
 
-                N_st = flat_st.shape[-1]
-                if flat_st.shape[:-1] == L:
-                    # Input matches leading dims (e.g. batched state)
-                    jac_st = jnp.moveaxis(jac_tuple_st[0], 0, -2)
-                else:
-                    # Input lacks leading dims (e.g. empty array). Broadcast to match.
-                    jac_st = jnp.broadcast_to(jac_tuple_st[0], L + (N_o, N_st))
+                jacs = []
+
+                if flat_st.size > 0:
+                    N_st = flat_st.shape[-1]
+                    if flat_st.shape[:-1] == L:
+                        # Input matches leading dims (e.g. batched state)
+                        jac_st = jnp.moveaxis(jac_tuple_st[0], 0, -2)
+                    else:
+                        # Input lacks leading dims (e.g. empty array). Broadcast to match.
+                        jac_st = jnp.broadcast_to(jac_tuple_st[0], L + (N_o, N_st))
+                    jacs.append(jac_st)
 
                 if flat_sys.size > 0:
                     N_sys = flat_sys.shape[-1]
@@ -402,9 +416,9 @@ class Process(ProcessStep):
                         jac_tuple_sys = jax.vmap(vjp_fn)(basis_sys)
                         jac_sys = jac_tuple_sys[1].reshape(L + (N_o, N_sys))
 
-                    batched_jacobian = jnp.concatenate([jac_st, jac_sys], axis=-1)
-                else:
-                    batched_jacobian = jac_st
+                    jacs.append(jac_sys)
+
+                batched_jacobian = jnp.concatenate(jacs, axis=-1)
 
             else:
                 # =========================================================
@@ -413,12 +427,16 @@ class Process(ProcessStep):
                 basis_st = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
                 jac_tuple = jax.vmap(vjp_fn)(basis_st)
 
-                N_st = flat_st.shape[-1]
-                if flat_st.shape[:-1] == L:
-                    # Dense coupling requires cross-referencing input and output leading dims
-                    jac_st = jac_tuple[0].reshape(L + (N_o,) + L + (N_st,))
-                else:
-                    jac_st = jac_tuple[0].reshape(L + (N_o, N_st))
+                jacs = []
+
+                if flat_st.size > 0:
+                    N_st = flat_st.shape[-1]
+                    if flat_st.shape[:-1] == L:
+                        # Dense coupling requires cross-referencing input and output leading dims
+                        jac_st = jac_tuple[0].reshape(L + (N_o,) + L + (N_st,))
+                    else:
+                        jac_st = jac_tuple[0].reshape(L + (N_o, N_st))
+                    jacs.append(jac_st)
 
                 if flat_sys.size > 0:
                     N_sys = flat_sys.shape[-1]
@@ -427,9 +445,9 @@ class Process(ProcessStep):
                     else:
                         jac_sys = jac_tuple[1].reshape(L + (N_o, N_sys))
 
-                    batched_jacobian = (jac_st, jac_sys)
-                else:
-                    batched_jacobian = jac_st
+                    jacs.append(jac_sys)
+
+                batched_jacobian = jnp.concatenate(jacs, axis=-1)
 
             return batched_jacobian, aux[0], aux[1], aux[2]
 
@@ -463,6 +481,42 @@ class Process(ProcessStep):
         state, system, settings = array_barrier(state, system, settings)
         return state, system, settings
 
+    def _compute_jacobian(self, state, system, settings, jac_map):
+
+        flat_st, flat_sys = jac_map.flatten_inputs(state, system)
+
+        if jac_map._n_st > 0 and jac_map._n_sys > 0:
+
+            def func(flat_st, flat_sys):
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
+                f_st, f_sys, f_setts = self(new_state, new_system, settings)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
+
+            jac_st, jac_sys = jax.jacrev(func, argnums=(0, 1))(flat_st, flat_sys)
+            jac = jnp.concatenate((jac_st, jac_sys), axis=-1)
+
+        elif jac_map._n_st > 0:
+
+            def func(flat_st):
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
+                f_st, f_sys, f_setts = self(new_state, new_system, settings)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
+
+            jac = jax.jacrev(func)(flat_st)
+
+        elif jac_map._n_sys > 0:
+
+            def func(flat_sys):
+                new_state, new_system = jac_map.update_inputs(flat_st, flat_sys, state, system)
+                f_st, f_sys, f_setts = self(new_state, new_system, settings)
+                return jac_map.flatten_outputs(f_st, f_sys, f_setts)
+
+            jac = jax.jacrev(func)(flat_sys)
+
+        else:
+            raise ValueError("JacobianMap contains no inputs.")
+
+        return jac
 
     @overload
     def run(
@@ -479,9 +533,7 @@ class Process(ProcessStep):
         track_history: Literal[False] = ...,
     ) -> tuple[State, System, Settings]: ...
 
-    def run(
-        self, state: State, system: System, settings: Settings, *, track_history: bool = False
-    ):
+    def run(self, state: State, system: System, settings: Settings, *, track_history: bool = False):
 
         state, system, settings = self.initialize(state, system, settings)
 
@@ -490,7 +542,6 @@ class Process(ProcessStep):
             return self(state, system, settings)
         else:
             f_st, f_sys, f_setts, raw_hist = self._run_with_raw_history(state, system, settings)
-
 
             logged_process = None
             logged_steps = []

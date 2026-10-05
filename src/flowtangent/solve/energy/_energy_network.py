@@ -36,6 +36,7 @@ __all__ = [
 #  Graph Energy Network Analysis
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 def make_node_function(analysis_network: PACTNetwork, network_id: str):
     node = analysis_network.nodes[network_id]
     node_func = node.__class__.transmit
@@ -56,6 +57,7 @@ def make_node_function(analysis_network: PACTNetwork, network_id: str):
         return analysis_network.nodes[network_id].transmit(state, system, settings)
 
     return transmit
+
 
 def make_network_function(analysis_network: PACTNetwork):
     net_func = analysis_network.__class__.transmit
@@ -79,7 +81,6 @@ def make_network_function(analysis_network: PACTNetwork):
 
 
 class PACTAnalysis(Process):
-
     def __init__(self, analysis_network: PACTNetwork, **kwargs):
         super().__init__(**kwargs)
 
@@ -92,9 +93,9 @@ class PACTAnalysis(Process):
         )
 
         net_step = ProcessStep(
-                name=f"{analysis_network.network_id}",
-                function=make_network_function(analysis_network),
-            )
+            name=f"{analysis_network.network_id}",
+            function=make_network_function(analysis_network),
+        )
 
         full_steps = node_steps + (net_step,)
 

@@ -16,6 +16,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from equinox import Partial, combine, is_array, is_array_like, partition
+from jax.numpy import s_ as ArraySlice  # noqa: N812
 
 # -----------------------------------------------------------------------------
 # UPSTREAM FACADE IMPORTS
@@ -70,8 +71,6 @@ def update(obj, where_or_updates, val=None, **kwargs):
             paths = [TreePath.cast(u) for u in where_or_updates]
 
         elif isinstance(where_or_updates, tuple):
-            # The Ultimate Ambiguity: Is this ONE update spec `("path", val)`,
-            # or a tuple of multiple update specs `(("path1", val1), ("path2", val2))`?
             try:
                 # Try treating it as a single update spec first
                 paths = [TreePath.cast(where_or_updates)]
@@ -85,10 +84,21 @@ def update(obj, where_or_updates, val=None, **kwargs):
 
     # Canonicalize and apply
     actual_paths = [get_actual_path(obj, p) for p in paths]
-    where_fn = partial(get_all_targets, input_map=actual_paths)
-    vals = tuple(p.value for p in paths)
 
-    return eqx.tree_at(where_fn, obj, vals, **kwargs)
+    new_leaves = []
+    for idx, p in enumerate(actual_paths):
+        val = paths[idx].value
+        if p.path_slice != slice(None):
+            real_parent = get_parent_target(obj, p)
+            new_leaves.append(real_parent.at[p.path_slice].set(paths[idx].value))
+        else:
+            new_leaves.append(paths[idx].value)
+
+    new_leaves = tuple(new_leaves)
+
+    where_fn = partial(get_all_parents, input_map=actual_paths)
+
+    return eqx.tree_at(where_fn, obj, new_leaves, **kwargs)
 
 
 # -----------------------------------------------------------------------------
@@ -98,7 +108,7 @@ def update(obj, where_or_updates, val=None, **kwargs):
 class TreePath:
     path: tuple
     value: Any
-    path_slice: slice
+    path_slice: slice | tuple[slice, ...] | Any
     name: str
 
     @classmethod
@@ -133,7 +143,7 @@ class TreePath:
         self,
         path: tuple | str | "TreePath" = ("state",),
         value: Optional[Any] = None,
-        path_slice: Optional[slice] = None,
+        path_slice: Optional[slice | tuple[slice, ...]] | Any = None,
         name: Optional[str] = None,
     ):
         if isinstance(path, TreePath):
@@ -285,7 +295,8 @@ def get_target(obj: Any, path: str | tuple | TreePath) -> Any:
     """Gets the target and applies the slice if one exists."""
     path_obj = TreePath.cast(path)
     parent = get_parent_target(obj, path_obj)
-    if hasattr(parent, "__getitem__") and path_obj.path_slice != slice(None):
+    # if hasattr(parent, "__getitem__") and path_obj.path_slice != slice(None):
+    if path_obj.path_slice != slice(None):
         return parent[path_obj.path_slice]
     return parent
 
@@ -486,6 +497,7 @@ __all__ = [
     "combine",
     "is_array",
     "is_array_like",
+    "ArraySlice",
     # FlowTangent API Wrappers
     "update",
     # FlowTangent Custom Functions

@@ -35,7 +35,7 @@ from flowtangent.utils import inputs, outputs, update
 def initialize_aerodynamics(state: "State", system: "Aircraft", settings: "Settings"):
 
     aero_conditions = state.aerodynamics
-
+    n_time = state.time.N
     n_wings = len(system.wings)
     n_fuselages = len(system.fuselages)
     n_nacelles = len(system.nacelles)
@@ -43,7 +43,7 @@ def initialize_aerodynamics(state: "State", system: "Aircraft", settings: "Setti
     def _expand_col(leaf: ComponentCoeffs):
         # 1. Dynamically extract n_time from the already row-expanded arrays
         if isinstance(leaf, ComponentCoeffs):
-            n_time = leaf.wings.shape[0]
+            # n_time = leaf.wings.shape[0]
 
             # 2. Instantiate the component arrays
             new_wings = jnp.zeros((n_time, n_wings))

@@ -6,6 +6,7 @@ from ._nacelles import Nacelle
 
 from ._wings import (
     Wing,
+    WingSegment,
     ControlSurface,
 )
 
@@ -24,6 +25,7 @@ __all__ = [
     "Airfoil",
     "Fuselage",
     "Wing",
+    "WingSegment",
     "ControlSurface",
     "Nacelle",
     "LandingGear",
