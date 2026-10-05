@@ -391,13 +391,17 @@ class Process(ProcessStep):
                 )
                 jac_tuple_st = jax.vmap(vjp_fn)(basis_st)
 
-                N_st = flat_st.shape[-1]
-                if flat_st.shape[:-1] == L:
-                    # Input matches leading dims (e.g. batched state)
-                    jac_st = jnp.moveaxis(jac_tuple_st[0], 0, -2)
-                else:
-                    # Input lacks leading dims (e.g. empty array). Broadcast to match.
-                    jac_st = jnp.broadcast_to(jac_tuple_st[0], L + (N_o, N_st))
+                jacs = []
+
+                if flat_st.size > 0:
+                    N_st = flat_st.shape[-1]
+                    if flat_st.shape[:-1] == L:
+                        # Input matches leading dims (e.g. batched state)
+                        jac_st = jnp.moveaxis(jac_tuple_st[0], 0, -2)
+                    else:
+                        # Input lacks leading dims (e.g. empty array). Broadcast to match.
+                        jac_st = jnp.broadcast_to(jac_tuple_st[0], L + (N_o, N_st))
+                    jacs.append(jac_st)
 
                 if flat_sys.size > 0:
                     N_sys = flat_sys.shape[-1]
@@ -408,10 +412,10 @@ class Process(ProcessStep):
                         basis_sys = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
                         jac_tuple_sys = jax.vmap(vjp_fn)(basis_sys)
                         jac_sys = jac_tuple_sys[1].reshape(L + (N_o, N_sys))
-
-                    batched_jacobian = jnp.concatenate([jac_st, jac_sys], axis=-1)
-                else:
-                    batched_jacobian = jac_st
+                    
+                    jacs.append(jac_sys)
+                
+                batched_jacobian = jnp.concatenate(jacs, axis=-1)
 
             else:
                 # =========================================================
@@ -420,12 +424,16 @@ class Process(ProcessStep):
                 basis_st = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
                 jac_tuple = jax.vmap(vjp_fn)(basis_st)
 
-                N_st = flat_st.shape[-1]
-                if flat_st.shape[:-1] == L:
-                    # Dense coupling requires cross-referencing input and output leading dims
-                    jac_st = jac_tuple[0].reshape(L + (N_o,) + L + (N_st,))
-                else:
-                    jac_st = jac_tuple[0].reshape(L + (N_o, N_st))
+                jacs = []
+
+                if flat_st.size > 0:
+                    N_st = flat_st.shape[-1]
+                    if flat_st.shape[:-1] == L:
+                        # Dense coupling requires cross-referencing input and output leading dims
+                        jac_st = jac_tuple[0].reshape(L + (N_o,) + L + (N_st,))
+                    else:
+                        jac_st = jac_tuple[0].reshape(L + (N_o, N_st))
+                    jacs.append(jac_st)
 
                 if flat_sys.size > 0:
                     N_sys = flat_sys.shape[-1]
@@ -434,9 +442,9 @@ class Process(ProcessStep):
                     else:
                         jac_sys = jac_tuple[1].reshape(L + (N_o, N_sys))
 
-                    batched_jacobian = (jac_st, jac_sys)
-                else:
-                    batched_jacobian = jac_st
+                    jacs.append(jac_sys)
+
+                batched_jacobian = jnp.concatenate(jacs, axis=-1)
 
             return batched_jacobian, aux[0], aux[1], aux[2]
 

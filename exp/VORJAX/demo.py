@@ -1,5 +1,3 @@
-from dataclasses import replace
-
 import flowtangent as ft
 import jax.numpy as jnp
 
@@ -111,5 +109,6 @@ if __name__ == "__main__":
     # fig.show()
 
     print(up_state.process_jacobian.shape)
+    print(up_state.process_jacobian)
 
     print("Done.")

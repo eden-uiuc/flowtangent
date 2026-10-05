@@ -121,18 +121,6 @@ def initialize_VORJAX_data(state: State, system: Aircraft, settings: Settings):
         center_of_gravity=jnp.array([[x_m, 0.0, z_m]]),  # type: ignore
     )
 
-    # Add analysis data keys
-    # initial_analysis_data = {
-    #     "vortex_distribution": None,
-    #     "VICs": None,
-    #     "induced_wake": None,
-    #     "boundary_conditions": None,
-    #     "relative_velocity": None,
-    #     "singularities": None,
-    #     "vortex_strengths": None,
-    #     "dCp": None,
-    # }
-
     updated_system = update(
         system,
         (
@@ -319,7 +307,6 @@ class LatticeData(Module):
         stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=self.total_strips)
         return stripwise_panels[strip_ids]
         
-
 def mirror_lattice(lat: LatticeData) -> LatticeData:
     """Creates the symmetric left-side counterpart of a right-side wing."""
 
@@ -343,7 +330,6 @@ def mirror_lattice(lat: LatticeData) -> LatticeData:
             mirrored_kwargs[key] = getattr(lat, key)
 
     return LatticeData(**mirrored_kwargs)
-
 
 def merge_lattices(lat_list: list[LatticeData]) -> LatticeData:
     """
@@ -1040,26 +1026,19 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         s_start = S_idx
         s_end = S_idx + N_s
 
-        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val[p_start:p_end])
-        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val[s_start:s_end])
+        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)
+        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)
 
         lat = update(
             lat_old,
             (
-                # ("panel_vertices", lat_old.panel_vertices.at[start:end].set(flat_vertices)),
-                # ("camber_slopes", lat_old.camber_slopes.at[start:end].set(camber_slopes.reshape(-1))),
-                # ("surface_id",lat_old.surface_id.at[start:end].set(jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32))),
-                # ("control_surface_id", lat_old.control_surface_id.at[start:end].set(panel_cs_id.reshape(-1).astype(jnp.int32))),
-                # ("is_leading_edge", lat_old.is_leading_edge.at[start:end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1))),
-                # ("is_trailing_edge", lat_old.is_trailing_edge.at[start:end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1))),
-
                 latPath("panel_vertices", flat_vertices),
                 latPath("camber_slopes", camber_slopes.reshape(-1)),
                 latPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
                 latPath("control_surface_id", panel_cs_id.reshape(-1)),
-                stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                stripPath("is_leading_edge", LE_idx),
-                stripPath("is_trailing_edge", TE_idx),
+                latPath("is_leading_edge", LE_idx),
+                latPath("is_trailing_edge", TE_idx),
+                stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),    
             )
         )
 
@@ -1077,28 +1056,20 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             m_s_start = S_idx + N_s
             m_s_end = m_s_start + N_s
 
-            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val[m_p_start, m_p_end])
-            m_stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val[m_s_start, m_s_end])
+            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)
+            m_stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val)
 
             lat_old = updated_system.analysis_data.lattice
             lat = update(
                 updated_system.analysis_data.lattice,
                 (
-                    # ("panel_vertices",lat_old.panel_vertices.at[mirror_start:mirror_end].set(mirrored_verts),),
-                    # ("camber_slopes",lat_old.camber_slopes.at[mirror_start:mirror_end].set(camber_slopes.reshape(-1)),),
-                    # ("wedge_angles", lat_old.wedge_angles.at[mirror_start:mirror_end].set(strip_wedge_angle.reshape(-1)),),
-                    # ("surface_id",lat_old.surface_id.at[mirror_start:mirror_end].set(jnp.full(N,wing_idx,dtype=jnp.int32,))),
-                    # ("control_surface_id",lat_old.control_surface_id.at[mirror_start:mirror_end].set(panel_cs_id.reshape(-1)),),
-                    # ("is_leading_edge",lat_old.is_leading_edge.at[mirror_start:mirror_end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),),
-                    # ("is_trailing_edge",lat_old.is_trailing_edge.at[mirror_start:mirror_end].set(jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),)
-
-                    m_latPath("panel_vertices", mirrored_verts),
+                    TreePath("panel_vertices", path_slice=slice(m_p_start, m_p_end), value=mirrored_verts),
                     m_latPath("camber_slopes", camber_slopes.reshape(-1)),
                     m_latPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
                     m_latPath("control_surface_id", panel_cs_id.reshape(-1)),
+                    m_latPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
+                    m_latPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
                     m_stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                    m_stripPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
-                    m_stripPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
                 )
             )
 
@@ -1109,7 +1080,7 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             S_idx += N_s
 
         # Preserve both halves, and carry this wing's mesh into the next update.
-        updated_system = update(updated_system, TreePath(("analysis_data", "vortex_distribution"), lat))
+        updated_system = update(updated_system, TreePath("analysis_data.lattice", lat))
         system = updated_system
 
     return state, updated_system, settings
