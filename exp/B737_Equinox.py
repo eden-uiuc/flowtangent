@@ -563,8 +563,8 @@ def mission_b737(state, system, settings):
 
     final_state, final_system, final_settings = mission.run(updated_state, system, updated_settings)
 
-    VLM_data = final_system.analysis_data
-    fig = plot_vlm_panels(VLM_data['vortex_distribution'], VLM_data['dCp'][0])
+    solve_data = final_system.analysis_data
+    fig = plot_vlm_panels(solve_data.lattice, solve_data.dCp[0])
     fig.show()
 
     return final_state, final_system, final_settings

@@ -225,7 +225,7 @@ def wing_renderer(wing_system):
 
     _, full_system, _ = discretize_surfaces(State(), wing_system, settings)
 
-    return plot_vlm_panels(full_system.analysis_data["vortex_distribution"])
+    return plot_vlm_panels(full_system.analysis_data.lattice)
 
 def encode_wing_id(aspect_ratio, taper_ratio, sweep, twist, dihedral, prefix=""):
     """

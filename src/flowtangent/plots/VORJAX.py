@@ -2,12 +2,12 @@ import numpy as np
 import plotly.graph_objects as go
 
 
-def plot_panels(VD, panel_values=None, title="VLM Panelization"):
+def plot_panels(lat, panel_values=None, title="VORJAX Panelization"):
     """
-    Plots a 3D interactive mesh of the VLM panels with an optional heatmap.
+    Plots a 3D interactive mesh of the VORJAX panels with an optional heatmap.
     If no panel_values are provided, displays light grey panels with black edges.
     """
-    panel_vertices = np.asarray(VD.panel_vertices)
+    panel_vertices = np.asarray(lat.panel_vertices)
 
     if panel_values is not None:
         panel_values = np.asarray(panel_values)

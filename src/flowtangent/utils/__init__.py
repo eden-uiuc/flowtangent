@@ -26,6 +26,7 @@ from .tree import (
     id_partition,
     inspect_leaves,
     scan_for_invalid_JAX_types,
+    ArraySlice,
     # Upstream JAX/Equinox
     tree_map,
     tree_flatten,
@@ -75,6 +76,7 @@ __all__ = [
     "empty_array",
     "Module",
     "TreePath",
+    "ArraySlice",
     "Partial",
     "update",
     "get_actual_path",

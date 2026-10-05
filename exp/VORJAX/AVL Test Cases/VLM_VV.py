@@ -921,7 +921,7 @@ if __name__ == "__main__":
 
             if PLOT_WINGS:
                 if n_seg % 5 == 0:
-                    fig = plot_vlm_panels(VD=f_sys.analysis_data['vortex_distribution'])
+                    fig = plot_vlm_panels(lat=f_sys.analysis_data.lattice)
                     fig.show()
             
         vehicle = VORJAX_elliptical_wing(AR=AR, n_segments=max_segments)
@@ -1002,7 +1002,7 @@ if __name__ == "__main__":
 
             if PLOT_WINGS:
                 if int(i) % 10 == 0:
-                    fig = plot_vlm_panels(f_sys.analysis_data['vortex_distribution'])
+                    fig = plot_vlm_panels(f_sys.analysis_data.lattice)
                     fig.show()
         
         fig = plot_delta_ar_sweep_plotly(ARs, grad_AD, error_AD, grad_jones)
@@ -1037,19 +1037,19 @@ if __name__ == "__main__":
 
         if PLOT_WINGS:
             data = f_sys.analysis_data
-            base_panels = plot_vlm_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
+            base_panels = plot_vlm_panels(data.lattice, title="ONERA M6 Panelization")
             base_panels.show()
 
-            # m03 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][0], title="ONERA M6 DCp, M = 0.3")
+            # m03 = plot_vlm_panels(data.lattice, data['singularities'][0], title="ONERA M6 DCp, M = 0.3")
             # m03.show()
 
-            m11_flags = plot_vlm_panels(data["vortex_distribution"], data['singularities'][11], title="ONERA M6 Flag, M = 1.1")
+            m11_flags = plot_vlm_panels(data.lattice, data['singularities'][11], title="ONERA M6 Flag, M = 1.1")
             m11_flags.show()
 
-            m11_dcp = plot_vlm_panels(data["vortex_distribution"], data['pressure_coefficients'][11], title="ONERA M6 DCp, M = 1.1")
+            m11_dcp = plot_vlm_panels(data.lattice, data['pressure_coefficients'][11], title="ONERA M6 DCp, M = 1.1")
             m11_dcp.show()
 
-            # m20 = plot_vlm_panels(data["vortex_distribution"], data['singularities'][-1], title="ONERA M6 DCp, M = 2.0")
+            # m20 = plot_vlm_panels(data.lattice, data['singularities'][-1], title="ONERA M6 DCp, M = 2.0")
             # m20.show()
 
 

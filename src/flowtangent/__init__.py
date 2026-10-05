@@ -23,6 +23,7 @@ from .core._processes import Process, ProcessStep, array_barrier
 from .utils import (
     update,
     TreePath,
+    ArraySlice,
     field,
     static_field,
     method_field,
@@ -67,6 +68,7 @@ __all__ = [
     "Process",
     "ProcessStep",
     "TreePath",
+    "ArraySlice",
     "JacobianMap",
     "NumericalSettings",
     "AnalysisSettings",

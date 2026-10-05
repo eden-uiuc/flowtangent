@@ -1743,7 +1743,7 @@ if __name__ == "__main__":
             # print(f"Max dCp Error: {err_max:.5f}")
 
             if PLOT_WINGS:
-                fig = plot_panels(data['vortex_distribution'], data['pressure_coefficients'][0])
+                fig = plot_panels(data.lattice, data['pressure_coefficients'][0])
                 fig.show()
 
             save_plot_cache(
@@ -1799,16 +1799,16 @@ if __name__ == "__main__":
 
                 if PLOT_WINGS:
                     if n_seg == 1 or n_seg % 5 == 0:
-                        fig = plot_panels(VD=f_sys.analysis_data['vortex_distribution'])
+                        fig = plot_panels(lat=f_sys.analysis_data.lattice)
                         fig.show()
                 
             data = f_sys.analysis_data
-            VD = data['vortex_distribution']
-            Gamma=data['vortex_strengths']
+            lat = data.lattice
+            Gamma=data.Gamma
             
-            le_mask_float = VD.is_leading_edge.astype(jnp.float32)
-            eta = jax.ops.segment_sum(VD.collocation_points[:, 1] * le_mask_float, VD.strip_ids, num_segments=VD.total_strips) / (AR/2.0)
-            gamma=jax.ops.segment_sum(Gamma[0], VD.strip_ids, num_segments=VD.total_strips)
+            le_mask_float = lat.is_leading_edge.astype(jnp.float32)
+            eta = jax.ops.segment_sum(lat.collocation_points[:, 1] * le_mask_float, lat.strip_ids, num_segments=lat.total_strips) / (AR/2.0)
+            gamma=jax.ops.segment_sum(Gamma[0], lat.strip_ids, num_segments=lat.total_strips)
             
             save_plot_cache(
                 "elliptical_convergence",
@@ -2003,7 +2003,7 @@ if __name__ == "__main__":
 
                 if PLOT_WINGS:
                     if int(i) % 10 == 0:
-                        fig = plot_panels(f_sys.analysis_data['vortex_distribution'])
+                        fig = plot_panels(f_sys.analysis_data.lattice)
                         fig.show()
 
             save_plot_cache(
@@ -2067,16 +2067,16 @@ if __name__ == "__main__":
 
             if PLOT_WINGS:
                 data = f_sys.analysis_data
-                base_panels = plot_panels(data["vortex_distribution"], title="ONERA M6 Panelization")
+                base_panels = plot_panels(data.lattice, title="ONERA M6 Panelization")
                 base_panels.show()
 
-                m11_flags = plot_panels(data["vortex_distribution"], data['singularities'][12], title="ONERA M6 Flag, M = 1.1")
+                m11_flags = plot_panels(data.lattice, data.singularities[12], title="ONERA M6 Flag, M = 1.1")
                 m11_flags.show()
 
-                m11_dcp = plot_panels(data["vortex_distribution"], data['dCp'][12], title="ONERA M6 DCp, M = 1.1")
+                m11_dcp = plot_panels(data.lattice, data.dCp[12], title="ONERA M6 DCp, M = 1.1")
                 m11_dcp.show()
 
-                m20 = plot_panels(data["vortex_distribution"], data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
+                m20 = plot_panels(data.lattice, data['dCp'][-1], title="ONERA M6 DCp, M = 2.0")
                 m20.show()
 
             save_plot_cache(

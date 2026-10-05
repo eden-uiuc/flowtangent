@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     pass
@@ -101,7 +101,7 @@ class Aircraft[EnergyType: PACTNetwork](System):
         return self.energy_networks[0]
 
     reference_geometry: AircraftReferenceGeometry = field(AircraftReferenceGeometry)
-    analysis_data: dict = field(dict)
+    analysis_data: Optional[Module] = None
 
     def update_network_topology(self) -> Aircraft:
         sorted_network = self.energy._update_node_topology()

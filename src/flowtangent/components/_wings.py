@@ -13,7 +13,6 @@ import jax.numpy as jnp
 
 from ..core._component import Component, Dimensions
 from ..utils import empty_array, field, static_field, update
-from ..utils.typing import _
 from . import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------

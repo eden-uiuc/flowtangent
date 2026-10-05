@@ -55,6 +55,7 @@ from ..utils import (
     TreePath,
     compute_tree_delta,
     field,
+    method_field,
     get_target,
     id_partition,
     inspect_leaves,
@@ -63,13 +64,15 @@ from ..utils import (
     update,
 )
 
+from ..utils.typing import _Placeholder
+
 # ----------------------------------------------------------------------------------------------------------------------
 #  ProcessStep
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 class ProcessStep(Module):
-    function: ProcessFunc = field(null_step)
+    function: ProcessFunc = method_field(null_step)
 
     _state_delta: Optional[State] = field(None)
     _system_delta: Optional[System] = field(None)
@@ -201,6 +204,10 @@ def array_barrier(state: State, system: System, settings: Settings):
     """
 
     def _to_array(leaf, ndim: int = 1):
+
+        if isinstance(leaf, _Placeholder):
+            leaf_arr = jnp.zeros((1,) * ndim)
+            return leaf_arr
         # Check if it's a raw scalar, a list/tuple of scalars, OR already an array
         is_scalar = isinstance(leaf, (float, int, complex))
         is_iterable = isinstance(leaf, (list, tuple)) and all(isinstance(i, (float, int, complex)) for i in leaf)

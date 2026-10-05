@@ -59,7 +59,9 @@ if __name__ == "__main__":
         (("chords", "mean_aerodynamic"), root_chord * 8.0 / (3 * jnp.pi)),
         (("areas", "reference"), S_ref),
         (("areas", "wetted"), (2.0 * S_ref)),
-    )).update_geometry()
+    ))
+    
+    wing = wing.update_geometry()
 
     system = ft.update(ft.Aircraft(name="VORJAX Model", subcomponents=(wing,)), "areas", wing.areas)
 
@@ -85,8 +87,8 @@ if __name__ == "__main__":
 
     initialize = ft.solve.aero.InitializeVORJAX()
 
-    span_path  = ft.TreePath(("wings", "main_wing", "spans", "projected"), name="b")
-    vert_path   = ft.TreePath(path=("analysis_data", "vortex_distribution", "panel_vertices"), path_slice=(slice(100), slice(1), slice(1)), name="v")
+    span_path  = ft.TreePath(("wings.main_wing.spans.projected"), name="b")
+    vert_path  = ft.TreePath(path="analysis_data.lattice.panel_vertices", path_slice=ft.ArraySlice[100, 1, 1], name="v")
     
     jac_map = ft.JacobianMap(system_inputs=(span_path,), system_outputs=(vert_path,))
 
@@ -97,15 +99,15 @@ if __name__ == "__main__":
 
     init_state, init_system, init_settings = initialize.run(initial_state, system, settings)
 
-    print(init_system.analysis_data['vortex_distribution'].panel_vertices[100,1,1])
+    print(init_system.analysis_data.lattice.panel_vertices[100,1,1])
 
     update_proc = ft.Process(steps=(update_mesh,))
     up_state, up_system, up_settings = update_proc.run(init_state, init_system, init_settings)
 
-    print(up_system.analysis_data['vortex_distribution'].panel_vertices[100,1,1])
+    print(up_system.analysis_data.lattice.panel_vertices[100,1,1])
 
-    # vd = init_system.analysis_data['vortex_distribution']
-    # fig = plot_panels(vd)
+    # lat = init_system.analysis_data.lattice
+    # fig = plot_panels(lat)
     # fig.show()
 
     print(up_state.process_jacobian.shape)
