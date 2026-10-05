@@ -360,8 +360,10 @@ class Process(ProcessStep):
             inner_setts = update(
                 base_settings,
                 "numerical.jacobian",
-                replace(base_settings.numerical.jacobian,
-                calculate=False,)
+                replace(
+                    base_settings.numerical.jacobian,
+                    calculate=False,
+                ),
             )
 
             f_st, f_sys, f_setts = self(st, sys, inner_setts)

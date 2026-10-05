@@ -1073,9 +1073,9 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             m_s_end = m_s_start + N_s
 
             m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)  # noqa: E731
-            m_stripPath = lambda attr_name, val: TreePath(
+            m_stripPath = lambda attr_name, val: TreePath(  # noqa: E731
                 path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val
-            )  # noqa: E731, E501
+            )
 
             lat_old = updated_system.analysis_data.lattice
             lat = update(
@@ -1611,7 +1611,6 @@ def compute_induced_velocity(state: State, system: Aircraft, settings: Settings)
         C_ij,
         singularity_flag,
     ) = compute_C_ij(lat, Mach)
-
 
     updated_system = update(system, (("analysis_data.VICS", C_ij), ("analysis_data.singularities", singularity_flag)))
 
