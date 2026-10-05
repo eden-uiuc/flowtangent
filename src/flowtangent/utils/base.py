@@ -130,7 +130,7 @@ class StateDataMeta(type(Module)):
                 annotations = annotationlib.call_annotate_function(
                     annotate, annotationlib.Format.FORWARDREF
                 )
-        #### 
+        ####
         for key, hint in annotations.items():
             if key.startswith("__"):
                 continue

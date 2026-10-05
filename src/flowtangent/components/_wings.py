@@ -449,7 +449,7 @@ class Wing(Component):
             # Assuming you have an immutable dataclass or tree update method here
             new_seg = update(
                 seg,
-                (   
+                (
                     ("sweeps.leading_edge", le_sweeps[i]),
                     ("chords.mean_aerodynamic", macs[i]),
                     ("areas.reference", s_ref_seg[i]),

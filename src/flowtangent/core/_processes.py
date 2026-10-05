@@ -55,15 +55,14 @@ from ..utils import (
     TreePath,
     compute_tree_delta,
     field,
-    method_field,
     get_target,
     id_partition,
     inspect_leaves,
     is_array_like,
+    method_field,
     null_step,
     update,
 )
-
 from ..utils.typing import _Placeholder
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -412,9 +411,9 @@ class Process(ProcessStep):
                         basis_sys = jnp.eye(N_L * N_o).reshape((N_L * N_o,) + L + (N_o,))
                         jac_tuple_sys = jax.vmap(vjp_fn)(basis_sys)
                         jac_sys = jac_tuple_sys[1].reshape(L + (N_o, N_sys))
-                    
+
                     jacs.append(jac_sys)
-                
+
                 batched_jacobian = jnp.concatenate(jacs, axis=-1)
 
             else:
@@ -532,7 +531,7 @@ class Process(ProcessStep):
     ):
 
         state, system, settings = self.initialize(state, system, settings)
-        
+
         # Direct call if not tracking history
         if not track_history:
             return self(state, system, settings)

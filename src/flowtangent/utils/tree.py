@@ -16,6 +16,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from equinox import Partial, combine, is_array, is_array_like, partition
+from jax.numpy import s_ as ArraySlice  # noqa: N812
 
 # -----------------------------------------------------------------------------
 # UPSTREAM FACADE IMPORTS
@@ -28,8 +29,6 @@ from jax.tree_util import (
     tree_map_with_path,
     tree_unflatten,
 )
-
-from jax.numpy import s_ as ArraySlice
 
 # -----------------------------------------------------------------------------
 # FLOWTANGENT WRAPPERS
@@ -94,7 +93,7 @@ def update(obj, where_or_updates, val=None, **kwargs):
             new_leaves.append(real_parent.at[p.path_slice].set(paths[idx].value))
         else:
             new_leaves.append(paths[idx].value)
-    
+
     new_leaves = tuple(new_leaves)
 
     where_fn = partial(get_all_parents, input_map=actual_paths)
