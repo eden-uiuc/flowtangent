@@ -32,7 +32,7 @@ from .utils import (
 
 # Data Hoists
 from .data import units
-# from .components.airfoils import (_data as airfoils, load_foil)
+# from .components.airfoils import (_data as airfoils, load_foil as load_airfoil)
 from .components.energy.maps import (_data as turbo_maps, load_map as load_turbo_map)
 from .data import gases
 
@@ -75,7 +75,7 @@ __all__ = [
     # Data sources
     "units",
     "airfoils",
-    "load_foil",
+    "load_airfoil",
     "turbo_maps",
     "load_turbo_map",
     "gases",

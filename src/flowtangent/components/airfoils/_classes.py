@@ -28,6 +28,7 @@ from ...core._component import Component
 
 class Airfoil(Component):
     name: str = field("Airfoil", static=True)
+    source_file: Optional[str | Path] = None
 
     thickness_to_chord: float = 0.0
     max_thickness: float = 0.0
@@ -394,6 +395,7 @@ class Airfoil(Component):
         else:
             return cls(
                 name=file_path.stem,
+                source_file=file_path,
                 camber=jnp.asarray((y_up_clean + y_lo_clean) / 2.0),
                 max_thickness=float(jnp.max(y_up_clean - y_lo_clean)),
                 coordinates=jnp.column_stack((selig_x, selig_y)),

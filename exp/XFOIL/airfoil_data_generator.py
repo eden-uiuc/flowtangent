@@ -7,12 +7,11 @@ import numpy as np
 import queue
 import shutil
 import zarr
+import csv
 
 from pathlib import Path
-
-from sklearn.decomposition import PCA
-from scipy.interpolate import interp1d
 from scipy.stats.qmc import Sobol
+from flowtangent.utils.io import _ft_root
 
 display_queue = queue.Queue()
 for i in range (100, 148):
@@ -24,12 +23,19 @@ BOUNDS = np.array([
     [15, 0.95, np.log10(3_000_000), 0.6]    # Upper
 ])
 
-ALPHAS = np.concatenate([
-    np.arange(-5, 8, 1.0), # Sparse linear region
-    np.arange(8, 15.25, 0.25) # Dense stall region
+# Start at 0, go up sparsely, then densely into the stall regime
+ALPHAS_POS = np.concatenate([
+    np.arange(0, 8, 1.0),       # [0, 1, 2 ... 7]
+    np.arange(8, 15.25, 0.25)   # [8, 8.25 ... 15.0]
 ])
 
+# Start just below 0, go down sparsely
+ALPHAS_NEG = np.arange(-1, -6, -1.0) # [-1, -2, -3, -4, -5]
+
+# The combined array for Zarr sizing and index matching
+ALPHAS = np.concatenate([ALPHAS_POS, ALPHAS_NEG])
 N_ALPHAS = len(ALPHAS)
+
 N_PANELS = 256
 
 BEND_KEYS = [
@@ -43,10 +49,13 @@ BEND_KEYS = [
 ]
 
 N_BEND_FEATURES = len(BEND_KEYS)
+LOG_FILE = Path(__file__).resolve().parent / "run_log.csv"
+ERROR_LOG_FILE = Path(__file__).resolve().parent / "error_log.csv"
 
-def generate_sobol_samples(n_samples):
+def generate_sobol_samples(total_samples):
     sampler = Sobol(4) # Flap Angle, Flap Hinge, Reynolds, Mach
-    raw_samples = sampler.random_base2(m=int(np.log2(n_samples)))  # e.g. m=7 -> 128 samples
+    m = int(np.ceil(np.log2(total_samples)))
+    raw_samples = sampler.random_base2(m=m)[:total_samples]  # e.g. m=7 -> 128 samples, truncated to target
 
     scaled = BOUNDS[0] + raw_samples * (BOUNDS[1] - BOUNDS[0])
 
@@ -102,28 +111,22 @@ def parse_bend_stdout(stdout_text):
 
 def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, zarr_root):
     
+    airfoil_name = Path(airfoil).stem
     uid = uuid.uuid4().hex[:8]
 
     # Use RAM disk for I/O
     ram_dir = Path(f"/dev/shm/xfoil_{uid}")
     ram_dir.mkdir(exist_ok=True)
-
     polar_file = ram_dir / "macro.pol"
 
-    from_file = "." in airfoil
-    
-    if from_file:
-        temp_dat = f"in_{uid}.dat"
+    # Store 
+    temp_dat = f"in_{uid}.dat"
+    shutil.copy(airfoil, temp_dat)
 
-        shutil.copy(airfoil, temp_dat)
-        af_str = f"LOAD {temp_dat}"
-    else:
-        # Assume NACA
-        af_str = f"NACA {airfoil}"
     
     # Building the command string as a list guarantees exact newline placement
     cmds = [
-        af_str,                     # NACA or DAT File
+        f"LOAD {temp_dat}",         # Load DAT File
         "PANE",                     # Inital panelization
         "GDES",                     # Geometry Design Routine
         "FLAP",                     # Flap Deflection
@@ -145,7 +148,7 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
         "PANE",                     # Repanel
         "BEND",                     # Calculate structural properties
         "OPER",                     # Enter OPER menu
-        "ITER 100",                 # 100 maximum iterations
+        "ITER 200",                 # 200 maximum iterations
         f"MACH {mach:.3f}",         # Set Mach number
         f"VISC {reynolds}",         # Set Reynolds Number
         "PACC",                     # Activate polar accumulation
@@ -153,12 +156,26 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
         "",                         # Skip dump file
     ]
 
-    for a in ALPHAS:
+    # 1. Sweep the Positive Alphas (Cold start at 0 is safe)
+    for a in ALPHAS_POS:
         cmds.extend([
             f"ALFA {a:.2f}",
             f"CPWR {ram_dir}/cp_{a:.2f}.txt",
             f"DUMP {ram_dir}/bl_{a:.2f}.txt"
         ])
+        
+    # 2. WIPE THE BOUNDARY LAYER MEMORY
+    # Without this, XFOIL uses the separated 15-degree wake to guess the -1 degree flow.
+    cmds.append("INIT")
+    
+    # 3. Sweep the Negative Alphas
+    for a in ALPHAS_NEG:
+        cmds.extend([
+            f"ALFA {a:.2f}",
+            f"CPWR {ram_dir}/cp_{a:.2f}.txt",
+            f"DUMP {ram_dir}/bl_{a:.2f}.txt"
+        ])
+        
     cmds.extend(["", "QUIT"])
     
     xfoil_cmds = "\n".join(cmds) + "\n"
@@ -173,6 +190,7 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
             pass
 
     xvfb_proc = None
+    converged_alphas = 0
     
     try:
         # 3. Launch a private Xvfb server for this specific thread
@@ -207,7 +225,7 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
             if cp_file.exists() and bl_file.exists():
                 try:
                     cp_data = np.loadtxt(cp_file, skiprows=1)
-                    bl_data = np.loadtxt(cp_file, skiprows=1)
+                    bl_data = np.loadtxt(bl_file, skiprows=1)
 
                     panel_arr[i, :, :-1] = bl_data[:N_PANELS, :]
                     panel_arr[i, :, -1] = cp_data[:N_PANELS, :]
@@ -245,6 +263,7 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
                             
                             if len(idx) > 0:
                                 polar_arr[idx[0]] = row
+                                converged_alphas += 1
 
         bend_dict = parse_bend_stdout(process.stdout)
         bend_vector = np.array([bend_dict.get(k, np.nan) for k in BEND_KEYS], dtype=np.float32)
@@ -253,6 +272,7 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
         zarr_root['conditions'][run_idx] = np.array([flap_angle, flap_hinge, reynolds, mach])
         zarr_root['polar_data'][run_idx] = polar_arr
         zarr_root['bend_data'][run_idx] = bend_vector
+        zarr_root['foil_name'][run_idx] = airfoil_name
         
     finally:
         # 6. Always kill the virtual monitor and return the port to the queue
@@ -264,177 +284,128 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
         if ram_dir.exists():
             shutil.rmtree(ram_dir)
 
-# ==========================================
-# 1. Coordinate Alignment (Cosine Spacing)
-# ==========================================
-def align_airfoil(x_coords, y_coords, num_points=100):
-    """
-    Interpolates arbitrary airfoil coordinates onto a standardized cosine-spaced grid.
-    Expects coordinates starting at trailing edge, over the top, to leading edge, 
-    and back along the bottom to the trailing edge.
-    """
-    # Create the standard cosine-spaced x grid (clustered at LE and TE)
-    beta = np.linspace(0, np.pi, num_points)
-    x_standard = 0.5 * (1.0 - np.cos(beta))
-    
-    # Split airfoil into upper and lower surfaces based on the leading edge (min X)
-    le_idx = np.argmin(x_coords)
-    
-    x_upper = x_coords[:le_idx+1][::-1] # Reverse to go LE -> TE
-    y_upper = y_coords[:le_idx+1][::-1]
-    
-    x_lower = x_coords[le_idx:]
-    y_lower = y_coords[le_idx:]
-    
-    # Interpolate using cubic splines
-    f_upper = interp1d(x_upper, y_upper, kind='cubic', fill_value="extrapolate", assume_sorted=False)
-    f_lower = interp1d(x_lower, y_lower, kind='cubic', fill_value="extrapolate", assume_sorted=False)
-    
-    y_upper_std = f_upper(x_standard)
-    y_lower_std = f_lower(x_standard)
-    
-    # Flatten into a single 1D vector: [y_upper_0 ... y_upper_N, y_lower_0 ... y_lower_N]
-    # (We drop x_standard because it is identical for every airfoil)
-    return np.concatenate([y_upper_std, y_lower_std])
-
-# ==========================================
-# 2. Basis Concatenation & Gram-Schmidt
-# ==========================================
-def build_hybrid_basis(uiuc_data, naca_data, uiuc_dims=32, naca_dims=3):
-    """
-    uiuc_data: shape (N_uiuc, 200) - Standardized UIUC vectors
-    naca_data: shape (N_naca, 200) - Standardized NACA vectors
-    """
-    print("Fitting independent PCAs...")
-    pca_uiuc = PCA(n_components=uiuc_dims).fit(uiuc_data)
-    pca_naca = PCA(n_components=naca_dims).fit(naca_data)
-    
-    # 1. Extract means and basis vectors
-    mu_U = pca_uiuc.mean_
-    mu_N = pca_naca.mean_
-    
-    V_U = pca_uiuc.components_  # Shape: (32, 200)
-    V_N = pca_naca.components_  # Shape: (3, 200)
-    
-    # 2. Calculate the Mean Shift Vector
-    delta_mu = mu_N - mu_U
-    delta_mu /= np.linalg.norm(delta_mu) # Normalize for numerical stability
-    
-    # 3. Assemble the raw concatenated matrix
-    # Order matters! We force the QR decomposition to prioritize the mean shift
-    # and NACA variance before filling the rest of the space with UIUC variance.
-    M_raw = np.vstack([
-        delta_mu,      # 1 vector
-        V_N,           # 3 vectors
-        V_U            # 32 vectors
-    ])
-    
-    # Transpose so vectors are columns (expected by np.linalg.qr)
-    M_raw = M_raw.T 
-    
-    print("Running QR Decomposition...")
-    # 4. Gram-Schmidt Orthogonalization
-    Q, R = np.linalg.qr(M_raw)
-    
-    # Q is now our orthonormal basis. Shape: (200, 36)
-    # Transpose back to scikit-learn standard format: (36, 200)
-    hybrid_basis = Q.T
-    
-    # Optional: Truncate back to exactly 32 dimensions if you want to keep the 
-    # latent space size strictly matched to your original UIUC estimate.
-    hybrid_basis = hybrid_basis[:uiuc_dims, :]
-    
-    return mu_U, hybrid_basis
-
-# ==========================================
-# 3. Encoding / Decoding Helper
-# ==========================================
-def encode_airfoil(airfoil_vector, basis, origin):
-    """Projects a 200D airfoil vector into the low-dimensional latent space."""
-    return np.dot(airfoil_vector - origin, basis.T)
-
-def decode_airfoil(latent_vector, basis, origin):
-    """Reconstructs the 200D airfoil from the latent weights."""
-    return np.dot(latent_vector, basis) + origin
+    return run_idx, airfoil_name, flap_angle, flap_hinge, reynolds, mach, converged_alphas
     
 
 if __name__ == '__main__':
-    airfoils = ['0012', '2412'
-                # '4412', '0009', '2415', '4415', '6409', '0015', '23012', '23015'
-                ]
+    # airfoils = list(Path(_ft_root() / "data" / "airfoils").glob('*.dat'))
 
-    N_SAMPLES = 8 # Power of 2 for Sobol
+    from flowtangent.components.airfoils._data import validate_library, analyze_split_safety, _AF_REGISTRY
+    valid_airfoils = validate_library(k=16)
+    train_set, test_set = analyze_split_safety(valid_airfoils, k=16)
+
+    airfoils = [_AF_REGISTRY[name] for name in train_set][:10]
+
+    N_SAMPLES = 128 # Power of 2 for Sobol
     TOTAL_RUNS = len(airfoils) * N_SAMPLES
 
-    print(f"Initializing Zarr store for {TOTAL_RUNS} total condition sweeps...")
-
     file_dir = Path(__file__).resolve().parent
-    root = zarr.group(file_dir / "data.zarr", overwrite=True)
+    zarr_path = file_dir / "data.zarr"
 
-    root.create_array("panel_data", shape=(TOTAL_RUNS, N_ALPHAS, N_PANELS, 13), chunks=(1, N_ALPHAS, N_PANELS, 13), dtype='f4')
-    root.create_array("conditions", shape=(TOTAL_RUNS, 4), chunks=(1, 4), dtype='f4')
-    root.create_array("polar_data", shape=(TOTAL_RUNS, N_ALPHAS, 9), chunks=(1, N_ALPHAS, 9), dtype='f4')
-    root.create_array("bend_data", shape=(TOTAL_RUNS, N_BEND_FEATURES), chunks=(1, N_BEND_FEATURES), dtype='f4')
+    completed_runs = set()
+    if LOG_FILE.exists():
+        with open(LOG_FILE, 'r') as f:
+            reader = csv.reader(f)
+            next(reader, None) # Skip header
+            for row in reader:
+                if row: 
+                    completed_runs.add(int(row[0]))
+                    
+    is_resuming = len(completed_runs) > 0
+    
+    print(f"Initializing Zarr store for {TOTAL_RUNS} total condition sweeps...")
+    root = zarr.open_group(zarr_path, mode='a' if is_resuming else 'w')
+
+    if not is_resuming:
+        root.create_array("panel_data", shape=(TOTAL_RUNS, N_ALPHAS, N_PANELS, 13), chunks=(1, N_ALPHAS, N_PANELS, 13), dtype='f4')
+        root.create_array("conditions", shape=(TOTAL_RUNS, 4), chunks=(1, 4), dtype='f4')
+        root.create_array("polar_data", shape=(TOTAL_RUNS, N_ALPHAS, 9), chunks=(1, N_ALPHAS, 9), dtype='f4')
+        root.create_array("bend_data", shape=(TOTAL_RUNS, N_BEND_FEATURES), chunks=(1, N_BEND_FEATURES), dtype='f4')
+        root.create_array("foil_name", shape=(TOTAL_RUNS,), chunks=(1000,), dtype='U50') # Fixed-length Unicode
+
+        with open(LOG_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['run_idx', 'airfoil', 'flap_angle', 'flap_hinge', 'reynolds', 'mach', 'converged_alphas', 'total_alphas'])
+        with open(ERROR_LOG_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['run_idx', 'airfoil', 'flap_angle', 'flap_hinge', 'reynolds', 'mach', 'error_message'])
+    else:
+        print(f"RESUMING: Found {len(completed_runs)} completed runs in log. Skipping...")
+
+    sobol_samples = generate_sobol_samples(TOTAL_RUNS)
     
     tasks = []
     run_counter = 0
     for airfoil in airfoils:
-        samples = generate_sobol_samples(N_SAMPLES)
-        for sample in samples:
-            flap_angle = float(sample[0])
-            flap_hinge = float(sample[1])
-            reynolds = float(sample[2])
-            mach = float(sample[3])
-            tasks.append((run_counter, airfoil, flap_angle, flap_hinge, reynolds, mach, root))
+        for _ in range(N_SAMPLES):
+            if run_counter not in completed_runs:
+                sample = sobol_samples[run_counter]
+                tasks.append((
+                    run_counter, airfoil, 
+                    float(sample[0]), float(sample[1]), float(sample[2]), float(sample[3]), 
+                    root
+                ))
             run_counter += 1
     
     print(f"Starting {TOTAL_RUNS} runs on {os.cpu_count() - 4} threads...") #type: ignore
-    start_time = time.time()
-    # converged_points = 0
-    # errors = []
 
-    print("Running a single test point for debugging...")
-    test_task = tasks[0] # (run_idx, airfoil, flap, reynolds, mach, root)
-    run_xfoil_point(*test_task)
-    print("Test point completed successfully!")
+    total_converged = 0
+    total_attempted = 0
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() - 4) as executor: #type: ignore
-        futures = [executor.submit(run_xfoil_point, *task) for task in tasks]
+    with open(LOG_FILE, 'a', newline='') as success_f, open(ERROR_LOG_FILE, 'a', newline='') as error_f:
+        success_writer = csv.writer(success_f)
+        error_writer = csv.writer(error_f)
         
-        for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
-            try:
-                future.result() 
-            except Exception as e:
-                print(f"THREAD CRASHED - TASK {i}: {repr(e)}")
-                raise e
-                
-            if i % 10 == 0:
-                print(f"Progress: {i} / {TOTAL_RUNS} completed.")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() - 4) as executor:
+            future_to_task = {executor.submit(run_xfoil_point, *task): task for task in tasks}
+            
+            for i, future in enumerate(concurrent.futures.as_completed(future_to_task)):
 
-    end_time = time.time()
+                task = future_to_task[future]
+                t_idx, t_airfoil, t_f_ang, t_f_hinge, t_re, t_mach, _ = task
+                t_af_name = Path(t_airfoil).stem
 
-    # if errors:
-    #     with open(Path(__file__).resolve().parent/"xfoil_errors.log", "w") as f:
-    #         f.writelines(errors)
-    #     print(f"\n[!] Logged {len(errors)} exceptions to xfoil_errors.log")
+                try:
+                    # If it succeeds, unpack the exact results
+                    run_idx, af_name, f_ang, f_hinge, re, mach, conv_alphas = future.result() 
+                    
+                    total_converged += conv_alphas
+                    total_attempted += N_ALPHAS
+                    
+                    success_writer.writerow([run_idx, af_name, f"{f_ang:.2f}", f"{f_hinge:.2f}", f"{re:.0f}", f"{mach:.3f}", conv_alphas, N_ALPHAS])
+                    success_f.flush()
+                    
+                except Exception as e:
+                    # If it crashes, log the exact inputs from the task dictionary
+                    error_msg = repr(e)
+                    print(f"THREAD CRASHED [{t_af_name} | idx: {t_idx}]: {error_msg}")
+                    
+                    error_writer.writerow([t_idx, t_af_name, f"{t_f_ang:.2f}", f"{t_f_hinge:.2f}", f"{t_re:.0f}", f"{t_mach:.3f}", error_msg])
+                    error_f.flush()
+                    
+                if i % 20 == 0:
+                    yield_pct = (total_converged / total_attempted) * 100 if total_attempted > 0 else 0
+                    print(f"Progress: {i} / {len(tasks)} | Yield: {yield_pct:.1f}% | Recent: {t_af_name}")
+
+
     
-    # Calculate statistics
-    benchmark_duration = end_time - start_time
-    time_per_run = benchmark_duration / TOTAL_RUNS
+    # # Calculate statistics
+    # benchmark_duration = end_time - start_time
+    # time_per_run = benchmark_duration / TOTAL_RUNS
     
-    # Extrapolate to 2,000 baseline airfoils
-    target_airfoils = 2000
-    target_samples = 128
-    multiplier = (target_airfoils / len(airfoils)) * (target_samples / N_SAMPLES)
-    estimated_total_time_seconds = benchmark_duration * multiplier
-    estimated_total_time_hours = estimated_total_time_seconds / 3600
+    # # Extrapolate to 2,000 baseline airfoils
+    # target_airfoils = 2000
+    # target_samples = 128
+    # multiplier = (target_airfoils / len(airfoils)) * (target_samples / N_SAMPLES)
+    # estimated_total_time_seconds = benchmark_duration * multiplier
+    # estimated_total_time_hours = estimated_total_time_seconds / 3600
     
-    print("\n" + "="*40)
-    print("BENCHMARK RESULTS")
-    print("="*40)
-    print(f"Benchmark duration:   {benchmark_duration:.2f} seconds")
-    print(f"Avg time per run:     {time_per_run:.3f} seconds")
-    print(f"\nESTIMATE FOR {target_airfoils} AIRFOILS:")
-    print(f"Total runs needed:    {multiplier * TOTAL_RUNS:,}")
-    print(f"Estimated time:       {estimated_total_time_hours:.2f} hours (approx {estimated_total_time_hours/24:.1f} days)")
-    print("="*40)
+    # print("\n" + "="*40)
+    # print("BENCHMARK RESULTS")
+    # print("="*40)
+    # print(f"Benchmark duration:   {benchmark_duration:.2f} seconds")
+    # print(f"Avg time per run:     {time_per_run:.3f} seconds")
+    # print(f"\nESTIMATE FOR {target_airfoils} AIRFOILS:")
+    # print(f"Total runs needed:    {multiplier * TOTAL_RUNS:,}")
+    # print(f"Estimated time:       {estimated_total_time_hours:.2f} hours (approx {estimated_total_time_hours/24:.1f} days)")
+    # print("="*40)
