@@ -23,11 +23,13 @@ from .core._processes import Process, ProcessStep, array_barrier
 from .utils import (
     update,
     TreePath,
+    ArraySlice,
     field,
     static_field,
     method_field,
     null_step,
     Module,
+    configure_environment,
 )
 
 # Data Hoists
@@ -41,7 +43,12 @@ from .solve import (
     BatchedAnalysis,
     ImplicitAnalysis,
     PACTAnalysis,
+    JacobianMap,
+    NumericalSettings,
+    AnalysisSettings,
 )
+
+from .components import Wing, Fuselage
 
 # 4. Short-Name Namespace Routing
 from . import functional as F  # noqa: N812
@@ -59,12 +66,17 @@ __all__ = [
     "Module",
     "State",
     "System",
+    "Settings",
     "Aircraft",
     "Settings",
     "Component",
     "Process",
     "ProcessStep",
     "TreePath",
+    "ArraySlice",
+    "JacobianMap",
+    "NumericalSettings",
+    "AnalysisSettings",
     # Key utilities
     "update",
     "field",
@@ -72,6 +84,7 @@ __all__ = [
     "method_field",
     "null_step",
     "array_barrier",
+    "configure_environment"
     # Data sources
     "units",
     "airfoils",
@@ -83,6 +96,9 @@ __all__ = [
     "BatchedAnalysis",
     "ImplicitAnalysis",
     "PACTAnalysis",
+    # Components
+    "Wing",
+    "Fuselage",
     # Submodules
     "F",
     "comp",

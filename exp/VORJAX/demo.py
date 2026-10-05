@@ -1,19 +1,11 @@
-import equinox as eqx
-import jax
+import flowtangent as ft
 import jax.numpy as jnp
 
-from flowtangent.framework.analyses.aero.VORJAX import InitializeVORJAX, VORJAX, Vortices, VORJAXSettings
-from flowtangent.library.components.wings import Wing, WingSegment, Sweeps, Chords, WingDimensions
-from flowtangent.core._systems import Aircraft
-from flowtangent.library.components import Areas
-from flowtangent.data import units
+from flowtangent import units
+from flowtangent.components import Wing, WingSegment
+from flowtangent.plots import plot_panels
 
-from flowtangent.utils import configure_environment, TreePath, update
-
-from flowtangent.framework import State, Settings, Process
-from flowtangent.core._settings import JacobianMap, NumericalSettings
-
-from flowtangent.framework.plotting.VLM import plot_vlm_panels
+from flowtangent.solve.aero._vorjax import update_mesh, VORJAXSettings, PanelSettings
 
 if __name__ == "__main__":
 
@@ -41,47 +33,39 @@ if __name__ == "__main__":
         delta_y = 0.5 * AR * (eta_end - eta_start)
         sweep_c4 = jnp.arctan2(delta_x_c4, delta_y)
 
-        sweeps = Sweeps(quarter_chord=sweep_c4.item())
+        new_seg = WingSegment(
+                        name=f"Elliptical Segment {i}",
+                        percent_span_location=eta_start.item(),
+                        root_chord_percent=chord_start.item(),
+                    )
+        new_seg = ft.update(new_seg, ("sweeps.quarter_chord", sweep_c4.item()))
+        segments += (new_seg,)
 
-        segments += (
-            WingSegment(
-                name=f"Elliptical Segment {i}",
-                percent_span_location=eta_start,
-                root_chord_percent=chord_start,
-                sweeps=sweeps,
-            ),
-        )
-
-    segments += (WingSegment(
-        name="Tip",
-        percent_span_location=1.0,
-        root_chord_percent=0.01),)
-
-    wing_areas = Areas(reference=S_ref, wetted=2.0 * S_ref)
-
+    # Instantiate wing
     wing = Wing(
-        name=f"Elliptical {n_seg}",
+        name=f"Main Wing",
         symmetric=True,
-        spans=WingDimensions(projected=span),
         segments=segments,
-        chords=Chords(
-            root=root_chord,
-            tip = 0.01 * root_chord,
-            mean_aerodynamic=root_chord * 8.0 / (3 * jnp.pi)),
-            areas = wing_areas,
-            taper=0.01,
-            aerodynamic_center=jnp.zeros(3)
-        ).update_geometry()
-
-    system = Aircraft(
-        name="VORJAX Model",
-        areas=wing_areas,
-        subcomponents=(wing,)
+        taper=0.01,
+        aerodynamic_center=jnp.zeros(3)
     )
 
-    initial_state = State().freeze_initials()
-    initial_state = update(
-        initial_state,
+    # Update nested properties and geometry
+    wing = ft.update(wing, (
+        (("spans", "projected"), span),
+        (("chords", "root"), root_chord),
+        (("chords", "mean_aerodynamic"), root_chord * 8.0 / (3 * jnp.pi)),
+        (("areas", "reference"), S_ref),
+        (("areas", "wetted"), (2.0 * S_ref)),
+    ))
+    
+    wing = wing.update_geometry()
+
+    system = ft.update(ft.Aircraft(name="VORJAX Model", subcomponents=(wing,)), "areas", wing.areas)
+
+    # initial_state = ft.State().freeze_initials()
+    initial_state = ft.update(
+        ft.State(),
         (
             ("stability.static.roll_rate", jnp.zeros((1, 1))),
             ("stability.static.pitch_rate", jnp.zeros((1, 1))),
@@ -89,41 +73,42 @@ if __name__ == "__main__":
         )
     )
 
-    initial_state = update(initial_state, "aerodynamics.angles.alpha", jnp.atleast_2d(3.0 * units.deg))
-    initial_state = update(initial_state, "aerodynamics.angles.beta", jnp.atleast_2d(0.0 * units.deg))
-    initial_state = update(initial_state, "freestream.mach_number", jnp.atleast_2d(0.0))
+    initial_state = ft.update(initial_state, "aerodynamics.angles.alpha", jnp.atleast_2d(3.0 * units.deg))
+    initial_state = ft.update(initial_state, "aerodynamics.angles.beta", jnp.atleast_2d(0.0 * units.deg))
+    initial_state = ft.update(initial_state, "freestream.mach_number", jnp.atleast_2d(0.0))
 
     # initial_state = update(initial_state, "freestream.speed", jnp.array([[100.0]]))
-    initial_state = update(initial_state, "freestream.density", jnp.array([[1.0]]))
-    initial_state = update(initial_state, "freestream.gamma", jnp.array([[1.4]]))
-    initial_state = update(initial_state, "freestream.temperature", jnp.array([[273.15]]))
-    initial_state = update(initial_state, "frames.inertial.velocity_vector", jnp.array([[100.0, 0., 0.]]))
+    initial_state = ft.update(initial_state, "freestream.density", jnp.array([[1.0]]))
+    initial_state = ft.update(initial_state, "freestream.gamma", jnp.array([[1.4]]))
+    initial_state = ft.update(initial_state, "freestream.temperature", jnp.array([[273.15]]))
+    initial_state = ft.update(initial_state, "frames.inertial.velocity_vector", jnp.array([[100.0, 0., 0.]]))
 
-    analysis = VORJAX()
+    initialize = ft.solve.aero.InitializeVORJAX()
 
-    panelization = Vortices(
-        n_spanwise=24,
-        n_chordwise=48
-    )
-
-    alpha_path  = TreePath(("aerodynamics", "angles", "alpha"), name="a")
-    lift_path   = TreePath(("aerodynamics", "coefficients", "lift", "total"), name="CL")
+    span_path  = ft.TreePath(("wings.main_wing.spans.projected"), name="b")
+    vert_path  = ft.TreePath(path="analysis_data.lattice.panel_vertices", path_slice=ft.ArraySlice[100, 1, 1], name="v")
     
-    jac_map = JacobianMap(state_inputs=(alpha_path,), state_outputs=(lift_path,))
-    num_sets = update(NumericalSettings(), "jacobian.mapping", jac_map)
+    jac_map = ft.JacobianMap(system_inputs=(span_path,), system_outputs=(vert_path,))
 
-    settings = update(
-        Settings(DEBUG_MODE=True),
-        (
-            ("analysis.aerodynamics", VORJAXSettings(vortices=panelization)),
-            ("numerical", num_sets),
-        ),
-    )
-    configure_environment(settings)
+    aero_settings = VORJAXSettings(panels=PanelSettings(n_spanwise=24, n_chordwise=8))
+    numerical_settings = ft.solve.NumericalSettings(jacobian=ft.solve.JacobianSettings(mapping=jac_map, calculate=True))
+    settings = ft.Settings(DEBUG_MODE=False, analysis=ft.solve.AnalysisSettings(aerodynamics=aero_settings), numerical=numerical_settings)
+    ft.configure_environment(settings)
 
-    init_state, init_system, init_settings = analysis.run(initial_state, system, settings)
-    vd = init_system.analysis_data['vortex_distribution']
-    fig = plot_vlm_panels(vd)
-    fig.show()
+    init_state, init_system, init_settings = initialize.run(initial_state, system, settings)
+
+    print(init_system.analysis_data.lattice.panel_vertices[100,1,1])
+
+    update_proc = ft.Process(steps=(update_mesh,))
+    up_state, up_system, up_settings = update_proc.run(init_state, init_system, init_settings)
+
+    print(up_system.analysis_data.lattice.panel_vertices[100,1,1])
+
+    # lat = init_system.analysis_data.lattice
+    # fig = plot_panels(lat)
+    # fig.show()
+
+    print(up_state.process_jacobian.shape)
+    print(up_state.process_jacobian)
 
     print("Done.")
