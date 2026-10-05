@@ -4,5 +4,5 @@ __all__ = [
     "VORJAX",
     "VORJAXSettings",
     "InitializeVORJAX",
-    "AnalyzeVORJAX"
+    "AnalyzeVORJAX",
 ]

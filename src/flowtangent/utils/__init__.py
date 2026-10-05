@@ -1,7 +1,7 @@
 # src/flowtangent/utils/__init__.py
 
 # 1. Base / Syntax
-from .base import(
+from .base import (
     null_step,
     field,
     static_field,

@@ -32,7 +32,6 @@ from ._state_data import (
 
 
 class State[EnergyType: NetworkState](StateData):
-
     time: Time = field(Time)
 
     frames: FrameData = field(FrameData)

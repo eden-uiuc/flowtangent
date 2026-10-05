@@ -101,11 +101,11 @@ class Wing(Component):
 
     # Specialty Attributes
 
-    symmetric: bool     = static_field(True)
-    vertical: bool      = static_field(False)
-    high_lift: bool     = static_field(False)
-    high_mach: bool     = static_field(False)
-    vortex_lift: bool   = static_field(False)
+    symmetric: bool = static_field(True)
+    vertical: bool = static_field(False)
+    high_lift: bool = static_field(False)
+    high_mach: bool = static_field(False)
+    vortex_lift: bool = static_field(False)
 
     taper: float = 0.0
     dihedral: float = 0.0

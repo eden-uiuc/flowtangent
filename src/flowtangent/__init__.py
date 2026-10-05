@@ -43,7 +43,7 @@ from .solve import (
     AnalysisSettings,
 )
 
-from .components import (Wing, Fuselage)
+from .components import Wing, Fuselage
 
 # 4. Short-Name Namespace Routing
 from . import functional as F  # noqa: N812

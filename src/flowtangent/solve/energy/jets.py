@@ -162,10 +162,8 @@ def _design_update(state: State, system: System, settings: Settings) -> tuple[St
 
 
 def build_turbojet_design(
-        state: State,
-        system: System,
-        settings: Settings
-    ) -> tuple[State, System, Settings, ImplicitAnalysis]:
+    state: State, system: System, settings: Settings
+) -> tuple[State, System, Settings, ImplicitAnalysis]:
 
     # Setup test state according to design parameters
 

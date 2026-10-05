@@ -52,12 +52,12 @@ class JacobianMap(Module):
         self.inputs = tuple(TreePath(i) for i in inputs)
         self.outputs = tuple(TreePath(o) for o in outputs)
 
-        _filter_in = lambda s: tuple(p for p in self.inputs if p.path[0].lower() == s) #noqa: E731
-        _filter_out = lambda s: tuple(p for p in self.outputs if p.path[0].lower() == s) #noqa: E731
+        _filter_in = lambda s: tuple(p for p in self.inputs if p.path[0].lower() == s)  # noqa: E731
+        _filter_out = lambda s: tuple(p for p in self.outputs if p.path[0].lower() == s)  # noqa: E731
 
-        self.state_inputs   = _filter_in("state") if state_inputs is None else state_inputs
-        self.system_inputs  = _filter_in("system") if system_inputs is None else system_inputs
-        self.state_outputs  = _filter_out("state") if state_outputs is None else state_outputs
+        self.state_inputs = _filter_in("state") if state_inputs is None else state_inputs
+        self.system_inputs = _filter_in("system") if system_inputs is None else system_inputs
+        self.state_outputs = _filter_out("state") if state_outputs is None else state_outputs
         self.system_outputs = _filter_out("system") if system_outputs is None else system_outputs
 
         self._n_st = len(self.state_inputs)
@@ -90,7 +90,7 @@ class JacobianMap(Module):
         if self._n_st > 0:
             st_in = get_all_targets(st, self.state_inputs)
             shapes = [x.shape for x in st_in]
-            sizes = [x.shape[-1] for x in st_in] # Number of features per array
+            sizes = [x.shape[-1] for x in st_in]  # Number of features per array
 
             # Split along the feature axis
             splits = jnp.split(flat_st, np.cumsum(sizes)[:-1], axis=-1)
@@ -133,8 +133,9 @@ class JacobianMap(Module):
         # Concatenate along the feature dimension, preserving B and T dynamically
         return jnp.concatenate([out.reshape(*out.shape[:-1], -1) for out in outputs], axis=-1)
 
+
 class JacobianSettings(Module):
-    calculate: bool =   static_field(False)
+    calculate: bool = static_field(False)
     couple_time: bool = static_field(True)
     mapping: Optional[JacobianMap] = static_field(None)
 

@@ -127,7 +127,7 @@ def initialize_VORJAX_data(state: State, system: Aircraft, settings: Settings):
             ("reference_geometry", new_ref_geom),
             ("analysis_data", VORJAXData()),
         ),
-        is_leaf=lambda x: x is None
+        is_leaf=lambda x: x is None,
     )
 
     return state, updated_system, settings
@@ -146,15 +146,16 @@ class LatticeData(Module):
 
     # --- Base Geometric State ---
     panel_vertices: jax.Array = field(jnp.empty((0, 4, 3)))  # (N, 4, 3), CCW from Front-Left
-    camber_slopes:  jax.Array = field(jnp.empty(0))  # (N,) Camber slope at each panel
-    wedge_angles:   jax.Array = field(jnp.empty(0))  # (N_s,) Leading edge wedge angle for supersonic correction
+    camber_slopes: jax.Array = field(jnp.empty(0))  # (N,) Camber slope at each panel
+    wedge_angles: jax.Array = field(jnp.empty(0))  # (N_s,) Leading edge wedge angle for supersonic correction
 
     # --- Identity & Topology (Calculated before flattening) ---
-    surface_id:         jax.Array = field(jnp.empty(0, dtype=jnp.int32))  # (N,) ID of the originating wing/fuselage
-    control_surface_id: jax.Array = field(jnp.empty(0, dtype=jnp.int32))  # (N,) ID of the control surface (-1 for solid wing)
-    is_leading_edge:    jax.Array = field(jnp.empty(0, dtype=bool))  # (N,) Boolean mask
-    is_trailing_edge:   jax.Array = field(jnp.empty(0, dtype=bool))  # (N,) Boolean mask
-
+    surface_id: jax.Array = field(jnp.empty(0, dtype=jnp.int32))  # (N,) ID of the originating wing/fuselage
+    control_surface_id: jax.Array = field(
+        jnp.empty(0, dtype=jnp.int32)
+    )  # (N,) ID of the control surface (-1 for solid wing)
+    is_leading_edge: jax.Array = field(jnp.empty(0, dtype=bool))  # (N,) Boolean mask
+    is_trailing_edge: jax.Array = field(jnp.empty(0, dtype=bool))  # (N,) Boolean mask
 
     # --- Static Structural Integers (NOT traced by JAX) ---
     total_panels: int = static_field(0)
@@ -171,7 +172,7 @@ class LatticeData(Module):
         is_trailing_edge=jnp.empty(0, dtype=bool),
         total_panels: int = 0,
         total_strips: int = 0,
-        **kwargs
+        **kwargs,
     ):
 
         super().__init__(**kwargs)
@@ -180,10 +181,26 @@ class LatticeData(Module):
         object.__setattr__(self, "camber_slopes", camber_slopes)
         object.__setattr__(self, "wedge_angles", wedge_angles)
 
-        object.__setattr__(self, "surface_id", jnp.asarray(surface_id, dtype=jnp.int32),)
-        object.__setattr__(self, "control_surface_id", jnp.asarray(control_surface_id, dtype=jnp.int32),)
-        object.__setattr__(self, "is_leading_edge", jnp.asarray(is_leading_edge, dtype=bool),)
-        object.__setattr__(self, "is_trailing_edge", jnp.asarray(is_trailing_edge, dtype=bool),)
+        object.__setattr__(
+            self,
+            "surface_id",
+            jnp.asarray(surface_id, dtype=jnp.int32),
+        )
+        object.__setattr__(
+            self,
+            "control_surface_id",
+            jnp.asarray(control_surface_id, dtype=jnp.int32),
+        )
+        object.__setattr__(
+            self,
+            "is_leading_edge",
+            jnp.asarray(is_leading_edge, dtype=bool),
+        )
+        object.__setattr__(
+            self,
+            "is_trailing_edge",
+            jnp.asarray(is_trailing_edge, dtype=bool),
+        )
 
         if total_panels is None:
             total_panels = panel_vertices.shape[0]
@@ -307,6 +324,7 @@ class LatticeData(Module):
         stripwise_panels = jax.ops.segment_sum(panel_ones, strip_ids, num_segments=self.total_strips)
         return stripwise_panels[strip_ids]
 
+
 def mirror_lattice(lat: LatticeData) -> LatticeData:
     """Creates the symmetric left-side counterpart of a right-side wing."""
 
@@ -330,6 +348,7 @@ def mirror_lattice(lat: LatticeData) -> LatticeData:
             mirrored_kwargs[key] = getattr(lat, key)
 
     return LatticeData(**mirrored_kwargs)
+
 
 def merge_lattices(lat_list: list[LatticeData]) -> LatticeData:
     """
@@ -396,8 +415,8 @@ def merge_lattices(lat_list: list[LatticeData]) -> LatticeData:
 
     return LatticeData(**merged_kwargs)
 
-class VORJAXData(Module):
 
+class VORJAXData(Module):
     lattice: LatticeData = field(LatticeData)
 
     VICs: jax.Array = _
@@ -495,7 +514,9 @@ def find_intervals(wing: Wing) -> tuple[jax.Array, jax.Array]:
     segment_boundaries_1d = jnp.concatenate([jnp.ravel(jnp.asarray(x)) for x in segment_boundaries])
 
     # raw_breaks = jnp.sort(jnp.array(segment_boundaries + cs_span_starts + cs_span_ends))
-    raw_breaks = jnp.sort(jnp.concatenate([jnp.ravel(jnp.asarray(x)) for x in (segment_boundaries+ cs_span_starts+ cs_span_ends)]))
+    raw_breaks = jnp.sort(
+        jnp.concatenate([jnp.ravel(jnp.asarray(x)) for x in (segment_boundaries + cs_span_starts + cs_span_ends)])
+    )
 
     diffs = jnp.diff(raw_breaks)
     mask = jnp.concatenate([jnp.array([True]), diffs > 1e-6])
@@ -508,7 +529,7 @@ def find_intervals(wing: Wing) -> tuple[jax.Array, jax.Array]:
     n_intervals = len(midpoints)
 
     # strip_segment_idx = jnp.searchsorted(jnp.array(segment_boundaries), midpoints, side="right") - 1
-    strip_segment_idx = jnp.searchsorted(segment_boundaries_1d, midpoints,side="right") - 1
+    strip_segment_idx = jnp.searchsorted(segment_boundaries_1d, midpoints, side="right") - 1
     strip_segment_idx = jnp.clip(strip_segment_idx, 0, len(wing.segments) - 1)
 
     # Escape CS handling if wing has no control surfaces
@@ -766,6 +787,7 @@ def morph_to_3d_mesh(xi_grid, strip_X_LE, strip_Y, strip_Z_LE, strip_c, strip_tw
 
     return panel_vertices
 
+
 @eqx.filter_jit
 def _generate_single_wing(
     wing,
@@ -784,9 +806,7 @@ def _generate_single_wing(
     wing_spans_projected: float,
 ):
     # Calculate strip eta (non-dimensional y-coordinate) (Shape: (n_sw +1,))
-    eta, strip_interval_map = generate_spanwise_coordinates(
-            interval_data, n_sw, spanwise_cosine
-    )
+    eta, strip_interval_map = generate_spanwise_coordinates(interval_data, n_sw, spanwise_cosine)
 
     # Calculate strip xi (non-dimensional x-coordinate) (Shape: (n_sw, n_cw + 1))
     strip_le_cuts = interval_data[:, 2][strip_interval_map]
@@ -802,9 +822,7 @@ def _generate_single_wing(
     strip_le_ids = interval_data[:, 4][strip_interval_map]
     strip_te_ids = interval_data[:, 5][strip_interval_map]
 
-    panel_cs_id = jnp.full_like(
-        xi_mid, -1, dtype=jnp.int32
-    )  # Default to -1 to indicate panel belongs to wing itself
+    panel_cs_id = jnp.full_like(xi_mid, -1, dtype=jnp.int32)  # Default to -1 to indicate panel belongs to wing itself
     panel_cs_id = jnp.where(
         xi_mid < strip_le_cuts[:, None], strip_le_ids[:, None], panel_cs_id
     )  # If xi < LE cut, assign local LE CS ID
@@ -838,7 +856,6 @@ def _generate_single_wing(
 
     flat_vertices = (morph_results + wing_origin).reshape(-1, 4, 3)
 
-
     return LatticeData(
         panel_vertices=flat_vertices,
         camber_slopes=camber_slopes.reshape(-1),
@@ -847,14 +864,15 @@ def _generate_single_wing(
         control_surface_id=panel_cs_id.reshape(-1),
         is_leading_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1),
         is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
-
     )
+
+
 def generate_topology(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     lat_list = []
 
     # Reformat original wings to have at least 2 segments and additional values for processing later
-    #non-jit
+    # non-jit
     for wing_idx, wing in enumerate(system.wings):  # type: ignore
         wing: Wing
         if len(wing.segments) == 0:
@@ -881,7 +899,6 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
         except TypeError:
             n_sw: int = vlm_settings.panels.wings_n_spanwise
             n_cw: int = vlm_settings.panels.wings_n_chordwise
-
 
         if len(interval_data) > n_sw or n_cw < 3:  # type: ignore
             warnings.warn(
@@ -916,13 +933,13 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
 
     return state, updated_system, updated_settings
 
+
 def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     N_idx = 0
     S_idx = 0
 
     for wing_idx, wing in enumerate(system.wings):
-
         interval_data, strip_interval_map = find_intervals(wing)
         vlm_settings = settings.analysis.aerodynamics
 
@@ -972,11 +989,11 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         seg_camber_x = jnp.stack(
             [seg.airfoil.x_lower_surface if getattr(seg, "airfoil", None) else flat_x for seg in wing.segments]
         )  # type: ignore
-        #non-jit
+        # non-jit
         seg_camber_z = jnp.stack(
             [seg.airfoil.camber if getattr(seg, "airfoil", None) else flat_z for seg in wing.segments]
         )  # type: ignore
-        #non-jit
+        # non-jit
         seg_wedge_angle = jnp.stack(
             [seg.airfoil.wedge_angle if getattr(seg, "airfoil", None) else 0.0 for seg in wing.segments]
         )  # type: ignore
@@ -1038,7 +1055,7 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
                 latPath("is_leading_edge", LE_idx),
                 latPath("is_trailing_edge", TE_idx),
                 stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-            )
+            ),
         )
 
         updated_system = update(system, TreePath(("analysis_data.lattice"), lat))
@@ -1056,7 +1073,9 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             m_s_end = m_s_start + N_s
 
             m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)  # noqa: E731
-            m_stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val) # noqa: E731, E501
+            m_stripPath = lambda attr_name, val: TreePath(
+                path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val
+            )  # noqa: E731, E501
 
             lat_old = updated_system.analysis_data.lattice
             lat = update(
@@ -1069,7 +1088,7 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
                     m_latPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
                     m_latPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
                     m_stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                )
+                ),
             )
 
             N_idx = m_p_end + N
@@ -1582,9 +1601,7 @@ def compute_C_ij(lat, Mach):
 
 
 @io.inputs("system.analysis_data.lattice", "state.freestream.mach_number")
-@io.outputs(
-    "system.analysis_data.VICs", "system.analysis_data.singularities", "system.analysis_data.le_normalwash"
-)
+@io.outputs("system.analysis_data.VICs", "system.analysis_data.singularities", "system.analysis_data.le_normalwash")
 def compute_induced_velocity(state: State, system: Aircraft, settings: Settings):
 
     lat = system.analysis_data.lattice
@@ -1595,12 +1612,8 @@ def compute_induced_velocity(state: State, system: Aircraft, settings: Settings)
         singularity_flag,
     ) = compute_C_ij(lat, Mach)
 
-    updated_analysis_data = system.analysis_data | {
-        "VICs": C_ij,
-        "singularities": singularity_flag,
-    }
 
-    updated_system = update(system, "analysis_data", updated_analysis_data)
+    updated_system = update(system, (("analysis_data.VICS", C_ij), ("analysis_data.singularities", singularity_flag)))
 
     return state, updated_system, settings
 
@@ -1622,7 +1635,7 @@ def compute_induced_velocity(state: State, system: Aircraft, settings: Settings)
 def compute_vortex_strength(state: State, system: Aircraft, settings: Settings):
     """Solves the linear system A * GAMMA = RHS for the vortex strengths."""
 
-    analysis: VORJAXData = system.analysis_data #type: ignore
+    analysis: VORJAXData = system.analysis_data  # type: ignore
     lat = analysis.lattice
 
     # Extract the arrays we built in previous steps
@@ -1785,7 +1798,7 @@ def compute_pressure_coefficients(lat, v_total, Gamma, v_inf):
 def compute_panel_pressures(state: State, system: Aircraft, settings: Settings):
     """Calculates the differential pressure coefficient (Delta C_P) for all VLM panels."""
 
-    analysis: VORJAXData = system.analysis_data # type: ignore
+    analysis: VORJAXData = system.analysis_data  # type: ignore
     lat = analysis.lattice
 
     v_total = analysis.relative_velocity
@@ -2119,7 +2132,7 @@ def _compute_aerodynamic_coefficients(lat, dCp, Gamma, state, system, settings):
 def compute_coefficients(state: State, system: Aircraft, settings: Settings):
     """Final VLM step to extract global coefficients and append to State."""
 
-    analysis: VORJAXData = system.analysis_data #type: ignore
+    analysis: VORJAXData = system.analysis_data  # type: ignore
 
     CL, CDi_far, CDi_near, CX, CY, CZ, C_l, C_m, C_n = _compute_aerodynamic_coefficients(
         analysis.lattice, analysis.dCp, analysis.Gamma, state, system, settings
@@ -2339,7 +2352,7 @@ class VORJAXSettings(Module):
 
 def _default_VORJAX_init_steps():
     return (
-        ProcessStep(function = array_barrier, name="Array Barrier"),
+        ProcessStep(function=array_barrier, name="Array Barrier"),
         ProcessStep(function=initialize_aerodynamics, name="Initialize Component Bookkeeping"),
         ProcessStep(function=initialize_VORJAX_data, name="Initialize Data Structures"),
         ProcessStep(function=generate_topology, name="Generate Topology"),
@@ -2377,32 +2390,21 @@ class AnalyzeVORJAX(Process):
     steps: tuple = field(_default_VORJAX_compute_steps)
 
     def __init__(
-        self,
-        name: str = "Compute VORJAX",
-        steps: tuple = _default_VORJAX_compute_steps(),
-        include_meshing: bool = True
+        self, name: str = "Compute VORJAX", steps: tuple = _default_VORJAX_compute_steps(), include_meshing: bool = True
     ) -> None:
         if include_meshing:
-            full_steps = (
-                ProcessStep(update_mesh, name="Update Mesh"),
-            ) + steps
+            full_steps = (ProcessStep(update_mesh, name="Update Mesh"),) + steps
         else:
             full_steps = steps
 
         super().__init__(name=name, steps=full_steps)
 
 
-
 class VORJAX(Process):
     name: str = static_field("Aerodynamics")
     steps: tuple = field(lambda: (InitializeVORJAX(), AnalyzeVORJAX()))
 
-    def __init__(
-        self,
-        name: str = "Aerodynamics",
-        steps: Optional[tuple] = None,
-        remesh: bool = True
-    ) -> None:
+    def __init__(self, name: str = "Aerodynamics", steps: Optional[tuple] = None, remesh: bool = True) -> None:
 
         self.initialize = InitializeVORJAX()
 
@@ -2411,8 +2413,7 @@ class VORJAX(Process):
         else:
             self.analyze = steps
 
-
-        super().__init__(name=name, steps = (self.analyze,))
+        super().__init__(name=name, steps=(self.analyze,))
 
     # TODO: Add full drag, trimming, stability analysis
 

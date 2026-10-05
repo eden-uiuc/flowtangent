@@ -356,7 +356,6 @@ class Residual(Module):
 
 
 class ImplicitAnalysis(Process):
-
     analyze: Process = ftu.field(Process)
     solver: Any | str = ftu.method_field(optx.LevenbergMarquardt)
     solver_options: Optional[dict] = ftu.static_field(None)
@@ -377,7 +376,6 @@ class ImplicitAnalysis(Process):
         _initial_system: Optional[System] = None,
         _initial_settings: Optional[Settings] = None,
         _filter_map: Optional[dict] = None,
-
     ) -> None:
 
         # Standard field assignments
@@ -819,7 +817,10 @@ class ImplicitAnalysis(Process):
 
         # Run Solver
         with Readout(
-            enabled=settings.verbose and not settings.DEBUG_MODE and not settings._DEV_MODE and len(_analysis_stack) == 1,
+            enabled=settings.verbose
+            and not settings.DEBUG_MODE
+            and not settings._DEV_MODE
+            and len(_analysis_stack) == 1,
             message=f"Tracing {self.name}...",
         ):
             f_vars, opt_state, f_st, f_sys = self._run_solver(
@@ -850,10 +851,10 @@ class ImplicitAnalysis(Process):
         return f_st, f_sys, settings
 
     @property
-    def steps(self): #type: ignore
+    def steps(self):  # type: ignore
         return self.analyze.steps
 
-    def initialize(self, state: State, system: System, settings:Settings):
+    def initialize(self, state: State, system: System, settings: Settings):
         state, system, settings = array_barrier(state, system, settings)
         state, system, settings = self.initialize_variables(state, system, settings)
         return state, system, settings
@@ -887,7 +888,5 @@ class ImplicitAnalysis(Process):
         if not track_history:
             return r_st, r_sys, r_setts
         else:
-            f_st, f_sys, f_setts, history = self.analyze.run(
-                r_st, r_sys, r_setts, track_history=True
-            )
+            f_st, f_sys, f_setts, history = self.analyze.run(r_st, r_sys, r_setts, track_history=True)
             return f_st, f_sys, f_setts, history

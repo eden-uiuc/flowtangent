@@ -90,7 +90,7 @@ class Module(eqx.Module):
         # Auto-apply jaxtyped to all standard methods that have type annotations
         for attr_name, attr_value in cls.__dict__.items():
             if attr_name in dataclass_fields:
-                continue # Skip dataclass defaults
+                continue  # Skip dataclass defaults
             # Skip dunder methods (__init__, __call__, etc.) to avoid breaking Equinox
             if inspect.isfunction(attr_value) and not attr_name.startswith("__"):
                 annotations = getattr(attr_value, "__annotations__", {})
@@ -127,9 +127,7 @@ class StateDataMeta(type(Module)):
 
             annotate = annotationlib.get_annotate_from_class_namespace(namespace)
             if annotate is not None:
-                annotations = annotationlib.call_annotate_function(
-                    annotate, annotationlib.Format.FORWARDREF
-                )
+                annotations = annotationlib.call_annotate_function(annotate, annotationlib.Format.FORWARDREF)
         ####
         for key, hint in annotations.items():
             if key.startswith("__"):
