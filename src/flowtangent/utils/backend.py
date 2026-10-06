@@ -10,22 +10,21 @@ def numerical_environment():
     os.environ["JAX_ENABLE_X64"] = "True"
     os.environ["OPENMDAO_REPORTS"] = "0"
     os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-    # os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
     os.environ["JAX_PERSISTENT_CACHE_DISABLE"] = "1"
     os.environ["JAX_PLATFORM_NAME"] = "gpu"
 
-    if sys.platform == "linux":
-        cpu_count = os.cpu_count() or 1
-        if cpu_count > 16:
-            try:
-                node_0_cores = set(range(16))
-                os.sched_setaffinity(0, node_0_cores)
-                os.environ["OMP_PROC_BIND"] = "true"
-                os.environ["OMP_PLACES"] = "cores"
-                # print("Hardware Config: NUMA affinity set to Node 0 (16 cores).")
-            except Exception as e:
-                print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
+    # if sys.platform == "linux":
+    #     cpu_count = os.cpu_count() or 1
+    #     if cpu_count > 16:
+    #         try:
+    #             node_0_cores = set(range(16))
+    #             os.sched_setaffinity(0, node_0_cores)
+    #             os.environ["OMP_PROC_BIND"] = "true"
+    #             os.environ["OMP_PLACES"] = "cores"
+    #             print("Hardware Config: NUMA affinity set to Node 0 (16 cores).")
+    #         except Exception as e:
+    #             print(f"Hardware Config Warning: Could not set CPU affinity: {e}")
 
     cache_path = os.path.expanduser("~/.flowtangent/jax_cache")
     os.makedirs(cache_path, exist_ok=True)

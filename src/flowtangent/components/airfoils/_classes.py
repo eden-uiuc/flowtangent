@@ -5,6 +5,7 @@ from typing import Optional
 
 from pathlib import Path
 from matplotlib import pyplot as plt
+from functools import total_ordering
 
 plt.style.use('dark_background')
 plt.rcParams['figure.facecolor'] = 'black'
@@ -25,7 +26,7 @@ from ...core._component import Component
 #  Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+@total_ordering
 class Airfoil(Component):
     name: str = field("Airfoil", static=True)
     source_file: Optional[str | Path] = None
@@ -407,7 +408,6 @@ class Airfoil(Component):
                 y_lower=jnp.asarray(y_lo),
             )
 
-
     def plot(self, title: Optional[str]=None):
         if not title:
             plot_title = self.name
@@ -420,6 +420,16 @@ class Airfoil(Component):
         plt.axis('equal')
         plt.tight_layout()
         plt.show()
+
+    def __eq__(self, other):
+        if not isinstance(other, Airfoil):
+            return NotImplemented
+        return self.name == other.name
+
+    def __lt__(self, other):
+        if not isinstance(other, Airfoil):
+            return NotImplemented
+        return self.name < other.name
     
 def NACA(code: str, n_pts: int = 128):
     return Airfoil.from_naca(code=code, n_pts=n_pts)

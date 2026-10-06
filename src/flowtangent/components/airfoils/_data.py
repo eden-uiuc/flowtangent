@@ -6,7 +6,7 @@ from pathlib import Path
 
 from functools import lru_cache
 from flowtangent.utils.io import _ft_root
-from flowtangent.components import Airfoil
+from ._classes import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil Directory
@@ -516,7 +516,7 @@ def analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=250, k=16, n_cond_
     
     return pruned_dict, worst_airfoil, history
 
-def analyze_split_safety(valid_airfoils_dict, max_prunes=250, k=16):
+def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=False):
     """
     Visualizes the 1400/250 split to ensure the retained core dataset 
     still covers the primary aerodynamic design space.
@@ -554,32 +554,32 @@ def analyze_split_safety(valid_airfoils_dict, max_prunes=250, k=16):
     
     # 3. Plot the top 2 Principal Components to check for Family Extinction
     import matplotlib.pyplot as plt
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    
-    # Panel 1: Latent Space Scatter
-    ax1.scatter(Z_keep[:, 0], Z_keep[:, 1], c='blue', alpha=0.5, label=f'Kept Core ({len(kept_dict)})', s=15)
-    ax1.scatter(Z_prune[:, 0], Z_prune[:, 1], c='red', alpha=0.8, marker='x', label=f'Pruned OOD ({len(pruned_dict)})', s=30)
-    ax1.set_title("Latent Space Distribution (PC1 vs PC2)")
-    ax1.set_xlabel("Principal Component 1")
-    ax1.set_ylabel("Principal Component 2")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    
-    # Panel 2: Reconstruction Error Histogram
-    ax2.hist(mse_prune_np, bins=40, color='red', alpha=0.7, edgecolor='black')
-    ax2.axvline(median_mse, color='blue', linestyle='dashed', linewidth=2, label=f'Median: {median_mse:.2e}')
-    ax2.axvline(p95_mse, color='black', linestyle='dashed', linewidth=2, label=f'95th Pctl: {p95_mse:.2e}')
-    ax2.set_title("OOD Reconstruction Error (MSE) via 16D Core Basis")
-    ax2.set_xlabel("Mean Squared Error")
-    ax2.set_ylabel("Frequency")
-    # Log scale is often necessary for MSE histograms to see the extreme outliers
-    ax2.set_yscale('log') 
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    plt.show()
+    if plotting:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Panel 1: Latent Space Scatter
+        ax1.scatter(Z_keep[:, 0], Z_keep[:, 1], c='blue', alpha=0.5, label=f'Kept Core ({len(kept_dict)})', s=15)
+        ax1.scatter(Z_prune[:, 0], Z_prune[:, 1], c='red', alpha=0.8, marker='x', label=f'Pruned OOD ({len(pruned_dict)})', s=30)
+        ax1.set_title("Latent Space Distribution (PC1 vs PC2)")
+        ax1.set_xlabel("Principal Component 1")
+        ax1.set_ylabel("Principal Component 2")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # Panel 2: Reconstruction Error Histogram
+        ax2.hist(mse_prune_np, bins=40, color='red', alpha=0.7, edgecolor='black')
+        ax2.axvline(median_mse, color='blue', linestyle='dashed', linewidth=2, label=f'Median: {median_mse:.2e}')
+        ax2.axvline(p95_mse, color='black', linestyle='dashed', linewidth=2, label=f'95th Pctl: {p95_mse:.2e}')
+        ax2.set_title("OOD Reconstruction Error (MSE) via 16D Core Basis")
+        ax2.set_xlabel("Mean Squared Error")
+        ax2.set_ylabel("Frequency")
+        # Log scale is often necessary for MSE histograms to see the extreme outliers
+        ax2.set_yscale('log') 
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
     
     # 5. Summary Statistics Output
     print("\n--- OOD Reconstruction Error Statistics ---")
@@ -587,18 +587,6 @@ def analyze_split_safety(valid_airfoils_dict, max_prunes=250, k=16):
     print(f"Mean MSE:   {mean_mse:.2e}")
     print(f"95th Pctl:  {p95_mse:.2e} (Extreme Geometry Error)")
     print(f"Max MSE:    {max_mse:.2e}")
-
-
-    plt.figure(figsize=(10, 8))
-    plt.scatter(Z_keep[:, 0], Z_keep[:, 1], c='blue', alpha=0.5, label=f'Kept Core ({len(kept_dict)})', s=15)
-    plt.scatter(Z_prune[:, 0], Z_prune[:, 1], c='red', alpha=0.8, marker='x', label=f'Pruned OOD ({len(pruned_dict)})', s=30)
-    
-    plt.title("Latent Space Distribution: Kept vs Pruned Airfoils")
-    plt.xlabel("Principal Component 1 (Usually Camber/Thickness ratio)")
-    plt.ylabel("Principal Component 2 (Usually Max Thickness Location)")
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
     
     # 4. Print a random sample of what got thrown away
     import numpy as np
@@ -615,7 +603,7 @@ if __name__ == "__main__":
     latent_dim = 16
     valid_airfoils = validate_library(k=latent_dim)
     # NND, max_void = calculate_latent_voids(valid_airfoils, k=latent_dim)
-    kept_dict, pruned_dict = analyze_split_safety(valid_airfoils)
+    kept_dict, pruned_dict = regularize_design_space(valid_airfoils)
     X_airfoils = evaluate_naca_overlap(kept_dict, k=latent_dim)
 
     # n6412i = load_foil("goe802a")

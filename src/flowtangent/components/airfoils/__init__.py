@@ -1,6 +1,6 @@
 from ._classes import Airfoil, NACA
-# from . import _data as from_ref
-# from ._data import load_foil
+from . import _data as from_ref
+from ._data import load_foil
 
 __all__ = [
     "Airfoil",
