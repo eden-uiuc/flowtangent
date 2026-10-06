@@ -364,7 +364,7 @@ def load_valid_airfoils(filepath="train_set.json"):
     print(f"Loaded {len(names)} airfoil names from {filepath}")
     return names
 
-def generate_data():
+def generate_data(N_SAMPLES: int = 256):
     from flowtangent.components.airfoils._data import validate_library, regularize_design_space, _AF_REGISTRY
 
     try:
@@ -375,11 +375,8 @@ def generate_data():
 
         save_valid_airfoils(train_set, filepath = str(FILE_DIR / "train_set.json"))
 
-    # train_set = ["goe184", "naca001064", "rhodesg32"]
-
     airfoils = sorted([_AF_REGISTRY[name] for name in train_set])
 
-    N_SAMPLES = 128 # Power of 2 for Sobol
     TOTAL_RUNS = len(airfoils) * N_SAMPLES
     
     zarr_path = FILE_DIR / "data.zarr"
@@ -447,6 +444,7 @@ def generate_data():
         with open(LOG_FILE, 'a', newline='') as success_f, open(ERROR_LOG_FILE, 'a', newline='') as error_f:
             success_writer = csv.writer(success_f)
             error_writer = csv.writer(error_f)
+            start_time = datetime.now()
             
             with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() - 4) as executor:
                 future_to_task = {executor.submit(run_xfoil_point, *task): task for task in tasks}
@@ -478,9 +476,11 @@ def generate_data():
                         total_crashed += N_ALPHAS
                         
                     if i % 100 == 0:
-                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        timestamp = datetime.now()
+                        time_delta = timestamp - start_time
+                        ETA = (time_delta / (i + 1) * len(tasks)) + start_time
                         yield_pct = (total_converged / total_attempted) * 100 if total_attempted > 0 else 0
-                        print(f"Progress: {i} / {len(tasks)} ({1/len(tasks) * 100:.1f}%)| Yield: {yield_pct:.1f}% | Recent: {t_af_name} | Time: {timestamp}")
+                        print(f"Progress: {i} / {len(tasks)} ({1/len(tasks) * 100:.1f}%)| Yield: {yield_pct:.1f}% | Recent: {t_af_name} | Time: {timestamp.strftime("%a %I:%M %p")} | ETA: {ETA.strftime("%a %I:%M %p")}")
     finally:
         cleanup_display_pool()
         subprocess.run(['killall', 'xfoil'], stderr=subprocess.DEVNULL)
