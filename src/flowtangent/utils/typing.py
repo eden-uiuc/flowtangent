@@ -1,9 +1,10 @@
 # ruff: noqa: F722
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, Union, cast, TypeVar
 
 from jaxtyping import Array, Bool, Float, Int, Shaped
 
 from .tree import TreePath
+from .base import Module
 
 # ==========================================
 # FLOWTANGENT DIMENSION GLOSSARY
@@ -13,6 +14,7 @@ from .tree import TreePath
 # ...:  Any number of dimensions (variadic wildcard)
 # ==========================================
 
+_Mod = TypeVar("M", bound=Module)
 
 # Used by metaclasses in utils.base to parse type hints into default arrays
 class _Placeholder:
@@ -43,6 +45,7 @@ AnyArray = Shaped[Array, "..."]
 
 __all__ = [
     "_",
+    "_Mod",
     "NameType",
     "TreePathLike",
     "ScalarFloat",

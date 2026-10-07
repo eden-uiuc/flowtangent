@@ -26,7 +26,10 @@ dependencies = [
     "tqdm",
     "zarr",
     "dask",
-    "pyarrow"
+    "pyarrow",
+    "h5py",
+    "netcdf4",
+    "optax",
 ]
 
 [project.optional-dependencies]
