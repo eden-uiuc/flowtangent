@@ -12,7 +12,7 @@ import scipy.io as sio
 import warnings
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from torch.utils.data import (
     # Core Datasets
@@ -131,6 +131,8 @@ def slice_data(data, split_indices, chunk_idx):
         return jnp.split(data[0], split_indices, axis=-1)[chunk_idx], data[1]
     return jnp.split(data, split_indices, axis=-1)[chunk_idx]
 
+LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
+
 #-----------------------------------------------------------------------------------------------------------------------
 # Dataset
 #-----------------------------------------------------------------------------------------------------------------------
@@ -185,7 +187,8 @@ class Dataset(Module):
 
         raise TypeError(f"Unsupported data source type: {type(source)}")
 
-    def __post_init__(self):
+    def __check_init__(self):
+        super(Dataset, self).__check_init__()
         if getattr(self, "_virtual_columns", _) is _:
             object.__setattr__(self, "_virtual_columns", {})
         if getattr(self, "_appended_data", _) is _:
@@ -635,6 +638,6 @@ class MATDataset(Dataset):
 __all__ = [
     "Dataset", "IterableDataset", "ArrayDataset", "StackDataset", "ConcatDataset", 
     "ChainDataset", "Subset", "random_split", "DataLoader", "LatentDataLoader", "get_worker_info", 
-    "slice_data", "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", 
+    "slice_data", "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", "LoaderType"
     "SequentialSampler", "SubsetRandomSampler", "WeightedRandomSampler"
 ]

@@ -1,0 +1,60 @@
+# .coderabbit.yaml
+language: "en-US"
+reviews:
+  auto_review:
+    enabled: true
+  instructions: |
+    When generating or expanding Python docstrings for FlowTangent, strictly adhere 
+    to the FlowTangent Extended Google Docstring Specification below.
+
+    ### FlowTangent Docstring Specification Rulebook:
+
+    1. Description Header:
+       - Sentence 1: High-level overview of what the module/class computes.
+       - Sentence 2-3: Mathematical context or system design role.
+
+    2. Markdown Sections (Use H3 '###' headings):
+       - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$).
+       - '### Process Architecture': Include only if describing a multi-step routine without a `.to_mermaid()` method.
+       - '### Usage Example': A minimal, Runnable JAX snippet demonstrating usage with Equinox.
+
+    3. Standard Google Sections:
+       - 'Args:': Typed parameter descriptions, noting if a JAX array is expected to be 1D or ND.
+       - 'Returns:': Return type and payload specification.
+       - 'Raises:': Exceptions for dimension mismatches or invalid shapes.
+
+    ### Standard Template Reference:
+
+    ```python
+    class ModuleName(Module):
+        """
+        Brief single-line description of the module.
+
+        Extended paragraph explaining physical significance, numerical properties, 
+        and integration into the broader simulation/optimization framework.
+
+        ### Mathematical Formulation
+        State the core equations solved or evaluated by this component:
+        
+        $$\\mathbf{y} = f(\\mathbf{x}; \\theta) + \\epsilon, \\quad \\epsilon \\sim \\mathcal{N}(0, \\mathbf{\\Sigma})$$
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        import flowtangent as ft
+
+        model = ft.ModuleName(...)
+        result = model(jnp.ones((10, 3)))
+        ```
+
+        Args:
+            param_a (jax.Array): Description of param_a, shape `(N, D)`.
+            param_b (float): Scaling hyperparameter. Defaults to 1.0.
+
+        Returns:
+            jax.Array: Transformed array, shape `(N, L)`.
+
+        Raises:
+            ValueError: If `param_a` shape does not match expected manifold dimension.
+        """
+    ```

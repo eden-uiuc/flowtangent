@@ -37,8 +37,12 @@ jobs:
       - name: Enforce Formatting (Ruff)
         run: ruff format --check .
 
-      - name: Lint (Ruff)
-        run: ruff check .
+      - name: Run Ruff with Reviewdog
+        uses: reviewdog/action-ruff@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review # Posts inline comments on the PR
+          ruff_flags: "--check ."
 
       - name: Type Check (Pyright)
         run: pyright src/flowtangent

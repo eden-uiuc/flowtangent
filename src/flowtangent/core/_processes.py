@@ -9,11 +9,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -40,6 +35,7 @@ import warnings
 from collections import Counter
 from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 
 # package imports
 import jax
@@ -55,11 +51,12 @@ from ..utils import (
     TreePath,
     compute_tree_delta,
     field,
+    static_field,
+    method_field,
     get_target,
     id_partition,
     inspect_leaves,
     is_array_like,
-    method_field,
     null_step,
     update,
 )
@@ -239,7 +236,7 @@ def array_barrier(state: State, system: System, settings: Settings):
 class Process(ProcessStep):
     steps: tuple[ProcessStep, ...] = ()
 
-    initial_step: int = field(0, static=True)
+    initial_step: int = static_field(0)
 
     _initial_state: Optional[State] = field(None)
     _initial_system: Optional[System] = field(None)
@@ -664,6 +661,69 @@ class Process(ProcessStep):
             else:
                 yield node_name, step
 
+    def _format_ascii_tree(self, paths: set[str] | list[str]) -> str:
+        """
+        Parses a list of variable paths and returns a formatted ASCII tree string.
+        Handles iterators ([Item]), dictionaries (['key']), and pseudo-types (: Type).
+        """
+        if not paths:
+            return ""
+
+        import re
+        tree = {}
+        type_hints = {}
+        # Regex extracts bracketed items (with or without quotes) and normal text, ignoring dots
+        pattern = re.compile(r"\[.*?\]|[^.\[\]]+")
+
+        for path in paths:
+            # 1. Strip out and store the type hint if it exists
+            if ":" in path:
+                base_path, hint = path.split(":", 1)
+                base_path = base_path.strip()
+                hint = hint.strip()
+            else:
+                base_path = path.strip()
+                hint = None
+
+            # 2. Split the base path into parts
+            parts = tuple(pattern.findall(base_path))
+
+            if hint:
+                type_hints[parts] = hint
+
+            # 3. Build the structural tree
+            current_level = tree
+            for part in parts:
+                current_level = current_level.setdefault(part, {})
+
+        # 4. Recursively build the string representation
+        lines = []
+        def traverse(current_tree: dict, current_parts: tuple = (), depth: int = 0):
+            keys = sorted(current_tree.keys())
+            for i, key in enumerate(keys):
+                node_parts = current_parts + (key,)
+                display_name = str(key)
+
+                if node_parts in type_hints:
+                    display_name += f": {type_hints[node_parts]}"
+
+                # Flag dictionary children
+                has_dict_children = any(str(k).startswith("['") or str(k).startswith('["') for k in current_tree[key].keys())
+                if has_dict_children:
+                    display_name += ": {dict}"
+
+                if depth == 0:
+                    lines.append(display_name)
+                else:
+                    padding = "  " * (depth - 1)
+                    branch = "└─ " if i == len(keys) - 1 else "├─ "
+                    lines.append(f"{padding}{branch}{display_name}")
+
+                traverse(current_tree[key], node_parts, depth + 1)
+
+        traverse(tree)
+        return "\n".join(lines)
+
     def graph(self, recursive: bool = False) -> nx.DiGraph:
         """
         Constructs a Directed Acyclic Graph (DAG) of the process.
@@ -713,8 +773,8 @@ class Process(ProcessStep):
         recursive: bool = False,
         show_edges: bool = True,
         layout: str = "LR",
-        exclude: list[str] = None,
-        save_path: str = None,
+        exclude: Optional[list[str]] = None,
+        save_path: Optional[str | Path] = None,
         style: str = "modern",
     ) -> str:
         """
@@ -725,12 +785,18 @@ class Process(ProcessStep):
             show_edges: Whether to label the edges with the variables passed between steps.
             layout: "LR" (Left-to-Right) or "TD" (Top-Down).
             exclude: List of predefined domains to hide from the edges (e.g., ['energy']).
+            save_path: Path to write the output file.
+            style: The visual style preset to use from MERMAID_STYLES.
         """
-        # 1. Setup the exclusion filters using the shared class attribute
+
+        # 1. Setup the exclusion filters
         if exclude is None:
             exclude = ["energy"]
 
-        compiled_patterns = [re.compile(self._filter_map[k]) for k in exclude if k in self._filter_map]
+        compiled_patterns = [
+            re.compile(self._filter_map[k]) 
+            for k in exclude if k in self._filter_map
+        ]
 
         def is_filtered(var_name: str) -> bool:
             return any(pat.search(var_name) for pat in compiled_patterns)
@@ -739,6 +805,8 @@ class Process(ProcessStep):
         G = self.graph(recursive=recursive)
         mermaid_lines = []
 
+        # Note: Ensure the MERMAID_STYLES dictionary uses strict JSON (double quotes) 
+        # inside the init block string so Mermaid can parse it correctly!
         if style in MERMAID_STYLES and MERMAID_STYLES[style]:
             mermaid_lines.append(MERMAID_STYLES[style])
 
@@ -755,58 +823,149 @@ class Process(ProcessStep):
             else:
                 step_obj = G.nodes[node_name].get("step_obj")
                 display_label = step_obj.name if step_obj else str(node_name)
+                
+                # Sanitize characters that break Mermaid node syntax
+                display_label = display_label.replace('"', "").replace("[", "(").replace("]", ")")
                 mermaid_lines.append(f"    {safe_id}[{display_label}]")
 
-        # 4. Build edges and apply filters to the variable lists
+        # 4. Build edges and apply filters
         for u, v, data in G.edges(data=True):
             raw_vars = data.get("variables", [])
-
-            # Apply the filter to strip out unwanted phantom paths
             vars_list = [var for var in raw_vars if not is_filtered(var)]
 
             if show_edges and vars_list:
-                if len(vars_list) > 4:
+                if len(vars_list) > 6:
                     label = f"{len(vars_list)} variables"
+                elif len(vars_list) == 1:
+                    # Don't try to build a tree for a single variable
+                    label = vars_list[0]
                 else:
-                    clean_vars = [var.split(".")[-1] for var in vars_list]
-                    label = "<br>".join(clean_vars)
+                    # 1. Split into components to find the common prefix
+                    split_vars = [v.split(".") for v in vars_list]
+                    min_len = min(len(v) for v in split_vars)
+                    
+                    common_idx = 0
+                    for i in range(min_len):
+                        if len(set(v[i] for v in split_vars)) == 1:
+                            common_idx += 1
+                        else:
+                            break
+                            
+                    # 2. Build the tree string
+                    if common_idx > 0 and common_idx < min_len:
+                        prefix = ".".join(split_vars[0][:common_idx])
+                        suffixes = [".".join(v[common_idx:]) for v in split_vars]
+                        
+                        # Added the bold tags back in
+                        tree_lines = [f"<b>{prefix}</b>"]
+                        for i, suffix in enumerate(suffixes):
+                            branch = "└─ " if i == len(suffixes) - 1 else "├─ "
+                            tree_lines.append(f"{branch}{suffix}")
+                            
+                        # Use Mermaid's native literal "\n" token (requires \\n in Python)
+                        label = "\\n".join(tree_lines)
+                    else:
+                        label = "\\n".join(vars_list)
 
-                # Sanitize any stray double quotes to single quotes
-                label = label.replace('"', "'")
-
-                # Wrap the final label in double quotes for Mermaid's parser
-                mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
-            else:
-                mermaid_lines.append(f"    {node_id_map[u]} --> {node_id_map[v]}")
-
+                # Robust sanitization
+                label = label.replace('"', "").replace("'", "").replace("|", "/")
+                
+                # Keep the escaped double quotes to protect the tree formatting
+                mermaid_lines.append(f"    {node_id_map[u]} -->|\"{label}\"| {node_id_map[v]}")
+        
         mermaid_str = "\n".join(mermaid_lines)
 
+        # 5. Handle File Output
         if save_path:
-            # Ensure the target directory exists
-            os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+            save_path = Path(save_path)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(save_path, "w", encoding="utf-8") as f:
-                # If it's a markdown file, wrap it in the mermaid code block
-                if save_path.lower().endswith(".md"):
+                if save_path.suffix.lower() == ".md":
                     f.write("```mermaid\n")
                     f.write(mermaid_str)
                     f.write("\n```\n")
                 else:
-                    # For .mmd or .txt, just write the raw string
                     f.write(mermaid_str)
 
         return mermaid_str
 
-    def print_io_tree(self, exclude: list[str] = None):
+    def to_cytoscape_json(self, recursive: bool = False, exclude: Optional[list[str]] = None) -> str:
+        import json
+        import re
+        
+        if exclude is None:
+            exclude = ["energy"]
+
+        compiled_patterns = [re.compile(self._filter_map[k]) for k in exclude if k in self._filter_map]
+        def is_filtered(var_name: str) -> bool:
+            return any(pat.search(var_name) for pat in compiled_patterns)
+
+        G = self.graph(recursive=recursive)
+        nodes = []
+        edges = []
+
+        # -- Pre-calculate all user inputs --
+        user_input_vars = set()
+        for u, v, data in G.edges(data=True):
+            if u == "User Inputs":
+                for var in data.get("variables", []):
+                    if not is_filtered(var):
+                        user_input_vars.add(var)
+        
+        # USE THE NEW FORMATTER
+        ui_tree_str = self._format_ascii_tree(user_input_vars)
+        ui_full_tree = f"USER INPUTS\n{ui_tree_str}" if ui_tree_str else "User Inputs"
+
+        # 1. Build Primary Nodes
+        name_to_id = {}
+        for i, node_name in enumerate(G.nodes()):
+            safe_id = f"N{i}"
+            name_to_id[node_name] = safe_id
+            
+            if node_name == "User Inputs":
+                nodes.append({
+                    "data": {"id": safe_id, "label": node_name, "full_tree": ui_full_tree, "node_type": "input"}
+                })
+            else:
+                step_obj = G.nodes[node_name].get("step_obj")
+                label = step_obj.name if step_obj else str(node_name)
+                nodes.append({
+                    "data": {"id": safe_id, "label": label, "node_type": "process"}
+                })
+
+        # 2. Build Edges and Intermediate Variable Nodes
+        for u, v, data in G.edges(data=True):
+            raw_vars = data.get("variables", [])
+            vars_list = [var for var in raw_vars if not is_filtered(var)]
+            
+            if not vars_list:
+                edges.append({"data": {"source": name_to_id[u], "target": name_to_id[v], "edge_type": "direct"}})
+                continue
+                
+            short_label = str(len(vars_list))
+            
+            # USE THE NEW FORMATTER
+            full_tree = self._format_ascii_tree(vars_list)
+
+            var_node_id = f"var_{name_to_id[u]}_{name_to_id[v]}"
+            
+            nodes.append({
+                "data": {"id": var_node_id, "short_label": short_label, "full_tree": full_tree, "node_type": "variable"}
+            })
+            
+            edges.append({"data": {"source": name_to_id[u], "target": var_node_id, "edge_type": "incoming"}})
+            edges.append({"data": {"source": var_node_id, "target": name_to_id[v], "edge_type": "outgoing"}})
+
+        return json.dumps({"nodes": nodes, "edges": edges}, indent=2)
+    
+    def print_io_tree(self, exclude: Optional[list[str]] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
         in a hierarchical, human-readable ASCII tree structure.
-        Handles iterators ([Item]), dictionaries (['key']), and pseudo-types (: Type).
-
-        Args:
-            exclude: List of predefined domains to hide from the I/O tree (e.g., ['energy']).
         """
-
+        import re
+        
         if exclude is None:
             exclude = ["energy"]
 
@@ -815,86 +974,17 @@ class Process(ProcessStep):
         def filter_paths(paths: set[str]) -> set[str]:
             if not exclude_patterns or not paths:
                 return paths
-
             compiled_patterns = [re.compile(p) for p in exclude_patterns]
             return {p for p in paths if not any(pat.search(p) for pat in compiled_patterns)}
 
         display_inputs = filter_paths(self.inputs)
         display_outputs = filter_paths(self.outputs)
 
-        def build_tree_and_metadata(paths: set[str]) -> tuple[dict, dict]:
-            """
-            Converts strings into a nested dict and extracts type hints.
-            Returns the structural tree and a dictionary of type hints keyed by path tuples.
-            """
-            tree = {}
-            type_hints = {}
-            # Regex extracts bracketed items (with or without quotes) and normal text, ignoring dots
-            pattern = re.compile(r"\[.*?\]|[^.\[\]]+")
-
-            for path in paths:
-                # 1. Strip out and store the type hint if it exists
-                if ":" in path:
-                    base_path, hint = path.split(":", 1)
-                    base_path = base_path.strip()
-                    hint = hint.strip()
-                else:
-                    base_path = path.strip()
-                    hint = None
-
-                # 2. Split the base path into parts
-                parts = tuple(pattern.findall(base_path))
-
-                # 3. Store the hint keyed by the exact structural path
-                if hint:
-                    type_hints[parts] = hint
-
-                # 4. Build the structural tree
-                current_level = tree
-                for part in parts:
-                    current_level = current_level.setdefault(part, {})
-
-            return tree, type_hints
-
-        def display_tree(tree: dict, type_hints: dict, depth: int = 0, current_parts: tuple = ()):
-            """Recursively prints the nested dictionary with ASCII indentation."""
-            for key in sorted(tree.keys()):
-                node_parts = current_parts + (key,)
-                display_name = str(key)
-
-                # Apply Type Hint if one was registered for this exact node
-                if node_parts in type_hints:
-                    display_name += f": {type_hints[node_parts]}"
-
-                # Look ahead: if a child is a dictionary key (has quotes inside brackets), flag this node
-                # Iterators like [Wing] have no quotes, so they won't trigger this.
-                has_dict_children = any(str(k).startswith("['") or str(k).startswith('["') for k in tree[key].keys())
-                if has_dict_children:
-                    display_name += ": {dict}"
-
-                # Print with formatting
-                if depth == 0:
-                    print(display_name)
-                else:
-                    prefix = "|" + "-" * (2 * depth)
-                    print(f"{prefix}{display_name}")
-
-                # Recurse
-                display_tree(tree[key], type_hints, depth + 1, node_parts)
-
         print("=== Process Inputs ===")
-        if not display_inputs:
-            print("  (None)")
-        else:
-            in_tree, in_hints = build_tree_and_metadata(display_inputs)
-            display_tree(in_tree, in_hints)
+        print(self._format_ascii_tree(display_inputs) if display_inputs else "  (None)")
 
         print("\n=== Process Outputs ===")
-        if not display_outputs:
-            print("  (None)")
-        else:
-            out_tree, out_hints = build_tree_and_metadata(display_outputs)
-            display_tree(out_tree, out_hints)
+        print(self._format_ascii_tree(display_outputs) if display_outputs else "  (None)")
 
     def find_variable_usage(self, search_term: str):
         """

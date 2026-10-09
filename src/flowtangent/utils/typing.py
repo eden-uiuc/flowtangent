@@ -1,11 +1,9 @@
 # ruff: noqa: F722
-from typing import Any, Optional, Union, cast, TypeVar
+from typing import Any, Optional, Union, cast
 
 from jaxtyping import Array, Bool, Float, Int, Shaped
 
 from .tree import TreePath
-from .base import Module
-from .data import DataLoader, LatentDataLoader, SlicedDataLoader
 
 # ==========================================
 # FLOWTANGENT DIMENSION GLOSSARY
@@ -14,8 +12,6 @@ from .data import DataLoader, LatentDataLoader, SlicedDataLoader
 # _:    An arbitrary, unconstrained dimension length
 # ...:  Any number of dimensions (variadic wildcard)
 # ==========================================
-
-_Mod = TypeVar("_Mod", bound=Module)
 
 # Used by metaclasses in utils.base to parse type hints into default arrays
 class _Placeholder:
@@ -27,7 +23,6 @@ _ = cast(Any, _Placeholder())
 # FT Metatypes
 NameType = Union[str, None]
 TreePathLike = Union[TreePath, str, tuple[tuple | str | TreePath, Any, Optional[slice]]]
-LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
 
 # --- Scalars (Accepts JAX 0D arrays or Python primitives) ---
 # Perfect for Variable bounds, constants, and initial conditions
@@ -47,10 +42,8 @@ AnyArray = Shaped[Array, "..."]
 
 __all__ = [
     "_",
-    "_Mod",
     "NameType",
     "TreePathLike",
-    "LoaderType",
     "ScalarFloat",
     "ScalarInt",
     "ScalarBool",

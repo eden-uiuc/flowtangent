@@ -121,5 +121,5 @@ __all__ = [
     "NameType",
     "TreePathLike",
     "Dataset",
-    "DataLoader"
+    "DataLoader",
 ]

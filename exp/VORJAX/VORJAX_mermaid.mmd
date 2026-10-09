@@ -1,0 +1,35 @@
+%%{init: {"theme": "base", "themeVariables": {
+        "primaryColor": "#f8fafc",
+        "primaryBorderColor": "#3b82f6",
+        "primaryTextColor": "#0f172a",
+        "lineColor": "#94a3b8",
+        "fontFamily": "Inter, system-ui, sans-serif"
+    }}}%%
+graph LR
+    N0[Update Mesh]
+    N1[Freestream Validation]
+    N2([User Inputs])
+    N3[Calculate Boundary Conditions]
+    N4[Calculate VICs]
+    N5[Compute Vortex Strength]
+    N6[Compute Pressure Coefficients]
+    N7[Compute Aerodynamic Coefficients]
+    N8[Apply Aerodynamic Forces]
+    N1 -->|"state.freestream.speed"| N3
+    N1 -->|"state.freestream.speed"| N6
+    N1 -->|"state.freestream.speed"| N7
+    N1 -->|"state.freestream.speed"| N8
+    N2 -->|"state.frames.inertial.velocity_vector"| N1
+    N2 -->|"7 variables"| N3
+    N2 -->|"system.analysis_data.lattice\nstate.freestream.mach_number"| N4
+    N2 -->|"system.analysis_data.lattice"| N5
+    N2 -->|"system.analysis_data.lattice"| N6
+    N2 -->|"10 variables"| N7
+    N2 -->|"state.freestream.density\nsystem.areas.reference"| N8
+    N3 -->|"system.analysis_data.boundary_conditions"| N5
+    N3 -->|"system.analysis_data.relative_velocity"| N6
+    N4 -->|"<b>system.analysis_data</b>\n├─ singularities\n└─ VICs"| N5
+    N5 -->|"system.analysis_data.Gamma"| N6
+    N5 -->|"system.analysis_data.Gamma"| N7
+    N6 -->|"system.analysis_data.dCp"| N7
+    N7 -->|"<b>state.aerodynamics.coefficients</b>\n├─ lift.total\n└─ drag.total"| N8

@@ -42,6 +42,11 @@ dev = [
     "ruff"
 ]
 
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
+
 [tool.ruff]
 line-length = 120 
 

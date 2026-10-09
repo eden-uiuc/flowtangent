@@ -933,7 +933,13 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
 
     return state, updated_system, updated_settings
 
-
+@io.inputs(
+    "system.wings",
+    "settings.analysis.aerodynamics.panels",
+)
+@io.outputs(
+    "system.analysis_data.lattice"
+)
 def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     N_idx = 0
@@ -2397,6 +2403,9 @@ class AnalyzeVORJAX(Process):
 class VORJAX(Process):
     name: str = static_field("Aerodynamics")
     steps: tuple = field(lambda: (InitializeVORJAX(), AnalyzeVORJAX()))
+
+    initialize: Process = _
+    analyze: Process | tuple = _
 
     def __init__(self, name: str = "Aerodynamics", steps: Optional[tuple] = None, remesh: bool = True) -> None:
 
