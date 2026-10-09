@@ -281,7 +281,7 @@ class Airfoil(Component):
         return cls._from_surfaces(name, x, y_up, y_lo)
 
     @classmethod
-    def from_file(cls, file_path: str | Path, interpolate: bool = True, n_pts: int = 128):
+    def from_file(cls, file_path: str | Path, interpolate: bool = False, n_pts: int = 128):
         """
         Parses Selig and Lednicer format airfoil .dat files.
         Converts all inputs to standard Selig topology before utilizing 

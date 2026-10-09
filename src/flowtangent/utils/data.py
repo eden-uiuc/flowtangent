@@ -63,6 +63,7 @@ def numpy_collate(batch):
     else:
         raise TypeError(f"numpy_collate cannot handle batch of type {type(elem)}")
 
+
 class DataLoader(TorchDataLoader):
     """
     A standalone facade wrapper around PyTorch's DataLoader.
@@ -96,6 +97,39 @@ class LatentDataLoader:
             
     def __len__(self):
         return len(self.dataloader)
+
+class SlicedDataLoader:
+    """
+    Dynamically slices the feature dimension of batches streaming from a DataLoader.
+    Duck-types as a standard DataLoader for neural training loops.
+    """
+    def __init__(self, dataloader, split_indices, chunk_idx):
+        self.dataloader = dataloader
+        self.split_indices = split_indices
+        self.chunk_idx = chunk_idx
+        self.dataset = getattr(dataloader, "dataset", None)
+
+    def __iter__(self):
+        for batch in self.dataloader:
+            if isinstance(batch, (tuple, list)):
+                x_batch, y_batch = batch
+                x_parts = jnp.split(x_batch, self.split_indices, axis=-1)
+                yield x_parts[self.chunk_idx], y_batch
+            else:
+                x_parts = jnp.split(batch, self.split_indices, axis=-1)
+                yield x_parts[self.chunk_idx]
+
+    def __len__(self):
+        return len(self.dataloader)
+
+def slice_data(data, split_indices, chunk_idx):
+    """Routes data slicing depending on if it's a full array or a DataLoader."""
+    if hasattr(data, "__iter__") and hasattr(data, "dataset"):
+        return SlicedDataLoader(data, split_indices, chunk_idx)
+    # If it's a raw tuple of (X, Y) or a raw X array
+    if isinstance(data, (tuple, list)):
+        return jnp.split(data[0], split_indices, axis=-1)[chunk_idx], data[1]
+    return jnp.split(data, split_indices, axis=-1)[chunk_idx]
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Dataset
@@ -601,6 +635,6 @@ class MATDataset(Dataset):
 __all__ = [
     "Dataset", "IterableDataset", "ArrayDataset", "StackDataset", "ConcatDataset", 
     "ChainDataset", "Subset", "random_split", "DataLoader", "LatentDataLoader", "get_worker_info", 
-    "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", 
+    "slice_data", "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", 
     "SequentialSampler", "SubsetRandomSampler", "WeightedRandomSampler"
 ]

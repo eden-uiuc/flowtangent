@@ -5,6 +5,7 @@ from jaxtyping import Array, Bool, Float, Int, Shaped
 
 from .tree import TreePath
 from .base import Module
+from .data import DataLoader, LatentDataLoader, SlicedDataLoader
 
 # ==========================================
 # FLOWTANGENT DIMENSION GLOSSARY
@@ -14,7 +15,7 @@ from .base import Module
 # ...:  Any number of dimensions (variadic wildcard)
 # ==========================================
 
-_Mod = TypeVar("M", bound=Module)
+_Mod = TypeVar("_Mod", bound=Module)
 
 # Used by metaclasses in utils.base to parse type hints into default arrays
 class _Placeholder:
@@ -26,6 +27,7 @@ _ = cast(Any, _Placeholder())
 # FT Metatypes
 NameType = Union[str, None]
 TreePathLike = Union[TreePath, str, tuple[tuple | str | TreePath, Any, Optional[slice]]]
+LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
 
 # --- Scalars (Accepts JAX 0D arrays or Python primitives) ---
 # Perfect for Variable bounds, constants, and initial conditions
@@ -48,6 +50,7 @@ __all__ = [
     "_Mod",
     "NameType",
     "TreePathLike",
+    "LoaderType",
     "ScalarFloat",
     "ScalarInt",
     "ScalarBool",

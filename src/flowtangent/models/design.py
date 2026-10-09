@@ -21,13 +21,14 @@ from ..opt import _funcs as opt_funcs
 
 class Parameter(Module):
 
+    name: str = static_field("Parameter")
+
     path: Optional[TreePathLike] = None
     
     extract_func: Optional[Callable] = method_field(None)
     update_func: Optional[Callable] = method_field(None)
 
     is_output: bool = False
-    latent_dim: int = 0
 
     def __post_init__(self):
 
@@ -176,7 +177,7 @@ class DesignSpace(Module):
     parameters: tuple[Parameter, ...] = _
     requirements: tuple[Requirement, ...] = _
 
-    manifold: Manifold = field(Passthrough)
+    manifold: Manifold = _
     surrogate: Surrogate = _
 
     solver: Any = optx.LevenbergMarquardt
@@ -225,7 +226,7 @@ class DesignSpace(Module):
             in_dataset = str(p.name) in self.dataset.full_vars
             
             # CASE 1: User did NOT provide a value
-            if p.value.size == 0:
+            if p.value.size == 0 or p.value is None:
                 if not in_dataset:
                     raise ValueError(
                         f"Parameter '{p.name}' is not in the dataset and has no default value. "
@@ -257,11 +258,8 @@ class DesignSpace(Module):
                 new_p = eqx.tree_at(lambda x: x._tree_path.value, p, user_val)
                 initialized_params.append(new_p)
         
-        sorted_params = tuple(sorted(initialized_params, key=lambda p: str(p.name)))
-        object.__setattr__(self, "parameters", sorted_params)
-
-        dummy_inputs = {p.name: p.value for p in self.inputs}
-        _, unravel_fn = ravel_pytree(dummy_inputs)
+        ordered_defaults = tuple(p.value for p in self.inputs)
+        _, unravel_fn = ravel_pytree(ordered_defaults)
         object.__setattr__(self, "_unravel_inputs", unravel_fn)
 
     def get_dataloader(self, batch_size: int = 256, shuffle: bool = True, **kwargs) -> DataLoader:
@@ -291,17 +289,33 @@ class DesignSpace(Module):
         )
 
     def project(self, physical_inputs: dict) -> jax.Array:
-        flat_x, _ = ravel_pytree(physical_inputs)
+        """
+        Maps a dictionary of physical variables to the latent space.
+        Guarantees topological ordering and flattens multi-dimensional parameters.
+        """
+        try:
+            # Extract into a Tuple (strictly ordered by self.inputs)
+            ordered_vals = tuple(physical_inputs[p.name] for p in self.inputs)
+        except KeyError as e:
+            raise KeyError(f"Missing required input parameter: {e}")
+            
+        # Ravel the tuple into a flat 1D array
+        flat_x, _ = ravel_pytree(ordered_vals)
+        
         return self.manifold.encode(flat_x)
         
-    def reconstruct(self, latent_z: jax.Array) -> dict:
+    def reconstruct(self, z: jax.Array) -> dict[str, jax.Array]:
         """
-        Decodes a latent vector and perfectly reconstructs the named physical dictionary.
+        Maps a latent vector back to a dictionary of physical variables.
         """
-        flat_x = self.manifold.decode(latent_z)
+        # Decode returns the flat 1D array
+        flat_x = self.manifold.decode(z)
         
-        # Call the statically stored function to reshape and map back to dictionary keys
-        return self._unravel(flat_x)
+        # Unravel exactly back into the structured Tuple
+        structured_tuple = self._unravel(flat_x)
+        
+        # Zip it back together with the parameter names
+        return {str(p.name): val for p, val in zip(self.inputs, structured_tuple)}
 
     def evaluate(
             self, 
