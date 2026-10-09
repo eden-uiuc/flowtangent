@@ -2,12 +2,16 @@ import abc
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from typing import Optional, TypeVar, List
+from typing import Optional, TypeAlias, List, Union, Tuple
+from jaxtyping import Float, Array
 
 from ..utils import Module
 from ..utils.typing import _
+from ..utils.data import DataLoader, LatentDataLoader
 from .kernels import Kernel
 from .nn import TransformerBlock, fit_neural_model
+
+_loader: TypeAlias =  DataLoader | LatentDataLoader
 
 # --- Module-Level Registries ---
 _SURROGATE_REGISTRY = {}
@@ -18,12 +22,20 @@ def register_surrogate(name: str):
         return cls
     return decorator
 
-# --- Shared Optimistix Training Helper ---
-M = TypeVar("M", bound=Module)
+# --- DataLoader Compatibility Helper ---
+def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax.Array, jax.Array]:
+    """Drains a DataLoader into full-batch arrays for classical matrix inversion."""
+    if hasattr(data, "dataset") and hasattr(data, "__iter__"):
+        X_list, Y_list = [], []
+        for batch in data:
+            X_list.append(batch[0])
+            Y_list.append(batch[1])
+        return jnp.concatenate(X_list, axis=0), jnp.concatenate(Y_list, axis=0)
+    return data[0], data[1]
 
 
 # --- Base State and Classes ---
-class PredictionState(Module):
+class SurrogateEvaluation(Module):
     """The universal, strongly-typed return payload for all surrogates."""
     means: jax.Array = _
     variances: Optional[jax.Array] = None
@@ -48,11 +60,11 @@ class Surrogate(Module):
         return _SURROGATE_REGISTRY[method](*args, **kwargs)
 
     @abc.abstractmethod
-    def predict(self, latent_z: jax.Array, context: jax.Array, compute_derivatives: bool = False) -> PredictionState: 
+    def predict(self, x: jax.Array, compute_derivatives: bool = False) -> SurrogateEvaluation: 
         pass
 
     @abc.abstractmethod
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, **kwargs) -> "Surrogate":
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
         pass
 
 
@@ -62,7 +74,6 @@ class Surrogate(Module):
 
 @register_surrogate("PCE")
 class PolynomialChaosSurrogate(Surrogate):
-    """Projects inputs into orthogonal polynomial bases."""
     weights: eqx.nn.Linear = _
     degree: int = _
 
@@ -79,28 +90,25 @@ class PolynomialChaosSurrogate(Surrogate):
         poly_x = self._polynomial_basis(x)
         return self.weights(poly_x)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "PolynomialChaosSurrogate":
-        def loss_fn(model, args):
-            z, c, y = args
-            x = jnp.concatenate([z, c], axis=-1)
-            preds = jax.vmap(model._internal_predict)(x)
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "PolynomialChaosSurrogate":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
+            
+            preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((y_batch - preds)**2)
 
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 @register_surrogate("IDW")
 class InverseDistanceWeighting(Surrogate):
-    """Fast, deterministic interpolation without training."""
     X_fit: jax.Array = _
     Y_fit: jax.Array = _
     power: float = _
@@ -110,30 +118,27 @@ class InverseDistanceWeighting(Surrogate):
         self.Y_fit = jnp.zeros((1, output_dim))
         self.power = power
 
-    def _internal_predict(self, x_in):
-        distances = jnp.linalg.norm(self.X_fit - x_in, axis=-1)
+    def _internal_predict(self, x):
+        distances = jnp.linalg.norm(self.X_fit - x, axis=-1)
         weights = 1.0 / (distances ** self.power + 1e-8)
         weights /= jnp.sum(weights)
         return jnp.sum(weights[:, None] * self.Y_fit, axis=0)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, **kwargs) -> "InverseDistanceWeighting":
-        # IDW doesn't "train", it just memorizes the dataset.
-        X = jnp.concatenate([latent_z, context], axis=-1)
-        return eqx.tree_at(lambda m: (m.X_fit, m.Y_fit), self, (X, targets))
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
+        X_full, Y_full = _get_full_XY(data)
+            
+        return eqx.tree_at(lambda m: (m.X_fit, m.Y_fit), self, (X_full, Y_full))
 
 
 @register_surrogate("RBF")
 class RadialBasisFunction(Surrogate):
-    """Interpolates using radial basis functions. Requires exact linear solve."""
     centers: jax.Array = _
     weights: jax.Array = _
     lengthscale: float = _
@@ -143,41 +148,33 @@ class RadialBasisFunction(Surrogate):
         self.weights = jnp.zeros((1, output_dim))
         self.lengthscale = lengthscale
 
-    def _internal_predict(self, x_in):
-        r = jnp.linalg.norm(self.centers - x_in, axis=-1)
+    def _internal_predict(self, x):
+        r = jnp.linalg.norm(self.centers - x, axis=-1)
         phi = jnp.exp(-0.5 * (r / self.lengthscale)**2)
         return self.weights.T @ phi
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, **kwargs) -> "RadialBasisFunction":
-        X = jnp.concatenate([latent_z, context], axis=-1)
-        
-        # Calculate Phi matrix: phi_ij = exp(-0.5 * ||X_i - X_j||^2 / lengthscale^2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
+        X_full, Y_full = _get_full_XY(data)
+            
         def phi_fn(x1, x2):
             return jnp.exp(-0.5 * jnp.sum((x1 - x2)**2) / self.lengthscale**2)
             
-        Phi = jax.vmap(lambda x1: jax.vmap(lambda x2: phi_fn(x1, x2))(X))(X)
+        Phi = jax.vmap(lambda x1: jax.vmap(lambda x2: phi_fn(x1, x2))(X_full))(X_full)
+        Phi_ridge = Phi + 1e-6 * jnp.eye(X_full.shape[0])
+        W = jnp.linalg.solve(Phi_ridge, Y_full)
         
-        # Add ridge term for numerical stability
-        Phi_ridge = Phi + 1e-6 * jnp.eye(X.shape[0])
-        
-        # Solve exactly for weights
-        W = jnp.linalg.solve(Phi_ridge, targets)
-        
-        return eqx.tree_at(lambda m: (m.centers, m.weights), self, (X, W))
+        return eqx.tree_at(lambda m: (m.centers, m.weights), self, (X_full, W))
 
 
 @register_surrogate("SVGP")
 class GaussianProcessSurrogate(Surrogate):
-    """Sparse Variational Gaussian Process using the FlowTangent Kernel class."""
     inducing_points: jax.Array = _
     kernel: Kernel = _
     variational_mean: jax.Array = _
@@ -188,32 +185,27 @@ class GaussianProcessSurrogate(Surrogate):
         self.kernel = kernel
         self.inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
         self.variational_mean = jax.random.normal(k2, (num_inducing, output_dim)) * 1e-2
-        self.noise_variance = jnp.zeros(output_dim) # log-space
+        self.noise_variance = jnp.zeros(output_dim)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
-        
-        # Simplified prediction path (In a full implementation, you also need K_zz inverse)
+    def predict(self, x, compute_derivatives=False):
         K_xz = jax.vmap(lambda z: self.kernel(x, z))(self.inducing_points)
         means = K_xz @ self.variational_mean
-        
-        # Rough diagonal variance estimation
         var = self.kernel(x, x) - jnp.sum(K_xz**2, axis=-1, keepdims=True) + jnp.exp(self.noise_variance)
         
-        preds = PredictionState(means=means, variances=var)
+        preds = SurrogateEvaluation(means=means, variances=var)
         if compute_derivatives:
             mean_fn = lambda x_in: (jax.vmap(lambda z: self.kernel(x_in, z))(self.inducing_points)) @ self.variational_mean
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "GaussianProcessSurrogate":
-        # Note: A true GP uses ELBO. This is a proxy MSE optimization for demonstration.
-        def loss_fn(model, args):
-            z, c, y = args
-            preds = jax.vmap(model.predict)(z, c).means
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "GaussianProcessSurrogate":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+            preds = jax.vmap(model.predict)(x_batch).means
+            return jnp.mean((y_batch - preds)**2)
+            
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 # ==========================================
@@ -222,7 +214,6 @@ class GaussianProcessSurrogate(Surrogate):
 
 @register_surrogate("MLP")
 class MLPSurrogate(Surrogate):
-    """The deep learning workhorse. Fast and highly scalable."""
     network: eqx.nn.MLP = _
     
     def __init__(self, key, input_dim: int, output_dim: int, width: int = 256, depth: int = 4):
@@ -231,27 +222,25 @@ class MLPSurrogate(Surrogate):
     def _internal_predict(self, x):
         return self.network(x)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-3, epochs: int = 1000, **kwargs) -> "MLPSurrogate":
-        def loss_fn(model, args):
-            z, c, y = args
-            preds = jax.vmap(model.predict)(z, c).means
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 1000, **kwargs) -> "MLPSurrogate":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
+            preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((y_batch - preds)**2)
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 @register_surrogate("TRANSFORMER")
 class TransformerSurrogate(Surrogate):
-    """Treats latent and context as separate tokens for cross-attention."""
+    latent_dim: int = _
     latent_embed: eqx.nn.Linear = _
     context_embed: eqx.nn.Linear = _
     blocks: List[TransformerBlock] = _
@@ -259,6 +248,7 @@ class TransformerSurrogate(Surrogate):
 
     def __init__(self, key, latent_dim: int, context_dim: int, output_dim: int, hidden_size: int = 128):
         k1, k2, k3, k4 = jax.random.split(key, 4)
+        self.latent_dim = latent_dim
         self.latent_embed = eqx.nn.Linear(latent_dim, hidden_size, key=k1)
         self.context_embed = eqx.nn.Linear(context_dim, hidden_size, key=k2)
         
@@ -266,9 +256,10 @@ class TransformerSurrogate(Surrogate):
         self.blocks = [TransformerBlock(hidden_size, 4, bk) for bk in block_keys]
         self.head = eqx.nn.Linear(hidden_size, output_dim, key=k4)
 
-    def _internal_predict(self, latent_z, context):
-        z_tok = self.latent_embed(latent_z)
-        c_tok = self.context_embed(context)
+    def _internal_predict(self, x):
+        z, c = jnp.split(x, [self.latent_dim], axis=-1)
+        z_tok = self.latent_embed(z)
+        c_tok = self.context_embed(c)
         seq = jnp.stack([z_tok, c_tok], axis=0)
         
         for block in self.blocks:
@@ -277,29 +268,25 @@ class TransformerSurrogate(Surrogate):
         pooled = jnp.mean(seq, axis=0)
         return self.head(pooled)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        means = self._internal_predict(latent_z, context)
-        preds = PredictionState(means=means)
-        
+    def predict(self, x, compute_derivatives=False):
+        means = self._internal_predict(x)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            jac_z = jax.jacrev(lambda z: self._internal_predict(z, context))(latent_z)
-            jac_c = jax.jacrev(lambda c: self._internal_predict(latent_z, c))(context)
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jnp.concatenate([jac_z, jac_c], axis=-1))
-            
+            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "TransformerSurrogate":
-        def loss_fn(model, args):
-            z, c, y = args
-            preds = jax.vmap(model.predict)(z, c).means
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "TransformerSurrogate":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+            preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((y_batch - preds)**2)
+            
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 @register_surrogate("DEEP_ENSEMBLE")
 class DeepEnsembleSurrogate(Surrogate):
-    """Uses multiple MLPs initialized with different seeds to provide epistemic uncertainty."""
     models: eqx.nn.MLP = _  
 
     def __init__(self, key, num_models: int, input_dim: int, output_dim: int):
@@ -309,34 +296,29 @@ class DeepEnsembleSurrogate(Surrogate):
     def _internal_predict(self, x):
         return eqx.filter_vmap(lambda m: m(x))(self.models)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         samples = self._internal_predict(x)
-        
         means = jnp.mean(samples, axis=0)
         variances = jnp.var(samples, axis=0)
-        preds = PredictionState(means=means, variances=variances, samples=samples)
         
+        preds = SurrogateEvaluation(means=means, variances=variances, samples=samples)
         if compute_derivatives:
             mean_fn = lambda x_in: jnp.mean(self._internal_predict(x_in), axis=0)
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x))
-            
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "DeepEnsembleSurrogate":
-        def loss_fn(model, args):
-            z, c, y = args
-            x = jnp.concatenate([z, c], axis=-1)
-            # Evaluate all models across the whole batch
-            all_preds = jax.vmap(model._internal_predict)(x) # shape: [batch, num_models, outputs]
-            return jnp.mean((jnp.expand_dims(y, 1) - all_preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "DeepEnsembleSurrogate":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+            all_preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds)**2)
+            
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 @register_surrogate("MOE")
 class MixtureOfExperts(Surrogate):
-    """Learns to route inputs to specialized local MLPs."""
     gating_network: eqx.nn.Linear = _
     experts: eqx.nn.MLP = _ 
 
@@ -346,33 +328,30 @@ class MixtureOfExperts(Surrogate):
         keys = jax.random.split(k2, num_experts)
         self.experts = eqx.filter_vmap(lambda k: eqx.nn.MLP(input_dim, output_dim, 64, 2, key=k))(keys)
 
-    def _internal_predict(self, x_in):
-        gate_logits = self.gating_network(x_in)
+    def _internal_predict(self, x):
+        gate_logits = self.gating_network(x)
         routing_weights = jax.nn.softmax(gate_logits)
-        
-        expert_outputs = eqx.filter_vmap(lambda m: m(x_in))(self.experts)
+        expert_outputs = eqx.filter_vmap(lambda m: m(x))(self.experts)
         return jnp.sum(routing_weights[:, None] * expert_outputs, axis=0)
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "MixtureOfExperts":
-        def loss_fn(model, args):
-            z, c, y = args
-            preds = jax.vmap(model.predict)(z, c).means
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "MixtureOfExperts":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+            preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((y_batch - preds)**2)
+            
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class SpectralConv1d(Module):
-    """Core operator layer: Convolution in the frequency domain."""
     weights_real: jax.Array = _
     weights_imag: jax.Array = _
     modes: int = _
@@ -395,7 +374,6 @@ class SpectralConv1d(Module):
 
 @register_surrogate("FNO")
 class FourierNeuralOperator(Surrogate):
-    """Maps continuous functions to continuous functions."""
     lifting: eqx.nn.Linear = _
     spectral_conv: SpectralConv1d = _
     projection: eqx.nn.Linear = _
@@ -406,24 +384,23 @@ class FourierNeuralOperator(Surrogate):
         self.spectral_conv = SpectralConv1d(k2, width, width, modes)
         self.projection = eqx.nn.Linear(width, output_dim, key=k3)
 
-    def _internal_predict(self, x_in):
-        lifted = self.lifting(x_in).reshape(-1, 1) 
+    def _internal_predict(self, x):
+        lifted = self.lifting(x).reshape(-1, 1) 
         conv_out = jax.nn.gelu(self.spectral_conv(lifted))
         return self.projection(conv_out.flatten())
 
-    def predict(self, latent_z, context, compute_derivatives=False):
-        x = jnp.concatenate([latent_z, context], axis=-1)
+    def predict(self, x, compute_derivatives=False):
         means = self._internal_predict(x)
-        
-        preds = PredictionState(means=means)
+        preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, latent_z: jax.Array, context: jax.Array, targets: jax.Array, learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "FourierNeuralOperator":
-        def loss_fn(model, args):
-            z, c, y = args
-            preds = jax.vmap(model.predict)(z, c).means
-            return jnp.mean((y - preds)**2)
+    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "FourierNeuralOperator":
+        def loss_fn(model, batch):
+            x_batch, y_batch = batch
             
-        return fit_neural_model(self, (latent_z, context, targets), loss_fn, learning_rate, epochs)
+            preds = jax.vmap(model._internal_predict)(x_batch)
+            return jnp.mean((y_batch - preds)**2)
+            
+        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)

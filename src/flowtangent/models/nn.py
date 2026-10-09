@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 import equinox as eqx
 import jax
 from ..utils import Module
@@ -7,26 +7,43 @@ import optimistix as optx
 import optax
 
 def fit_neural_model(
-    model: _Mod, 
-    args: Any, 
-    loss_fn, 
+    model: Any, 
+    data: Any, 
+    loss_fn: Callable, 
     learning_rate: float = 1e-3, 
-    epochs: int = 500,
-    rtol: float = 1e-4,
-    atol: float = 1e-4
-) -> _Mod:
-    """Generic helper to run Optimistix minimization using Optax solvers."""
-    solver = optx.OptaxMinimiser(optax.adam(learning_rate), rtol=rtol, atol=atol)
-    
-    sol = optx.minimise(
-        loss_fn,
-        solver,
-        y0=model,
-        args=args,
-        max_steps=epochs,
-        throw=False
-    )
-    return sol.value
+    epochs: int = 50
+):
+    """
+    Universal Optax training loop. 
+    Accepts either a tuple of full-batch arrays (X, Y) or a PyTorch DataLoader.
+    """
+    # 1. Setup Optax optimizer (filters out static metadata automatically)
+    optimizer = optax.adam(learning_rate)
+    opt_state = optimizer.init(eqx.filter(model, eqx.is_array))
+
+    # 2. Compile the single-step update
+    @eqx.filter_jit
+    def make_step(current_model, state, batch):
+        # filter_value_and_grad cleanly handles taking derivatives of PyTrees
+        loss, grads = eqx.filter_value_and_grad(loss_fn)(current_model, batch)
+        updates, state = optimizer.update(grads, state, current_model)
+        new_model = eqx.apply_updates(current_model, updates)
+        return new_model, state, loss
+
+    # 3. Duck-type check: Is it a DataLoader or a Tuple of Arrays?
+    is_dataloader = hasattr(data, "dataset") and hasattr(data, "__iter__")
+
+    # 4. Execute the Training Loop
+    for epoch in range(epochs):
+        if is_dataloader:
+            # Mini-batch out-of-core training
+            for batch in data:
+                model, opt_state, loss = make_step(model, opt_state, batch)
+        else:
+            # Full-batch training (data is just the tuple args)
+            model, opt_state, loss = make_step(model, opt_state, data)
+
+    return model
 
 class TransformerBlock(Module):
     """A standard pre-norm transformer block."""

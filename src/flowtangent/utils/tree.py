@@ -188,6 +188,9 @@ class TreePath:
     def _snip_lead(self):
         return update(self, lambda p: p.path, self.path[1:])
 
+    def as_item(self):
+        return (self.name, self.value)
+
 
 def get_actual_path(obj: Any, path: str | tuple | TreePath) -> TreePath:
     "Walks object to convert virtual aliases to canonical paths."

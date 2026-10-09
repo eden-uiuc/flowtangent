@@ -13,7 +13,6 @@ dependencies = [
     "equinox",
     "jax",
     "jaxtyping",
-    "beartype",
     "matplotlib",
     "networkx",
     "numcodecs",
