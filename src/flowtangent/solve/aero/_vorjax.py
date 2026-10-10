@@ -1047,8 +1047,8 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         s_start = S_idx
         s_end = S_idx + N_s
 
-        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)  # noqa: E731
-        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)  # noqa: E731
+        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)
+        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)
 
         lat = update(
             lat_old,
@@ -1077,8 +1077,8 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             m_s_start = S_idx + N_s
             m_s_end = m_s_start + N_s
 
-            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)  # noqa: E731
-            m_stripPath = lambda attr_name, val: TreePath(  # noqa: E731
+            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)
+            m_stripPath = lambda attr_name, val: TreePath(
                 path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val
             )
 

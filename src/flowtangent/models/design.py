@@ -79,8 +79,11 @@ class RequirementEvaluation(Module):
     met: jax.Array = _
     residual: jax.Array = _  # Positive = margin of safety, Negative = violation
     probability: Optional[jax.Array] = None
+
     log_likelihood: Optional[jax.Array] = None
+
     derivatives: Optional[jax.Array] = None
+    derivatives_ll: Optional[jax.Array] = None
 
 
 class Requirement(Parameter):
@@ -400,7 +403,7 @@ class DesignSpace(Module):
 
         check_batch_vmap = jax.vmap(check_batch_feasible)
 
-        for x_batch, _ in dataloader:
+        for x_batch, __ in dataloader:
             if domain == "latent":
                 eval_batch = jax.vmap(self.manifold.encode)(x_batch)
             elif domain == "primal":
@@ -721,56 +724,42 @@ class ActiveSpace(DesignSpace):
         self, x: jax.Array, compute_derivatives: bool = False
     ) -> dict[str, RequirementEvaluation]:
 
-        # 1. The traceable function that JAX will differentiate
-        def _get_tracked_values(x_in):
+        def _forward(x_in):
             preds = self.evaluate(x_in, compute_derivatives=False)
 
-            # Reconstruct primal dictionary
             full_means = self.reconstruct(x_in)
             full_vars = {}
             for i, p in enumerate(self.outputs):
                 full_means[p.name] = preds.means[i]
                 full_vars[p.name] = preds.variances[i]
 
-            # Evaluate all requirements
             res_dict = {}
             ll_dict = {}
+            results_dict = {}
+
             for req in self.requirements:
                 req_eval = req.evaluate(vals_dict=full_means, vars_dict=full_vars)
+                results_dict[req.name] = req_eval
                 res_dict[req.name] = req_eval.residual
                 ll_dict[req.name] = req_eval.log_likelihood
 
-            return res_dict, ll_dict
+            primals = (res_dict, ll_dict)
 
-        # 2. Compute the actual base values
-        res_vals, ll_vals = _get_tracked_values(x)
+            # Return primals as the differentiable target,
+            # and pack them into the aux so we get them back for free
+            return primals, (primals, results_dict)
 
-        # 3. Compute the Jacobians using JAX reverse-mode autodiff
         if compute_derivatives:
-            # jacrev perfectly handles functions returning tuples of dictionaries
-            jacobians_res, jacobians_ll = jax.jacrev(_get_tracked_values)(x)
+            # jacrev returns (Jacobians, Aux)
+            (jac_res, jac_ll), (primals, results) = jax.jacrev(_forward, has_aux=True)(x)
+
+            for req_name, req_eval in results.items():
+                req_eval = eqx.tree_at(lambda e: e.derivatives, req_eval, jac_res[req_name])
+                req_eval = eqx.tree_at(lambda e: e.derivatives_ll, req_eval, jac_ll[req_name])
+                results[req_name] = req_eval
         else:
-            jacobians_res, jacobians_ll = {}, {}
-
-        # 4. Pack everything neatly into the Return objects
-        preds = self.evaluate(x, compute_derivatives=compute_derivatives)
-        full_means = self.reconstruct(x)
-        full_vars = {p.name: preds.variances[i] for i, p in enumerate(self.outputs)}
-        for i, p in enumerate(self.outputs):
-            full_means[p.name] = preds.means[i]
-
-        results = {}
-        for req in self.requirements:
-            req_eval = req.evaluate(vals_dict=full_means, vars_dict=full_vars)
-
-            if compute_derivatives:
-                # Add the residual derivative
-                req_eval = eqx.tree_at(lambda e: e.derivatives, req_eval, jacobians_res[req.name])
-
-                # Optional: We can add the log_likelihood derivative as well if we extend RequirementEvaluation
-                # req_eval = eqx.tree_at(lambda e: e.ll_derivatives, req_eval, jacobians_ll[req.name])
-
-            results[req.name] = req_eval
+            # Standard call returns (Primals, Aux)
+            _, (primals, results) = _forward(x)
 
         return results
 

@@ -63,11 +63,11 @@ class Manifold(Module):
         return _MANIFOLD_REGISTRY[method](*args, **kwargs)
 
     @abc.abstractmethod
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         pass
 
     @abc.abstractmethod
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         pass
 
     @abc.abstractmethod
@@ -105,12 +105,12 @@ class CompositeManifold(Manifold):
         out_sizes = [m.latent_dim for m in manifolds[:-1]]
         self._latent_splits = tuple(jnp.cumsum(jnp.array(out_sizes)).tolist())
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         x_parts = jnp.split(x, self._input_splits, axis=-1)
         z_parts = [m.encode(x_p) for m, x_p in zip(self.manifolds, x_parts)]
         return jnp.concatenate(z_parts, axis=-1)
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         z_parts = jnp.split(z, self._latent_splits, axis=-1)
         x_parts = [m.decode(z_p) for m, z_p in zip(self.manifolds, z_parts)]
         return jnp.concatenate(x_parts, axis=-1)
@@ -132,10 +132,10 @@ class Passthrough(Manifold):
         self.input_dim = dim
         self.latent_dim = dim
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         return x
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return z
 
     def fit(self, X: Union[Float[Array, "N D"], DataLoader], **kwargs) -> "Passthrough":
@@ -173,11 +173,11 @@ class ScalingManifold(Manifold):
     # 1. Routing
     # ==========================================================================
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         func = getattr(self, f"_{self.method}_encode")
         return func(x)
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         func = getattr(self, f"_{self.method}_decode")
         return func(z)
 
@@ -285,10 +285,10 @@ class LinearPCA(Manifold):
         self.W_dec = jnp.zeros((physical_dim, latent_dim))
         self.b_dec = jnp.zeros((physical_dim,))
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         return self.W_enc @ x + self.b_enc
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return self.W_dec @ z + self.b_dec
 
     def fit(self, X: Union[Float[Array, "N D"], LoaderType], **kwargs) -> "LinearPCA":
@@ -331,11 +331,11 @@ class KernelPCA(Manifold):
         self.eigenvalues = jnp.ones(latent_dim)
         self.pre_image_decoder = eqx.nn.MLP(latent_dim, input_dim, 64, 2, key=key)
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         K_x = jax.vmap(lambda x_train: self.kernel(x, x_train))(self.X_fit)
         return (K_x @ self.eigenvectors) / jnp.sqrt(self.eigenvalues)
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return self.pre_image_decoder(z)
 
     def fit(
@@ -389,7 +389,7 @@ class VariationalAutoencoder(Manifold):
         self.encoder = eqx.nn.MLP(physical_dim, latent_dim * 2, width, depth, activation, key=k1)
         self.decoder = eqx.nn.MLP(latent_dim, physical_dim, width, depth, activation, key=k2)
 
-    def encode(self, x: Float[Array, "D"], key=None) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"], key=None) -> Float[Array, " L"]:
         stats = self.encoder(x)
         mu, logvar = jnp.split(stats, 2, axis=-1)
         if key is None:
@@ -398,7 +398,7 @@ class VariationalAutoencoder(Manifold):
         eps = jax.random.normal(key, mu.shape)
         return mu + eps * std
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return self.decoder(z)
 
     def fit(
@@ -450,7 +450,7 @@ class TransformerAutoencoder(Manifold):
         self.latent_proj = eqx.nn.Linear(seq_len * hidden_size, latent_dim, key=k4)
         self.decoder_proj = eqx.nn.Linear(latent_dim, seq_len * feature_dim, key=k1)
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         # Reshape the flat 1D array back into sequence blocks
         x_seq = x.reshape((self.seq_len, self.feature_dim))
         embedded = jax.vmap(self.embedding)(x_seq) + self.positional_encoding
@@ -458,7 +458,7 @@ class TransformerAutoencoder(Manifold):
             embedded = block(embedded)
         return self.latent_proj(embedded.flatten())
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         # decoder_proj already flattens to match the 1D contract
         return self.decoder_proj(z)
 
@@ -497,7 +497,7 @@ class StateSpaceAutoencoder(Manifold):
         self.D = jax.random.normal(k4, (latent_dim, feature_dim))
         self.decoder_proj = eqx.nn.Linear(latent_dim, seq_len * feature_dim, key=k5)
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         x_seq = x.reshape((self.seq_len, self.feature_dim))
 
         def scan_fn(state, x_t):
@@ -508,7 +508,7 @@ class StateSpaceAutoencoder(Manifold):
         _, hidden_states = jax.lax.scan(scan_fn, initial_state, x_seq)
         return self.C @ hidden_states[-1] + self.D @ x_seq[-1]
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return self.decoder_proj(z)
 
     def fit(
@@ -562,12 +562,12 @@ class NormalizingFlow(Manifold):
             mask = jnp.arange(dim) < (dim // 2) if i % 2 == 0 else jnp.arange(dim) >= (dim // 2)
             self.layers.append(AffineCoupling(key=k, dim=dim, mask=jnp.array(mask, dtype=jnp.float32)))
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         for layer in self.layers:
             x, _ = layer.forward(x)
         return x
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         for layer in reversed(self.layers):
             z = layer.inverse(z)
         return z
@@ -601,14 +601,14 @@ class PointCloudManifold(Manifold):
         self.shared_mlp2 = eqx.nn.MLP(64, latent_dim, 128, 2, key=k2)
         self.decoder = eqx.nn.MLP(latent_dim, num_points * 3, 256, 3, key=k3)
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+    def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         points = x.reshape((self.num_points, 3))
         features = jax.vmap(self.shared_mlp1)(points)
         features = jax.vmap(self.shared_mlp2)(features)
         global_feature = jnp.max(features, axis=0)
         return global_feature
 
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+    def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         # decoder already projects to flat num_points * 3 array
         return self.decoder(z)
 
