@@ -2,12 +2,19 @@ site_name: FlowTangent
 site_description: A differentiable, GPU-accelerated aerospace systems design environment.
 theme:
   name: material
+  palette:
+    scheme: slate      # Forces dark mode
+    primary: custom    # Tells MkDocs to look at our CSS for the primary color
+    accent: custom
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.indexes
     - content.code.copy
 
+extra_css:
+  - stylesheets/nord-theme.css
+  
 plugins:
   - search
   - mkdocstrings:
@@ -43,4 +50,6 @@ extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
   - https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js
-  - javascripts/cytoscape-render.js
+  - https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js
+  - https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js
+  - javascripts/cyto-render.js
