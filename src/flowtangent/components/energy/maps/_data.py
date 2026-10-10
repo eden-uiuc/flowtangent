@@ -27,8 +27,8 @@ def load_map(name: str):
         try:
             with open(name, "r") as f:
                 data = json.load(f)
-        except:
-            raise AttributeError(f"Found map file {name}, but unable to load. Turbo maps must be JSONs.")
+        except Exception as e:
+            raise AttributeError(f"Found map file {name}, but unable to load: {e}")
         # TODO: Add map schema to docstring
 
     file_path = _MAP_DIR / f"{name}.json"

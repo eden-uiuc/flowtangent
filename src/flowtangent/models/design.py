@@ -253,7 +253,7 @@ class DesignSpace(Module):
                     dataset_val = jnp.atleast_1d(sample_row[p.name])
                     if user_val.shape != dataset_val.shape:
                         raise ValueError(
-                            f"Shape mismatch for Parameter '{p.name}'. User: {user_val.shape}, Dataset: {dataset_val.shape}."
+                            f"Shape mismatch for Parameter '{p.name}'. User: {user_val.shape}, Dataset: {dataset_val.shape}." # noqa: E501
                         )
                     if user_val.dtype != dataset_val.dtype:
                         user_val = user_val.astype(dataset_val.dtype)

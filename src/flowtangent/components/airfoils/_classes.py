@@ -5,23 +5,17 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Optional
 
-from matplotlib import pyplot as plt
-
-plt.style.use("dark_background")
-plt.rcParams["figure.facecolor"] = "black"
-plt.rcParams["axes.facecolor"] = "black"
-plt.rcParams["grid.color"] = "#444444"
-plt.rcParams["font.size"] = 12
-
 # package imports
 import jax
 import jax.numpy as jnp
 import numpy as np  # For loading from disk
+import plotly.graph_objects as go
 
 # FlowTangent imports
 from flowtangent.utils import empty_array, field
 
 from ...core._component import Component
+from ...plots import plot_airfoil, styles
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
@@ -311,7 +305,7 @@ class Airfoil(Component):
                 parts = line.replace(",", " ").split()
                 if len(parts) >= 2:
                     try:
-                        float(parts[0]), float(parts[1])
+                        _ = float(parts[0]), float(parts[1])
                         data_start_idx = i
                         break
                     except ValueError:
@@ -403,18 +397,27 @@ class Airfoil(Component):
                 y_lower=jnp.asarray(y_lo),
             )
 
-    def plot(self, title: Optional[str] = None):
-        if not title:
-            plot_title = self.name
-        else:
-            plot_title = title
-        plt.figure(figsize=(10, 6))
-        plt.plot(self.x_upper, self.y_upper, color="#FC6255")
-        plt.plot(self.x_lower, self.y_lower, color="#080888")
-        plt.title(plot_title)
-        plt.axis("equal")
-        plt.tight_layout()
-        plt.show()
+    def plot(
+        self,
+        title: Optional[str] = None,
+        show_markers: bool = False,
+        show_camber: bool = False,
+        theme: go.layout.Template = styles.nord_dark,
+        save_path: Optional[str] = None,
+        show: bool = False
+    ) -> go.Figure:
+        """
+        Generates a 1:1 aspect ratio visualization of the airfoil geometry.
+        """
+        return plot_airfoil(
+            airfoil=self,
+            title=title,
+            show_markers=show_markers,
+            show_camber=show_camber,
+            theme=theme,
+            save_path=save_path,
+            show=show
+        )
 
     def __eq__(self, other):
         if not isinstance(other, Airfoil):
