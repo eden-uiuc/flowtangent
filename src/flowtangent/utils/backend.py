@@ -2,7 +2,6 @@
 ## NO 3RD PARTY PACKAGE IMPORTS - SETS UP JAX/EQUINOX FLAGS AND MUST RUN FIRST
 
 import os
-import sys
 
 
 def numerical_environment():

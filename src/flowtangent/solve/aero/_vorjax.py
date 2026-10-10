@@ -934,6 +934,11 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
     return state, updated_system, updated_settings
 
 
+@io.inputs(
+    "system.wings",
+    "settings.analysis.aerodynamics.panels",
+)
+@io.outputs("system.analysis_data.lattice")
 def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     N_idx = 0
@@ -1042,8 +1047,8 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
         s_start = S_idx
         s_end = S_idx + N_s
 
-        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)  # noqa: E731
-        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)  # noqa: E731
+        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)
+        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)
 
         lat = update(
             lat_old,
@@ -1072,8 +1077,8 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
             m_s_start = S_idx + N_s
             m_s_end = m_s_start + N_s
 
-            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)  # noqa: E731
-            m_stripPath = lambda attr_name, val: TreePath(  # noqa: E731
+            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)
+            m_stripPath = lambda attr_name, val: TreePath(
                 path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val
             )
 
@@ -1205,7 +1210,9 @@ def compute_boundary_conditions(state: State, system: Aircraft, settings: Settin
     v_unit_x = v_unit[..., 0]
     rhs_array = base_rhs_array + (v_unit_x * lat.camber_slopes)
 
-    updated_system = update(system, (("analysis_data.boundary_conditions", rhs_array),("analysis_data.relative_velocity", v_total)))
+    updated_system = update(
+        system, (("analysis_data.boundary_conditions", rhs_array), ("analysis_data.relative_velocity", v_total))
+    )
 
     return state, updated_system, settings
 
@@ -2397,6 +2404,9 @@ class AnalyzeVORJAX(Process):
 class VORJAX(Process):
     name: str = static_field("Aerodynamics")
     steps: tuple = field(lambda: (InitializeVORJAX(), AnalyzeVORJAX()))
+
+    initialize: Process = _
+    analyze: Process | tuple = _
 
     def __init__(self, name: str = "Aerodynamics", steps: Optional[tuple] = None, remesh: bool = True) -> None:
 

@@ -1,0 +1,68 @@
+site_name: FlowTangent
+site_description: A differentiable, GPU-accelerated aerospace systems design environment.
+theme:
+  name: material
+  palette:
+    scheme: slate      # Forces dark mode
+    primary: custom    # Tells MkDocs to look at our CSS for the primary color
+    accent: custom
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - content.code.copy
+
+extra_css:
+  - stylesheets/nord-theme.css
+  
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+  - mkdocs-jupyter:
+      # Do not re-run the notebooks during the CI build
+      execute: false 
+      
+      # Force the notebook outputs to respect your slate/Nord dark theme
+      theme: dark 
+      
+      # Show the code cells (set to false if you only want to show markdown + plots)
+      include_source: true 
+      
+      # Ignore any .ipynb checkpoints created by Jupyter
+      ignore_hugo: false
+      ignore: ["*.ipynb_checkpoints/*"]
+
+hooks:
+  - docs/hooks/autodoc.py
+      
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Quickstart: tutorials/quickstart.ipynb
+      - VORJAX: tutorials/VORJAX.ipynb
+  - API Reference:
+      - Processes: api/processes.md
+      - Components: api/components.md
+      - Design Space: api/design_space.md
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  - https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js
+  - https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js
+  - https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js
+  - javascripts/cyto-render.js

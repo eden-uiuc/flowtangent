@@ -13,7 +13,6 @@ dependencies = [
     "equinox",
     "jax",
     "jaxtyping",
-    "beartype",
     "matplotlib",
     "networkx",
     "numcodecs",
@@ -21,12 +20,17 @@ dependencies = [
     "optimistix",
     "pandas",
     "plotly",
+    "kaleido",
     "scikit-learn",
     "scipy",
+    "torch",
     "tqdm",
     "zarr",
     "dask",
-    "pyarrow"
+    "pyarrow",
+    "h5py",
+    "netcdf4",
+    "optax",
 ]
 
 [project.optional-dependencies]
@@ -35,9 +39,15 @@ dev = [
     "openmdao",
     "pycycle",
     "pytest",
+    "pytest-regressions",
     "nvidia-ml-py",
     "om-pycycle",
-    "ruff"
+    "ruff",
+]
+
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
 ]
 
 [tool.ruff]
@@ -58,7 +68,9 @@ select = [
 ]
 
 ignore = [
-    "E741", 
+    "E731",
+    "E741",
+    "F722",
     "N802",
     "N803", 
     "N806",
@@ -91,6 +103,7 @@ section-order = [
 [tool.ruff.lint.per-file-ignores]
 # Ignore unused imports (F401) and import sorting (I) globally for init files
 "__init__.py" = ["F401", "I","E402"]
+"src/flowtangent/components/airfoils/_data.pyi" = ["N816"] # Ignore case for airfoil names
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]       # Only look for tests in the tests/ directory

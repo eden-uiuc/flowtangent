@@ -717,7 +717,7 @@ class ImplicitAnalysis(Process):
 
             print("\n2. Tracing Jacobian & Lowering to HLO...")
             t0 = time.time()
-            jac_fn = lambda x: jax.jacrev(fwd_fn, has_aux=True)(x)  # noqa: E731
+            jac_fn = lambda x: jax.jacrev(fwd_fn, has_aux=True)(x)
             jac_lowered = eqx.filter_jit(jac_fn).lower(variable_values)  # type: ignore
             print(f" - Jacobian Lowering Time: {time.time() - t0:.2f} seconds")
 
@@ -739,7 +739,7 @@ class ImplicitAnalysis(Process):
             else:
                 print("\n3. Tracing Full Optimistix Solver & Lowering...")
                 t0 = time.time()
-                run_fn = lambda c, st, sy: optx.root_find(  # noqa: E731
+                run_fn = lambda c, st, sy: optx.root_find(
                     fn=get_residuals,
                     solver=self.solver(**solver_options),  # type: ignore
                     y0=c,

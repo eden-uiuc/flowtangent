@@ -73,15 +73,10 @@ nosetests.xml
 # Images
 *.pdf
 *.png
-*.md
 
 # Docs
 *.html
 *.rst
 
-/doc/html
-/doc/latex
-/docs/_build/
-/docs/_modules/
-/docs/_sources/
-/docs/_static/
+
+.VSCodeCounter
