@@ -18,21 +18,35 @@ extra_css:
 plugins:
   - search
   - mkdocstrings:
-      handlers:
-        python:
-          options:
-            docstring_style: google  # or numpy
-            show_source: true
-            show_root_heading: true
+      default_handler: python
+  - mkdocs-jupyter:
+      # Do not re-run the notebooks during the CI build
+      execute: false 
+      
+      # Force the notebook outputs to respect your slate/Nord dark theme
+      theme: dark 
+      
+      # Show the code cells (set to false if you only want to show markdown + plots)
+      include_source: true 
+      
+      # Ignore any .ipynb checkpoints created by Jupyter
+      ignore_hugo: false
+      ignore: ["*.ipynb_checkpoints/*"]
 
 hooks:
   - docs/hooks/autodoc.py
-
+      
 nav:
   - Home: index.md
+  - Tutorials:
+      - Quickstart: tutorials/quickstart.ipynb
+      - Advanced Aerodynamics: tutorials/advanced_aero.ipynb
   - API Reference:
+      - Processes: api/processes.md
+      - Components: api/components.md
       - Design Space: api/design_space.md
       - Manifolds: api/manifolds.md
+
 
 markdown_extensions:
   - admonition
