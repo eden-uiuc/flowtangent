@@ -22,8 +22,8 @@ def plot_airfoil(
     plot_title = title if title else f"Airfoil Geometry: {airfoil.name}"
 
     # Plotly expects standard numpy arrays, safely cast from JAX arrays
-    x_up =  np.asarray(airfoil.x_upper)
-    y_up =  np.asarray(airfoil.y_upper)
+    x_up = np.asarray(airfoil.x_upper)
+    y_up = np.asarray(airfoil.y_upper)
     x_low = np.asarray(airfoil.x_lower)
     y_low = np.asarray(airfoil.y_lower)
 
