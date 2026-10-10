@@ -1,17 +1,32 @@
 name: Publish Docs
+
 on:
   push:
     branches:
       - main
+
 permissions:
   contents: write
+
 jobs:
   deploy:
+    name: Build & Deploy MkDocs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12
-      - run: pip install -e .[docs]
-      - run: mkdocs gh-deploy --force
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Installs both the standard framework and the docs requirements
+          pip install -e .[docs]
+
+      - name: Deploy to GitHub Pages
+        run: mkdocs gh-deploy --force

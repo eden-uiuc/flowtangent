@@ -1,7 +1,7 @@
 import flowtangent as ft
 from pathlib import Path
 
-aero = ft.solve.VORJAX()
+aero = ft.solve.BatchedAnalysis()
 cyto_json = aero.to_cytoscape_json(recursive=True)
 
 # Updated template with Dagre extension

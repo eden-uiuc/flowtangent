@@ -39,7 +39,8 @@ dev = [
     "pytest",
     "nvidia-ml-py",
     "om-pycycle",
-    "ruff"
+    "ruff",
+    "pyright",
 ]
 
 docs = [
