@@ -46,7 +46,7 @@ _plasma_colors = ["#f0f921", "#f89441", "#cc4678", "#7e03a8", "#0d0887"]
 
 plasma_dark = go.layout.Template(
     layout=go.Layout(
-        plot_bgcolor="#0a0a0a", # Near-black to make the bright yellows/oranges pop
+        plot_bgcolor="#0a0a0a",  # Near-black to make the bright yellows/oranges pop
         paper_bgcolor="#0a0a0a",
         font=dict(color="#eeeeee", family="Inter, system-ui, sans-serif"),
         colorway=_plasma_colors,
@@ -96,7 +96,7 @@ bw_pub = go.layout.Template(
             linecolor="black",
             mirror=True,
             ticks="outside",
-            showline=True
+            showline=True,
         ),
         yaxis=dict(
             gridcolor="#eeeeee",
@@ -104,7 +104,7 @@ bw_pub = go.layout.Template(
             linecolor="black",
             mirror=True,
             ticks="outside",
-            showline=True
+            showline=True,
         ),
     )
 )

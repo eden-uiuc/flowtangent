@@ -13,7 +13,7 @@ def plot_airfoil(
     show_camber: bool = False,
     theme: go.layout.Template = styles.nord_dark,
     save_path: Optional[str] = None,
-    show: bool = False
+    show: bool = False,
 ) -> go.Figure:
     """
     Plots the Airfoil class geometry using Plotly.
@@ -32,19 +32,11 @@ def plot_airfoil(
     fig = go.Figure()
 
     # Upper Surface
-    fig.add_trace(
-        go.Scatter(
-            x=x_up, y=y_up, mode=mode, name="Upper Surface",
-            line=dict(width=2), marker=dict(size=4)
-        )
-    )
+    fig.add_trace(go.Scatter(x=x_up, y=y_up, mode=mode, name="Upper Surface", line=dict(width=2), marker=dict(size=4)))
 
     # Lower Surface
     fig.add_trace(
-        go.Scatter(
-            x=x_low, y=y_low, mode=mode, name="Lower Surface",
-            line=dict(width=2), marker=dict(size=4)
-        )
+        go.Scatter(x=x_low, y=y_low, mode=mode, name="Lower Surface", line=dict(width=2), marker=dict(size=4))
     )
 
     # Camber Line
@@ -52,7 +44,10 @@ def plot_airfoil(
         camber_y = np.asarray(airfoil.camber)
         fig.add_trace(
             go.Scatter(
-                x=x_low, y=camber_y, mode=mode, name="Camber Line",
+                x=x_low,
+                y=camber_y,
+                mode=mode,
+                name="Camber Line",
                 line=dict(width=2, dash="dash"),
                 marker=dict(size=4, symbol="cross"),
             )
@@ -67,7 +62,7 @@ def plot_airfoil(
         hovermode="x unified",
         template=theme,
         legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
-        margin=dict(l=40, r=40, t=60, b=40)
+        margin=dict(l=40, r=40, t=60, b=40),
     )
 
     if save_path:

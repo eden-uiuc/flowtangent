@@ -404,7 +404,7 @@ class Airfoil(Component):
         show_camber: bool = False,
         theme: go.layout.Template = styles.nord_dark,
         save_path: Optional[str] = None,
-        show: bool = False
+        show: bool = False,
     ) -> go.Figure:
         """
         Generates a 1:1 aspect ratio visualization of the airfoil geometry.
@@ -416,7 +416,7 @@ class Airfoil(Component):
             show_camber=show_camber,
             theme=theme,
             save_path=save_path,
-            show=show
+            show=show,
         )
 
     def __eq__(self, other):
