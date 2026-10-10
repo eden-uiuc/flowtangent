@@ -38,6 +38,7 @@ dev = [
     "openmdao",
     "pycycle",
     "pytest",
+    "pytest-regressions",
     "nvidia-ml-py",
     "om-pycycle",
     "ruff",
