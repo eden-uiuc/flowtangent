@@ -13,7 +13,7 @@ from ._classes import Airfoil
 #  Airfoil Directory
 # ----------------------------------------------------------------------------------------------------------------------
 
-_AF_DIR = _ft_root() / "data/airfoils"
+_AF_DIR = _ft_root() / "data/airfoils/files"
 _AF_REGISTRY = {}
 STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 

@@ -11,7 +11,7 @@ def plot_airfoil(
     title: Optional[str] = None,
     show_markers: bool = False,
     show_camber: bool = False,
-    theme: go.layout.Template = styles.nord_dark,
+    theme: go.layout.Template | str = styles.nord_dark,
     save_path: Optional[str] = None,
     show: bool = False,
 ) -> go.Figure:
@@ -22,10 +22,10 @@ def plot_airfoil(
     plot_title = title if title else f"Airfoil Geometry: {airfoil.name}"
 
     # Plotly expects standard numpy arrays, safely cast from JAX arrays
-    x_up = np.asarray(airfoil.x_upper_surface)
-    y_up = np.asarray(airfoil.y_upper_surface)
-    x_low = np.asarray(airfoil.x_lower_surface)
-    y_low = np.asarray(airfoil.y_lower_surface)
+    x_up =  np.asarray(airfoil.x_upper)
+    y_up =  np.asarray(airfoil.y_upper)
+    x_low = np.asarray(airfoil.x_lower)
+    y_low = np.asarray(airfoil.y_lower)
 
     mode = "lines+markers" if show_markers else "lines"
 

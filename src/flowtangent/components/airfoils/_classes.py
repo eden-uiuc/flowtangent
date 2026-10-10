@@ -402,7 +402,7 @@ class Airfoil(Component):
         title: Optional[str] = None,
         show_markers: bool = False,
         show_camber: bool = False,
-        theme: go.layout.Template = styles.nord_dark,
+        theme: go.layout.Template | str = styles.nord_dark,
         save_path: Optional[str] = None,
         show: bool = False,
     ) -> go.Figure:
