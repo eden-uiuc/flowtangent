@@ -23,6 +23,7 @@ dependencies = [
     "kaleido",
     "scikit-learn",
     "scipy",
+    "torch",
     "tqdm",
     "zarr",
     "dask",
