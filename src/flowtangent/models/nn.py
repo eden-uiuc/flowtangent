@@ -1,16 +1,18 @@
 from typing import Any, Callable
+
 import equinox as eqx
 import jax
-from ..utils import Module
-from ..utils.typing import _, _Mod
-import optimistix as optx
 import optax
 
+from ..utils import Module
+from ..utils.typing import _
+
+
 def fit_neural_model(
-    model: Any, 
-    data: Any, 
-    loss_fn: Callable, 
-    learning_rate: float = 1e-3, 
+    model: Any,
+    data: Any,
+    loss_fn: Callable,
+    learning_rate: float = 1e-3,
     epochs: int = 50
 ):
     """
@@ -63,7 +65,7 @@ class TransformerBlock(Module):
         # x shape: [seq_len, hidden_size]
         x_norm1 = jax.vmap(self.ln1)(x)
         x = x + self.mha(x_norm1, x_norm1, x_norm1)
-        
+
         x_norm2 = jax.vmap(self.ln2)(x)
         x = x + jax.vmap(self.mlp)(x_norm2)
         return x

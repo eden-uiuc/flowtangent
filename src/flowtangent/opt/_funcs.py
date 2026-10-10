@@ -1,7 +1,8 @@
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 from jax.scipy.stats import norm
-from typing import Callable, Tuple
 
 # --- Registries ---
 _PENALTY_REGISTRY = {}
@@ -46,15 +47,15 @@ def __getattr__(name: str):
 
 def __dir__():
     return (
-        list(_PENALTY_REGISTRY.keys()) + 
-        list(_ACQUISITION_REGISTRY.keys()) + 
+        list(_PENALTY_REGISTRY.keys()) +
+        list(_ACQUISITION_REGISTRY.keys()) +
         list(_TRUST_REGISTRY.keys()) +
         list(_PROBABILITY_ACQ_REGISTRY.keys())
     )
 
 
 # ==========================================
-# 1. Penalty Functions 
+# 1. Penalty Functions
 # ==========================================
 
 @register_penalty("quadratic_penalty")
@@ -94,7 +95,7 @@ def infinite_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs
 
 
 # ==========================================
-# 2. Acquisition Functions 
+# 2. Acquisition Functions
 # ==========================================
 
 @register_acquisition("ucb")
@@ -126,7 +127,7 @@ def greedy_exploitation(mu: jax.Array, sigma: jax.Array, best_val: float, maximi
 
 
 # ==========================================
-# 3. Trust Functions 
+# 3. Trust Functions
 # ==========================================
 
 @register_trust("exponential_trust")

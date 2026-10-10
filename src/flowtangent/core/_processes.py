@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     ProcessFunc: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
 
 import inspect
-import os
 import re
 import time
 import warnings
@@ -51,13 +50,13 @@ from ..utils import (
     TreePath,
     compute_tree_delta,
     field,
-    static_field,
-    method_field,
     get_target,
     id_partition,
     inspect_leaves,
     is_array_like,
+    method_field,
     null_step,
+    static_field,
     update,
 )
 from ..utils.typing import _Placeholder
@@ -794,7 +793,7 @@ class Process(ProcessStep):
             exclude = ["energy"]
 
         compiled_patterns = [
-            re.compile(self._filter_map[k]) 
+            re.compile(self._filter_map[k])
             for k in exclude if k in self._filter_map
         ]
 
@@ -805,7 +804,7 @@ class Process(ProcessStep):
         G = self.graph(recursive=recursive)
         mermaid_lines = []
 
-        # Note: Ensure the MERMAID_STYLES dictionary uses strict JSON (double quotes) 
+        # Note: Ensure the MERMAID_STYLES dictionary uses strict JSON (double quotes)
         # inside the init block string so Mermaid can parse it correctly!
         if style in MERMAID_STYLES and MERMAID_STYLES[style]:
             mermaid_lines.append(MERMAID_STYLES[style])
@@ -823,7 +822,7 @@ class Process(ProcessStep):
             else:
                 step_obj = G.nodes[node_name].get("step_obj")
                 display_label = step_obj.name if step_obj else str(node_name)
-                
+
                 # Sanitize characters that break Mermaid node syntax
                 display_label = display_label.replace('"', "").replace("[", "(").replace("]", ")")
                 mermaid_lines.append(f"    {safe_id}[{display_label}]")
@@ -843,25 +842,25 @@ class Process(ProcessStep):
                     # 1. Split into components to find the common prefix
                     split_vars = [v.split(".") for v in vars_list]
                     min_len = min(len(v) for v in split_vars)
-                    
+
                     common_idx = 0
                     for i in range(min_len):
                         if len(set(v[i] for v in split_vars)) == 1:
                             common_idx += 1
                         else:
                             break
-                            
+
                     # 2. Build the tree string
                     if common_idx > 0 and common_idx < min_len:
                         prefix = ".".join(split_vars[0][:common_idx])
                         suffixes = [".".join(v[common_idx:]) for v in split_vars]
-                        
+
                         # Added the bold tags back in
                         tree_lines = [f"<b>{prefix}</b>"]
                         for i, suffix in enumerate(suffixes):
                             branch = "└─ " if i == len(suffixes) - 1 else "├─ "
                             tree_lines.append(f"{branch}{suffix}")
-                            
+
                         # Use Mermaid's native literal "\n" token (requires \\n in Python)
                         label = "\\n".join(tree_lines)
                     else:
@@ -869,10 +868,10 @@ class Process(ProcessStep):
 
                 # Robust sanitization
                 label = label.replace('"', "").replace("'", "").replace("|", "/")
-                
+
                 # Keep the escaped double quotes to protect the tree formatting
                 mermaid_lines.append(f"    {node_id_map[u]} -->|\"{label}\"| {node_id_map[v]}")
-        
+
         mermaid_str = "\n".join(mermaid_lines)
 
         # 5. Handle File Output
@@ -893,7 +892,7 @@ class Process(ProcessStep):
     def to_cytoscape_json(self, recursive: bool = False, exclude: Optional[list[str]] = None) -> str:
         import json
         import re
-        
+
         if exclude is None:
             exclude = ["energy"]
 
@@ -912,7 +911,7 @@ class Process(ProcessStep):
                 for var in data.get("variables", []):
                     if not is_filtered(var):
                         user_input_vars.add(var)
-        
+
         # USE THE NEW FORMATTER
         ui_tree_str = self._format_ascii_tree(user_input_vars)
         ui_full_tree = f"USER INPUTS\n{ui_tree_str}" if ui_tree_str else "User Inputs"
@@ -922,7 +921,7 @@ class Process(ProcessStep):
         for i, node_name in enumerate(G.nodes()):
             safe_id = f"N{i}"
             name_to_id[node_name] = safe_id
-            
+
             if node_name == "User Inputs":
                 nodes.append({
                     "data": {"id": safe_id, "label": node_name, "full_tree": ui_full_tree, "node_type": "input"}
@@ -938,34 +937,34 @@ class Process(ProcessStep):
         for u, v, data in G.edges(data=True):
             raw_vars = data.get("variables", [])
             vars_list = [var for var in raw_vars if not is_filtered(var)]
-            
+
             if not vars_list:
                 edges.append({"data": {"source": name_to_id[u], "target": name_to_id[v], "edge_type": "direct"}})
                 continue
-                
+
             short_label = str(len(vars_list))
-            
+
             # USE THE NEW FORMATTER
             full_tree = self._format_ascii_tree(vars_list)
 
             var_node_id = f"var_{name_to_id[u]}_{name_to_id[v]}"
-            
+
             nodes.append({
                 "data": {"id": var_node_id, "short_label": short_label, "full_tree": full_tree, "node_type": "variable"}
             })
-            
+
             edges.append({"data": {"source": name_to_id[u], "target": var_node_id, "edge_type": "incoming"}})
             edges.append({"data": {"source": var_node_id, "target": name_to_id[v], "edge_type": "outgoing"}})
 
         return json.dumps({"nodes": nodes, "edges": edges}, indent=2)
-    
+
     def print_io_tree(self, exclude: Optional[list[str]] = None):
         """
         Extracts the inputs and outputs of the Process and prints them
         in a hierarchical, human-readable ASCII tree structure.
         """
         import re
-        
+
         if exclude is None:
             exclude = ["energy"]
 

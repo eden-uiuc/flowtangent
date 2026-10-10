@@ -2,7 +2,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import pycycle.api as pyc
 
@@ -30,7 +30,7 @@ def load_map(name: str):
         except:
             raise AttributeError(f"Found map file {name}, but unable to load. Turbo maps must be JSONs.")
         #TODO: Add map schema to docstring
-    
+
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
         raise AttributeError(f"Map '{name}' not found in FlowTangent library ({_MAP_DIR}).")

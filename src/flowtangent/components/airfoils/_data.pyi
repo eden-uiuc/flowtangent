@@ -1,4 +1,3 @@
-from typing import Any
 from ._classes import Airfoil
 
 def load_foil(name: str, interpolate: bool = True, n_pts: int = 128) -> Airfoil: ...

@@ -1,13 +1,16 @@
 import abc
+from typing import Dict
+
 import jax
 import jax.numpy as jnp
-from typing import Dict, Any, Union
+
 from ..utils import Module
 from ..utils.typing import _
 
+
 class Kernel(Module):
     """Base class for all covariance kernels."""
-    
+
     @abc.abstractmethod
     def __call__(self, x1: jax.Array, x2: jax.Array) -> jax.Array:
         pass
@@ -24,7 +27,7 @@ class Kernel(Module):
 
     def __mul__(self, other: "Kernel") -> "Kernel":
         return ProductKernel(k1=self, k2=other)
-        
+
     def __pow__(self, exponent: float) -> "Kernel":
         return ExponentiationKernel(kernel=self, exponent=exponent)
 
@@ -33,44 +36,44 @@ class Kernel(Module):
 class SumKernel(Kernel):
     k1: Kernel = _
     k2: Kernel = _
-    
+
     def __init__(self, k1: Kernel, k2: Kernel):
         self.k1 = k1
         self.k2 = k2
-        
-    def __call__(self, x1, x2): 
+
+    def __call__(self, x1, x2):
         return self.k1(x1, x2) + self.k2(x1, x2)
-        
+
     @property
-    def theta(self): 
+    def theta(self):
         return {"k1": self.k1.theta, "k2": self.k2.theta}
 
 class ProductKernel(Kernel):
     k1: Kernel = _
     k2: Kernel = _
-    
+
     def __init__(self, k1: Kernel, k2: Kernel):
         self.k1 = k1
         self.k2 = k2
-        
-    def __call__(self, x1, x2): 
+
+    def __call__(self, x1, x2):
         return self.k1(x1, x2) * self.k2(x1, x2)
-        
+
     @property
-    def theta(self): 
+    def theta(self):
         return {"k1": self.k1.theta, "k2": self.k2.theta}
 
 class ExponentiationKernel(Kernel):
     kernel: Kernel = _
     exponent: float = _
-    
+
     def __init__(self, kernel: Kernel, exponent: float):
         self.kernel = kernel
         self.exponent = exponent
-        
+
     def __call__(self, x1, x2):
         return self.kernel(x1, x2) ** self.exponent
-        
+
     @property
     def theta(self):
         return self.kernel.theta
@@ -163,7 +166,7 @@ class RBFKernel(Kernel):
     variance: jax.Array = _
 
     def __init__(self, input_dim: int):
-        self.lengthscales = jnp.zeros(input_dim) 
+        self.lengthscales = jnp.zeros(input_dim)
         self.variance = jnp.zeros(1)
 
     def __call__(self, x1, x2):
@@ -181,7 +184,7 @@ class Matern52Kernel(Kernel):
     variance: jax.Array = _
 
     def __init__(self, input_dim: int):
-        self.lengthscales = jnp.zeros(input_dim) 
+        self.lengthscales = jnp.zeros(input_dim)
         self.variance = jnp.zeros(1)
 
     def __call__(self, x1, x2):

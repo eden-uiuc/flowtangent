@@ -1,38 +1,36 @@
-import numpy as np
-import netCDF4 as nc
-import h5py
-import pyarrow.parquet as pq
-import pyarrow.csv as pcsv
-import torch
-import equinox as eqx
-import jax
-import jax.numpy as jnp
-import zarr
-import scipy.io as sio
 import warnings
-
 from pathlib import Path
 from typing import Any, Optional, Union
 
+import equinox as eqx
+import h5py
+import jax
+import jax.numpy as jnp
+import netCDF4 as nc
+import numpy as np
+import pyarrow.csv as pcsv
+import pyarrow.parquet as pq
+import scipy.io as sio
+import torch
+import zarr
 from torch.utils.data import (
+    BatchSampler,
+    ChainDataset,
+    ConcatDataset,
     # Core Datasets
     IterableDataset,
-    StackDataset,
-    ConcatDataset,
-    ChainDataset,
-    Subset,
-    random_split,
+    RandomSampler,
     # Samplers
     Sampler,
-    BatchSampler,
-    RandomSampler,
-    SequentialSampler,
+    StackDataset,
+    Subset,
     SubsetRandomSampler,
     WeightedRandomSampler,
     # Utils
     get_worker_info,
-    DataLoader as TorchDataLoader
+    random_split,
 )
+from torch.utils.data import DataLoader as TorchDataLoader
 
 from .base import Module, static_field
 from .typing import _
@@ -48,7 +46,7 @@ def numpy_collate(batch):
     JAX functions never accidentally receive a torch.Tensor.
     """
     elem = batch[0]
-    
+
     if isinstance(elem, torch.Tensor):
         return np.stack([x.detach().cpu().numpy() for x in batch])
     elif isinstance(elem, np.ndarray):
@@ -94,7 +92,7 @@ class LatentDataLoader:
             # Encode physical batch to latent batch
             z_batch = jax.vmap(self.manifold.encode)(x_batch)
             yield z_batch, y_batch
-            
+
     def __len__(self):
         return len(self.dataloader)
 
@@ -235,19 +233,19 @@ class Dataset(Module):
         Returns a functionally updated Dataset.
         """
         new_appended = dict(self._appended_data)
-        
+
         for var in self.full_vars:
             # Extract the new value, defaulting to NaN if the oracle didn't provide it
             val = jnp.atleast_1d(row_dict.get(var, jnp.nan))
-            
+
             if var in new_appended:
                 new_appended[var] = jnp.concatenate([new_appended[var], val], axis=0)
             else:
                 new_appended[var] = val
-                
+
         return eqx.tree_at(
-            lambda d: (d._appended_data, d._appended_len), 
-            self, 
+            lambda d: (d._appended_data, d._appended_len),
+            self,
             (new_appended, self._appended_len + 1)
         )
 
@@ -260,17 +258,17 @@ class Dataset(Module):
             new_indices = jnp.where(mask)[0]
         else:
             new_indices = mask
-            
+
         # If we are already a subset, map the new indices through the existing ones
         if self._indices is not None:
             new_indices = self._indices[new_indices]
-            
+
         return eqx.tree_at(lambda d: d._indices, self, new_indices)
 
     def __getattr__(self, name: str):
         if name.startswith("_"):
             return object.__getattribute__(self, name)
-            
+
         # 1. Fetch the base column (from virtual columns or the backend proxy)
         base_col = None
         if hasattr(self, "_virtual_columns") and name in self._virtual_columns:
@@ -280,14 +278,14 @@ class Dataset(Module):
                 base_col = getattr(self._backend_proxy, name)
             except AttributeError:
                 pass
-                
+
         if base_col is None:
             raise AttributeError(f"Dataset has no variable '{name}'")
-            
+
         # 2. Concatenate any appended active-learning rows to the end
         if hasattr(self, "_appended_data") and name in self._appended_data:
             return jnp.concatenate([jnp.asarray(base_col), self._appended_data[name]], axis=0)
-            
+
         return base_col
 
     # --- PyTorch DataLoader Compatibility ---
@@ -300,7 +298,7 @@ class Dataset(Module):
         # Route the requested index through the virtual view
         if self._indices is not None:
             idx = self._indices[idx]
-            
+
         row = {}
         for var in self.full_vars:
             row[var] = getattr(self, var)[idx]
@@ -384,7 +382,7 @@ class ZarrDataset(Dataset):
         object.__setattr__(self, "_source", source)
         object.__setattr__(self, "_backend_proxy", ZarrGroupProxy(source))
         object.__setattr__(self, "_virtual_columns", {})
-        
+
         root = zarr.open_group(source, mode="r")
         # Use first array if primary_array isn't specified
         primary_array = primary_array or list(root.keys())[0]
@@ -403,21 +401,21 @@ class ZarrDataset(Dataset):
 
 class DataFrameDataset(Dataset):
     _len: int = _
-    
+
     def __init__(self, df):
         columns = list(df.columns)
         data_arr = df.to_numpy(dtype=np.float32)
-        
+
         data_dict = {col: data_arr[:, i] for i, col in enumerate(columns)}
-        
+
         object.__setattr__(self, "_source", "dataframe")
         object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", len(data_arr))
-        
+
     def __len__(self):
         return self._len
-        
+
     def __getitem__(self, idx):
         row = {}
         for var in self.full_vars:
@@ -437,12 +435,12 @@ class HDF5GroupProxy:
     def __getattr__(self, name: str):
         if name.startswith("_"):
             raise AttributeError
-            
+
         with h5py.File(self._file_path, "r") as f:
             group = self._get_obj(f)
             if name not in group:
                 raise AttributeError
-                
+
             target = group[name]
             next_path = f"{self._group_path}/{name}" if self._group_path else name
 
@@ -490,7 +488,7 @@ class ParquetDataset(Dataset):
 
     def __init__(self, file_path: str):
         pf = pq.ParquetFile(file_path)
-        
+
         object.__setattr__(self, "_source", file_path)
         object.__setattr__(self, "_backend_proxy", ParquetProxy(file_path, pf.schema.names))
         object.__setattr__(self, "_virtual_columns", {})
@@ -534,7 +532,7 @@ class CSVDataset(Dataset):
         table = pcsv.read_csv(file_path)
         columns = table.column_names
         data_dict = {col: table.column(col).to_numpy() for col in columns}
-        
+
         object.__setattr__(self, "_source", file_path)
         object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
@@ -562,7 +560,7 @@ class NetCDFGroupProxy:
 
         with nc.Dataset(self._file_path, "r") as ds:
             grp = ds[self._group_path] if self._group_path else ds
-            
+
             if name in grp.groups:
                 next_path = f"{self._group_path}/{name}" if self._group_path else name
                 return NetCDFGroupProxy(self._file_path, next_path)
@@ -620,7 +618,7 @@ class MATDataset(Dataset):
 
         keys = list(data_dict.keys())
         primary_key = primary_key or keys[0]
-        
+
         object.__setattr__(self, "_source", file_path)
         object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
@@ -636,8 +634,8 @@ class MATDataset(Dataset):
         return row
 
 __all__ = [
-    "Dataset", "IterableDataset", "ArrayDataset", "StackDataset", "ConcatDataset", 
-    "ChainDataset", "Subset", "random_split", "DataLoader", "LatentDataLoader", "get_worker_info", 
+    "Dataset", "IterableDataset", "ArrayDataset", "StackDataset", "ConcatDataset",
+    "ChainDataset", "Subset", "random_split", "DataLoader", "LatentDataLoader", "get_worker_info",
     "slice_data", "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", "LoaderType"
     "SequentialSampler", "SubsetRandomSampler", "WeightedRandomSampler"
 ]
