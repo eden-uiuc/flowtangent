@@ -1,6 +1,7 @@
 from ._classes import CompressorMap, TurbineMap
 
 def load_map(name: str) -> CompressorMap | TurbineMap: ...
+
 LPT: TurbineMap
 HPT1269: TurbineMap
 AXI3_2: CompressorMap

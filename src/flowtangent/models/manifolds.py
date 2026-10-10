@@ -17,14 +17,17 @@ from .nn import TransformerBlock, fit_neural_model
 # --- Module-Level Registries ---
 _MANIFOLD_REGISTRY = {}
 
+
 def register_manifold(name: str):
     def decorator(cls):
         _MANIFOLD_REGISTRY[name.upper()] = cls
         return cls
+
     return decorator
 
+
 # --- DataLoader Compatibility Helpers ---
-def _get_full_X(data: Union[Float[Array, "N D"], LoaderType]) -> Float[Array, "N D"] :
+def _get_full_X(data: Union[Float[Array, "N D"], LoaderType]) -> Float[Array, "N D"]:
     """Drains a DataLoader into a single full-batch array for classical matrix inversion."""
     if hasattr(data, "dataset") and hasattr(data, "__iter__"):
         X_list = []
@@ -32,7 +35,8 @@ def _get_full_X(data: Union[Float[Array, "N D"], LoaderType]) -> Float[Array, "N
             # Depending on collate_fn, batch might be (X, Y) or just X
             X_list.append(batch[0] if isinstance(batch, (tuple, list)) else batch)
         return jnp.concatenate(X_list, axis=0)
-    return data #type: ignore
+    return data  # type: ignore
+
 
 def _unpack_batch(batch: Union[Float[Array, "B D"], Tuple]) -> Float[Array, "B D"]:
     """Safely unpacks X_batch from a DataLoader (X, Y) tuple for unsupervised AE training."""
@@ -43,7 +47,6 @@ def _unpack_batch(batch: Union[Float[Array, "B D"], Tuple]) -> Float[Array, "B D
 
 # --- Base Class ---
 class Manifold(Module):
-
     input_dim: int = static_field(_)
     latent_dim: int = static_field(_)
 
@@ -81,9 +84,11 @@ class Manifold(Module):
 
         return CompositeManifold(left + right)
 
+
 @register_manifold("Composite")
 class CompositeManifold(Manifold):
     """Adjoins multiple manifolds side-by-side."""
+
     manifolds: List[Manifold] = _
     _input_splits: Tuple[int, ...] = static_field(())
     _latent_splits: Tuple[int, ...] = static_field(())
@@ -114,9 +119,10 @@ class CompositeManifold(Manifold):
         new_manifolds = []
         for i, m in enumerate(self.manifolds):
             sliced_data = slice_data(data, self._input_splits, i)
-            new_manifolds.append(m.fit(sliced_data, **kwargs)) #type: ignore
+            new_manifolds.append(m.fit(sliced_data, **kwargs))  # type: ignore
 
         return eqx.tree_at(lambda model: model.manifolds, self, new_manifolds)
+
 
 @register_manifold("Passthrough")
 class Passthrough(Manifold):
@@ -126,23 +132,26 @@ class Passthrough(Manifold):
         self.input_dim = dim
         self.latent_dim = dim
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]: return x
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]: return z
-    def fit(self, X: Union[Float[Array, "N D"], DataLoader], **kwargs) -> "Passthrough": return self
+    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+        return x
+
+    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+        return z
+
+    def fit(self, X: Union[Float[Array, "N D"], DataLoader], **kwargs) -> "Passthrough":
+        return self
+
 
 @register_manifold("SCALING")
 class ScalingManifold(Manifold):
     """
-    Unified manifold for transforming physical variables into an unbounded, 
+    Unified manifold for transforming physical variables into an unbounded,
     normalized [-inf, inf] latent space suitable for gradient-based optimization.
     """
-    method: Literal[
-        "linear",
-        "log_bounded",
-        "algebraic_bounded",
-        "softplus",
-        "logarithmic"
-    ] = static_field("log_bounded")
+
+    method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = static_field(
+        "log_bounded"
+    )
 
     scale_factors: jax.Array = _
     bounds_min: jax.Array = _
@@ -151,13 +160,7 @@ class ScalingManifold(Manifold):
     def __init__(
         self,
         dim: int,
-        method: Literal[
-            "linear",
-            "log_bounded",
-            "algebraic_bounded",
-            "softplus",
-            "logarithmic"
-        ] = "log_bounded"
+        method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = "log_bounded",
     ):
         self.input_dim = dim
         self.latent_dim = dim
@@ -232,8 +235,16 @@ class ScalingManifold(Manifold):
     # ==========================================================================
     def fit(self, data: Union[Float[Array, "N D"], Any], **kwargs) -> "ScalingManifold":
         # Helper to extract full arrays if `data` is a DataLoader
-        X_full = data[0] if isinstance(data, (tuple, list)) else (
-            data if not hasattr(data, "__iter__") else jnp.concatenate([batch[0] if isinstance(batch, (tuple, list)) else batch for batch in data], axis=0)
+        X_full = (
+            data[0]
+            if isinstance(data, (tuple, list))
+            else (
+                data
+                if not hasattr(data, "__iter__")
+                else jnp.concatenate(
+                    [batch[0] if isinstance(batch, (tuple, list)) else batch for batch in data], axis=0
+                )
+            )
         )
 
         d_min = jnp.min(X_full, axis=0)
@@ -249,18 +260,19 @@ class ScalingManifold(Manifold):
         scale_factors = jnp.where(scale_factors == 0, 1.0, scale_factors)
 
         return eqx.tree_at(
-            lambda m: (m.bounds_min, m.bounds_max, m.scale_factors),
-            self,
-            (padded_min, padded_max, scale_factors)
+            lambda m: (m.bounds_min, m.bounds_max, m.scale_factors), self, (padded_min, padded_max, scale_factors)
         )
+
 
 # ==========================================
 # 1. Statistical & Kernel Methods
 # ==========================================
 
+
 @register_manifold("PCA")
 class LinearPCA(Manifold):
     """Classic Principal Component Analysis."""
+
     W_enc: jax.Array = _
     b_enc: jax.Array = _
     W_dec: jax.Array = _
@@ -273,8 +285,11 @@ class LinearPCA(Manifold):
         self.W_dec = jnp.zeros((physical_dim, latent_dim))
         self.b_dec = jnp.zeros((physical_dim,))
 
-    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]: return self.W_enc @ x + self.b_enc
-    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]: return self.W_dec @ z + self.b_dec
+    def encode(self, x: Float[Array, "D"]) -> Float[Array, "L"]:
+        return self.W_enc @ x + self.b_enc
+
+    def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
+        return self.W_dec @ z + self.b_dec
 
     def fit(self, X: Union[Float[Array, "N D"], LoaderType], **kwargs) -> "LinearPCA":
         X_full = _get_full_X(X)
@@ -290,20 +305,18 @@ class LinearPCA(Manifold):
         idx = jnp.argsort(eigenvalues)[::-1]
         eigenvectors = eigenvectors[:, idx]
 
-        W_enc = eigenvectors[:, :self.latent_dim].T
+        W_enc = eigenvectors[:, : self.latent_dim].T
         b_enc = -W_enc @ mu
-        W_dec = eigenvectors[:, :self.latent_dim]
+        W_dec = eigenvectors[:, : self.latent_dim]
         b_dec = mu
 
-        return eqx.tree_at(
-            lambda m: (m.W_enc, m.b_enc, m.W_dec, m.b_dec),
-            self,
-            (W_enc, b_enc, W_dec, b_dec)
-        )
+        return eqx.tree_at(lambda m: (m.W_enc, m.b_enc, m.W_dec, m.b_dec), self, (W_enc, b_enc, W_dec, b_dec))
+
 
 @register_manifold("KPCA")
 class KernelPCA(Manifold):
     """Non-Linear PCA utilizing the generalized Kernel class."""
+
     X_fit: jax.Array = _
     eigenvectors: jax.Array = _
     eigenvalues: jax.Array = _
@@ -325,7 +338,9 @@ class KernelPCA(Manifold):
     def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
         return self.pre_image_decoder(z)
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "KernelPCA":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "KernelPCA":
         X_full = _get_full_X(X)
         K = jax.vmap(lambda x1: jax.vmap(lambda x2: self.kernel(x1, x2))(X_full))(X_full)
 
@@ -335,20 +350,18 @@ class KernelPCA(Manifold):
 
         eigvals, eigvecs = jnp.linalg.eigh(K_centered)
         idx = jnp.argsort(eigvals)[::-1]
-        top_eigvals = eigvals[idx][:self.latent_dim]
-        top_eigvecs = eigvecs[:, idx][:self.latent_dim]
+        top_eigvals = eigvals[idx][: self.latent_dim]
+        top_eigvecs = eigvecs[:, idx][: self.latent_dim]
 
         model = eqx.tree_at(
-            lambda m: (m.X_fit, m.eigenvalues, m.eigenvectors),
-            self,
-            (X_full, top_eigvals, top_eigvecs)
+            lambda m: (m.X_fit, m.eigenvalues, m.eigenvectors), self, (X_full, top_eigvals, top_eigvecs)
         )
 
         # Pre-image training uses iterative neural fit
         def decoder_loss(decoder, batch):
             Z_target, X_target = batch
             X_pred = jax.vmap(decoder)(Z_target)
-            return jnp.mean((X_target - X_pred)**2)
+            return jnp.mean((X_target - X_pred) ** 2)
 
         Z_full = jax.vmap(model.encode)(X_full)
         new_decoder = fit_neural_model(model.pre_image_decoder, (Z_full, X_full), decoder_loss, learning_rate, epochs)
@@ -360,13 +373,17 @@ class KernelPCA(Manifold):
 # 2. Deep Generative Models
 # ==========================================
 
+
 @register_manifold("VAE")
 class VariationalAutoencoder(Manifold):
     """Standard VAE. Enforces a Gaussian prior on the latent space for MCMC."""
+
     encoder: eqx.nn.MLP = _
     decoder: eqx.nn.MLP = _
 
-    def __init__(self, key, physical_dim: int, latent_dim: int, width: int = 128, depth: int = 3, activation=jax.nn.gelu):
+    def __init__(
+        self, key, physical_dim: int, latent_dim: int, width: int = 128, depth: int = 3, activation=jax.nn.gelu
+    ):
         k1, k2 = jax.random.split(key)
         self.latent_dim = latent_dim
         self.encoder = eqx.nn.MLP(physical_dim, latent_dim * 2, width, depth, activation, key=k1)
@@ -384,7 +401,9 @@ class VariationalAutoencoder(Manifold):
     def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
         return self.decoder(z)
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "VariationalAutoencoder":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "VariationalAutoencoder":
         def vae_loss(model, batch):
             X_batch = _unpack_batch(batch)
 
@@ -400,7 +419,7 @@ class VariationalAutoencoder(Manifold):
             z = mu + eps * std
 
             X_recon = jax.vmap(model.decoder)(z)
-            recon_loss = jnp.mean((X_batch - X_recon)**2)
+            recon_loss = jnp.mean((X_batch - X_recon) ** 2)
 
             return recon_loss + kl_loss
 
@@ -443,12 +462,14 @@ class TransformerAutoencoder(Manifold):
         # decoder_proj already flattens to match the 1D contract
         return self.decoder_proj(z)
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "TransformerAutoencoder":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "TransformerAutoencoder":
         def ae_loss(model, batch):
             X_batch = _unpack_batch(batch)
             Z = jax.vmap(model.encode)(X_batch)
             X_recon = jax.vmap(model.decode)(Z)
-            return jnp.mean((X_batch - X_recon)**2)
+            return jnp.mean((X_batch - X_recon) ** 2)
 
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
 
@@ -456,6 +477,7 @@ class TransformerAutoencoder(Manifold):
 @register_manifold("SSM_AE")
 class StateSpaceAutoencoder(Manifold):
     """Continuous-time sequence modeling (Mamba/S4 style)."""
+
     A: jax.Array = _
     B: jax.Array = _
     C: jax.Array = _
@@ -489,12 +511,14 @@ class StateSpaceAutoencoder(Manifold):
     def decode(self, z: Float[Array, "L"]) -> Float[Array, "D"]:
         return self.decoder_proj(z)
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "StateSpaceAutoencoder":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "StateSpaceAutoencoder":
         def ae_loss(model, batch):
             X_batch = _unpack_batch(batch)
             Z = jax.vmap(model.encode)(X_batch)
             X_recon = jax.vmap(model.decode)(Z)
-            return jnp.mean((X_batch - X_recon)**2)
+            return jnp.mean((X_batch - X_recon) ** 2)
 
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
 
@@ -527,6 +551,7 @@ class AffineCoupling(Module):
 @register_manifold("NormalizingFlow")
 class NormalizingFlow(Manifold):
     """Perfectly invertible probability mapping using RealNVP."""
+
     layers: List[AffineCoupling] = _
 
     def __init__(self, key, dim: int, num_layers: int = 4):
@@ -547,12 +572,14 @@ class NormalizingFlow(Manifold):
             z = layer.inverse(z)
         return z
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "NormalizingFlow":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "NormalizingFlow":
         def ae_loss(model, batch):
             X_batch = _unpack_batch(batch)
             Z = jax.vmap(model.encode)(X_batch)
             X_recon = jax.vmap(model.decode)(Z)
-            return jnp.mean((X_batch - X_recon)**2)
+            return jnp.mean((X_batch - X_recon) ** 2)
 
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
 
@@ -560,6 +587,7 @@ class NormalizingFlow(Manifold):
 @register_manifold("PointCloud")
 class PointCloudManifold(Manifold):
     """Handles unordered 3D point clouds via permutation-invariant max pooling."""
+
     shared_mlp1: eqx.nn.MLP = _
     shared_mlp2: eqx.nn.MLP = _
     decoder: eqx.nn.MLP = _
@@ -584,11 +612,13 @@ class PointCloudManifold(Manifold):
         # decoder already projects to flat num_points * 3 array
         return self.decoder(z)
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "PointCloudManifold":
+    def fit(
+        self, X: Union[Float[Array, "N D"], LoaderType], learning_rate: float = 1e-3, epochs: int = 500, **kwargs
+    ) -> "PointCloudManifold":
         def ae_loss(model, batch):
             X_batch = _unpack_batch(batch)
             Z = jax.vmap(model.encode)(X_batch)
             X_recon = jax.vmap(model.decode)(Z)
-            return jnp.mean((X_batch - X_recon)**2)
+            return jnp.mean((X_batch - X_recon) ** 2)
 
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)

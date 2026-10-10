@@ -13,6 +13,7 @@ from .tree import TreePath
 # ...:  Any number of dimensions (variadic wildcard)
 # ==========================================
 
+
 # Used by metaclasses in utils.base to parse type hints into default arrays
 class _Placeholder:
     pass

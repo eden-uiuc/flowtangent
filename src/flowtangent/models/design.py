@@ -21,7 +21,6 @@ from .surrogates import Surrogate, SurrogateEvaluation
 
 
 class Parameter(Module):
-
     name: str = static_field("Parameter")
 
     path: Optional[TreePathLike] = None
@@ -45,13 +44,17 @@ class Parameter(Module):
                 object.__setattr__(self, "name", tree_path.name)
 
             if has_extract and has_update:
-                warnings.warn(f"Parameter {self.name} has a path specified along with extract and update functions. "
-                              "This is not the intended usage and may lead to unexpected behavior.")
+                warnings.warn(
+                    f"Parameter {self.name} has a path specified along with extract and update functions. "
+                    "This is not the intended usage and may lead to unexpected behavior."
+                )
 
             if not self.extract_func:
                 object.__setattr__(self, "extract_func", lambda tree: ftu.get_target(tree, tree_path))
             if not self.update_func:
-                object.__setattr__(self, "update_func", lambda tree, value: ftu.update(tree, ftu.update(tree_path, "value", value)))
+                object.__setattr__(
+                    self, "update_func", lambda tree, value: ftu.update(tree, ftu.update(tree_path, "value", value))
+                )
         else:
             if not self.extract_func:
                 raise ValueError(f"Parameter {self.name} has no path and is missing an extraction function.")
@@ -66,12 +69,15 @@ class Parameter(Module):
     def value(self):
         if self.path is not None:
             return TreePath.cast(self.path).value
-        else: return jnp.empty(0)
+        else:
+            return jnp.empty(0)
+
 
 class RequirementEvaluation(Module):
     """Payload returned by a Requirement's evaluate method."""
+
     met: jax.Array = _
-    residual: jax.Array = _ # Positive = margin of safety, Negative = violation
+    residual: jax.Array = _  # Positive = margin of safety, Negative = violation
     probability: Optional[jax.Array] = None
     log_likelihood: Optional[jax.Array] = None
     derivatives: Optional[jax.Array] = None
@@ -79,9 +85,10 @@ class RequirementEvaluation(Module):
 
 class Requirement(Parameter):
     """
-    Evaluates physical constraints. 
+    Evaluates physical constraints.
     Can map directly to a variable name or use a custom derived extract_func.
     """
+
     name: str = "Parameter"
     eq_bound: Optional[jax.Array] = None
     lower_bound: Optional[jax.Array] = None
@@ -141,15 +148,14 @@ class Requirement(Parameter):
             else:
                 # Delta Method: propagate variance through the custom derived function
                 grads = jax.grad(self.extract_func)(vals_dict)
-                val_var = sum(
-                    (grads[k]**2) * vars_dict[k]
-                    for k in vars_dict.keys() if k in grads
-                )
+                val_var = sum((grads[k] ** 2) * vars_dict[k] for k in vars_dict.keys() if k in grads)
 
             sigma = jnp.sqrt(jnp.maximum(val_var, 1e-12))
 
             if self.lower_bound is not None and self.upper_bound is not None:
-                prob = self.error_cdf(self.upper_bound, loc=val, scale=sigma) - self.error_cdf(self.lower_bound, loc=val, scale=sigma)
+                prob = self.error_cdf(self.upper_bound, loc=val, scale=sigma) - self.error_cdf(
+                    self.lower_bound, loc=val, scale=sigma
+                )
             elif self.lower_bound is not None:
                 prob = 1.0 - self.error_cdf(self.lower_bound, loc=val, scale=sigma)
             elif self.upper_bound is not None:
@@ -160,18 +166,15 @@ class Requirement(Parameter):
             prob = jnp.clip(prob, 1e-12, 1.0)
             log_ll = jnp.log(prob)
 
-        return RequirementEvaluation(
-            met=met,
-            residual=residual,
-            probability=prob,
-            log_likelihood=log_ll
-        )
+        return RequirementEvaluation(met=met, residual=residual, probability=prob, log_likelihood=log_ll)
+
 
 class DesignSpace(Module):
     """
-    The deterministic foundation. Handles dataset translation, manifold projection, 
+    The deterministic foundation. Handles dataset translation, manifold projection,
     and standard gradient-based optimization.
     """
+
     dataset: Dataset = static_field(_)
     strict_dataset: bool = static_field(True)
 
@@ -192,10 +195,12 @@ class DesignSpace(Module):
         return {str(p.name): p for p in self.parameters}
 
     @property
-    def inputs(self): return tuple(p for p in self.parameters if not p.is_output)
+    def inputs(self):
+        return tuple(p for p in self.parameters if not p.is_output)
 
     @property
-    def outputs(self): return tuple(p for p in self.parameters if p.is_output)
+    def outputs(self):
+        return tuple(p for p in self.parameters if p.is_output)
 
     @property
     def X(self) -> jax.Array:
@@ -244,17 +249,19 @@ class DesignSpace(Module):
                 if in_dataset:
                     dataset_val = jnp.atleast_1d(sample_row[p.name])
                     if user_val.shape != dataset_val.shape:
-                        raise ValueError(f"Shape mismatch for Parameter '{p.name}'. User: {user_val.shape}, Dataset: {dataset_val.shape}.")
+                        raise ValueError(
+                            f"Shape mismatch for Parameter '{p.name}'. User: {user_val.shape}, Dataset: {dataset_val.shape}."
+                        )
                     if user_val.dtype != dataset_val.dtype:
                         user_val = user_val.astype(dataset_val.dtype)
                 else:
                     # New derived variable! Pass the strict_dataset flag as the quiet toggle
                     nan_overlay = jnp.full((len(self.dataset), *user_val.shape), jnp.nan, dtype=user_val.dtype)
-                    object.__setattr__(self, "dataset", self.dataset.add_variable(
-                        str(p.name),
-                        nan_overlay,
-                        quiet=not self.strict_dataset
-                    ))
+                    object.__setattr__(
+                        self,
+                        "dataset",
+                        self.dataset.add_variable(str(p.name), nan_overlay, quiet=not self.strict_dataset),
+                    )
 
                 new_p = eqx.tree_at(lambda x: x._tree_path.value, p, user_val)
                 initialized_params.append(new_p)
@@ -282,11 +289,7 @@ class DesignSpace(Module):
 
         # Instantiate the FT facade wrapper
         return DataLoader(
-            dataset=self.dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            collate_fn=xy_collate_fn,
-            **kwargs
+            dataset=self.dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=xy_collate_fn, **kwargs
         )
 
     def project(self, physical_inputs: dict) -> jax.Array:
@@ -318,13 +321,9 @@ class DesignSpace(Module):
         # Zip it back together with the parameter names
         return {str(p.name): val for p, val in zip(self.inputs, structured_tuple)}
 
-    def evaluate(
-            self,
-            x: Optional[jax.Array] = None,
-            compute_derivatives: bool = False
-        ) -> SurrogateEvaluation:
+    def evaluate(self, x: Optional[jax.Array] = None, compute_derivatives: bool = False) -> SurrogateEvaluation:
         """
-        Evaluates the surrogate. 
+        Evaluates the surrogate.
         If 'x' is omitted, projects the current Parameter values into the latent space.
         """
         if x is None:
@@ -339,6 +338,7 @@ class DesignSpace(Module):
         Evaluates all registered requirements against a latent vector x.
         If compute_derivatives=True, JAX calculates the Jacobian of the residuals w.r.t x.
         """
+
         def _get_residuals(x_in):
             preds = self.evaluate(x_in)
 
@@ -376,7 +376,7 @@ class DesignSpace(Module):
         domain: str = "latent",
         sampler: Optional[Any] = None,
         target_requirements: Optional[list[str]] = None,
-        batch_size: int = 256
+        batch_size: int = 256,
     ) -> jax.Array:
         """
         Filters the dataset to find points that satisfy engineering requirements.
@@ -432,12 +432,12 @@ class DesignSpace(Module):
         return lower_bound, upper_bound
 
     def optimize(
-            self,
-            objective_fn: Callable,
-            opt_vars: list[str],
-            initial_values: Optional[dict[str, jax.Array]] = None,
-            opt_kwargs: Optional[dict[str, Any]] = None,
-        ):
+        self,
+        objective_fn: Callable,
+        opt_vars: list[str],
+        initial_values: Optional[dict[str, jax.Array]] = None,
+        opt_kwargs: Optional[dict[str, Any]] = None,
+    ):
 
         # 1. Gather all baseline parameter values
         base_values = {p.name: p.value for p in self.inputs}
@@ -480,13 +480,7 @@ class DesignSpace(Module):
             return objective_fn(preds, x, full_dict)
 
         # 7. Execute the continuous optimization loop
-        sol = optx.minimise(
-            fn=loss_fn,
-            solver=solver,
-            y0=opt_vals,
-            args=fixed_vals,
-            throw=False
-        )
+        sol = optx.minimise(fn=loss_fn, solver=solver, y0=opt_vals, args=fixed_vals, throw=False)
 
         # Return the completely recombined, optimized physical dictionary
         optimized_opt_dict = opt_unravel(sol.value)
@@ -523,11 +517,7 @@ class DesignSpace(Module):
         return eqx.tree_at(lambda s: s.dataset, self, new_dataset)
 
     def refit_models(
-        self,
-        batch_size: int = 256,
-        manifold_epochs: int = 100,
-        surrogate_epochs: int = 50,
-        **dataloader_kwargs
+        self, batch_size: int = 256, manifold_epochs: int = 100, surrogate_epochs: int = 50, **dataloader_kwargs
     ) -> "DesignSpace":
         """
         Streams the current dataset to fine-tune the models.
@@ -543,22 +533,18 @@ class DesignSpace(Module):
         # 3. Fine-Tune Surrogate (blissfully unaware of the Manifold's existence)
         new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs)
 
-        return eqx.tree_at(
-            lambda s: (s.manifold, s.surrogate),
-            self,
-            (new_manifold, new_surrogate)
-        )
+        return eqx.tree_at(lambda s: (s.manifold, s.surrogate), self, (new_manifold, new_surrogate))
 
     def make_subspace(
         self,
         latent_bounds: Optional[tuple[jax.Array, jax.Array]] = None,
         primal_bounds: Optional[dict[str, tuple[Optional[float], Optional[float]]]] = None,
         refit: bool = False,
-        **refit_kwargs
+        **refit_kwargs,
     ):
         """
         Creates a constrained design space filtered by primal and/or latent bounds.
-        
+
         Args:
             latent_bounds: (lower_bound_array, upper_bound_array)
             primal_bounds: Dict of {"var_name": (lower_bound, upper_bound)}. Use None for open bounds.
@@ -586,10 +572,7 @@ class DesignSpace(Module):
             for x_batch, _ in self.get_dataloader(shuffle=False):
                 z_batch = jax.vmap(self.manifold.encode)(x_batch)
 
-                in_bounds = jnp.all(
-                    (z_batch >= latent_bounds[0]) & (z_batch <= latent_bounds[1]),
-                    axis=-1
-                )
+                in_bounds = jnp.all((z_batch >= latent_bounds[0]) & (z_batch <= latent_bounds[1]), axis=-1)
                 latent_mask_chunks.append(in_bounds)
 
             latent_mask = jnp.concatenate(latent_mask_chunks, axis=0)
@@ -603,19 +586,16 @@ class DesignSpace(Module):
 
         # 4. Return either a zero-copy wrapper or a hard refit instance
         if not refit:
-            return DesignSubspace(
-                base_space=self,
-                latent_bounds=latent_bounds,
-                primal_bounds=primal_bounds
-            )
+            return DesignSubspace(base_space=self, latent_bounds=latent_bounds, primal_bounds=primal_bounds)
 
         # Hard refit logic: Swap out the dataset and stream the sliced rows to the fitters
         temp_space = eqx.tree_at(lambda s: s.dataset, self, sliced_dataset)
         return temp_space.refit_models(
             batch_size=refit_kwargs.get("batch_size", 256),
             manifold_epochs=refit_kwargs.get("manifold_epochs", 100),
-            surrogate_epochs=refit_kwargs.get("surrogate_epochs", 50)
+            surrogate_epochs=refit_kwargs.get("surrogate_epochs", 50),
         )
+
 
 class DesignSubspace(Module):
     base_space: Any = _
@@ -624,7 +604,7 @@ class DesignSubspace(Module):
 
     def __getattr__(self, name: str):
         """
-        Dynamically forwards properties (dataset, parameters, surrogate, etc.) 
+        Dynamically forwards properties (dataset, parameters, surrogate, etc.)
         and flat methods (get_dataloader, augment_data, refit_models).
         """
         if name.startswith("_"):
@@ -662,9 +642,10 @@ class DesignSubspace(Module):
         initial_values: Optional[dict[str, jax.Array]] = None,
         opt_kwargs: Optional[dict[str, Any]] = None,
         penalty_type: str | Callable = "quadratic_penalty",
-        penalty_kwargs: Optional[dict[str, Any]] = None
+        penalty_kwargs: Optional[dict[str, Any]] = None,
     ):
-        if penalty_kwargs is None: penalty_kwargs = {"weight": 1e-3}
+        if penalty_kwargs is None:
+            penalty_kwargs = {"weight": 1e-3}
         penalty_weight = penalty_kwargs.pop("weight", 1e-3)
 
         penalty_fn = getattr(opt_funcs, penalty_type) if isinstance(penalty_type, str) else penalty_type
@@ -688,9 +669,19 @@ class DesignSubspace(Module):
 
         return self.base_space.optimize(constrained_objective, opt_vars, initial_values, opt_kwargs)
 
-    def explore(self, target_quantity: str, opt_vars: list[str], initial_values=None, method="ei", maximize=True, method_kwargs=None, opt_kwargs=None):
+    def explore(
+        self,
+        target_quantity: str,
+        opt_vars: list[str],
+        initial_values=None,
+        method="ei",
+        maximize=True,
+        method_kwargs=None,
+        opt_kwargs=None,
+    ):
         """Borrows the objective from the base space, but runs it through our penalized optimizer!"""
-        if method_kwargs is None: method_kwargs = {}
+        if method_kwargs is None:
+            method_kwargs = {}
 
         # Get the bare acquisition objective from the probabilistic base
         obj_fn = self.base_space._get_explore_objective(target_quantity, method, maximize, method_kwargs)
@@ -708,9 +699,10 @@ class DesignSubspace(Module):
 
         return base_ll
 
+
 class ActiveSpace(DesignSpace):
     """
-    The advanced tier. Requires a probabilistic surrogate (e.g., SVGP, Deep Ensemble). 
+    The advanced tier. Requires a probabilistic surrogate (e.g., SVGP, Deep Ensemble).
     Unlocks uncertainty quantification, Active Learning, and MCMC.
     """
 
@@ -725,7 +717,9 @@ class ActiveSpace(DesignSpace):
         trust_fn = getattr(opt_funcs, method)
         return trust_fn(preds.variances, **kwargs)
 
-    def evaluate_requirements(self, x: jax.Array, compute_derivatives: bool = False) -> dict[str, RequirementEvaluation]:
+    def evaluate_requirements(
+        self, x: jax.Array, compute_derivatives: bool = False
+    ) -> dict[str, RequirementEvaluation]:
 
         # 1. The traceable function that JAX will differentiate
         def _get_tracked_values(x_in):
@@ -786,7 +780,7 @@ class ActiveSpace(DesignSpace):
         method: str = "dataset",
         key: Optional[jax.Array] = None,
         num_warmup: int = 500,
-        **kwargs
+        **kwargs,
     ) -> jax.Array:
 
         if method != "mcmc":
@@ -808,7 +802,7 @@ class ActiveSpace(DesignSpace):
 
         # 1. Adapt phase (pass num_warmup as a positional argument)
         adapt = blackjax.window_adaptation(blackjax.nuts, logprob_fn)
-        (last_state, parameters), _ = adapt.run(warmup_key, initial_position, num_steps=num_warmup) #type: ignore
+        (last_state, parameters), _ = adapt.run(warmup_key, initial_position, num_steps=num_warmup)  # type: ignore
 
         # 2. Kernel setup
         kernel = blackjax.nuts(logprob_fn, **parameters).step
@@ -820,7 +814,7 @@ class ActiveSpace(DesignSpace):
                 key_step, subkey = jax.random.split(key_step)
 
                 # Unpack the step return. Explicitly hint that next_state is an HMCState
-                next_state, info = kernel(subkey, curr_state) #type: ignore
+                next_state, info = kernel(subkey, curr_state)  # type: ignore
                 next_state: HMCState = next_state
 
                 return (key_step, next_state), next_state.position
@@ -855,10 +849,11 @@ class ActiveSpace(DesignSpace):
         method: str = "ei",
         maximize: bool = True,
         method_kwargs: Optional[dict[str, Any]] = None,
-        opt_kwargs: Optional[dict[str, Any]] = None
+        opt_kwargs: Optional[dict[str, Any]] = None,
     ) -> dict[str, jax.Array]:
         """Active Learning execution via standard optimize loop."""
-        if method_kwargs is None: method_kwargs = {}
+        if method_kwargs is None:
+            method_kwargs = {}
 
         # Build the objective, then route it right back through our own optimizer!
         obj_fn = self._get_explore_objective(target_quantity, method, maximize, method_kwargs)
@@ -871,14 +866,16 @@ class ActiveSpace(DesignSpace):
         initial_values: Optional[dict[str, jax.Array]] = None,
         method: str = "binary_entropy",
         method_kwargs: Optional[dict] = None,
-        opt_kwargs: Optional[dict] = None
+        opt_kwargs: Optional[dict] = None,
     ) -> dict[str, jax.Array]:
         """
         Active Learning for Constraint Mapping.
         Searches for specific probability contours (like maximum confusion at P=0.5).
         """
-        if method_kwargs is None: method_kwargs = {}
-        if opt_kwargs is None: opt_kwargs = {"rtol": 1e-5, "atol": 1e-5}
+        if method_kwargs is None:
+            method_kwargs = {}
+        if opt_kwargs is None:
+            opt_kwargs = {"rtol": 1e-5, "atol": 1e-5}
 
         # Dynamically fetch from the new registry
         acq_fn = getattr(opt_funcs, method)
@@ -909,10 +906,10 @@ class ActiveSpace(DesignSpace):
         fixed_values: Optional[dict[str, jax.Array]] = None,
         refit: bool = True,
         explore_kwargs: Optional[dict] = None,
-        refit_kwargs: Optional[dict] = None
+        refit_kwargs: Optional[dict] = None,
     ) -> "ActiveSpace":
         """
-        Closed-loop Active Learning step. 
+        Closed-loop Active Learning step.
         If new_latents is None, automatically explores to find the optimal next point.
         """
         if new_latents is None:
@@ -928,7 +925,7 @@ class ActiveSpace(DesignSpace):
                 initial_values=fixed_values,
                 method=method,
                 maximize=maximize,
-                **explore_kwargs
+                **explore_kwargs,
             )
 
             # 2. Project the optimal physical parameters back into the latent space
@@ -944,6 +941,6 @@ class ActiveSpace(DesignSpace):
         # 4. Automatically close the loop by refitting the models on the newly appended data
         if refit:
             refit_kwargs = refit_kwargs or {}
-            return new_space.refit_models(**refit_kwargs) # type: ignore
+            return new_space.refit_models(**refit_kwargs)  # type: ignore
 
-        return new_space #type: ignore
+        return new_space  # type: ignore

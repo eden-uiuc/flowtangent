@@ -31,7 +31,9 @@ class Kernel(Module):
     def __pow__(self, exponent: float) -> "Kernel":
         return ExponentiationKernel(kernel=self, exponent=exponent)
 
+
 # --- 1. Composition Kernels ---
+
 
 class SumKernel(Kernel):
     k1: Kernel = _
@@ -48,6 +50,7 @@ class SumKernel(Kernel):
     def theta(self):
         return {"k1": self.k1.theta, "k2": self.k2.theta}
 
+
 class ProductKernel(Kernel):
     k1: Kernel = _
     k2: Kernel = _
@@ -62,6 +65,7 @@ class ProductKernel(Kernel):
     @property
     def theta(self):
         return {"k1": self.k1.theta, "k2": self.k2.theta}
+
 
 class ExponentiationKernel(Kernel):
     kernel: Kernel = _
@@ -78,10 +82,13 @@ class ExponentiationKernel(Kernel):
     def theta(self):
         return self.kernel.theta
 
+
 # --- 2. Base Scikit-Learn Kernels ---
+
 
 class ConstantKernel(Kernel):
     """Returns a constant value. Often used with ProductKernel to scale another kernel."""
+
     constant_value: jax.Array = _
 
     def __init__(self, constant_value: float = 1.0):
@@ -100,6 +107,7 @@ class WhiteKernel(Kernel):
     White noise kernel. Returns noise_level if x1 == x2, else 0.
     In practice, usually added directly to the diagonal of the covariance matrix.
     """
+
     noise_level: jax.Array = _
 
     def __init__(self, noise_level: float = 1e-5):
@@ -117,13 +125,14 @@ class WhiteKernel(Kernel):
 
 class DotProductKernel(Kernel):
     """Dot-product (linear) kernel: k(x, y) = sigma_0^2 + x * y"""
+
     sigma_0: jax.Array = _
 
     def __init__(self, sigma_0: float = 1.0):
         self.sigma_0 = jnp.array([jnp.log(sigma_0)])
 
     def __call__(self, x1, x2):
-        return jnp.exp(self.sigma_0)**2 + jnp.sum(x1 * x2, axis=-1)
+        return jnp.exp(self.sigma_0) ** 2 + jnp.sum(x1 * x2, axis=-1)
 
     @property
     def theta(self):
@@ -135,6 +144,7 @@ class PairwiseKernel(Kernel):
     Wrapper for non-stationary pairwise metrics (linear, polynomial, cosine).
     Note: Some metrics may not yield positive-semidefinite matrices.
     """
+
     metric: str = _
     gamma: jax.Array = _
 
@@ -147,7 +157,7 @@ class PairwiseKernel(Kernel):
         if self.metric == "linear":
             return jnp.sum(x1 * x2, axis=-1)
         elif self.metric == "polynomial":
-            return (g * jnp.sum(x1 * x2, axis=-1) + 1.0) ** 3.0 # Hardcoded degree 3 for proxy
+            return (g * jnp.sum(x1 * x2, axis=-1) + 1.0) ** 3.0  # Hardcoded degree 3 for proxy
         elif self.metric == "cosine":
             n1 = jnp.linalg.norm(x1, axis=-1)
             n2 = jnp.linalg.norm(x2, axis=-1)
@@ -159,7 +169,9 @@ class PairwiseKernel(Kernel):
     def theta(self):
         return {"gamma": jnp.exp(self.gamma)}
 
+
 # --- 3. Stationary / Distance-based Kernels ---
+
 
 class RBFKernel(Kernel):
     lengthscales: jax.Array = _
@@ -171,7 +183,7 @@ class RBFKernel(Kernel):
 
     def __call__(self, x1, x2):
         ls = jnp.exp(self.lengthscales)
-        sq_dist = jnp.sum(((x1 / ls) - (x2 / ls))**2, axis=-1)
+        sq_dist = jnp.sum(((x1 / ls) - (x2 / ls)) ** 2, axis=-1)
         return jnp.exp(self.variance) * jnp.exp(-0.5 * sq_dist)
 
     @property
@@ -188,9 +200,9 @@ class Matern52Kernel(Kernel):
         self.variance = jnp.zeros(1)
 
     def __call__(self, x1, x2):
-        r = jnp.sqrt(jnp.sum(((x1 - x2) / jnp.exp(self.lengthscales))**2, axis=-1) + 1e-8)
+        r = jnp.sqrt(jnp.sum(((x1 - x2) / jnp.exp(self.lengthscales)) ** 2, axis=-1) + 1e-8)
         sqrt5_r = jnp.sqrt(5.0) * r
-        return jnp.exp(self.variance) * (1.0 + sqrt5_r + (5.0/3.0)*r**2) * jnp.exp(-sqrt5_r)
+        return jnp.exp(self.variance) * (1.0 + sqrt5_r + (5.0 / 3.0) * r**2) * jnp.exp(-sqrt5_r)
 
     @property
     def theta(self):
@@ -202,6 +214,7 @@ class RationalQuadraticKernel(Kernel):
     Equivalent to adding together many RBF kernels with different lengthscales.
     Excellent for data featuring variations across multiple scales.
     """
+
     lengthscale: jax.Array = _
     alpha: jax.Array = _
 
@@ -212,7 +225,7 @@ class RationalQuadraticKernel(Kernel):
     def __call__(self, x1, x2):
         ls = jnp.exp(self.lengthscale)
         alpha = jnp.exp(self.alpha)
-        sq_dist = jnp.sum((x1 - x2)**2, axis=-1)
+        sq_dist = jnp.sum((x1 - x2) ** 2, axis=-1)
         return (1.0 + sq_dist / (2.0 * alpha * ls**2)) ** (-alpha)
 
     @property
@@ -222,9 +235,10 @@ class RationalQuadraticKernel(Kernel):
 
 class ExpSineSquaredKernel(Kernel):
     """
-    Also known as the Periodic Kernel. 
+    Also known as the Periodic Kernel.
     Models functions that repeat themselves exactly.
     """
+
     lengthscale: jax.Array = _
     periodicity: jax.Array = _
 
@@ -237,7 +251,7 @@ class ExpSineSquaredKernel(Kernel):
         p = jnp.exp(self.periodicity)
         # Uses Euclidean distance for the sine argument
         dist = jnp.linalg.norm(x1 - x2, axis=-1)
-        return jnp.exp(-2.0 * (jnp.sin(jnp.pi * dist / p) / ls)**2)
+        return jnp.exp(-2.0 * (jnp.sin(jnp.pi * dist / p) / ls) ** 2)
 
     @property
     def theta(self):

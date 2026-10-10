@@ -34,8 +34,8 @@ from .utils import (
 
 # Data Hoists
 from .data import units
-from .components.airfoils import (_data as airfoils, load_foil as load_airfoil)
-from .components.energy.maps import (_data as turbo_maps, load_map as load_turbo_map)
+from .components.airfoils import _data as airfoils, load_foil as load_airfoil
+from .components.energy.maps import _data as turbo_maps, load_map as load_turbo_map
 from .data import gases
 
 # Analysis hoists

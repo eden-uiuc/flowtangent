@@ -21,13 +21,14 @@ STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 def _sanitize_for_python(stem: str) -> str:
     """Converts a messy filename stem into a valid Python identifier."""
     # Replace both hyphens and periods with underscores
-    safe_name = stem.replace('-', '_').replace('.', '_')
+    safe_name = stem.replace("-", "_").replace(".", "_")
 
     # If it starts with a number, prepend 'af_'
     if safe_name and safe_name[0] in string.digits:
         safe_name = f"af_{safe_name}"
 
     return safe_name
+
 
 # 1. Build the registry ONCE at module initialization
 if _AF_DIR.exists():
@@ -42,6 +43,7 @@ if _AF_DIR.exists():
         if attr_name not in _AF_REGISTRY:
             _AF_REGISTRY[attr_name] = file_path
 
+
 # 2. Simplified Loading Logic
 @lru_cache(maxsize=None)
 def load_foil(name: str, interpolate: bool = True, n_pts: int = 128):
@@ -51,15 +53,18 @@ def load_foil(name: str, interpolate: bool = True, n_pts: int = 128):
 
     return Airfoil.from_file(_AF_REGISTRY[name], interpolate=interpolate, n_pts=n_pts)
 
+
 def __getattr__(name: str):
     """Intercepts module-level attribute access."""
     if name.startswith("_"):
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
     return load_foil(name)
 
+
 def __dir__():
     """Allows IDEs and the `dir()` command to see the available airfoils."""
-    return list(_AF_REGISTRY.keys()) + ['load_foil']
+    return list(_AF_REGISTRY.keys()) + ["load_foil"]
+
 
 def generate_stub():
     """Generates the .pyi stub file for IDE autocomplete."""
@@ -87,7 +92,7 @@ def validate_library(plotting: bool = False, k=32):
     print(f"Starting validation of {len(_AF_REGISTRY)} airfoils...")
 
     valid_airfoils = {}
-    inspection_queue = [] # Stores tuples of (name, reason)
+    inspection_queue = []  # Stores tuples of (name, reason)
 
     from tqdm import tqdm
 
@@ -95,8 +100,6 @@ def validate_library(plotting: bool = False, k=32):
     # PASS 1: Hard Geometric & Topological Constraints
     # ---------------------------------------------------------
     for name in tqdm(_AF_REGISTRY.keys(), desc="Inspecting Airfoils"):
-
-
         if "30p" in name or "ua79sff" in name or "r1145" in name:
             continue
 
@@ -123,18 +126,16 @@ def validate_library(plotting: bool = False, k=32):
     from matplotlib import pyplot as plt
 
     for name, reason in inspection_queue:
-
         af = load_foil(name)
         file_af = load_foil(name, interpolate=False)
         if plotting:
-            plt.plot(af.x_upper, af.y_upper, color='#FC6255', label="interpolated")
-            plt.plot(af.x_lower, af.y_lower, color='#FC6255', label="interpolated")
+            plt.plot(af.x_upper, af.y_upper, color="#FC6255", label="interpolated")
+            plt.plot(af.x_lower, af.y_lower, color="#FC6255", label="interpolated")
             plt.plot(file_af.x_upper, file_af.y_upper, color="#0B078A", label="raw")
             plt.plot(file_af.x_lower, file_af.y_lower, color="#0B078A", label="raw")
             plt.title(f"{name} Raw vs Interpolated: {reason}")
-            plt.axis('equal')
+            plt.axis("equal")
             plt.show()
-
 
     # ---------------------------------------------------------
     # PASS 2: Eigenspace Norms (Absolute Threshold >= 0.95)
@@ -166,25 +167,25 @@ def validate_library(plotting: bool = False, k=32):
     # ---------------------------------------------------------
 
     import matplotlib.pyplot as plt
-    if plotting:
 
+    if plotting:
         print(f"\nFound {len(outlier_indices)} statistical outliers (Dist >= 0.95).")
         print("Displaying distance histogram. Close the plot to begin manual inspection...")
 
         plt.figure(figsize=(10, 6))
-        plt.hist(distances[safe_indices], bins=50, alpha=0.7, color='blue', label='Normal Airfoils (< 0.95)')
+        plt.hist(distances[safe_indices], bins=50, alpha=0.7, color="blue", label="Normal Airfoils (< 0.95)")
 
         if len(outlier_indices) > 0:
-            plt.hist(distances[outlier_indices], bins=10, alpha=0.9, color='red', label='Outliers (>= 0.95)')
+            plt.hist(distances[outlier_indices], bins=10, alpha=0.9, color="red", label="Outliers (>= 0.95)")
 
-        plt.axvline(x=threshold, color='black', linestyle='--', linewidth=1.5, label='Threshold (0.95)')
+        plt.axvline(x=threshold, color="black", linestyle="--", linewidth=1.5, label="Threshold (0.95)")
         plt.title("Airfoil Eigenspace Norms (Mahalanobis Distance)")
         plt.xlabel("Distance from Dataset Mean")
         plt.ylabel("Frequency")
         plt.legend()
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.show() # Pauses here until user closes histogram
+        plt.show()  # Pauses here until user closes histogram
 
         # ---------------------------------------------------------
         # PASS 4: Interactive Visual Inspection
@@ -207,7 +208,6 @@ def validate_library(plotting: bool = False, k=32):
         import numpy as np
 
         def get_curvature(x, y):
-
             """Calculates geometric curvature using standard NumPy gradients."""
             x, y = np.array(x), np.array(y)
 
@@ -220,7 +220,7 @@ def validate_library(plotting: bool = False, k=32):
             ypp = np.gradient(yp) / dx
 
             # True curvature magnitude
-            kappa = np.abs(ypp) / (1.0 + yp**2)**1.5
+            kappa = np.abs(ypp) / (1.0 + yp**2) ** 1.5
             return kappa
 
         print(f"Launching diagnostic suite for {len(sorted_outliers)} outliers...")
@@ -250,34 +250,34 @@ def validate_library(plotting: bool = False, k=32):
 
             # Create 3-panel diagnostic plot
             fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 10))
-            fig.suptitle(f"Diagnostic: {name} (M-Dist: {dist:.2f})", fontsize=14, fontweight='bold')
+            fig.suptitle(f"Diagnostic: {name} (M-Dist: {dist:.2f})", fontsize=14, fontweight="bold")
 
             # Panel 1: Raw Geometry (Look for blunt trailing edges)
-            ax1.plot(x, y_up_raw, 'b-', label='Interp. Upper')
-            ax1.plot(x, y_lo_raw, 'r-', label='Interp. Lower')
-            ax1.scatter(file_af.x_upper, file_af.y_upper, c='c', label='File Upper')
-            ax1.scatter(file_af.x_lower, file_af.y_lower, c='g', label='File Lower')
-            ax1.set_aspect('equal')
+            ax1.plot(x, y_up_raw, "b-", label="Interp. Upper")
+            ax1.plot(x, y_lo_raw, "r-", label="Interp. Lower")
+            ax1.scatter(file_af.x_upper, file_af.y_upper, c="c", label="File Upper")
+            ax1.scatter(file_af.x_lower, file_af.y_lower, c="g", label="File Lower")
+            ax1.set_aspect("equal")
             ax1.set_title("1. Raw Interpolated Geometry")
             ax1.grid(True, alpha=0.3)
             ax1.legend()
 
             # Panel 2: Curvature (Look for spikes away from X=0)
-            ax2.plot(x, kappa_up, 'b-', label='Upper Curvature')
-            ax2.plot(x, kappa_lo, 'r-', label='Lower Curvature')
-            ax2.set_yscale('log')
+            ax2.plot(x, kappa_up, "b-", label="Upper Curvature")
+            ax2.plot(x, kappa_lo, "r-", label="Lower Curvature")
+            ax2.set_yscale("log")
             ax2.set_title("2. Surface Curvature (Log Scale)")
             ax2.set_ylabel(r"$\kappa$")
             ax2.grid(True, alpha=0.3)
             ax2.legend()
 
             # Panel 3: PCA Residual (The exact noise isolating this airfoil)
-            ax3.plot(x, y_up_raw - y_up_smooth, 'b-', label='Upper Residual')
-            ax3.plot(x, y_lo_raw - y_lo_smooth, 'r-', label='Lower Residual')
+            ax3.plot(x, y_up_raw - y_up_smooth, "b-", label="Upper Residual")
+            ax3.plot(x, y_lo_raw - y_lo_smooth, "r-", label="Lower Residual")
             ax3.set_title(f"3. PCA Reconstruction Residual (Top {k} Components)")
             ax3.set_xlabel("X Coordinate")
             ax3.set_ylabel(r"$\Delta Y$")
-            ax3.axhline(0, color='black', linewidth=1)
+            ax3.axhline(0, color="black", linewidth=1)
             ax3.grid(True, alpha=0.3)
             ax3.legend()
 
@@ -286,6 +286,7 @@ def validate_library(plotting: bool = False, k=32):
 
     print("\nInspection complete.")
     return valid_airfoils
+
 
 def evaluate_naca_overlap(valid_uiuc_dict, n_samples=5000, n_pts=128, k=32):
     """
@@ -353,7 +354,7 @@ def evaluate_naca_overlap(valid_uiuc_dict, n_samples=5000, n_pts=128, k=32):
     naca_reconstructed = jnp.dot(X_naca_centered, jnp.dot(basis.T, basis)) + mu_uiuc
 
     # Calculate MSE
-    mse = jnp.mean((X_naca - naca_reconstructed)**2, axis=1)
+    mse = jnp.mean((X_naca - naca_reconstructed) ** 2, axis=1)
 
     print(f"Mean Reconstruction Error: {jnp.mean(mse):.2e}")
     print(f"Max Reconstruction Error:  {jnp.max(mse):.2e}")
@@ -368,9 +369,10 @@ def evaluate_naca_overlap(valid_uiuc_dict, n_samples=5000, n_pts=128, k=32):
         X_joint = jnp.vstack([X_uiuc, X_naca])
         return X_joint
 
+
 def calculate_latent_voids(valid_airfoils_dict, k=32):
     """
-    Calculates the maximum empty void (dispersion) in the latent geometry manifold 
+    Calculates the maximum empty void (dispersion) in the latent geometry manifold
     using the Mahalanobis Nearest-Neighbor distance.
     """
     # 1. Project into Latent Space
@@ -379,7 +381,7 @@ def calculate_latent_voids(valid_airfoils_dict, k=32):
     X_centered = X - mu
 
     U, S, Vt = jnp.linalg.svd(X_centered, full_matrices=False)
-    Z = U[:, :k] * S[:k] # Latent scores (1650, k)
+    Z = U[:, :k] * S[:k]  # Latent scores (1650, k)
 
     # 2. Normalize by Singular Values to get Mahalanobis Space
     # We add a tiny epsilon to prevent division by zero on low-variance components
@@ -415,19 +417,20 @@ def calculate_latent_voids(valid_airfoils_dict, k=32):
 
     return nearest_neighbor_dists, max_void
 
+
 def analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=250, k=16, n_cond_baseline=128):
     """
-    Iteratively prunes the latent space and plots the statistical tradeoff 
+    Iteratively prunes the latent space and plots the statistical tradeoff
     between geometric density and required Sobol condition sampling.
     """
     pruned_dict = dict(valid_airfoils_dict)
 
     history = {
-        'n_airfoils': [],
-        'max_void_mah': [],
-        'geom_sigma': [],
-        'cond_sigma_at_128': [],
-        'n_cond_for_baseline': []
+        "n_airfoils": [],
+        "max_void_mah": [],
+        "geom_sigma": [],
+        "cond_sigma_at_128": [],
+        "n_cond_for_baseline": [],
     }
 
     # The mathematical standard to maintain
@@ -464,19 +467,19 @@ def analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=250, k=16, n_cond_
         worst_airfoil = names[isolated_idx]
 
         # 2. Record Metrics
-        history['n_airfoils'].append(n_airfoils)
-        history['max_void_mah'].append(max_void)
+        history["n_airfoils"].append(n_airfoils)
+        history["max_void_mah"].append(max_void)
 
         # Convert to Universal Sigma units for ARD Kernel comparison
-        history['geom_sigma'].append(max_void * np.sqrt(n_airfoils))
+        history["geom_sigma"].append(max_void * np.sqrt(n_airfoils))
 
         # Calculate Condition Void Sigma (Max void in 4D Sobol * sqrt(12))
         current_total_points = n_airfoils * n_cond_baseline
-        cond_void_raw = (1.0 / current_total_points)**0.25
-        history['cond_sigma_at_128'].append(cond_void_raw * np.sqrt(12))
+        cond_void_raw = (1.0 / current_total_points) ** 0.25
+        history["cond_sigma_at_128"].append(cond_void_raw * np.sqrt(12))
 
         # Calculate required conditions to maintain exact baseline density
-        history['n_cond_for_baseline'].append(baseline_total_points / n_airfoils)
+        history["n_cond_for_baseline"].append(baseline_total_points / n_airfoils)
 
         # 3. Prune the worst offender for the next loop
         if step < max_prunes:
@@ -484,28 +487,29 @@ def analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=250, k=16, n_cond_
 
     # --- Plotting the Tradeoffs ---
     import matplotlib.pyplot as plt
+
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12))
-    x_axis = history['n_airfoils']
+    x_axis = history["n_airfoils"]
 
     # Panel 1: The Raw Geometric Void
-    ax1.plot(x_axis, history['max_void_mah'], 'b-', linewidth=2)
+    ax1.plot(x_axis, history["max_void_mah"], "b-", linewidth=2)
     ax1.set_title("Max Geometric Void (Mahalanobis)")
     ax1.set_ylabel("Raw Distance")
-    ax1.invert_xaxis() # Read left-to-right as airfoils are removed
+    ax1.invert_xaxis()  # Read left-to-right as airfoils are removed
     ax1.grid(True, alpha=0.3)
 
     # Panel 2: The Isotropic Convergence (Sigma Units)
-    ax2.plot(x_axis, history['geom_sigma'], 'b-', label=r"Geometry Void ($\sigma$)")
-    ax2.plot(x_axis, history['cond_sigma_at_128'], 'r--', label=r"Condition Void at N=128 ($\sigma$)")
+    ax2.plot(x_axis, history["geom_sigma"], "b-", label=r"Geometry Void ($\sigma$)")
+    ax2.plot(x_axis, history["cond_sigma_at_128"], "r--", label=r"Condition Void at N=128 ($\sigma$)")
     ax2.set_title("Space Convergence (ARD Kernel Confidence)")
     ax2.set_ylabel(r"Standard Deviations ($\sigma$)")
-    ax2.set_yscale('log')
+    ax2.set_yscale("log")
     ax2.invert_xaxis()
     ax2.legend()
     ax2.grid(True, alpha=0.3)
 
     # Panel 3: Required Compensation
-    ax3.plot(x_axis, history['n_cond_for_baseline'], 'g-', linewidth=2)
+    ax3.plot(x_axis, history["n_cond_for_baseline"], "g-", linewidth=2)
     ax3.set_title("Conditions per Airfoil Needed to Preserve Baseline Density")
     ax3.set_xlabel("Number of Airfoils Remaining")
     ax3.set_ylabel(r"Required $N_{cond}$")
@@ -517,15 +521,16 @@ def analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=250, k=16, n_cond_
 
     return pruned_dict, worst_airfoil, history
 
+
 def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=False):
     """
-    Visualizes the 1400/250 split to ensure the retained core dataset 
+    Visualizes the 1400/250 split to ensure the retained core dataset
     still covers the primary aerodynamic design space.
     """
     # 1. Run the pruner exactly as before to get the two sets
     # (Assuming you modify prune_latent_space to return both dictionaries)
     kept_dict, next_prune, history = analyze_pruning_tradeoffs(valid_airfoils_dict, max_prunes=max_prunes, k=k)
-    pruned_dict = {k:v for k,v in valid_airfoils_dict.items() if k not in kept_dict}
+    pruned_dict = {k: v for k, v in valid_airfoils_dict.items() if k not in kept_dict}
 
     # 2. Project BOTH sets into the PCA space defined ONLY by the Kept airfoils
     X_keep = jnp.stack(list(kept_dict.values()))
@@ -542,7 +547,7 @@ def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=
     Z_prune = jnp.dot(X_prune - mu_keep, basis.T)
 
     X_prune_reconstructed = jnp.dot(Z_prune, basis) + mu_keep
-    mse_prune = jnp.mean((X_prune - X_prune_reconstructed)**2, axis=1)
+    mse_prune = jnp.mean((X_prune - X_prune_reconstructed) ** 2, axis=1)
 
     import numpy as np
 
@@ -555,12 +560,15 @@ def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=
 
     # 3. Plot the top 2 Principal Components to check for Family Extinction
     import matplotlib.pyplot as plt
+
     if plotting:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
         # Panel 1: Latent Space Scatter
-        ax1.scatter(Z_keep[:, 0], Z_keep[:, 1], c='blue', alpha=0.5, label=f'Kept Core ({len(kept_dict)})', s=15)
-        ax1.scatter(Z_prune[:, 0], Z_prune[:, 1], c='red', alpha=0.8, marker='x', label=f'Pruned OOD ({len(pruned_dict)})', s=30)
+        ax1.scatter(Z_keep[:, 0], Z_keep[:, 1], c="blue", alpha=0.5, label=f"Kept Core ({len(kept_dict)})", s=15)
+        ax1.scatter(
+            Z_prune[:, 0], Z_prune[:, 1], c="red", alpha=0.8, marker="x", label=f"Pruned OOD ({len(pruned_dict)})", s=30
+        )
         ax1.set_title("Latent Space Distribution (PC1 vs PC2)")
         ax1.set_xlabel("Principal Component 1")
         ax1.set_ylabel("Principal Component 2")
@@ -568,14 +576,14 @@ def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=
         ax1.grid(True, alpha=0.3)
 
         # Panel 2: Reconstruction Error Histogram
-        ax2.hist(mse_prune_np, bins=40, color='red', alpha=0.7, edgecolor='black')
-        ax2.axvline(median_mse, color='blue', linestyle='dashed', linewidth=2, label=f'Median: {median_mse:.2e}')
-        ax2.axvline(p95_mse, color='black', linestyle='dashed', linewidth=2, label=f'95th Pctl: {p95_mse:.2e}')
+        ax2.hist(mse_prune_np, bins=40, color="red", alpha=0.7, edgecolor="black")
+        ax2.axvline(median_mse, color="blue", linestyle="dashed", linewidth=2, label=f"Median: {median_mse:.2e}")
+        ax2.axvline(p95_mse, color="black", linestyle="dashed", linewidth=2, label=f"95th Pctl: {p95_mse:.2e}")
         ax2.set_title("OOD Reconstruction Error (MSE) via 16D Core Basis")
         ax2.set_xlabel("Mean Squared Error")
         ax2.set_ylabel("Frequency")
         # Log scale is often necessary for MSE histograms to see the extreme outliers
-        ax2.set_yscale('log')
+        ax2.set_yscale("log")
         ax2.legend()
         ax2.grid(True, alpha=0.3)
 
@@ -591,6 +599,7 @@ def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=
 
     # 4. Print a random sample of what got thrown away
     import numpy as np
+
     print("\nSample of Pruned Geometries (Check for extinct families):")
     pruned_names = list(pruned_dict.keys())
     pruned_names.sort()
@@ -598,6 +607,7 @@ def regularize_design_space(valid_airfoils_dict, max_prunes=250, k=16, plotting=
         print(f" - {name}")
 
     return kept_dict, pruned_dict
+
 
 if __name__ == "__main__":
     generate_stub()

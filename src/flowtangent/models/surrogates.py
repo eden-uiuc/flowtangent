@@ -11,16 +11,19 @@ from ..utils.typing import _
 from .kernels import Kernel
 from .nn import TransformerBlock, fit_neural_model
 
-_loader: TypeAlias =  DataLoader | LatentDataLoader
+_loader: TypeAlias = DataLoader | LatentDataLoader
 
 # --- Module-Level Registries ---
 _SURROGATE_REGISTRY = {}
+
 
 def register_surrogate(name: str):
     def decorator(cls):
         _SURROGATE_REGISTRY[name.upper()] = cls
         return cls
+
     return decorator
+
 
 # --- DataLoader Compatibility Helper ---
 def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax.Array, jax.Array]:
@@ -37,6 +40,7 @@ def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax
 # --- Base State and Classes ---
 class SurrogateEvaluation(Module):
     """The universal, strongly-typed return payload for all surrogates."""
+
     means: jax.Array = _
     variances: Optional[jax.Array] = None
     covariance: Optional[jax.Array] = None
@@ -72,6 +76,7 @@ class Surrogate(Module):
 # 1. Classical & Statistical Surrogates
 # ==========================================
 
+
 @register_surrogate("PCE")
 class PolynomialChaosSurrogate(Surrogate):
     weights: eqx.nn.Linear = _
@@ -83,7 +88,7 @@ class PolynomialChaosSurrogate(Surrogate):
         self.weights = eqx.nn.Linear(poly_features, output_dim, use_bias=True, key=key)
 
     def _polynomial_basis(self, x):
-        bases = [x ** d for d in range(1, self.degree + 1)]
+        bases = [x**d for d in range(1, self.degree + 1)]
         return jnp.concatenate(bases, axis=-1)
 
     def _internal_predict(self, x):
@@ -97,12 +102,18 @@ class PolynomialChaosSurrogate(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "PolynomialChaosSurrogate":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-2,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "PolynomialChaosSurrogate":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -120,7 +131,7 @@ class InverseDistanceWeighting(Surrogate):
 
     def _internal_predict(self, x):
         distances = jnp.linalg.norm(self.X_fit - x, axis=-1)
-        weights = 1.0 / (distances ** self.power + 1e-8)
+        weights = 1.0 / (distances**self.power + 1e-8)
         weights /= jnp.sum(weights)
         return jnp.sum(weights[:, None] * self.Y_fit, axis=0)
 
@@ -150,7 +161,7 @@ class RadialBasisFunction(Surrogate):
 
     def _internal_predict(self, x):
         r = jnp.linalg.norm(self.centers - x, axis=-1)
-        phi = jnp.exp(-0.5 * (r / self.lengthscale)**2)
+        phi = jnp.exp(-0.5 * (r / self.lengthscale) ** 2)
         return self.weights.T @ phi
 
     def predict(self, x, compute_derivatives=False):
@@ -164,7 +175,7 @@ class RadialBasisFunction(Surrogate):
         X_full, Y_full = _get_full_XY(data)
 
         def phi_fn(x1, x2):
-            return jnp.exp(-0.5 * jnp.sum((x1 - x2)**2) / self.lengthscale**2)
+            return jnp.exp(-0.5 * jnp.sum((x1 - x2) ** 2) / self.lengthscale**2)
 
         Phi = jax.vmap(lambda x1: jax.vmap(lambda x2: phi_fn(x1, x2))(X_full))(X_full)
         Phi_ridge = Phi + 1e-6 * jnp.eye(X_full.shape[0])
@@ -194,16 +205,24 @@ class GaussianProcessSurrogate(Surrogate):
 
         preds = SurrogateEvaluation(means=means, variances=var)
         if compute_derivatives:
-            mean_fn = lambda x_in: (jax.vmap(lambda z: self.kernel(x_in, z))(self.inducing_points)) @ self.variational_mean
+            mean_fn = lambda x_in: (
+                (jax.vmap(lambda z: self.kernel(x_in, z))(self.inducing_points)) @ self.variational_mean
+            )
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-2, epochs: int = 500, **kwargs) -> "GaussianProcessSurrogate":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-2,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "GaussianProcessSurrogate":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model.predict)(x_batch).means
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -211,6 +230,7 @@ class GaussianProcessSurrogate(Surrogate):
 # ==========================================
 # 2. Deep Learning Surrogates
 # ==========================================
+
 
 @register_surrogate("MLP")
 class MLPSurrogate(Surrogate):
@@ -229,11 +249,17 @@ class MLPSurrogate(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 1000, **kwargs) -> "MLPSurrogate":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-3,
+        epochs: int = 1000,
+        **kwargs,
+    ) -> "MLPSurrogate":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -275,12 +301,18 @@ class TransformerSurrogate(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "TransformerSurrogate":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-3,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "TransformerSurrogate":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -307,12 +339,18 @@ class DeepEnsembleSurrogate(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "DeepEnsembleSurrogate":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-3,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "DeepEnsembleSurrogate":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             all_preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds)**2)
+            return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -341,12 +379,18 @@ class MixtureOfExperts(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "MixtureOfExperts":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-3,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "MixtureOfExperts":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -359,7 +403,7 @@ class SpectralConv1d(Module):
     def __init__(self, key, in_channels, out_channels, modes):
         k1, k2 = jax.random.split(key)
         self.modes = modes
-        scale = (1.0 / (in_channels * out_channels))
+        scale = 1.0 / (in_channels * out_channels)
         self.weights_real = jax.random.normal(k1, (in_channels, out_channels, modes)) * scale
         self.weights_imag = jax.random.normal(k2, (in_channels, out_channels, modes)) * scale
 
@@ -367,8 +411,8 @@ class SpectralConv1d(Module):
         x_ft = jnp.fft.rfft(x)
         complex_weights = self.weights_real + 1j * self.weights_imag
         out_ft = jnp.zeros((complex_weights.shape[1], x_ft.shape[-1]), dtype=jnp.complex64)
-        out_ft_modes = jnp.einsum("im,iom->om", x_ft[:, :self.modes], complex_weights)
-        out_ft = out_ft.at[:, :self.modes].set(out_ft_modes)
+        out_ft_modes = jnp.einsum("im,iom->om", x_ft[:, : self.modes], complex_weights)
+        out_ft = out_ft.at[:, : self.modes].set(out_ft_modes)
         return jnp.fft.irfft(out_ft, n=x.shape[-1])
 
 
@@ -396,11 +440,17 @@ class FourierNeuralOperator(Surrogate):
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x))
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], learning_rate: float = 1e-3, epochs: int = 500, **kwargs) -> "FourierNeuralOperator":
+    def fit(
+        self,
+        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        learning_rate: float = 1e-3,
+        epochs: int = 500,
+        **kwargs,
+    ) -> "FourierNeuralOperator":
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds)**2)
+            return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)

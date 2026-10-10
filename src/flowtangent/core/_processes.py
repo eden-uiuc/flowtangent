@@ -669,6 +669,7 @@ class Process(ProcessStep):
             return ""
 
         import re
+
         tree = {}
         type_hints = {}
         # Regex extracts bracketed items (with or without quotes) and normal text, ignoring dots
@@ -697,6 +698,7 @@ class Process(ProcessStep):
 
         # 4. Recursively build the string representation
         lines = []
+
         def traverse(current_tree: dict, current_parts: tuple = (), depth: int = 0):
             keys = sorted(current_tree.keys())
             for i, key in enumerate(keys):
@@ -707,7 +709,9 @@ class Process(ProcessStep):
                     display_name += f": {type_hints[node_parts]}"
 
                 # Flag dictionary children
-                has_dict_children = any(str(k).startswith("['") or str(k).startswith('["') for k in current_tree[key].keys())
+                has_dict_children = any(
+                    str(k).startswith("['") or str(k).startswith('["') for k in current_tree[key].keys()
+                )
                 if has_dict_children:
                     display_name += ": {dict}"
 
@@ -792,10 +796,7 @@ class Process(ProcessStep):
         if exclude is None:
             exclude = ["energy"]
 
-        compiled_patterns = [
-            re.compile(self._filter_map[k])
-            for k in exclude if k in self._filter_map
-        ]
+        compiled_patterns = [re.compile(self._filter_map[k]) for k in exclude if k in self._filter_map]
 
         def is_filtered(var_name: str) -> bool:
             return any(pat.search(var_name) for pat in compiled_patterns)
@@ -870,7 +871,7 @@ class Process(ProcessStep):
                 label = label.replace('"', "").replace("'", "").replace("|", "/")
 
                 # Keep the escaped double quotes to protect the tree formatting
-                mermaid_lines.append(f"    {node_id_map[u]} -->|\"{label}\"| {node_id_map[v]}")
+                mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
 
         mermaid_str = "\n".join(mermaid_lines)
 
@@ -897,6 +898,7 @@ class Process(ProcessStep):
             exclude = ["energy"]
 
         compiled_patterns = [re.compile(self._filter_map[k]) for k in exclude if k in self._filter_map]
+
         def is_filtered(var_name: str) -> bool:
             return any(pat.search(var_name) for pat in compiled_patterns)
 
@@ -923,15 +925,13 @@ class Process(ProcessStep):
             name_to_id[node_name] = safe_id
 
             if node_name == "User Inputs":
-                nodes.append({
-                    "data": {"id": safe_id, "label": node_name, "full_tree": ui_full_tree, "node_type": "input"}
-                })
+                nodes.append(
+                    {"data": {"id": safe_id, "label": node_name, "full_tree": ui_full_tree, "node_type": "input"}}
+                )
             else:
                 step_obj = G.nodes[node_name].get("step_obj")
                 label = step_obj.name if step_obj else str(node_name)
-                nodes.append({
-                    "data": {"id": safe_id, "label": label, "node_type": "process"}
-                })
+                nodes.append({"data": {"id": safe_id, "label": label, "node_type": "process"}})
 
         # 2. Build Edges and Intermediate Variable Nodes
         for u, v, data in G.edges(data=True):
@@ -949,9 +949,16 @@ class Process(ProcessStep):
 
             var_node_id = f"var_{name_to_id[u]}_{name_to_id[v]}"
 
-            nodes.append({
-                "data": {"id": var_node_id, "short_label": short_label, "full_tree": full_tree, "node_type": "variable"}
-            })
+            nodes.append(
+                {
+                    "data": {
+                        "id": var_node_id,
+                        "short_label": short_label,
+                        "full_tree": full_tree,
+                        "node_type": "variable",
+                    }
+                }
+            )
 
             edges.append({"data": {"source": name_to_id[u], "target": var_node_id, "edge_type": "incoming"}})
             edges.append({"data": {"source": var_node_id, "target": name_to_id[v], "edge_type": "outgoing"}})

@@ -8,15 +8,9 @@ from ..utils import Module
 from ..utils.typing import _
 
 
-def fit_neural_model(
-    model: Any,
-    data: Any,
-    loss_fn: Callable,
-    learning_rate: float = 1e-3,
-    epochs: int = 50
-):
+def fit_neural_model(model: Any, data: Any, loss_fn: Callable, learning_rate: float = 1e-3, epochs: int = 50):
     """
-    Universal Optax training loop. 
+    Universal Optax training loop.
     Accepts either a tuple of full-batch arrays (X, Y) or a PyTorch DataLoader.
     """
     # 1. Setup Optax optimizer (filters out static metadata automatically)
@@ -47,8 +41,10 @@ def fit_neural_model(
 
     return model
 
+
 class TransformerBlock(Module):
     """A standard pre-norm transformer block."""
+
     mha: eqx.nn.MultiheadAttention = _
     mlp: eqx.nn.MLP = _
     ln1: eqx.nn.LayerNorm = _
@@ -70,7 +66,5 @@ class TransformerBlock(Module):
         x = x + jax.vmap(self.mlp)(x_norm2)
         return x
 
-__all__ = [
-    "fit_neural_model",
-    "TransformerBlock"
-]
+
+__all__ = ["fit_neural_model", "TransformerBlock"]

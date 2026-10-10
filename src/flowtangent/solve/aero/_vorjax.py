@@ -933,13 +933,12 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
 
     return state, updated_system, updated_settings
 
+
 @io.inputs(
     "system.wings",
     "settings.analysis.aerodynamics.panels",
 )
-@io.outputs(
-    "system.analysis_data.lattice"
-)
+@io.outputs("system.analysis_data.lattice")
 def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     N_idx = 0
@@ -1211,7 +1210,9 @@ def compute_boundary_conditions(state: State, system: Aircraft, settings: Settin
     v_unit_x = v_unit[..., 0]
     rhs_array = base_rhs_array + (v_unit_x * lat.camber_slopes)
 
-    updated_system = update(system, (("analysis_data.boundary_conditions", rhs_array),("analysis_data.relative_velocity", v_total)))
+    updated_system = update(
+        system, (("analysis_data.boundary_conditions", rhs_array), ("analysis_data.relative_velocity", v_total))
+    )
 
     return state, updated_system, settings
 

@@ -29,7 +29,7 @@ def load_map(name: str):
                 data = json.load(f)
         except:
             raise AttributeError(f"Found map file {name}, but unable to load. Turbo maps must be JSONs.")
-        #TODO: Add map schema to docstring
+        # TODO: Add map schema to docstring
 
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
@@ -65,7 +65,7 @@ def __dir__():
     """Allows IDEs and the `dir()` command to see the available maps."""
     # List all .json files in the directory without their extensions
     if _MAP_DIR.exists():
-        return [f.stem for f in _MAP_DIR.glob("*.json")] + ['load_map']
+        return [f.stem for f in _MAP_DIR.glob("*.json")] + ["load_map"]
     return []
 
 

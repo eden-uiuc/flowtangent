@@ -35,14 +35,15 @@ from torch.utils.data import DataLoader as TorchDataLoader
 from .base import Module, static_field
 from .typing import _
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Helper Functions
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 def numpy_collate(batch):
     """
-    Recursively converts to NumPy and stacks the batch. 
-    Completely replaces PyTorch's default_collate to ensure downstream 
+    Recursively converts to NumPy and stacks the batch.
+    Completely replaces PyTorch's default_collate to ensure downstream
     JAX functions never accidentally receive a torch.Tensor.
     """
     elem = batch[0]
@@ -65,23 +66,20 @@ def numpy_collate(batch):
 class DataLoader(TorchDataLoader):
     """
     A standalone facade wrapper around PyTorch's DataLoader.
-    Defaults to `numpy_collate` to ensure batches are returned as pure NumPy arrays 
+    Defaults to `numpy_collate` to ensure batches are returned as pure NumPy arrays
     (or dictionaries of arrays) instead of PyTorch Tensors.
     """
+
     def __init__(self, dataset, batch_size=1, shuffle=False, collate_fn=numpy_collate, **kwargs):
-        super().__init__(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            collate_fn=collate_fn,
-            **kwargs
-        )
+        super().__init__(dataset=dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn, **kwargs)
+
 
 class LatentDataLoader:
     """
     Wraps a physical DataLoader to encode X_batch into Z_batch on the fly.
     Duck-types as a standard DataLoader for downstream training loops.
     """
+
     def __init__(self, dataloader, manifold):
         self.dataloader = dataloader
         self.manifold = manifold
@@ -96,11 +94,13 @@ class LatentDataLoader:
     def __len__(self):
         return len(self.dataloader)
 
+
 class SlicedDataLoader:
     """
     Dynamically slices the feature dimension of batches streaming from a DataLoader.
     Duck-types as a standard DataLoader for neural training loops.
     """
+
     def __init__(self, dataloader, split_indices, chunk_idx):
         self.dataloader = dataloader
         self.split_indices = split_indices
@@ -120,6 +120,7 @@ class SlicedDataLoader:
     def __len__(self):
         return len(self.dataloader)
 
+
 def slice_data(data, split_indices, chunk_idx):
     """Routes data slicing depending on if it's a full array or a DataLoader."""
     if hasattr(data, "__iter__") and hasattr(data, "dataset"):
@@ -129,18 +130,21 @@ def slice_data(data, split_indices, chunk_idx):
         return jnp.split(data[0], split_indices, axis=-1)[chunk_idx], data[1]
     return jnp.split(data, split_indices, axis=-1)[chunk_idx]
 
+
 LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Dataset
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 class Dataset(Module):
     """
     Universal FlowTangent Dataset factory.
-    Duck-types as a PyTorch Dataset (via __len__ and __getitem__) 
+    Duck-types as a PyTorch Dataset (via __len__ and __getitem__)
     while remaining a valid Equinox PyTree.
     """
+
     _source: Any = static_field(_)
     _proxy: Any = static_field(_)
     _virtual_columns: dict[str, jax.Array] = _
@@ -155,7 +159,7 @@ class Dataset(Module):
 
         if isinstance(source, (str, Path)):
             src_str = str(source).lower()
-            ext = src_str.split('.')[-1]
+            ext = src_str.split(".")[-1]
 
             ext_dict = {
                 "zarr": ZarrDataset,
@@ -166,7 +170,7 @@ class Dataset(Module):
                 "nc": NetCDFDataset,
                 "nc4": NetCDFDataset,
                 "netcdf": NetCDFDataset,
-                "mat": MATDataset
+                "mat": MATDataset,
             }
 
             if ext in ext_dict:
@@ -205,7 +209,7 @@ class Dataset(Module):
 
     def add_variable(self, name: str, data: Optional[jax.Array] = None, quiet: bool = False) -> "Dataset":
         """
-        Registers a new variable in the virtual overlay. 
+        Registers a new variable in the virtual overlay.
         Emits a warning to prevent silent typo bugs unless quiet=True.
         """
         if not quiet:
@@ -213,7 +217,7 @@ class Dataset(Module):
                 f"Creating virtual dataset column for new variable '{name}'. "
                 "If this is a typo, check your Parameter names.",
                 UserWarning,
-                stacklevel=2
+                stacklevel=2,
             )
 
         if data is None:
@@ -243,11 +247,7 @@ class Dataset(Module):
             else:
                 new_appended[var] = val
 
-        return eqx.tree_at(
-            lambda d: (d._appended_data, d._appended_len),
-            self,
-            (new_appended, self._appended_len + 1)
-        )
+        return eqx.tree_at(lambda d: (d._appended_data, d._appended_len), self, (new_appended, self._appended_len + 1))
 
     def filter(self, mask: jax.Array) -> "Dataset":
         """
@@ -304,12 +304,15 @@ class Dataset(Module):
             row[var] = getattr(self, var)[idx]
         return row
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------
 # Universal Proxy Helpers
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
+
 
 class MemoryProxy:
     """A generic proxy for tabular formats loaded fully into memory (CSV, MAT, DataFrames)."""
+
     def __init__(self, data_dict: dict):
         self._data = data_dict
 
@@ -326,6 +329,7 @@ class MemoryProxy:
 
 class ParquetProxy:
     """Lazy-evaluation proxy for Parquet files."""
+
     def __init__(self, file_path: str, columns: list):
         self._file_path = file_path
         self._columns = columns
@@ -341,11 +345,13 @@ class ParquetProxy:
     def __dir__(self):
         return self._columns
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------------------------------------------------
 # Dataset Implementations
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 
 # Zarr -----------------------------------------------------------------------------------------------------------------
+
 
 class ZarrGroupProxy:
     def __init__(self, zarr_path: str, group_path: str = ""):
@@ -397,7 +403,9 @@ class ZarrDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # DataFrames (Pandas/Polars) -------------------------------------------------------------------------------------------
+
 
 class DataFrameDataset(Dataset):
     _len: int = _
@@ -422,7 +430,9 @@ class DataFrameDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # HDF5 -----------------------------------------------------------------------------------------------------------------
+
 
 class HDF5GroupProxy:
     def __init__(self, file_path: str, group_path: str = ""):
@@ -481,7 +491,9 @@ class HDF5Dataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # Parquet --------------------------------------------------------------------------------------------------------------
+
 
 class ParquetDataset(Dataset):
     _len: int = _
@@ -503,13 +515,16 @@ class ParquetDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # Tensor/Arrays --------------------------------------------------------------------------------------------------------
+
 
 class ArrayDataset(Dataset):
     """
     Direct JAX replacement for PyTorch's TensorDataset.
     Does not use the string-based proxy routing of the tabular datasets.
     """
+
     arrays: tuple = _
 
     def __init__(self, *arrays):
@@ -523,7 +538,9 @@ class ArrayDataset(Dataset):
     def __len__(self):
         return self.arrays[0].shape[0]
 
+
 # CSV ------------------------------------------------------------------------------------------------------------------
+
 
 class CSVDataset(Dataset):
     _len: int = _
@@ -547,7 +564,9 @@ class CSVDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # NetCDF ---------------------------------------------------------------------------------------------------------------
+
 
 class NetCDFGroupProxy:
     def __init__(self, file_path: str, group_path: str = ""):
@@ -597,7 +616,9 @@ class NetCDFDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 # MATLAB ---------------------------------------------------------------------------------------------------------------
+
 
 class MATDataset(Dataset):
     _len: int = _
@@ -633,9 +654,25 @@ class MATDataset(Dataset):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 __all__ = [
-    "Dataset", "IterableDataset", "ArrayDataset", "StackDataset", "ConcatDataset",
-    "ChainDataset", "Subset", "random_split", "DataLoader", "LatentDataLoader", "get_worker_info",
-    "slice_data", "numpy_collate", "Sampler", "BatchSampler", "RandomSampler", "LoaderType"
-    "SequentialSampler", "SubsetRandomSampler", "WeightedRandomSampler"
+    "Dataset",
+    "IterableDataset",
+    "ArrayDataset",
+    "StackDataset",
+    "ConcatDataset",
+    "ChainDataset",
+    "Subset",
+    "random_split",
+    "DataLoader",
+    "LatentDataLoader",
+    "get_worker_info",
+    "slice_data",
+    "numpy_collate",
+    "Sampler",
+    "BatchSampler",
+    "RandomSampler",
+    "LoaderTypeSequentialSampler",
+    "SubsetRandomSampler",
+    "WeightedRandomSampler",
 ]

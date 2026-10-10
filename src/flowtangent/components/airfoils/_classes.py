@@ -7,11 +7,11 @@ from typing import Optional
 
 from matplotlib import pyplot as plt
 
-plt.style.use('dark_background')
-plt.rcParams['figure.facecolor'] = 'black'
-plt.rcParams['axes.facecolor'] = 'black'
-plt.rcParams['grid.color'] = '#444444'
-plt.rcParams['font.size'] = 12
+plt.style.use("dark_background")
+plt.rcParams["figure.facecolor"] = "black"
+plt.rcParams["axes.facecolor"] = "black"
+plt.rcParams["grid.color"] = "#444444"
+plt.rcParams["font.size"] = 12
 
 # package imports
 import jax
@@ -26,6 +26,7 @@ from ...core._component import Component
 # ----------------------------------------------------------------------------------------------------------------------
 #  Airfoil
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 @total_ordering
 class Airfoil(Component):
@@ -49,20 +50,18 @@ class Airfoil(Component):
     y_lower: jax.Array = empty_array()
 
     @staticmethod
-    @jax.jit(static_argnames=['n_points'])
+    @jax.jit(static_argnames=["n_points"])
     def _naca_4_math(m: float, p: float, t: float, n_points: int = 128):
         theta = jnp.linspace(0, jnp.pi, n_points)
         x = 0.5 * (1 - jnp.cos(theta))
 
-        yt = 5 * t * (0.2969 * jnp.sqrt(x) - 0.1260 * x -
-                    0.3516 * x**2 + 0.2843 * x**3 -
-                    0.1015 * x**4)
+        yt = 5 * t * (0.2969 * jnp.sqrt(x) - 0.1260 * x - 0.3516 * x**2 + 0.2843 * x**3 - 0.1015 * x**4)
 
         # Safe denominators to prevent NaN generation in the JIT compiler
         p_safe = jnp.where(p == 0, 1e-7, p)
 
         yc_fwd = (m / p_safe**2) * (2 * p_safe * x - x**2)
-        yc_aft = (m / (1 - p_safe)**2) * ((1 - 2 * p_safe) + 2 * p_safe * x - x**2)
+        yc_aft = (m / (1 - p_safe) ** 2) * ((1 - 2 * p_safe) + 2 * p_safe * x - x**2)
 
         # Multiplex the camber line
         yc = jnp.where(p == 0, 0.0, jnp.where(x <= p, yc_fwd, yc_aft))
@@ -70,7 +69,7 @@ class Airfoil(Component):
         return x, yc + yt, yc - yt
 
     @staticmethod
-    @jax.jit(static_argnames=['n_points'])
+    @jax.jit(static_argnames=["n_points"])
     def _naca_5_math(design_cl: float, p_idx: int, q_val: int, t: float, n_points: int = 128):
         """
         design_cl: First digit * 0.15 (e.g., '2' -> 0.3)
@@ -85,13 +84,13 @@ class Airfoil(Component):
         # 1. Constants Mapping (Indices 0 to 5)
         # ----------------------------------------------------
         # Normal (Q=0) Constants
-        m_q0  = jnp.array([0.0, 0.0580, 0.1260, 0.2025, 0.2900, 0.3910])
-        k1_q0 = jnp.array([0.0, 361.4,  51.64,  15.957, 6.643,  3.230])
+        m_q0 = jnp.array([0.0, 0.0580, 0.1260, 0.2025, 0.2900, 0.3910])
+        k1_q0 = jnp.array([0.0, 361.4, 51.64, 15.957, 6.643, 3.230])
 
         # Reflexed (Q=1) Constants
         # (Note: P=1 is theoretically undefined for reflexed, filled with 0.0)
-        m_q1    = jnp.array([0.0, 0.0, 0.1300, 0.2130,  0.2980, 0.3910])
-        k1_q1   = jnp.array([0.0, 0.0, 51.99,  15.793,  6.520,  3.191])
+        m_q1 = jnp.array([0.0, 0.0, 0.1300, 0.2130, 0.2980, 0.3910])
+        k1_q1 = jnp.array([0.0, 0.0, 51.99, 15.793, 6.520, 3.191])
         k2k1_q1 = jnp.array([0.0, 0.0, 0.000764, 0.00677, 0.0303, 0.1355])
 
         # Select constants based on the Q digit
@@ -116,10 +115,7 @@ class Airfoil(Component):
         cubic_weight = jnp.where(x <= m, 1.0, k2k1)
 
         yc_1 = (k1 / 6.0) * (
-            cubic_weight * (x - m_safe)**3
-            - k2k1 * (1 - m_safe)**3 * x
-            - (m_safe**3) * x
-            + m_safe**3
+            cubic_weight * (x - m_safe) ** 3 - k2k1 * (1 - m_safe) ** 3 * x - (m_safe**3) * x + m_safe**3
         )
 
         # ----------------------------------------------------
@@ -131,14 +127,12 @@ class Airfoil(Component):
         yc = jnp.where(m == 0, 0.0, yc_raw) * camber_scale
 
         # Standard thickness distribution
-        yt = 5 * t * (0.2969 * jnp.sqrt(x) - 0.1260 * x -
-                    0.3516 * x**2 + 0.2843 * x**3 -
-                    0.1015 * x**4)
+        yt = 5 * t * (0.2969 * jnp.sqrt(x) - 0.1260 * x - 0.3516 * x**2 + 0.2843 * x**3 - 0.1015 * x**4)
 
         return x, yc + yt, yc - yt
 
     @staticmethod
-    @jax.jit(static_argnames=['n_points'])
+    @jax.jit(static_argnames=["n_points"])
     def _interpolate_surface(points: jax.Array, n_points: int = 128):
         """Assumes Selig Format for sorting."""
         N = points.shape[0]
@@ -212,12 +206,12 @@ class Airfoil(Component):
                     anomalies.append(i)
 
             if not anomalies:
-                break # Cleaned
+                break  # Cleaned
 
             # 4. Apply Distance-Weighted Smoothing for non-uniform grids
             for i in anomalies:
-                dx_left = x[i] - x[i-1]
-                dx_right = x[i+1] - x[i]
+                dx_left = x[i] - x[i - 1]
+                dx_right = x[i + 1] - x[i]
                 total_dx = dx_left + dx_right
 
                 # Weight by opposite distance (closer node has higher influence)
@@ -226,7 +220,7 @@ class Airfoil(Component):
 
                 # Replaces the spike with a clean, physically linear interpolation
                 # between its immediate neighbors in the cosine space.
-                y_smooth[i] = (w_left * y_smooth[i-1]) + (w_right * y_smooth[i+1])
+                y_smooth[i] = (w_left * y_smooth[i - 1]) + (w_right * y_smooth[i + 1])
 
         return jnp.array(y_smooth)
 
@@ -285,7 +279,7 @@ class Airfoil(Component):
     def from_file(cls, file_path: str | Path, interpolate: bool = False, n_pts: int = 128):
         """
         Parses Selig and Lednicer format airfoil .dat files.
-        Converts all inputs to standard Selig topology before utilizing 
+        Converts all inputs to standard Selig topology before utilizing
         the JAX-native interpolator.
         """
 
@@ -340,11 +334,11 @@ class Airfoil(Component):
         # 1. Standardize to LE -> TE for both surfaces to apply the filter
         if is_lednicer:
             x_up, y_up = x_raw[:n_up], y_raw[:n_up]
-            x_lo, y_lo = x_raw[n_up:n_up+n_lo], y_raw[n_up:n_up+n_lo]
+            x_lo, y_lo = x_raw[n_up : n_up + n_lo], y_raw[n_up : n_up + n_lo]
         else:
             le_idx = np.argmin(x_raw)
             # Reverse upper so it flows LE -> TE
-            x_up, y_up = x_raw[:le_idx+1][::-1], y_raw[:le_idx+1][::-1]
+            x_up, y_up = x_raw[: le_idx + 1][::-1], y_raw[: le_idx + 1][::-1]
             x_lo, y_lo = x_raw[le_idx:], y_raw[le_idx:]
 
         # 2. The Trailing Edge De-Hooking Filter
@@ -409,16 +403,16 @@ class Airfoil(Component):
                 y_lower=jnp.asarray(y_lo),
             )
 
-    def plot(self, title: Optional[str]=None):
+    def plot(self, title: Optional[str] = None):
         if not title:
             plot_title = self.name
         else:
             plot_title = title
         plt.figure(figsize=(10, 6))
-        plt.plot(self.x_upper, self.y_upper, color='#FC6255')
+        plt.plot(self.x_upper, self.y_upper, color="#FC6255")
         plt.plot(self.x_lower, self.y_lower, color="#080888")
         plt.title(plot_title)
-        plt.axis('equal')
+        plt.axis("equal")
         plt.tight_layout()
         plt.show()
 
@@ -432,7 +426,6 @@ class Airfoil(Component):
             return NotImplemented
         return self.name < other.name
 
+
 def NACA(code: str, n_pts: int = 128):
     return Airfoil.from_naca(code=code, n_pts=n_pts)
-
-
