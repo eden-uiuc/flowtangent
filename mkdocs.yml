@@ -40,12 +40,11 @@ nav:
   - Home: index.md
   - Tutorials:
       - Quickstart: tutorials/quickstart.ipynb
-      - Advanced Aerodynamics: tutorials/advanced_aero.ipynb
+      - VORJAX: tutorials/VORJAX.ipynb
   - API Reference:
       - Processes: api/processes.md
       - Components: api/components.md
       - Design Space: api/design_space.md
-      - Manifolds: api/manifolds.md
 
 
 markdown_extensions:
