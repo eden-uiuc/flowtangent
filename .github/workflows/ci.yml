@@ -36,11 +36,11 @@ jobs:
           pip install pyright
 
       - name: Enforce Formatting (Ruff)
-        run: ruff format src/flowtangent --check .
+        run: ruff format --check src/flowtangent
 
       - name: Lint (Ruff)
         # Natively injects inline comments into the PR diff
-        run: ruff check src/flowtangent --output-format=github .
+        run: ruff check --output-format=github src/flowtangent
 
       - name: Type Check (Pyright)
         run: pyright src/flowtangent

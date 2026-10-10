@@ -41,7 +41,6 @@ dev = [
     "nvidia-ml-py",
     "om-pycycle",
     "ruff",
-    "pyright",
 ]
 
 docs = [
