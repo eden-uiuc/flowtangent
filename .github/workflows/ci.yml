@@ -38,14 +38,9 @@ jobs:
       - name: Enforce Formatting (Ruff)
         run: ruff format --check .
 
-      - name: Lint (Reviewdog + Ruff)
-        # This action automatically intercepts Ruff's output and posts it to the PR
-        uses: reviewdog/action-ruff@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-review
-          ruff_flags: "--check ."
-          fail_on_error: true
+      - name: Lint (Ruff)
+        # Natively injects inline comments into the PR diff
+        run: ruff check --output-format=github .
 
       - name: Type Check (Pyright)
         run: pyright src/flowtangent
