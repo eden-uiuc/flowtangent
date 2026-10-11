@@ -1,4 +1,5 @@
 import warnings
+from functools import partial
 from typing import Any, Callable, Optional
 
 import blackjax
@@ -6,7 +7,6 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
-from functools import partial
 from blackjax.mcmc.hmc import HMCState
 from jax.flatten_util import ravel_pytree
 from jax.scipy.stats import norm

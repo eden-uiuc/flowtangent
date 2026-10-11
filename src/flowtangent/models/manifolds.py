@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, List, Literal, Optional, Tuple, Union
+from typing import Any, List, Literal, Tuple, Union
 
 import equinox as eqx
 import jax
