@@ -132,7 +132,7 @@ class DotProductKernel(Kernel):
         self.sigma_0 = jnp.array([jnp.log(sigma_0)])
 
     def __call__(self, x1, x2):
-        return jnp.exp(self.sigma_0) ** 2 + jnp.sum(x1 * x2, axis=-1)
+        return jnp.exp(self.sigma_0[0]) ** 2 + jnp.sum(x1 * x2, axis=-1)
 
     @property
     def theta(self):
@@ -184,7 +184,7 @@ class RBFKernel(Kernel):
     def __call__(self, x1, x2):
         ls = jnp.exp(self.lengthscales)
         sq_dist = jnp.sum(((x1 / ls) - (x2 / ls)) ** 2, axis=-1)
-        return jnp.exp(self.variance) * jnp.exp(-0.5 * sq_dist)
+        return jnp.exp(self.variance[0]) * jnp.exp(-0.5 * sq_dist)
 
     @property
     def theta(self):
@@ -202,7 +202,7 @@ class Matern52Kernel(Kernel):
     def __call__(self, x1, x2):
         r = jnp.sqrt(jnp.sum(((x1 - x2) / jnp.exp(self.lengthscales)) ** 2, axis=-1) + 1e-8)
         sqrt5_r = jnp.sqrt(5.0) * r
-        return jnp.exp(self.variance) * (1.0 + sqrt5_r + (5.0 / 3.0) * r**2) * jnp.exp(-sqrt5_r)
+        return jnp.exp(self.variance[0]) * (1.0 + sqrt5_r + (5.0 / 3.0) * r**2) * jnp.exp(-sqrt5_r)
 
     @property
     def theta(self):
@@ -223,8 +223,8 @@ class RationalQuadraticKernel(Kernel):
         self.alpha = jnp.array([jnp.log(alpha)])
 
     def __call__(self, x1, x2):
-        ls = jnp.exp(self.lengthscale)
-        alpha = jnp.exp(self.alpha)
+        ls = jnp.exp(self.lengthscale)[0]
+        alpha = jnp.exp(self.alpha)[0]
         sq_dist = jnp.sum((x1 - x2) ** 2, axis=-1)
         return (1.0 + sq_dist / (2.0 * alpha * ls**2)) ** (-alpha)
 
@@ -247,8 +247,8 @@ class ExpSineSquaredKernel(Kernel):
         self.periodicity = jnp.array([jnp.log(periodicity)])
 
     def __call__(self, x1, x2):
-        ls = jnp.exp(self.lengthscale)
-        p = jnp.exp(self.periodicity)
+        ls = jnp.exp(self.lengthscale)[0]
+        p = jnp.exp(self.periodicity)[0]
         # Uses Euclidean distance for the sine argument
         dist = jnp.linalg.norm(x1 - x2, axis=-1)
         return jnp.exp(-2.0 * (jnp.sin(jnp.pi * dist / p) / ls) ** 2)

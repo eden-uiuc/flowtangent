@@ -6,6 +6,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
+from functools import partial
 from blackjax.mcmc.hmc import HMCState
 from jax.flatten_util import ravel_pytree
 from jax.scipy.stats import norm
@@ -13,7 +14,7 @@ from jax.scipy.stats import norm
 from .. import Process
 from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
-from ..utils import Module, TreePath, TreePathLike, method_field, static_field
+from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
 from ..utils.data import DataLoader, Dataset, LatentDataLoader, RandomSampler, numpy_collate
 from ..utils.typing import _
 from .manifolds import Manifold
@@ -34,7 +35,7 @@ class Parameter(Module):
 
         has_path = self.path is not None
         has_extract = self.extract_func is not None
-        has_update = self.extract_func is not None
+        has_update = self.update_func is not None
 
         if has_path:
             tree_path = TreePath.cast(self.path)
@@ -100,19 +101,29 @@ class Requirement(Parameter):
 
     # Generalizes the probabilistic evaluation (default is Gaussian CDF)
     # Signature: (x, loc, scale) -> cumulative probability
-    error_cdf: Callable = eqx.field(default=norm.cdf, static=True)
+    error_cdf: Callable = method_field(norm.cdf)
+
+    _is_custom_extractor: bool = False
 
     def __post_init__(self):
-        # Handle equality constraints
         if self.eq_bound is not None:
             object.__setattr__(self, "lower_bound", self.eq_bound)
             object.__setattr__(self, "upper_bound", self.eq_bound)
 
-        # Apply tolerance to expand the acceptable bounds
         if self.lower_bound is not None:
             object.__setattr__(self, "lower_bound", self.lower_bound - self.tolerance)
         if self.upper_bound is not None:
             object.__setattr__(self, "upper_bound", self.upper_bound + self.tolerance)
+
+        # Record user intent before Parameter overwrites it
+        has_custom = self.extract_func is not None
+        object.__setattr__(self, "_is_custom_extractor", has_custom)
+
+        # If this is a direct-name requirement, feed Parameter dummy values
+        # so it doesn't raise a ValueError in super().__post_init__()
+        if self.path is None and not has_custom:
+            object.__setattr__(self, "path", TreePath(path="", name=self.name))
+            object.__setattr__(self, "update_func", lambda tree, val: tree) # No-op
 
         super().__post_init__()
 
@@ -122,13 +133,10 @@ class Requirement(Parameter):
         vars_dict: Optional[dict[str, jax.Array]] = None,
     ) -> RequirementEvaluation:
 
-        # 1. Evaluate the Mean Value safely
-        if self.name in vals_dict:
+        if not self._is_custom_extractor:
             val = vals_dict[self.name]
-        elif self.extract_func is not None:
-            val = self.extract_func(vals_dict)
         else:
-            raise ValueError(f"Requirement '{self.name}' not found in dictionary and lacks extract_func.")
+            val = self.extract_func(vals_dict) #type: ignore
 
         # 2. Evaluate Residual (Margin to nearest boundary)
         if self.lower_bound is not None and self.upper_bound is not None:
@@ -146,11 +154,12 @@ class Requirement(Parameter):
         # 3. Probabilistic Evaluation (If variance is provided)
         prob, log_ll = None, None
         if vars_dict is not None:
-            if self.extract_func is None:
+            
+            if not self._is_custom_extractor: # Use the flag!
                 val_var = vars_dict.get(str(self.name), jnp.array(0.0))
             else:
                 # Delta Method: propagate variance through the custom derived function
-                grads = jax.grad(self.extract_func)(vals_dict)
+                grads = jax.grad(self.extract_func)(vals_dict) #type: ignore
                 val_var = sum((grads[k] ** 2) * vars_dict[k] for k in vars_dict.keys() if k in grads)
 
             sigma = jnp.sqrt(jnp.maximum(val_var, 1e-12))
@@ -178,7 +187,7 @@ class DesignSpace(Module):
     and standard gradient-based optimization.
     """
 
-    dataset: Dataset = static_field(_)
+    dataset: Dataset = field(_)
     strict_dataset: bool = static_field(True)
 
     parameters: tuple[Parameter, ...] = _
@@ -187,7 +196,7 @@ class DesignSpace(Module):
     manifold: Manifold = _
     surrogate: Surrogate = _
 
-    solver: Any = optx.LevenbergMarquardt
+    solver: Any = optx.BFGS
 
     augment: Process = _
 
@@ -235,14 +244,14 @@ class DesignSpace(Module):
             in_dataset = str(p.name) in self.dataset.full_vars
 
             # CASE 1: User did NOT provide a value
-            if p.value.size == 0 or p.value is None:
+            if p.value is None or jnp.size(p.value) == 0:
                 if not in_dataset:
                     raise ValueError(
                         f"Parameter '{p.name}' is not in the dataset and has no default value. "
                         "Shape cannot be inferred."
                     )
                 dataset_val = jnp.atleast_1d(sample_row[p.name])
-                new_p = eqx.tree_at(lambda x: x._tree_path.value, p, dataset_val)
+                new_p = eqx.tree_at(lambda x: x.path.value, p, dataset_val)
                 initialized_params.append(new_p)
 
             # CASE 2: User DID provide a value
@@ -268,10 +277,11 @@ class DesignSpace(Module):
 
                 new_p = eqx.tree_at(lambda x: x._tree_path.value, p, user_val)
                 initialized_params.append(new_p)
-
+         
+        object.__setattr__(self, "parameters", tuple(initialized_params))
         ordered_defaults = tuple(p.value for p in self.inputs)
         _, unravel_fn = ravel_pytree(ordered_defaults)
-        object.__setattr__(self, "_unravel_inputs", unravel_fn)
+        object.__setattr__(self, "_unravel", unravel_fn)
 
     def get_dataloader(self, batch_size: int = 256, shuffle: bool = True, **kwargs) -> DataLoader:
         """
@@ -404,16 +414,16 @@ class DesignSpace(Module):
         check_batch_vmap = jax.vmap(check_batch_feasible)
 
         for x_batch, __ in dataloader:
-            if domain == "latent":
-                eval_batch = jax.vmap(self.manifold.encode)(x_batch)
-            elif domain == "primal":
-                eval_batch = x_batch
-            else:
-                raise ValueError(f"Unknown domain: {domain}")
+            eval_batch = jax.vmap(self.manifold.encode)(x_batch)
 
             # Mask out the points that violate physics/requirements
             mask = check_batch_vmap(eval_batch)
-            valid_points = eval_batch[mask]
+            if domain == "latent":
+                valid_points = eval_batch[mask]
+            elif domain == "primal":
+                valid_points = x_batch[mask]
+            else:
+                raise ValueError(f"Unrecognized domain: {domain}")
 
             if len(valid_points) > 0:
                 feasible_points.append(valid_points)
@@ -796,7 +806,7 @@ class ActiveSpace(DesignSpace):
         # 2. Kernel setup
         kernel = blackjax.nuts(logprob_fn, **parameters).step
 
-        @jax.jit
+        @partial(jax.jit, static_argnames="total_steps")
         def inference_loop(rng_key, state: HMCState, total_steps: int):
             def step_fn(carry, _):
                 key_step, curr_state = carry
@@ -808,7 +818,7 @@ class ActiveSpace(DesignSpace):
 
                 return (key_step, next_state), next_state.position
 
-            _, positions = jax.lax.scan(step_fn, (rng_key, state), jnp.arange(total_steps))
+            _, positions = jax.lax.scan(step_fn, (rng_key, state), None, length=total_steps)
             return positions
 
         return inference_loop(sample_key, last_state, num_samples)

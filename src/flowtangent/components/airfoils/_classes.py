@@ -31,6 +31,7 @@ class Airfoil(Component):
     max_thickness: float = 0.0
     wedge_angle: float = 0.0
 
+    raw_coordinates: Optional[jax.Array] = None # For file import reference
     coordinates: jax.Array = empty_array((0, 2))
     camber: jax.Array = empty_array()
 
@@ -270,7 +271,7 @@ class Airfoil(Component):
         return cls._from_surfaces(name, x, y_up, y_lo)
 
     @classmethod
-    def from_file(cls, file_path: str | Path, interpolate: bool = False, n_pts: int = 128):
+    def from_file(cls, file_path: str | Path, n_pts: int = 128):
         """
         Parses Selig and Lednicer format airfoil .dat files.
         Converts all inputs to standard Selig topology before utilizing
@@ -380,27 +381,29 @@ class Airfoil(Component):
         y_up_clean = y_max
         y_lo_clean = y_min
 
-        if interpolate:
-            return cls._from_surfaces(file_path.stem, x_grid, y_up_clean, y_lo_clean)
-        else:
-            return cls(
-                name=file_path.stem,
-                source_file=file_path,
-                camber=jnp.asarray((y_up_clean + y_lo_clean) / 2.0),
-                max_thickness=float(jnp.max(y_up_clean - y_lo_clean)),
-                coordinates=jnp.column_stack((selig_x, selig_y)),
-                x_coordinates=jnp.asarray(selig_x),
-                y_coordinates=jnp.asarray(selig_y),
-                x_upper=jnp.asarray(x_up_rev),
-                x_lower=jnp.asarray(x_lo),
-                y_upper=jnp.asarray(y_up_rev),
-                y_lower=jnp.asarray(y_lo),
-            )
+        x_coord = jnp.concatenate([x_grid[::-1], x_grid[1:]])
+        y_coord = jnp.concatenate([y_up_clean[::-1], y_lo_clean[1:]])
+
+        return cls(
+            name=file_path.stem,
+            source_file=file_path,
+            camber=jnp.asarray((y_up_clean + y_lo_clean) / 2.0),
+            max_thickness=float(jnp.max(y_up_clean - y_lo_clean)),
+            raw_coordinates=jnp.column_stack((selig_x, selig_y)),
+            coordinates=jnp.column_stack((x_coord, y_coord)),
+            x_coordinates=x_coord,
+            y_coordinates=y_coord,
+            x_upper=jnp.asarray(x_up_rev),
+            x_lower=jnp.asarray(x_lo),
+            y_upper=jnp.asarray(y_up_rev),
+            y_lower=jnp.asarray(y_lo),
+        )
 
     def plot(
         self,
         title: Optional[str] = None,
         show_markers: bool = False,
+        show_raw: bool = False,
         show_camber: bool = False,
         theme: go.layout.Template | str = styles.nord_dark,
         save_path: Optional[str] = None,
@@ -413,6 +416,7 @@ class Airfoil(Component):
             airfoil=self,
             title=title,
             show_markers=show_markers,
+            show_raw=show_raw,
             show_camber=show_camber,
             theme=theme,
             save_path=save_path,

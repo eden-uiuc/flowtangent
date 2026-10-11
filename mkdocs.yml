@@ -60,9 +60,9 @@ markdown_extensions:
 
 extra_javascript:
   - javascripts/mathjax.js
+  - javascripts/cytoscape-render.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
   - https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js
   - https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js
   - https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js
-  - javascripts/cyto-render.js

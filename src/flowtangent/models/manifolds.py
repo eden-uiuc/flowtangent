@@ -9,21 +9,10 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ..utils import Module, static_field
-from ..utils.data import DataLoader, slice_data
-from ..utils.typing import LoaderType, _
+from ..utils.data import DataLoader, LoaderType, slice_data
+from ..utils.typing import _
 from .kernels import Kernel
 from .nn import TransformerBlock, fit_neural_model
-
-# --- Module-Level Registries ---
-_MANIFOLD_REGISTRY = {}
-
-
-def register_manifold(name: str):
-    def decorator(cls):
-        _MANIFOLD_REGISTRY[name.upper()] = cls
-        return cls
-
-    return decorator
 
 
 # --- DataLoader Compatibility Helpers ---
@@ -50,18 +39,6 @@ class Manifold(Module):
     input_dim: int = static_field(_)
     latent_dim: int = static_field(_)
 
-    def __new__(cls, method: Optional[str] = None, *args, **kwargs):
-        if cls is not Manifold:
-            return super().__new__(cls)
-        if method is None:
-            raise ValueError("Must provide a method string when instantiating directly.")
-
-        method = method.upper()
-        if method not in _MANIFOLD_REGISTRY:
-            raise ValueError(f"Unknown Manifold: {method}. Available: {list(_MANIFOLD_REGISTRY.keys())}")
-
-        return _MANIFOLD_REGISTRY[method](*args, **kwargs)
-
     @abc.abstractmethod
     def encode(self, x: Float[Array, " D"]) -> Float[Array, " L"]:
         pass
@@ -85,7 +62,6 @@ class Manifold(Module):
         return CompositeManifold(left + right)
 
 
-@register_manifold("Composite")
 class CompositeManifold(Manifold):
     """Adjoins multiple manifolds side-by-side."""
 
@@ -124,7 +100,6 @@ class CompositeManifold(Manifold):
         return eqx.tree_at(lambda model: model.manifolds, self, new_manifolds)
 
 
-@register_manifold("Passthrough")
 class Passthrough(Manifold):
     """Passthrough manifold for direct methods"""
 
@@ -142,7 +117,6 @@ class Passthrough(Manifold):
         return self
 
 
-@register_manifold("SCALING")
 class ScalingManifold(Manifold):
     """
     Unified manifold for transforming physical variables into an unbounded,
@@ -235,17 +209,7 @@ class ScalingManifold(Manifold):
     # ==========================================================================
     def fit(self, data: Union[Float[Array, "N D"], Any], **kwargs) -> "ScalingManifold":
         # Helper to extract full arrays if `data` is a DataLoader
-        X_full = (
-            data[0]
-            if isinstance(data, (tuple, list))
-            else (
-                data
-                if not hasattr(data, "__iter__")
-                else jnp.concatenate(
-                    [batch[0] if isinstance(batch, (tuple, list)) else batch for batch in data], axis=0
-                )
-            )
-        )
+        X_full = data[0] if isinstance(data, (tuple, list)) else _get_full_X(data)
 
         d_min = jnp.min(X_full, axis=0)
         d_max = jnp.max(X_full, axis=0)
@@ -269,7 +233,6 @@ class ScalingManifold(Manifold):
 # ==========================================
 
 
-@register_manifold("PCA")
 class LinearPCA(Manifold):
     """Classic Principal Component Analysis."""
 
@@ -279,7 +242,9 @@ class LinearPCA(Manifold):
     b_dec: jax.Array = _
 
     def __init__(self, physical_dim: int, latent_dim: int, key=None):
+        self.input_dim = physical_dim
         self.latent_dim = latent_dim
+
         self.W_enc = jnp.zeros((latent_dim, physical_dim))
         self.b_enc = jnp.zeros((latent_dim,))
         self.W_dec = jnp.zeros((physical_dim, latent_dim))
@@ -313,7 +278,6 @@ class LinearPCA(Manifold):
         return eqx.tree_at(lambda m: (m.W_enc, m.b_enc, m.W_dec, m.b_dec), self, (W_enc, b_enc, W_dec, b_dec))
 
 
-@register_manifold("KPCA")
 class KernelPCA(Manifold):
     """Non-Linear PCA utilizing the generalized Kernel class."""
 
@@ -324,7 +288,9 @@ class KernelPCA(Manifold):
     pre_image_decoder: eqx.nn.MLP = _
 
     def __init__(self, key, input_dim: int, latent_dim: int, kernel: Kernel):
+        self.input_dim = input_dim
         self.latent_dim = latent_dim
+        
         self.kernel = kernel
         self.X_fit = jnp.zeros((1, input_dim))
         self.eigenvectors = jnp.zeros((1, latent_dim))
@@ -351,7 +317,7 @@ class KernelPCA(Manifold):
         eigvals, eigvecs = jnp.linalg.eigh(K_centered)
         idx = jnp.argsort(eigvals)[::-1]
         top_eigvals = eigvals[idx][: self.latent_dim]
-        top_eigvecs = eigvecs[:, idx][: self.latent_dim]
+        top_eigvecs = eigvecs[:, idx][:, : self.latent_dim]
 
         model = eqx.tree_at(
             lambda m: (m.X_fit, m.eigenvalues, m.eigenvectors), self, (X_full, top_eigvals, top_eigvecs)
@@ -374,7 +340,6 @@ class KernelPCA(Manifold):
 # ==========================================
 
 
-@register_manifold("VAE")
 class VariationalAutoencoder(Manifold):
     """Standard VAE. Enforces a Gaussian prior on the latent space for MCMC."""
 
@@ -385,7 +350,10 @@ class VariationalAutoencoder(Manifold):
         self, key, physical_dim: int, latent_dim: int, width: int = 128, depth: int = 3, activation=jax.nn.gelu
     ):
         k1, k2 = jax.random.split(key)
+
+        self.input_dim = physical_dim
         self.latent_dim = latent_dim
+
         self.encoder = eqx.nn.MLP(physical_dim, latent_dim * 2, width, depth, activation, key=k1)
         self.decoder = eqx.nn.MLP(latent_dim, physical_dim, width, depth, activation, key=k2)
 
@@ -426,7 +394,6 @@ class VariationalAutoencoder(Manifold):
         return fit_neural_model(self, X, vae_loss, learning_rate, epochs)
 
 
-@register_manifold("T_AE")
 class TransformerAutoencoder(Manifold):
     embedding: eqx.nn.Linear = _
     positional_encoding: jax.Array = _
@@ -438,7 +405,10 @@ class TransformerAutoencoder(Manifold):
 
     def __init__(self, key, seq_len: int, feature_dim: int, latent_dim: int, num_heads: int = 4, hidden_size: int = 64):
         k1, k2, k3, k4 = jax.random.split(key, 4)
+
+        self.input_dim = seq_len * feature_dim
         self.latent_dim = latent_dim
+        
         self.seq_len = seq_len
         self.feature_dim = feature_dim
         self.embedding = eqx.nn.Linear(feature_dim, hidden_size, key=k1)
@@ -474,7 +444,6 @@ class TransformerAutoencoder(Manifold):
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
 
 
-@register_manifold("SSM_AE")
 class StateSpaceAutoencoder(Manifold):
     """Continuous-time sequence modeling (Mamba/S4 style)."""
 
@@ -490,8 +459,12 @@ class StateSpaceAutoencoder(Manifold):
         k1, k2, k3, k4, k5 = jax.random.split(key, 5)
         self.seq_len = seq_len
         self.feature_dim = feature_dim
+        
+        self.input_dim = seq_len * feature_dim
         self.latent_dim = latent_dim
-        self.A = jax.random.normal(k1, (state_dim, state_dim))
+
+        # Scale A to make spectral radius < 1 and prevent overflow
+        self.A = jax.random.normal(k1, (state_dim, state_dim)) * (0.9 / jnp.sqrt(state_dim))
         self.B = jax.random.normal(k2, (state_dim, feature_dim))
         self.C = jax.random.normal(k3, (latent_dim, state_dim))
         self.D = jax.random.normal(k4, (latent_dim, feature_dim))
@@ -548,7 +521,6 @@ class AffineCoupling(Module):
         return (y - t) * jnp.exp(-s)
 
 
-@register_manifold("NormalizingFlow")
 class NormalizingFlow(Manifold):
     """Perfectly invertible probability mapping using RealNVP."""
 
@@ -556,7 +528,10 @@ class NormalizingFlow(Manifold):
 
     def __init__(self, key, dim: int, num_layers: int = 4):
         keys = jax.random.split(key, num_layers)
+
+        self.input_dim = dim
         self.latent_dim = dim
+        
         self.layers = []
         for i, k in enumerate(keys):
             mask = jnp.arange(dim) < (dim // 2) if i % 2 == 0 else jnp.arange(dim) >= (dim // 2)
@@ -584,7 +559,6 @@ class NormalizingFlow(Manifold):
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
 
 
-@register_manifold("PointCloud")
 class PointCloudManifold(Manifold):
     """Handles unordered 3D point clouds via permutation-invariant max pooling."""
 
@@ -595,8 +569,11 @@ class PointCloudManifold(Manifold):
 
     def __init__(self, key, num_points: int, latent_dim: int):
         k1, k2, k3 = jax.random.split(key, 3)
+        
         self.num_points = num_points
+        self.input_dim = num_points * 3
         self.latent_dim = latent_dim
+        
         self.shared_mlp1 = eqx.nn.MLP(3, 64, 64, 2, key=k1)
         self.shared_mlp2 = eqx.nn.MLP(64, latent_dim, 128, 2, key=k2)
         self.decoder = eqx.nn.MLP(latent_dim, num_points * 3, 256, 3, key=k3)
@@ -622,3 +599,18 @@ class PointCloudManifold(Manifold):
             return jnp.mean((X_batch - X_recon) ** 2)
 
         return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
+
+
+__all__ = [
+    "Manifold",
+    "CompositeManifold",
+    "Passthrough",
+    "ScalingManifold",
+    "LinearPCA",
+    "KernelPCA",
+    "VariationalAutoencoder",
+    "TransformerAutoencoder",
+    "StateSpaceAutoencoder",
+    "NormalizingFlow",
+    "PointCloudManifold"
+]

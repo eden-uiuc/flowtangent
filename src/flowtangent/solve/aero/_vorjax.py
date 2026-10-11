@@ -866,7 +866,13 @@ def _generate_single_wing(
         is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
     )
 
-
+@io.inputs(
+    "system.wings",
+    "settings.analysis.aerodynamics",
+)
+@io.outputs(
+    "system.analysis_data.lattice",
+)
 def generate_topology(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
     lat_list = []
@@ -929,12 +935,11 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
 
     updated_system = update(system, "analysis_data.lattice", full_lat_topological)
 
-    updated_settings = update(settings, "analysis.aerodynamics", vlm_settings)
-
-    return state, updated_system, updated_settings
+    return state, updated_system, settings
 
 
 @io.inputs(
+    "system.analysis_data.lattice",
     "system.wings",
     "settings.analysis.aerodynamics.panels",
 )

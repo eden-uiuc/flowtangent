@@ -13,17 +13,6 @@ from .nn import TransformerBlock, fit_neural_model
 
 _loader: TypeAlias = DataLoader | LatentDataLoader
 
-# --- Module-Level Registries ---
-_SURROGATE_REGISTRY = {}
-
-
-def register_surrogate(name: str):
-    def decorator(cls):
-        _SURROGATE_REGISTRY[name.upper()] = cls
-        return cls
-
-    return decorator
-
 
 # --- DataLoader Compatibility Helper ---
 def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax.Array, jax.Array]:
@@ -53,15 +42,6 @@ class SurrogateEvaluation(Module):
 
 
 class Surrogate(Module):
-    def __new__(cls, method: str = "", *args, **kwargs):
-        if cls is not Surrogate:
-            return super().__new__(cls)
-
-        method = method.upper()
-        if method not in _SURROGATE_REGISTRY:
-            raise ValueError(f"Unknown Surrogate: {method}. Available: {list(_SURROGATE_REGISTRY.keys())}")
-
-        return _SURROGATE_REGISTRY[method](*args, **kwargs)
 
     @abc.abstractmethod
     def predict(self, x: jax.Array, compute_derivatives: bool = False) -> SurrogateEvaluation:
@@ -77,7 +57,6 @@ class Surrogate(Module):
 # ==========================================
 
 
-@register_surrogate("PCE")
 class PolynomialChaosSurrogate(Surrogate):
     weights: eqx.nn.Linear = _
     degree: int = _
@@ -118,7 +97,6 @@ class PolynomialChaosSurrogate(Surrogate):
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
-@register_surrogate("IDW")
 class InverseDistanceWeighting(Surrogate):
     X_fit: jax.Array = _
     Y_fit: jax.Array = _
@@ -148,7 +126,6 @@ class InverseDistanceWeighting(Surrogate):
         return eqx.tree_at(lambda m: (m.X_fit, m.Y_fit), self, (X_full, Y_full))
 
 
-@register_surrogate("RBF")
 class RadialBasisFunction(Surrogate):
     centers: jax.Array = _
     weights: jax.Array = _
@@ -184,7 +161,6 @@ class RadialBasisFunction(Surrogate):
         return eqx.tree_at(lambda m: (m.centers, m.weights), self, (X_full, W))
 
 
-@register_surrogate("SVGP")
 class GaussianProcessSurrogate(Surrogate):
     inducing_points: jax.Array = _
     kernel: Kernel = _
@@ -232,7 +208,6 @@ class GaussianProcessSurrogate(Surrogate):
 # ==========================================
 
 
-@register_surrogate("MLP")
 class MLPSurrogate(Surrogate):
     network: eqx.nn.MLP = _
 
@@ -264,7 +239,6 @@ class MLPSurrogate(Surrogate):
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
-@register_surrogate("TRANSFORMER")
 class TransformerSurrogate(Surrogate):
     latent_dim: int = _
     latent_embed: eqx.nn.Linear = _
@@ -317,7 +291,6 @@ class TransformerSurrogate(Surrogate):
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
-@register_surrogate("DEEP_ENSEMBLE")
 class DeepEnsembleSurrogate(Surrogate):
     models: eqx.nn.MLP = _
 
@@ -355,7 +328,6 @@ class DeepEnsembleSurrogate(Surrogate):
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
 
-@register_surrogate("MOE")
 class MixtureOfExperts(Surrogate):
     gating_network: eqx.nn.Linear = _
     experts: eqx.nn.MLP = _
@@ -416,7 +388,6 @@ class SpectralConv1d(Module):
         return jnp.fft.irfft(out_ft, n=x.shape[-1])
 
 
-@register_surrogate("FNO")
 class FourierNeuralOperator(Surrogate):
     lifting: eqx.nn.Linear = _
     spectral_conv: SpectralConv1d = _
@@ -429,7 +400,7 @@ class FourierNeuralOperator(Surrogate):
         self.projection = eqx.nn.Linear(width, output_dim, key=k3)
 
     def _internal_predict(self, x):
-        lifted = self.lifting(x).reshape(-1, 1)
+        lifted = self.lifting(x).reshape(1, -1)
         conv_out = jax.nn.gelu(self.spectral_conv(lifted))
         return self.projection(conv_out.flatten())
 
@@ -454,3 +425,18 @@ class FourierNeuralOperator(Surrogate):
             return jnp.mean((y_batch - preds) ** 2)
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+
+__all__ = [
+    "Surrogate",
+    "SurrogateEvaluation",
+    "PolynomialChaosSurrogate",
+    "InverseDistanceWeighting",
+    "RadialBasisFunction",
+    "GaussianProcessSurrogate",
+    "MLPSurrogate",
+    "TransformerSurrogate",
+    "DeepEnsembleSurrogate",
+    "MixtureOfExperts",
+    "SpectralConv1d",
+    "FourierNeuralOperator"
+]

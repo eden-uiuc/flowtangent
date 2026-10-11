@@ -738,13 +738,17 @@ class Process(ProcessStep):
         G = nx.DiGraph()
         latest_producers = {}
 
+        # 1. Normalize the iterator to always yield (base_name, step)
         if recursive:
-            step_iterator = self._get_flattened_steps()
+            base_iterator = self._get_flattened_steps()
         else:
-            step_iterator = ((f"{i}_{step.name}", step) for i, step in enumerate(self.steps))
+            base_iterator = ((step.name, step) for step in self.steps)
 
         # 2. Build the chronological DAG
-        for step_node, step in step_iterator:
+        for i, (base_name, step) in enumerate(base_iterator):
+            # Prepend a global index to guarantee NetworkX node uniqueness
+            step_node = f"{i}_{base_name}"
+            
             G.add_node(step_node, step_obj=step)
 
             # Resolve Inputs
@@ -872,6 +876,9 @@ class Process(ProcessStep):
 
                 # Keep the escaped double quotes to protect the tree formatting
                 mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
+            else:
+                # Emit an unlabeled edge to preserve the graph's dependency structure
+                mermaid_lines.append(f'    {node_id_map[u]} --> {node_id_map[v]}')
 
         mermaid_str = "\n".join(mermaid_lines)
 

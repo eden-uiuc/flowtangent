@@ -5,11 +5,11 @@ import plotly.graph_objects as go
 
 from . import styles
 
-
 def plot_airfoil(
     airfoil,
     title: Optional[str] = None,
     show_markers: bool = False,
+    show_raw: bool = False,
     show_camber: bool = False,
     theme: go.layout.Template | str = styles.nord_dark,
     save_path: Optional[str] = None,
@@ -31,10 +31,10 @@ def plot_airfoil(
 
     fig = go.Figure()
 
-    # Upper Surface
+    # Upper Surface (Interpolated)
     fig.add_trace(go.Scatter(x=x_up, y=y_up, mode=mode, name="Upper Surface", line=dict(width=2), marker=dict(size=4)))
 
-    # Lower Surface
+    # Lower Surface (Interpolated)
     fig.add_trace(
         go.Scatter(x=x_low, y=y_low, mode=mode, name="Lower Surface", line=dict(width=2), marker=dict(size=4))
     )
@@ -50,6 +50,19 @@ def plot_airfoil(
                 name="Camber Line",
                 line=dict(width=2, dash="dash"),
                 marker=dict(size=4, symbol="cross"),
+            )
+        )
+
+    # Raw File Coordinates
+    if show_raw and getattr(airfoil, "raw_coordinates", None) is not None:
+        raw_coords = np.asarray(airfoil.raw_coordinates)
+        fig.add_trace(
+            go.Scatter(
+                x=raw_coords[:, 0],
+                y=raw_coords[:, 1],
+                mode="markers",
+                name="Raw Data",
+                marker=dict(size=6, symbol="circle-open", opacity=0.7, line=dict(width=1.5)),
             )
         )
 

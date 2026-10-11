@@ -51,9 +51,9 @@ def numpy_collate(batch):
 
     if isinstance(elem, torch.Tensor):
         return np.stack([x.detach().cpu().numpy() for x in batch])
-    elif isinstance(elem, np.ndarray):
-        return np.stack(batch)
-    elif isinstance(elem, (int, float)):
+    elif isinstance(elem, (np.ndarray, jax.Array)):
+        return np.stack([np.asarray(x) for x in batch])
+    elif isinstance(elem, (int, float, bool, np.generic)):
         return np.array(batch)
     elif isinstance(elem, (tuple, list)):
         transposed = zip(*batch)
@@ -150,45 +150,8 @@ class Dataset(Module):
     _proxy: Any = static_field(_)
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
-
-    def __new__(cls, source=None, *args, **kwargs):
-        if cls is not Dataset:
-            return super().__new__(cls)
-
-        if source is None:
-            raise ValueError("ft.Dataset requires a source when instantiated directly.")
-
-        if isinstance(source, (str, Path)):
-            src_str = str(source).lower()
-            ext = src_str.split(".")[-1]
-
-            ext_dict = {
-                "zarr": ZarrDataset,
-                "h5": HDF5Dataset,
-                "hdf5": HDF5Dataset,
-                "parquet": ParquetDataset,
-                "csv": CSVDataset,
-                "nc": NetCDFDataset,
-                "nc4": NetCDFDataset,
-                "netcdf": NetCDFDataset,
-                "mat": MATDataset,
-            }
-
-            if ext in ext_dict:
-                # Instantiate manually to bypass Equinox initialization strictness
-                proxy_cls = ext_dict[ext]
-                instance = proxy_cls.__new__(proxy_cls)
-                instance.__init__(source, *args, **kwargs)
-                return instance
-            else:
-                raise ValueError(f"Unsupported data format extension: {source}")
-
-        elif hasattr(source, "columns") and hasattr(source, "iloc"):
-            instance = DataFrameDataset.__new__(DataFrameDataset)
-            instance.__init__(source, *args, **kwargs)
-            return instance
-
-        raise TypeError(f"Unsupported data source type: {type(source)}")
+    _appended_data: dict = _
+    _appended_len: int = 0
 
     def __check_init__(self):
         super(Dataset, self).__check_init__()
@@ -198,6 +161,8 @@ class Dataset(Module):
             object.__setattr__(self, "_appended_data", {})
         if getattr(self, "_indices", _) is _:
             object.__setattr__(self, "_indices", None)
+        if getattr(self, "_appended_data", _) is _:
+            object.__setattr__(self, "_appended_data", {})
 
     @property
     def full_vars(self) -> list[str]:
@@ -274,9 +239,9 @@ class Dataset(Module):
         base_col = None
         if hasattr(self, "_virtual_columns") and name in self._virtual_columns:
             base_col = self._virtual_columns[name]
-        elif hasattr(self, "_backend_proxy") and self._backend_proxy is not _:
+        elif hasattr(self, "_proxy") and self._proxy is not _:
             try:
-                base_col = getattr(self._backend_proxy, name)
+                base_col = getattr(self._proxy, name)
             except AttributeError:
                 pass
 
@@ -304,6 +269,38 @@ class Dataset(Module):
         for var in self.full_vars:
             row[var] = getattr(self, var)[idx]
         return row
+
+def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
+
+    if source is None:
+        raise ValueError("ft.Dataset requires a source when instantiated directly.")
+
+    if isinstance(source, (str, Path)):
+        src_str = str(source).lower()
+        ext = src_str.split(".")[-1]
+
+        ext_dict = {
+            "zarr": ZarrDataset,
+            "h5": HDF5Dataset,
+            "hdf5": HDF5Dataset,
+            "parquet": ParquetDataset,
+            "csv": CSVDataset,
+            "nc": NetCDFDataset,
+            "nc4": NetCDFDataset,
+            "netcdf": NetCDFDataset,
+            "mat": MATDataset,
+        }
+
+        if ext in ext_dict:
+            # Instantiate manually to bypass Equinox initialization strictness
+            return ext_dict[ext](source, *args, **kwargs)
+        else:
+            raise ValueError(f"Unsupported data format extension: {source}")
+
+    elif hasattr(source, "columns") and hasattr(source, "iloc"):
+        return DataFrameDataset(source, *args, **kwargs)
+
+    raise TypeError(f"Unsupported data source type: {type(source)}")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -374,7 +371,7 @@ class ZarrGroupProxy:
         target = obj[name]
         next_path = f"{self._group_path}/{name}" if self._group_path else name
 
-        if isinstance(target, zarr.hierarchy.Group):
+        if isinstance(target, zarr.Group):
             return ZarrGroupProxy(self._zarr_path, next_path)
         return target[:]
 
@@ -387,22 +384,13 @@ class ZarrDataset(Dataset):
 
     def __init__(self, source: str, primary_array: str = ""):
         object.__setattr__(self, "_source", source)
-        object.__setattr__(self, "_backend_proxy", ZarrGroupProxy(source))
+        object.__setattr__(self, "_proxy", ZarrGroupProxy(source))
         object.__setattr__(self, "_virtual_columns", {})
 
         root = zarr.open_group(source, mode="r")
         # Use first array if primary_array isn't specified
         primary_array = primary_array or list(root.keys())[0]
         object.__setattr__(self, "_len", root[primary_array].shape[0])
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # DataFrames (Pandas/Polars) -------------------------------------------------------------------------------------------
@@ -418,18 +406,10 @@ class DataFrameDataset(Dataset):
         data_dict = {col: data_arr[:, i] for i, col in enumerate(columns)}
 
         object.__setattr__(self, "_source", "dataframe")
-        object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
+        object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", len(data_arr))
 
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # HDF5 -----------------------------------------------------------------------------------------------------------------
@@ -479,18 +459,9 @@ class HDF5Dataset(Dataset):
             length = f[primary_key].shape[0]
 
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_backend_proxy", HDF5GroupProxy(file_path))
+        object.__setattr__(self, "_proxy", HDF5GroupProxy(file_path))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", length)
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx: int):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # Parquet --------------------------------------------------------------------------------------------------------------
@@ -503,18 +474,9 @@ class ParquetDataset(Dataset):
         pf = pq.ParquetFile(file_path)
 
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_backend_proxy", ParquetProxy(file_path, pf.schema.names))
+        object.__setattr__(self, "_proxy", ParquetProxy(file_path, pf.schema.names))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", pf.metadata.num_rows)
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx: int):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # Tensor/Arrays --------------------------------------------------------------------------------------------------------
@@ -531,11 +493,11 @@ class ArrayDataset(Dataset):
     def __init__(self, *arrays):
         assert all(arrays[0].shape[0] == array.shape[0] for array in arrays), "Size mismatch"
         object.__setattr__(self, "arrays", arrays)
-        # Bypassing _source/_backend_proxy entirely since we use positional indexing
+        # Bypassing _source/_proxy entirely since we use positional indexing
 
     def __getitem__(self, index):
         return tuple(array[index] for array in self.arrays)
-
+    
     def __len__(self):
         return self.arrays[0].shape[0]
 
@@ -552,18 +514,9 @@ class CSVDataset(Dataset):
         data_dict = {col: table.column(col).to_numpy() for col in columns}
 
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
+        object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", table.num_rows)
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx: int):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # NetCDF ---------------------------------------------------------------------------------------------------------------
@@ -604,18 +557,9 @@ class NetCDFDataset(Dataset):
             length = ds.variables[primary_variable].shape[0]
 
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_backend_proxy", NetCDFGroupProxy(file_path))
+        object.__setattr__(self, "_proxy", NetCDFGroupProxy(file_path))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", length)
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx: int):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 # MATLAB ---------------------------------------------------------------------------------------------------------------
@@ -642,22 +586,14 @@ class MATDataset(Dataset):
         primary_key = primary_key or keys[0]
 
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_backend_proxy", MemoryProxy(data_dict))
+        object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", len(data_dict[primary_key]))
-
-    def __len__(self):
-        return self._len
-
-    def __getitem__(self, idx: int):
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-        return row
 
 
 __all__ = [
     "Dataset",
+    "load_dataset",
     "IterableDataset",
     "ArrayDataset",
     "StackDataset",

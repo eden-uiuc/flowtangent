@@ -9,6 +9,7 @@ description = "A differentiable, GPU-accelerated aerospace systems design enviro
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "blackjax",
     "beartype",
     "equinox",
     "jax",
@@ -33,7 +34,7 @@ dependencies = [
     "optax",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "chex",
     "openmdao",
@@ -44,14 +45,21 @@ dev = [
     "om-pycycle",
     "ruff",
 ]
-
 docs = [
     "mkdocs-material",
+    "mkdocs-jupyter",
     "mkdocstrings[python]",
 ]
 
 [tool.ruff]
-line-length = 120 
+line-length = 120
+exclude = [
+    "exp",
+    ".git",
+    ".github",
+    ".ruff_cache",
+    "__pycache__"
+]
 
 # Python 3.12 as the minimum
 target-version = "py312"
