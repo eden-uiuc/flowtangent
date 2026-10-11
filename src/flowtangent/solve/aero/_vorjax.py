@@ -866,6 +866,7 @@ def _generate_single_wing(
         is_trailing_edge=jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1),
     )
 
+
 @io.inputs(
     "system.wings",
     "settings.analysis.aerodynamics",

@@ -123,7 +123,7 @@ class Requirement(Parameter):
         # so it doesn't raise a ValueError in super().__post_init__()
         if self.path is None and not has_custom:
             object.__setattr__(self, "path", TreePath(path="", name=self.name))
-            object.__setattr__(self, "update_func", lambda tree, val: tree) # No-op
+            object.__setattr__(self, "update_func", lambda tree, val: tree)  # No-op
 
         super().__post_init__()
 
@@ -136,7 +136,7 @@ class Requirement(Parameter):
         if not self._is_custom_extractor:
             val = vals_dict[self.name]
         else:
-            val = self.extract_func(vals_dict) #type: ignore
+            val = self.extract_func(vals_dict)  # type: ignore
 
         # 2. Evaluate Residual (Margin to nearest boundary)
         if self.lower_bound is not None and self.upper_bound is not None:
@@ -154,12 +154,11 @@ class Requirement(Parameter):
         # 3. Probabilistic Evaluation (If variance is provided)
         prob, log_ll = None, None
         if vars_dict is not None:
-            
-            if not self._is_custom_extractor: # Use the flag!
+            if not self._is_custom_extractor:  # Use the flag!
                 val_var = vars_dict.get(str(self.name), jnp.array(0.0))
             else:
                 # Delta Method: propagate variance through the custom derived function
-                grads = jax.grad(self.extract_func)(vals_dict) #type: ignore
+                grads = jax.grad(self.extract_func)(vals_dict)  # type: ignore
                 val_var = sum((grads[k] ** 2) * vars_dict[k] for k in vars_dict.keys() if k in grads)
 
             sigma = jnp.sqrt(jnp.maximum(val_var, 1e-12))
@@ -277,7 +276,7 @@ class DesignSpace(Module):
 
                 new_p = eqx.tree_at(lambda x: x._tree_path.value, p, user_val)
                 initialized_params.append(new_p)
-         
+
         object.__setattr__(self, "parameters", tuple(initialized_params))
         ordered_defaults = tuple(p.value for p in self.inputs)
         _, unravel_fn = ravel_pytree(ordered_defaults)

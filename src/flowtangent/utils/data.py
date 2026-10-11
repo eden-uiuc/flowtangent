@@ -270,6 +270,7 @@ class Dataset(Module):
             row[var] = getattr(self, var)[idx]
         return row
 
+
 def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
 
     if source is None:
@@ -411,7 +412,6 @@ class DataFrameDataset(Dataset):
         object.__setattr__(self, "_len", len(data_arr))
 
 
-
 # HDF5 -----------------------------------------------------------------------------------------------------------------
 
 
@@ -497,7 +497,7 @@ class ArrayDataset(Dataset):
 
     def __getitem__(self, index):
         return tuple(array[index] for array in self.arrays)
-    
+
     def __len__(self):
         return self.arrays[0].shape[0]
 

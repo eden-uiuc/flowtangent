@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 
 from . import styles
 
+
 def plot_airfoil(
     airfoil,
     title: Optional[str] = None,

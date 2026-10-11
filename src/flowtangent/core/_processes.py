@@ -748,7 +748,7 @@ class Process(ProcessStep):
         for i, (base_name, step) in enumerate(base_iterator):
             # Prepend a global index to guarantee NetworkX node uniqueness
             step_node = f"{i}_{base_name}"
-            
+
             G.add_node(step_node, step_obj=step)
 
             # Resolve Inputs
@@ -878,7 +878,7 @@ class Process(ProcessStep):
                 mermaid_lines.append(f'    {node_id_map[u]} -->|"{label}"| {node_id_map[v]}')
             else:
                 # Emit an unlabeled edge to preserve the graph's dependency structure
-                mermaid_lines.append(f'    {node_id_map[u]} --> {node_id_map[v]}')
+                mermaid_lines.append(f"    {node_id_map[u]} --> {node_id_map[v]}")
 
         mermaid_str = "\n".join(mermaid_lines)
 

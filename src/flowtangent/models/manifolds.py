@@ -290,7 +290,7 @@ class KernelPCA(Manifold):
     def __init__(self, key, input_dim: int, latent_dim: int, kernel: Kernel):
         self.input_dim = input_dim
         self.latent_dim = latent_dim
-        
+
         self.kernel = kernel
         self.X_fit = jnp.zeros((1, input_dim))
         self.eigenvectors = jnp.zeros((1, latent_dim))
@@ -408,7 +408,7 @@ class TransformerAutoencoder(Manifold):
 
         self.input_dim = seq_len * feature_dim
         self.latent_dim = latent_dim
-        
+
         self.seq_len = seq_len
         self.feature_dim = feature_dim
         self.embedding = eqx.nn.Linear(feature_dim, hidden_size, key=k1)
@@ -459,7 +459,7 @@ class StateSpaceAutoencoder(Manifold):
         k1, k2, k3, k4, k5 = jax.random.split(key, 5)
         self.seq_len = seq_len
         self.feature_dim = feature_dim
-        
+
         self.input_dim = seq_len * feature_dim
         self.latent_dim = latent_dim
 
@@ -531,7 +531,7 @@ class NormalizingFlow(Manifold):
 
         self.input_dim = dim
         self.latent_dim = dim
-        
+
         self.layers = []
         for i, k in enumerate(keys):
             mask = jnp.arange(dim) < (dim // 2) if i % 2 == 0 else jnp.arange(dim) >= (dim // 2)
@@ -569,11 +569,11 @@ class PointCloudManifold(Manifold):
 
     def __init__(self, key, num_points: int, latent_dim: int):
         k1, k2, k3 = jax.random.split(key, 3)
-        
+
         self.num_points = num_points
         self.input_dim = num_points * 3
         self.latent_dim = latent_dim
-        
+
         self.shared_mlp1 = eqx.nn.MLP(3, 64, 64, 2, key=k1)
         self.shared_mlp2 = eqx.nn.MLP(64, latent_dim, 128, 2, key=k2)
         self.decoder = eqx.nn.MLP(latent_dim, num_points * 3, 256, 3, key=k3)
@@ -612,5 +612,5 @@ __all__ = [
     "TransformerAutoencoder",
     "StateSpaceAutoencoder",
     "NormalizingFlow",
-    "PointCloudManifold"
+    "PointCloudManifold",
 ]

@@ -31,7 +31,7 @@ class Airfoil(Component):
     max_thickness: float = 0.0
     wedge_angle: float = 0.0
 
-    raw_coordinates: Optional[jax.Array] = None # For file import reference
+    raw_coordinates: Optional[jax.Array] = None  # For file import reference
     coordinates: jax.Array = empty_array((0, 2))
     camber: jax.Array = empty_array()
 

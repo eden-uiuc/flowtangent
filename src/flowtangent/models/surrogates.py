@@ -42,7 +42,6 @@ class SurrogateEvaluation(Module):
 
 
 class Surrogate(Module):
-
     @abc.abstractmethod
     def predict(self, x: jax.Array, compute_derivatives: bool = False) -> SurrogateEvaluation:
         pass
@@ -426,6 +425,7 @@ class FourierNeuralOperator(Surrogate):
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
 
+
 __all__ = [
     "Surrogate",
     "SurrogateEvaluation",
@@ -438,5 +438,5 @@ __all__ = [
     "DeepEnsembleSurrogate",
     "MixtureOfExperts",
     "SpectralConv1d",
-    "FourierNeuralOperator"
+    "FourierNeuralOperator",
 ]
