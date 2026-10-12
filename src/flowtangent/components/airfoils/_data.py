@@ -72,7 +72,7 @@ def generate_stub():
         "from typing import Any",
         "from ._classes import Airfoil",
         "",
-        "def load_foil(name: str, interpolate: bool = True, n_pts: int = 128) -> Airfoil: ...",
+        "def load_foil(name: str, n_pts: int = 128) -> Airfoil: ...",
         "",
     ]
 
@@ -127,12 +127,10 @@ def validate_library(plotting: bool = False, k=32):
 
     for name, reason in inspection_queue:
         af = load_foil(name)
-        file_af = load_foil(name, interpolate=False)
         if plotting:
             plt.plot(af.x_upper, af.y_upper, color="#FC6255", label="interpolated")
             plt.plot(af.x_lower, af.y_lower, color="#FC6255", label="interpolated")
-            plt.plot(file_af.x_upper, file_af.y_upper, color="#0B078A", label="raw")
-            plt.plot(file_af.x_lower, file_af.y_lower, color="#0B078A", label="raw")
+            plt.plot(af.raw_coordinates, color="#0B078A", label="raw")  # type: ignore
             plt.title(f"{name} Raw vs Interpolated: {reason}")
             plt.axis("equal")
             plt.show()
@@ -234,7 +232,6 @@ def validate_library(plotting: bool = False, k=32):
             dist = distances[idx]
 
             af = getattr(sys.modules[__name__], name)
-            file_af = load_foil(name, interpolate=False)
             x = np.array(af.x_upper)
 
             y_up_raw = np.array(af.y_upper)
@@ -255,8 +252,7 @@ def validate_library(plotting: bool = False, k=32):
             # Panel 1: Raw Geometry (Look for blunt trailing edges)
             ax1.plot(x, y_up_raw, "b-", label="Interp. Upper")
             ax1.plot(x, y_lo_raw, "r-", label="Interp. Lower")
-            ax1.scatter(file_af.x_upper, file_af.y_upper, c="c", label="File Upper")
-            ax1.scatter(file_af.x_lower, file_af.y_lower, c="g", label="File Lower")
+            ax1.scatter(af.raw_coordinates, c="c", label="File Coordinates")
             ax1.set_aspect("equal")
             ax1.set_title("1. Raw Interpolated Geometry")
             ax1.grid(True, alpha=0.3)
@@ -613,19 +609,5 @@ if __name__ == "__main__":
     generate_stub()
     latent_dim = 16
     valid_airfoils = validate_library(k=latent_dim)
-    # NND, max_void = calculate_latent_voids(valid_airfoils, k=latent_dim)
     kept_dict, pruned_dict = regularize_design_space(valid_airfoils)
     X_airfoils = evaluate_naca_overlap(kept_dict, k=latent_dim)
-
-    # n6412i = load_foil("goe802a")
-    # n6412r = load_foil("goe802a", interpolate=False)
-
-    # import matplotlib.pyplot as plt
-
-    # plt.plot(n6412i.x_upper, n6412i.y_upper, color='#FC6255')
-    # plt.plot(n6412i.x_lower, n6412i.y_lower, color='#FC6255')
-    # plt.scatter(n6412r.x_upper, n6412r.y_upper, color="#0B078A")
-    # plt.scatter(n6412r.x_lower, n6412r.y_lower, color="#0B078A")
-    # plt.title("Raw vs Interpolated")
-    # plt.axis('equal')
-    # plt.show()

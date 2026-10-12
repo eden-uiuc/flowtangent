@@ -204,11 +204,27 @@ class Dataset(Module):
         """
         new_appended = dict(self._appended_data)
 
-        array_vars = [var for var in self.full_vars if hasattr(getattr(self, var), "shape")]
+        base_columns = {}
+        for var in self.full_vars:
+            if var in self._virtual_columns:
+                base_col = self._virtual_columns[var]
+            elif self._proxy is not _:
+                try:
+                    base_col = getattr(self._proxy, var)
+                except AttributeError:
+                    continue
+            else:
+                continue
+            if hasattr(base_col, "shape"):
+                base_columns[var] = base_col
 
-        for var in array_vars:
+        for var, base_col in base_columns.items():
             # Extract the new value, defaulting to NaN if the oracle didn't provide it
-            val = jnp.atleast_1d(row_dict.get(var, jnp.nan))
+            trailing_shape = base_col.shape[1:]
+            if var in row_dict:
+                val = jnp.asarray(row_dict[var]).reshape((1, *trailing_shape))
+            else:
+                val = jnp.full((1, *trailing_shape), jnp.nan)
 
             if var in new_appended:
                 new_appended[var] = jnp.concatenate([new_appended[var], val], axis=0)
@@ -256,7 +272,10 @@ class Dataset(Module):
 
         # 2. Concatenate any appended active-learning rows to the end
         if hasattr(self, "_appended_data") and name in self._appended_data:
-            return jnp.concatenate([jnp.asarray(base_col), self._appended_data[name]], axis=0)
+            base_col = jnp.concatenate([jnp.asarray(base_col), self._appended_data[name]], axis=0)
+
+        if self._indices is not None:
+            return base_col[self._indices]
 
         return base_col
 
@@ -267,9 +286,6 @@ class Dataset(Module):
         return object.__getattribute__(self, "_len") + self._appended_len
 
     def __getitem__(self, idx):
-        # Route the requested index through the virtual view
-        if self._indices is not None:
-            idx = self._indices[idx]
 
         row = {}
         for var in self.full_vars:
