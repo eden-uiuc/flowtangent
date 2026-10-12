@@ -699,7 +699,7 @@ class Process(ProcessStep):
         # 4. Recursively build the string representation
         lines = []
 
-        def traverse(current_tree: dict, current_parts: tuple = (), depth: int = 0):
+        def traverse(current_tree: dict, current_parts: tuple = (), depth: int = 0, prefix: str = ""):
             keys = sorted(current_tree.keys())
             for i, key in enumerate(keys):
                 node_parts = current_parts + (key,)
@@ -717,12 +717,13 @@ class Process(ProcessStep):
 
                 if depth == 0:
                     lines.append(display_name)
+                    child_prefix = ""
                 else:
-                    padding = "  " * (depth - 1)
                     branch = "└─ " if i == len(keys) - 1 else "├─ "
-                    lines.append(f"{padding}{branch}{display_name}")
+                    lines.append(f"{prefix}{branch}{display_name}")
+                    child_prefix = prefix + ("   " if i == len(keys) - 1 else "│  ")
 
-                traverse(current_tree[key], node_parts, depth + 1)
+                traverse(current_tree[key], node_parts, depth + 1, child_prefix)
 
         traverse(tree)
         return "\n".join(lines)

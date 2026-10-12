@@ -30,5 +30,5 @@ def on_pre_build(config):
                 )
 
                 cls.__doc__ = doc + diagram_section
-            except Exception:
-                pass
+            except Exception as exc:
++                logging.getLogger("mkdocs").warning("autodoc: no graph for %s: %s", cls.__name__, exc)

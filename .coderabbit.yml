@@ -5,7 +5,7 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-  ignore:
+  path_filters:
     - "exp/**"
 
 

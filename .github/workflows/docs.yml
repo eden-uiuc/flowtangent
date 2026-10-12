@@ -31,7 +31,7 @@ jobs:
 
       - name: Install dependencies
         # 2. Use uv to correctly install the [dependency-groups] block
-        run: uv pip install --system -e . --group docs
+        run: uv sync --group docs
 
       - name: Deploy to GitHub Pages
         env:

@@ -160,13 +160,20 @@ document$.subscribe(function() {
 
         // INTERACTION: Double-click Process -> Route to specific Docs API page
         cy.on('dblclick', 'node[node_type="process"]', function(evt){
-            const nodeName = evt.target.data('label');
-            // Assuming your MkDocs creates slugs like 'compute-aerodynamic-coefficients'
-            const urlSlug = nodeName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            const nodeData = evt.target.data();
+            const nodeName = nodeData.label;
             
-            // NOTE: Adjust this base path depending on your MkDocs structure!
-            const basePath = window.location.origin + "/api/processes/"; 
-            window.location.href = basePath + "#flowtangent.solve." + urlSlug;
+            // 1. Fix the Path: Resolve relative to the current page's URL.
+            // This safely preserves the '/flowtangent/' GitHub Pages sub-path.
+            const basePath = new URL('api/processes/', window.location.href).href;
+            
+            // 2. Fix the Fragment: Use the node's unique ID (which is usually 
+            // the fully qualified Python path) instead of a hard-coded string.
+            // Fallback to the label if an ID isn't provided.
+            const targetFragment = nodeData.id ? nodeData.id : nodeName;
+            
+            // Navigate cleanly to the target
+            window.location.href = `${basePath}#${targetFragment}`;
         });
     });
 });
