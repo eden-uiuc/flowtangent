@@ -17,39 +17,48 @@ from ._classes import CompressorMap, TurbineMap
 _MAP_DIR = _ft_root() / "data/turbo_maps"
 STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 
+def _from_data(data: dict, file_path: Path):
+    """Dispatches the loaded JSON data to the correct Map class."""
+    map_type = data.get("type", "compressor").lower()
+    
+    if map_type == "compressor":
+        return CompressorMap.from_json(file_path)
+    elif map_type == "turbine":
+        return TurbineMap.from_json(file_path)
+    else:
+        raise ValueError(f"Unrecognized map type '{map_type}' in {file_path.name}")
 
 @lru_cache(maxsize=None)
 def load_map(name: str):
     """
     Helper that does the disk I/O, safely cached, and routes by type.
     """
-    if Path(name).exists():
+    # 1. Try loading as an explicit local file path first
+    explicit_path = Path(name)
+    if explicit_path.exists():
         try:
-            with open(name, "r") as f:
+            with open(explicit_path, "r") as f:
                 data = json.load(f)
         except Exception as e:
-            raise AttributeError(f"Found map file {name}, but unable to load: {e}")
-        # TODO: Add map schema to docstring
+            # Chain the exception with `from e` to preserve the stack trace
+            raise AttributeError(f"Found map file {name}, but unable to load: {e}") from e
+        
+        # Return immediately, preventing the fall-through
+        return _from_data(data, explicit_path)
 
+    # 2. If not a local file, fall back to the FlowTangent library
     file_path = _MAP_DIR / f"{name}.json"
     if not file_path.exists():
         raise AttributeError(f"Map '{name}' not found in FlowTangent library ({_MAP_DIR}).")
 
-    # 1. Peek inside the JSON to grab the metadata
-    with open(file_path, "r") as f:
-        data = json.load(f)
+    try:
+        with open(file_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        raise AttributeError(f"Found library map {name}, but unable to load: {e}") from e
 
-    # 2. Extract the type (defaulting to compressor for legacy safety)
-    map_type = data.get("type", "compressor").lower()
-
-    # 3. Dispatch to the correct class
-    # (Assuming your classes have a classmethod like .from_dict() or .from_json())
-    if map_type == "compressor":
-        return CompressorMap.from_json(file_path)
-    elif map_type == "turbine":
-        return TurbineMap.from_json(file_path)
-    else:
-        raise ValueError(f"Unrecognized map type '{map_type}' in {name}.json")
+    # Return using the helper
+    return _from_data(data, file_path)
 
 
 def __getattr__(name: str) -> Any:
