@@ -275,7 +275,8 @@ class DesignSpace(Module):
                         self.dataset.add_variable(str(p.name), nan_overlay, quiet=not self.strict_dataset),
                     )
 
-                new_p = eqx.tree_at(lambda x: x._tree_path.value, p, user_val)
+                tp = TreePath.cast(p.path)
+                new_p = eqx.tree_at(lambda x: x.path, p, TreePath(tp.path, user_val, tp.path_slice, tp.name))
                 initialized_params.append(new_p)
 
         object.__setattr__(self, "parameters", tuple(initialized_params))
@@ -599,7 +600,8 @@ class DesignSpace(Module):
 
         # 4. Return either a zero-copy wrapper or a hard refit instance
         if not refit:
-            return DesignSubspace(base_space=self, latent_bounds=latent_bounds, primal_bounds=primal_bounds)
+            sliced_space = eqx.tree_at(lambda s: s.dataset, self, sliced_dataset)
+            return DesignSubspace(base_space=sliced_space, latent_bounds=latent_bounds, primal_bounds=primal_bounds)
 
         # Hard refit logic: Swap out the dataset and stream the sliced rows to the fitters
         temp_space = eqx.tree_at(lambda s: s.dataset, self, sliced_dataset)

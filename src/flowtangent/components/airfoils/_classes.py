@@ -393,10 +393,10 @@ class Airfoil(Component):
             coordinates=jnp.column_stack((x_coord, y_coord)),
             x_coordinates=x_coord,
             y_coordinates=y_coord,
-            x_upper=jnp.asarray(x_up_rev),
-            x_lower=jnp.asarray(x_lo),
-            y_upper=jnp.asarray(y_up_rev),
-            y_lower=jnp.asarray(y_lo),
+            x_upper=jnp.asarray(x_grid),
+            x_lower=jnp.asarray(x_grid),
+            y_upper=jnp.asarray(y_up_clean),
+            y_lower=jnp.asarray(y_lo_clean),
         )
 
     def plot(

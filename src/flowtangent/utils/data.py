@@ -148,8 +148,11 @@ class Dataset(Module):
 
     _source: Any = static_field(_)
     _proxy: Any = static_field(_)
+    _proxy_Vars: tuple[str, ...] = static_field(())
+    
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
+    
     _appended_data: dict = _
     _appended_len: int = 0
 
@@ -163,15 +166,19 @@ class Dataset(Module):
             object.__setattr__(self, "_indices", None)
         if getattr(self, "_appended_data", _) is _:
             object.__setattr__(self, "_appended_data", {})
+        
+        if getattr(self, "_proxy_vars", None) == ():
+            if self._proxy is not _:
+                p_vars = [
+                    k for k in dir(self._proxy) 
+                    if not k.startswith("_") and hasattr(getattr(self._proxy, k), "shape")
+                ]
+                object.__setattr__(self, "_proxy_vars", tuple(p_vars))
 
     @property
     def full_vars(self) -> list[str]:
-        # Implementation for crawling proxy + virtual columns (from previous step)
-        backend_keys = []
-        if self._proxy is not _:
-            backend_keys = [k for k in dir(self._proxy) if not k.startswith("_")]
         virtual_keys = list(self._virtual_columns.keys())
-        return sorted(list(set(backend_keys + virtual_keys)))
+        return sorted(list(set(list(self._proxy_vars) + virtual_keys)))
 
     def add_variable(self, name: str, data: Optional[jax.Array] = None, quiet: bool = False) -> "Dataset":
         """
@@ -286,7 +293,31 @@ class Dataset(Module):
         return object.__getattribute__(self, "_len") + self._appended_len
 
     def __getitem__(self, idx):
+        # Fast-path for single integer indexing (PyTorch DataLoader)
+        if isinstance(idx, int):
+            row = {}
+            total_len = len(self)
+            if idx < 0:
+                idx += total_len
+                
+            actual_idx = idx if self._indices is None else self._indices[idx]
+            orig_len = object.__getattribute__(self, "_len")
 
+            for var in self.full_vars:
+                # 1. Is it an active-learning row?
+                if actual_idx >= orig_len:
+                    row[var] = self._appended_data[var][actual_idx - orig_len]
+                
+                # 2. Is it a virtual column?
+                elif var in self._virtual_columns:
+                    row[var] = self._virtual_columns[var][actual_idx]
+                
+                # 3. It must be on disk
+                else:
+                    row[var] = self._proxy.get_row(var, actual_idx)
+            return row
+
+        # Fallback for slices
         row = {}
         for var in self.full_vars:
             row[var] = getattr(self, var)[idx]
@@ -347,6 +378,11 @@ class MemoryProxy:
     def __dir__(self):
         return list(self._data.keys())
 
+    def get_row(self, name: str, idx: int):
+        if name not in self._data:
+            raise AttributeError(f"MemoryProxy has no attribute '{name}'")
+        return self._data[name][idx]
+
 
 class ParquetProxy:
     """Lazy-evaluation proxy for Parquet files."""
@@ -365,6 +401,13 @@ class ParquetProxy:
 
     def __dir__(self):
         return self._columns
+
+    def get_row(self, name: str, idx: int):
+        if name not in self._columns:
+            raise AttributeError(f"ParquetProxy has no column '{name}'")
+        # pq.read_table with columns=[] only loads that specific column's chunk into memory
+        table = pq.read_table(self._file_path, columns=[name])
+        return table.column(name)[idx].as_py()
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -400,6 +443,13 @@ class ZarrGroupProxy:
 
     def __dir__(self):
         return list(self._get_zarr_obj().keys())
+
+    def get_row(self, name: str, idx: int):
+        obj = self._get_zarr_obj()
+        if name not in obj:
+            raise AttributeError(f"Zarr group '{self._group_path or 'root'}' has no array '{name}'.")
+        # Slicing the Zarr array object reads only that specific chunk from disk
+        return obj[name][idx]
 
 
 class ZarrDataset(Dataset):
@@ -466,6 +516,14 @@ class HDF5GroupProxy:
         with h5py.File(self._file_path, "r") as f:
             group = self._get_obj(f)
             return list(group.keys())
+
+    def get_row(self, name: str, idx: int):
+        with h5py.File(self._file_path, "r") as f:
+            group = self._get_obj(f)
+            if name not in group:
+                raise AttributeError
+            # Target is an h5py.Dataset, slicing it reads only that index from disk
+            return group[name][idx]
 
 
 class HDF5Dataset(Dataset):
@@ -567,6 +625,14 @@ class NetCDFGroupProxy:
         with nc.Dataset(self._file_path, "r") as ds:
             grp = ds[self._group_path] if self._group_path else ds
             return list(grp.groups.keys()) + list(grp.variables.keys())
+
+    def get_row(self, name: str, idx: int):
+        with nc.Dataset(self._file_path, "r") as ds:
+            grp = ds[self._group_path] if self._group_path else ds
+            if name not in grp.variables:
+                raise AttributeError
+            # Slicing the netCDF variable reads only that index from disk
+            return grp.variables[name][idx]
 
 
 class NetCDFDataset(Dataset):

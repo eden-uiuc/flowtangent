@@ -130,7 +130,7 @@ def validate_library(plotting: bool = False, k=32):
         if plotting:
             plt.plot(af.x_upper, af.y_upper, color="#FC6255", label="interpolated")
             plt.plot(af.x_lower, af.y_lower, color="#FC6255", label="interpolated")
-            plt.plot(af.raw_coordinates, color="#0B078A", label="raw")  # type: ignore
+            plt.plot(af.raw_coordinates[:, 0], af.raw_coordinates[:, 1], color="#0B078A", label="raw")  # type: ignore
             plt.title(f"{name} Raw vs Interpolated: {reason}")
             plt.axis("equal")
             plt.show()
@@ -252,7 +252,7 @@ def validate_library(plotting: bool = False, k=32):
             # Panel 1: Raw Geometry (Look for blunt trailing edges)
             ax1.plot(x, y_up_raw, "b-", label="Interp. Upper")
             ax1.plot(x, y_lo_raw, "r-", label="Interp. Lower")
-            ax1.scatter(af.raw_coordinates, c="c", label="File Coordinates")
+            ax1.scatter(af.raw_coordinates[:, 0], af.raw_coordinates[:, 1], c="c", label="File Coordinates")
             ax1.set_aspect("equal")
             ax1.set_title("1. Raw Interpolated Geometry")
             ax1.grid(True, alpha=0.3)

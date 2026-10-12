@@ -113,7 +113,7 @@ class Passthrough(Manifold):
     def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return z
 
-    def fit(self, X: Union[Float[Array, "N D"], DataLoader], **kwargs) -> "Passthrough":
+    def fit(self, X: Union[Float[Array, "N D"], LoaderType, Tuple], **kwargs) -> "Passthrough":
         return self
 
 
