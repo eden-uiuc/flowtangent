@@ -1,3 +1,28 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:venv"
 }
+{
+  // 1. Stops PyLance from trying to read and provide autocomplete for these folders
+  "python.analysis.exclude": [
+    ".venv",
+    "**/__pycache__"
+  ],
+  
+  // 2. Stops VSCode from using up your OS file-watcher limit on these folders
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.venv/**": true,
+    "**/__pycache__/**": true,
+    "**/*.dat": true,
+    "**/*.zarr/**": true,
+    "**/*.h5": true
+  },
+  
+  // 3. (Optional) Hides these from the left-hand file explorer so it's cleaner
+  "files.exclude": {
+    "**/.git": true,
+    "**/.venv": true,
+    "**/__pycache__": true
+  }
+}
