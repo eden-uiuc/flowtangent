@@ -250,7 +250,8 @@ class DesignSpace(Module):
                         "Shape cannot be inferred."
                     )
                 dataset_val = jnp.atleast_1d(sample_row[p.name])
-                new_p = eqx.tree_at(lambda x: x.path.value, p, dataset_val)
+                tp = TreePath.cast(p.path)
+                new_p = eqx.tree_at(lambda x: x.path, p, TreePath(tp.path, dataset_val, tp.path_slice, tp.name))
                 initialized_params.append(new_p)
 
             # CASE 2: User DID provide a value
