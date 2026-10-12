@@ -1,4 +1,5 @@
 import inspect
+import logging
 
 import flowtangent as ft
 
@@ -31,4 +32,4 @@ def on_pre_build(config):
 
                 cls.__doc__ = doc + diagram_section
             except Exception as exc:
-+                logging.getLogger("mkdocs").warning("autodoc: no graph for %s: %s", cls.__name__, exc)
+                logging.getLogger("mkdocs").warning("autodoc: no graph for %s: %s", cls.__name__, exc)

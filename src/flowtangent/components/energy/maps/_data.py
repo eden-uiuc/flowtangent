@@ -17,16 +17,18 @@ from ._classes import CompressorMap, TurbineMap
 _MAP_DIR = _ft_root() / "data/turbo_maps"
 STUB_FILE = Path(__file__).resolve().parent / "_data.pyi"
 
+
 def _from_data(data: dict, file_path: Path):
     """Dispatches the loaded JSON data to the correct Map class."""
     map_type = data.get("type", "compressor").lower()
-    
+
     if map_type == "compressor":
         return CompressorMap.from_json(file_path)
     elif map_type == "turbine":
         return TurbineMap.from_json(file_path)
     else:
         raise ValueError(f"Unrecognized map type '{map_type}' in {file_path.name}")
+
 
 @lru_cache(maxsize=None)
 def load_map(name: str):
@@ -42,7 +44,7 @@ def load_map(name: str):
         except Exception as e:
             # Chain the exception with `from e` to preserve the stack trace
             raise AttributeError(f"Found map file {name}, but unable to load: {e}") from e
-        
+
         # Return immediately, preventing the fall-through
         return _from_data(data, explicit_path)
 
