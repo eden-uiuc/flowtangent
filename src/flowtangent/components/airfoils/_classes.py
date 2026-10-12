@@ -389,7 +389,7 @@ class Airfoil(Component):
             source_file=file_path,
             camber=jnp.asarray((y_up_clean + y_lo_clean) / 2.0),
             max_thickness=float(jnp.max(y_up_clean - y_lo_clean)),
-            raw_coordinates=jnp.column_stack((selig_x, selig_y)),
+            raw_coordinates=jnp.asarray(raw_coords),
             coordinates=jnp.column_stack((x_coord, y_coord)),
             x_coordinates=x_coord,
             y_coordinates=y_coord,

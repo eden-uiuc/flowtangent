@@ -46,12 +46,12 @@ if _AF_DIR.exists():
 
 # 2. Simplified Loading Logic
 @lru_cache(maxsize=None)
-def load_foil(name: str, interpolate: bool = True, n_pts: int = 128):
+def load_foil(name: str, n_pts: int = 128):
     """Hidden helper that does the disk I/O, safely cached."""
     if name not in _AF_REGISTRY:
         raise AttributeError(f"Airfoil '{name}' not found in library.")
 
-    return Airfoil.from_file(_AF_REGISTRY[name], interpolate=interpolate, n_pts=n_pts)
+    return Airfoil.from_file(_AF_REGISTRY[name], n_pts=n_pts)
 
 
 def __getattr__(name: str):

@@ -203,8 +203,13 @@ class Dataset(Module):
         Returns a functionally updated Dataset.
         """
         new_appended = dict(self._appended_data)
+        
+        array_vars = [
+            var for var in self.full_vars 
+            if hasattr(getattr(self, var), "shape")
+        ]
 
-        for var in self.full_vars:
+        for var in self.array_vars:
             # Extract the new value, defaulting to NaN if the oracle didn't provide it
             val = jnp.atleast_1d(row_dict.get(var, jnp.nan))
 
@@ -213,7 +218,11 @@ class Dataset(Module):
             else:
                 new_appended[var] = val
 
-        return eqx.tree_at(lambda d: (d._appended_data, d._appended_len), self, (new_appended, self._appended_len + 1))
+        new = eqx.tree_at(lambda d: (d._appended_data, d._appended_len), self, (new_appended, self._appended_len + 1))
+        if self._indices is not None:
+            new_idx = object.__getattribute__(self, "_len") + self._appended_len
+            new = eqx.tree_at(lambda d: d._indices, new, jnp.append(self._indices, new_idx))
+        return new
 
     def filter(self, mask: jax.Array) -> "Dataset":
         """
