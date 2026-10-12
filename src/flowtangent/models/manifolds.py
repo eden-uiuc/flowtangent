@@ -13,6 +13,7 @@ from ..utils.data import LoaderType, slice_data
 from ..utils.typing import _
 from .kernels import Kernel
 from .nn import TransformerBlock, fit_neural_model
+from .surrogates import Surrogate
 
 
 # --- DataLoader Compatibility Helpers ---
@@ -95,7 +96,16 @@ class CompositeManifold(Manifold):
         new_manifolds = []
         for i, m in enumerate(self.manifolds):
             sliced_data = slice_data(data, self._input_splits, i)
-            new_manifolds.append(m.fit(sliced_data, **kwargs))  # type: ignore
+
+            # If input is an (X, Y) tuple, pass features-only (X) to unsupervised manifolds,
+            # and pass the full (X, Y) tuple to supervised surrogates.
+            if isinstance(sliced_data, tuple):
+                sliced_x, y = sliced_data
+                target_data = sliced_data if isinstance(m, Surrogate) else sliced_x
+            else:
+                target_data = sliced_data
+
+            new_manifolds.append(m.fit(target_data, **kwargs))  # type: ignore
 
         return eqx.tree_at(lambda model: model.manifolds, self, new_manifolds)
 

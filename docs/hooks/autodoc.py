@@ -7,7 +7,7 @@ import flowtangent as ft
 
 
 class ProcessDiagramExtension(Extension):
-    def on_class(self, node, cls):
+    def on_class(self, *, cls, **kwargs):
         # 1. Skip anything that isn't part of FlowTangent
         if not cls.path.startswith("flowtangent."):
             return
