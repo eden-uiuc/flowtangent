@@ -203,13 +203,10 @@ class Dataset(Module):
         Returns a functionally updated Dataset.
         """
         new_appended = dict(self._appended_data)
-        
-        array_vars = [
-            var for var in self.full_vars 
-            if hasattr(getattr(self, var), "shape")
-        ]
 
-        for var in self.array_vars:
+        array_vars = [var for var in self.full_vars if hasattr(getattr(self, var), "shape")]
+
+        for var in array_vars:
             # Extract the new value, defaulting to NaN if the oracle didn't provide it
             val = jnp.atleast_1d(row_dict.get(var, jnp.nan))
 
