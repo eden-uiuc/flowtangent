@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, Float
 
 from ..utils import Module, static_field
-from ..utils.data import DataLoader, LoaderType, slice_data
+from ..utils.data import LoaderType, slice_data
 from ..utils.typing import _
 from .kernels import Kernel
 from .nn import TransformerBlock, fit_neural_model

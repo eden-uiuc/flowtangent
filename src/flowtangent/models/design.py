@@ -379,7 +379,9 @@ class DesignSpace(Module):
         for req in self.requirements:
             req_eval = req.evaluate(vals_dict=full_dict)
             if compute_derivatives:
-                req_eval = eqx.tree_at(lambda e: e.derivatives, req_eval, jacobians[req.name], is_leaf=lambda x: x is None)
+                req_eval = eqx.tree_at(
+                    lambda e: e.derivatives, req_eval, jacobians[req.name], is_leaf=lambda x: x is None
+                )
             results[req.name] = req_eval
 
         return results
@@ -766,8 +768,12 @@ class ActiveSpace(DesignSpace):
             (jac_res, jac_ll), (primals, results) = jax.jacrev(_forward, has_aux=True)(x)
 
             for req_name, req_eval in results.items():
-                req_eval = eqx.tree_at(lambda e: e.derivatives, req_eval, jac_res[req_name], is_leaf=lambda x: x is None)
-                req_eval = eqx.tree_at(lambda e: e.derivatives_ll, req_eval, jac_ll[req_name], is_leaf=lambda x: x is None)
+                req_eval = eqx.tree_at(
+                    lambda e: e.derivatives, req_eval, jac_res[req_name], is_leaf=lambda x: x is None
+                )
+                req_eval = eqx.tree_at(
+                    lambda e: e.derivatives_ll, req_eval, jac_ll[req_name], is_leaf=lambda x: x is None
+                )
                 results[req_name] = req_eval
         else:
             # Standard call returns (Primals, Aux)

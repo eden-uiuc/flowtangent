@@ -221,7 +221,7 @@ class GaussianProcessSurrogate(Surrogate):
         # 1. Fix the signature to accept a single batch
         def loss_fn(model, batch):
             x_train, y_train = batch
-            
+
             """Negative Log Marginal Likelihood for GP training."""
             # Compute exact covariance matrix for the training data
             K_xx = jax.vmap(lambda x1: jax.vmap(lambda x2: model.kernel(x1, x2))(x_train))(x_train)
@@ -236,10 +236,10 @@ class GaussianProcessSurrogate(Surrogate):
             # 2. Fix the non-scalar loss computation
             # Element-wise multiply and sum yields a guaranteed 0D scalar
             data_fit = 0.5 * jnp.sum(y_train * alpha)
-            
+
             # The complexity penalty scales with the number of output dimensions (D)
             D = y_train.shape[-1] if y_train.ndim > 1 else 1
-            complexity_penalty = D * jnp.sum(jnp.log(jnp.diag(L))) 
+            complexity_penalty = D * jnp.sum(jnp.log(jnp.diag(L)))
 
             return data_fit + complexity_penalty
 
