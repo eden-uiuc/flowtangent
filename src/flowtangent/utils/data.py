@@ -148,11 +148,11 @@ class Dataset(Module):
 
     _source: Any = static_field(_)
     _proxy: Any = static_field(_)
-    _proxy_Vars: tuple[str, ...] = static_field(())
-    
+    _proxy_vars: tuple[str, ...] = static_field(())
+
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
-    
+
     _appended_data: dict = _
     _appended_len: int = 0
 
@@ -166,12 +166,11 @@ class Dataset(Module):
             object.__setattr__(self, "_indices", None)
         if getattr(self, "_appended_data", _) is _:
             object.__setattr__(self, "_appended_data", {})
-        
+
         if getattr(self, "_proxy_vars", None) == ():
             if self._proxy is not _:
                 p_vars = [
-                    k for k in dir(self._proxy) 
-                    if not k.startswith("_") and hasattr(getattr(self._proxy, k), "shape")
+                    k for k in dir(self._proxy) if not k.startswith("_") and hasattr(getattr(self._proxy, k), "shape")
                 ]
                 object.__setattr__(self, "_proxy_vars", tuple(p_vars))
 
@@ -299,7 +298,7 @@ class Dataset(Module):
             total_len = len(self)
             if idx < 0:
                 idx += total_len
-                
+
             actual_idx = idx if self._indices is None else self._indices[idx]
             orig_len = object.__getattribute__(self, "_len")
 
@@ -307,11 +306,11 @@ class Dataset(Module):
                 # 1. Is it an active-learning row?
                 if actual_idx >= orig_len:
                     row[var] = self._appended_data[var][actual_idx - orig_len]
-                
+
                 # 2. Is it a virtual column?
                 elif var in self._virtual_columns:
                     row[var] = self._virtual_columns[var][actual_idx]
-                
+
                 # 3. It must be on disk
                 else:
                     row[var] = self._proxy.get_row(var, actual_idx)

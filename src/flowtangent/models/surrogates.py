@@ -77,7 +77,9 @@ class PolynomialChaosSurrogate(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(
@@ -116,7 +118,9 @@ class InverseDistanceWeighting(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
@@ -144,7 +148,9 @@ class RadialBasisFunction(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
@@ -181,28 +187,28 @@ class GaussianProcessSurrogate(Surrogate):
         # --- NEW VARIANCE CALCULATION ---
         # 2. Inducing point covariance matrix
         K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self.inducing_points))(self.inducing_points)
-        
+
         # Add numerical jitter to the diagonal for Cholesky stability
         K_zz += 1e-5 * jnp.eye(self.inducing_points.shape[0])
-        
+
         # 3. Cholesky decomposition (lower triangular)
         L = jax.scipy.linalg.cholesky(K_zz, lower=True)
-        
+
         # 4. Solve L * v = K_zx for v
         v = jax.scipy.linalg.solve_triangular(L, K_xz, lower=True)
-        
+
         # 5. Correct variance calculation
         k_xx = self.kernel(x, x)
         var = k_xx - jnp.sum(v**2) + jnp.exp(self.noise_variance)
 
         preds = SurrogateEvaluation(means=means, variances=var)
-        
+
         if compute_derivatives:
             mean_fn = lambda x_in: (
                 jax.vmap(lambda z: self.kernel(x_in, z))(self.inducing_points) @ self.variational_mean
             )
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x), is_leaf=lambda x: x is None)
-            
+
         return preds
 
     def fit(
@@ -213,21 +219,21 @@ class GaussianProcessSurrogate(Surrogate):
         **kwargs,
     ) -> "GaussianProcessSurrogate":
         def loss_fn(model, x_train, y_train):
-        """Negative Log Marginal Likelihood for GP training."""
+            """Negative Log Marginal Likelihood for GP training."""
             # Compute exact covariance matrix for the training data
             K_xx = jax.vmap(lambda x1: jax.vmap(lambda x2: model.kernel(x1, x2))(x_train))(x_train)
             K_xx += jnp.exp(model.noise_variance) * jnp.eye(x_train.shape[0])
-            
+
             # Cholesky decomposition
             L = jax.scipy.linalg.cholesky(K_xx, lower=True)
-            
+
             # Solve L * alpha = y_train
             alpha = jax.scipy.linalg.cho_solve((L, True), y_train)
-            
+
             # NLML = 0.5 * y^T * K^-1 * y + 0.5 * log|K| + const
             data_fit = 0.5 * jnp.dot(y_train.T, alpha)
-            complexity_penalty = jnp.sum(jnp.log(jnp.diag(L))) # 0.5 * log|K| is sum of log diagonal of L
-            
+            complexity_penalty = jnp.sum(jnp.log(jnp.diag(L)))  # 0.5 * log|K| is sum of log diagonal of L
+
             return data_fit + complexity_penalty
 
         return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
@@ -251,7 +257,9 @@ class MLPSurrogate(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(
@@ -302,7 +310,9 @@ class TransformerSurrogate(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(
@@ -378,7 +388,9 @@ class MixtureOfExperts(Surrogate):
         means = self._internal_predict(x)
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None)
+            preds = eqx.tree_at(
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda x: x is None
+            )
         return preds
 
     def fit(
@@ -429,27 +441,27 @@ class FourierNeuralOperator(Surrogate):
         # Enforce the Nyquist limit: modes cannot exceed half the grid size plus one
         if modes > grid // 2 + 1:
             raise ValueError(f"modes ({modes}) must be <= grid // 2 + 1 ({grid // 2 + 1})")
-            
+
         k1, k2, k3 = jax.random.split(key, 3)
         self.grid = grid
         self.width = width
-        
+
         # Lift the input into a full 2D space: (channels * grid_points)
         self.lifting = eqx.nn.Linear(input_dim, width * grid, key=k1)
-        
+
         # The Spectral Convolution now correctly processes `width` channels over a spatial `grid`
         self.spectral_conv = SpectralConv1d(k2, width, width, modes)
-        
+
         # Project the flattened 2D space back into the output dimension
         self.projection = eqx.nn.Linear(width * grid, output_dim, key=k3)
 
     def _internal_predict(self, x):
         # 1. Lift and unflatten into (channels, grid_points)
         lifted = self.lifting(x).reshape(self.width, self.grid)
-        
+
         # 2. Convolve in the frequency domain, returning (channels, grid_points)
         conv_out = jax.nn.gelu(self.spectral_conv(lifted))
-        
+
         # 3. Flatten back to 1D and project down to the exact output_dim
         return self.projection(conv_out.flatten())
 
@@ -458,10 +470,7 @@ class FourierNeuralOperator(Surrogate):
         preds = SurrogateEvaluation(means=means)
         if compute_derivatives:
             preds = eqx.tree_at(
-                lambda p: p.derivatives, 
-                preds, 
-                jax.jacrev(self._internal_predict)(x), 
-                is_leaf=lambda n: n is None
+                lambda p: p.derivatives, preds, jax.jacrev(self._internal_predict)(x), is_leaf=lambda n: n is None
             )
         return preds
 
