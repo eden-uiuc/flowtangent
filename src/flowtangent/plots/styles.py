@@ -128,7 +128,3 @@ PLOTLY_STYLES = {
 # 1. Register them globally for string lookup and composition (e.g., "nord_dark+presentation")
 for name, template in PLOTLY_STYLES.items():
     pio.templates[name] = template
-
-# 2. Set the global default for the library
-# Note: Plotly accepts either the string name or the object itself here.
-pio.templates.default = "nord_dark"

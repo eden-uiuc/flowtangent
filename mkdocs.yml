@@ -19,22 +19,17 @@ plugins:
   - search
   - mkdocstrings:
       default_handler: python
+      handlers:
+        python:
+          options:
+            extensions:
+              - docs/hooks/autodoc.py
   - mkdocs-jupyter:
-      # Do not re-run the notebooks during the CI build
       execute: false 
-      
-      # Force the notebook outputs to respect your slate/Nord dark theme
       theme: dark 
-      
-      # Show the code cells (set to false if you only want to show markdown + plots)
       include_source: true 
-      
-      # Ignore any .ipynb checkpoints created by Jupyter
       ignore_hugo: false
       ignore: ["*.ipynb_checkpoints/*"]
-
-hooks:
-  - docs/hooks/autodoc.py
       
 nav:
   - Home: index.md

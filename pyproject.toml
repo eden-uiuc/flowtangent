@@ -46,6 +46,7 @@ dev = [
     "ruff",
 ]
 docs = [
+    "griffe",
     "mkdocs-material",
     "mkdocs-jupyter",
     "mkdocstrings[python]",

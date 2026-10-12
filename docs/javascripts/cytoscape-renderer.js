@@ -161,19 +161,22 @@ document$.subscribe(function() {
         // INTERACTION: Double-click Process -> Route to specific Docs API page
         cy.on('dblclick', 'node[node_type="process"]', function(evt){
             const nodeData = evt.target.data();
-            const nodeName = nodeData.label;
             
-            // 1. Fix the Path: Resolve relative to the current page's URL.
-            // This safely preserves the '/flowtangent/' GitHub Pages sub-path.
-            const basePath = new URL('api/processes/', window.location.href).href;
+            // 1. Extract the fully qualified Python module/class path injected by Python
+            const apiPath = nodeData.api_path;
+            if (!apiPath) return;
+
+            // 2. Determine the site root dynamically to handle both GitHub Pages (/flowtangent/) 
+            // and local dev servers (http://localhost:8000/)
+            const siteRoot = window.location.pathname.startsWith('/flowtangent') 
+                ? '/flowtangent' 
+                : '';
+
+            // 3. Construct an absolute target URL pointing cleanly to the API reference
+            const targetUrl = `${siteRoot}/api/processes/#${apiPath}`;
             
-            // 2. Fix the Fragment: Use the node's unique ID (which is usually 
-            // the fully qualified Python path) instead of a hard-coded string.
-            // Fallback to the label if an ID isn't provided.
-            const targetFragment = nodeData.id ? nodeData.id : nodeName;
-            
-            // Navigate cleanly to the target
-            window.location.href = `${basePath}#${targetFragment}`;
+            // Navigate cleanly to the target anchor
+            window.location.href = targetUrl;
         });
     });
 });

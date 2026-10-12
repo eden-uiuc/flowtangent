@@ -934,12 +934,27 @@ class Process(ProcessStep):
 
             if node_name == "User Inputs":
                 nodes.append(
-                    {"data": {"id": safe_id, "label": node_name, "full_tree": ui_full_tree, "node_type": "input"}}
+                    {
+                        "data": {
+                            "id": safe_id,
+                            "label": node_name,
+                            "full_tree": ui_full_tree,
+                            "node_type": "input",
+                            "api_path": "flowtangent.core._state.State",  # Points to top-level State docs
+                        }
+                    }
                 )
             else:
                 step_obj = G.nodes[node_name].get("step_obj")
                 label = step_obj.name if step_obj else str(node_name)
-                nodes.append({"data": {"id": safe_id, "label": label, "node_type": "process"}})
+
+                # Extract class path dynamically from step_obj if available
+                api_path = ""
+                if step_obj:
+                    cls = type(step_obj)
+                    api_path = f"{cls.__module__}.{cls.__name__}"
+
+                nodes.append({"data": {"id": safe_id, "label": label, "node_type": "process", "api_path": api_path}})
 
         # 2. Build Edges and Intermediate Variable Nodes
         for u, v, data in G.edges(data=True):
@@ -957,6 +972,8 @@ class Process(ProcessStep):
 
             var_node_id = f"var_{name_to_id[u]}_{name_to_id[v]}"
 
+            var_api_path = "flowtangent.core._state_data"
+
             nodes.append(
                 {
                     "data": {
@@ -964,6 +981,7 @@ class Process(ProcessStep):
                         "short_label": short_label,
                         "full_tree": full_tree,
                         "node_type": "variable",
+                        "api_path": var_api_path,
                     }
                 }
             )

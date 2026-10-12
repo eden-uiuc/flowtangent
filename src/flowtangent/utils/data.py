@@ -384,29 +384,37 @@ class MemoryProxy:
 
 
 class ParquetProxy:
-    """Lazy-evaluation proxy for Parquet files."""
+    """Lazy-evaluation proxy for Parquet files with column caching."""
 
     def __init__(self, file_path: str, columns: list):
         self._file_path = file_path
         self._columns = columns
+        # Cache to store columns as they are requested
+        self._column_cache = {}
+
+    def get_row(self, name: str, idx: int):
+        if name not in self._columns:
+            raise AttributeError(f"ParquetProxy has no column '{name}'")
+
+        # Load the column from disk only if it hasn't been accessed yet
+        if name not in self._column_cache:
+            table = pq.read_table(self._file_path, columns=[name])
+            self._column_cache[name] = table.column(name)
+
+        return self._column_cache[name][idx].as_py()
 
     def __getattr__(self, name: str):
         if name.startswith("_"):
             raise AttributeError
         if name in self._columns:
-            table = pq.read_table(self._file_path, columns=[name])
-            return table.column(name).to_numpy()
+            if name not in self._column_cache:
+                table = pq.read_table(self._file_path, columns=[name])
+                self._column_cache[name] = table.column(name)
+            return self._column_cache[name].to_numpy()
         raise AttributeError(f"ParquetProxy has no column '{name}'")
 
     def __dir__(self):
         return self._columns
-
-    def get_row(self, name: str, idx: int):
-        if name not in self._columns:
-            raise AttributeError(f"ParquetProxy has no column '{name}'")
-        # pq.read_table with columns=[] only loads that specific column's chunk into memory
-        table = pq.read_table(self._file_path, columns=[name])
-        return table.column(name)[idx].as_py()
 
 
 # ----------------------------------------------------------------------------------------------------------------------

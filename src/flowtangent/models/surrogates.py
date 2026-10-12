@@ -218,28 +218,25 @@ class GaussianProcessSurrogate(Surrogate):
         epochs: int = 500,
         **kwargs,
     ) -> "GaussianProcessSurrogate":
-        # 1. Fix the signature to accept a single batch
+
         def loss_fn(model, batch):
             x_train, y_train = batch
 
-            """Negative Log Marginal Likelihood for GP training."""
-            # Compute exact covariance matrix for the training data
-            K_xx = jax.vmap(lambda x1: jax.vmap(lambda x2: model.kernel(x1, x2))(x_train))(x_train)
-            K_xx += jnp.exp(model.noise_variance) * jnp.eye(x_train.shape[0])
+            # 1. Use the model's own predict method via vmap to ensure
+            #    the inducing points and variational mean are actively trained.
+            #    XLA is smart enough to compile this efficiently.
+            preds = jax.vmap(model.predict, in_axes=(0, None))(x_train, False)
+            means = preds.means  # Shape: (N, D)
+            variances = preds.variances  # Shape: (N, D)
 
-            # Cholesky decomposition
-            L = jax.scipy.linalg.cholesky(K_xx, lower=True)
+            # 2. Compute the Negative Log Likelihood (NLL)
+            #    This correctly broadcasts the variances across the output dimensions.
+            diff = y_train - means
+            data_fit = 0.5 * jnp.sum(jnp.log(variances)) + 0.5 * jnp.sum((diff**2) / variances)
 
-            # Solve L * alpha = y_train
-            alpha = jax.scipy.linalg.cho_solve((L, True), y_train)
-
-            # 2. Fix the non-scalar loss computation
-            # Element-wise multiply and sum yields a guaranteed 0D scalar
-            data_fit = 0.5 * jnp.sum(y_train * alpha)
-
-            # The complexity penalty scales with the number of output dimensions (D)
-            D = y_train.shape[-1] if y_train.ndim > 1 else 1
-            complexity_penalty = D * jnp.sum(jnp.log(jnp.diag(L)))
+            # 3. Add a complexity penalty (KL divergence proxy) for the variational mean.
+            #    This prevents the sparse weights from exploding during SGD.
+            complexity_penalty = 0.5 * jnp.sum(model.variational_mean**2)
 
             return data_fit + complexity_penalty
 

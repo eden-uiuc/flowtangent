@@ -40,4 +40,4 @@ jobs:
         run: |
           # 4. Inject the token into the origin URL immediately before pushing
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          mkdocs gh-deploy --force
+          uv run mkdocs gh-deploy --force
