@@ -213,12 +213,15 @@ class GaussianProcessSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[Tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
     ) -> "GaussianProcessSurrogate":
-        def loss_fn(model, x_train, y_train):
+        # 1. Fix the signature to accept a single batch
+        def loss_fn(model, batch):
+            x_train, y_train = batch
+            
             """Negative Log Marginal Likelihood for GP training."""
             # Compute exact covariance matrix for the training data
             K_xx = jax.vmap(lambda x1: jax.vmap(lambda x2: model.kernel(x1, x2))(x_train))(x_train)
@@ -230,9 +233,13 @@ class GaussianProcessSurrogate(Surrogate):
             # Solve L * alpha = y_train
             alpha = jax.scipy.linalg.cho_solve((L, True), y_train)
 
-            # NLML = 0.5 * y^T * K^-1 * y + 0.5 * log|K| + const
-            data_fit = 0.5 * jnp.dot(y_train.T, alpha)
-            complexity_penalty = jnp.sum(jnp.log(jnp.diag(L)))  # 0.5 * log|K| is sum of log diagonal of L
+            # 2. Fix the non-scalar loss computation
+            # Element-wise multiply and sum yields a guaranteed 0D scalar
+            data_fit = 0.5 * jnp.sum(y_train * alpha)
+            
+            # The complexity penalty scales with the number of output dimensions (D)
+            D = y_train.shape[-1] if y_train.ndim > 1 else 1
+            complexity_penalty = D * jnp.sum(jnp.log(jnp.diag(L))) 
 
             return data_fit + complexity_penalty
 

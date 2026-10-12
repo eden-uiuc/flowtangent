@@ -91,7 +91,7 @@ class CompositeManifold(Manifold):
         x_parts = [m.decode(z_p) for m, z_p in zip(self.manifolds, z_parts)]
         return jnp.concatenate(x_parts, axis=-1)
 
-    def fit(self, data: Union[Float[Array, "N D"], DataLoader], **kwargs) -> "CompositeManifold":
+    def fit(self, data: Union[Float[Array, "N D"], LoaderType], **kwargs) -> "CompositeManifold":
         new_manifolds = []
         for i, m in enumerate(self.manifolds):
             sliced_data = slice_data(data, self._input_splits, i)
