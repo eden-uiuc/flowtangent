@@ -185,16 +185,31 @@ class Module(eqx.Module):
 
     @property
     def field_name(self) -> str:
-        """Converts the module's human-readable name into a Python-safe attribute variable name.
+        """Converts the module's name to lowercase with spaces replaced by underscores.
 
-        Example:
-            A module with `name="Main Wing"` returns `"main_wing"`.
+        Provides a lookup key for named components. Other punctuation and leading
+        digits are retained, so the result need not be a valid Python identifier.
+
+        ### Mathematical Formulation
+        For the resolved name $n$, $k = lower(replace(str(n), " ", "_"))$.
+
+        ### Process Architecture
+        Resolve a truthy non-string name through its `value` attribute, then
+        convert to a string, replace spaces, and lowercase.
+
+        ### Usage Example
+        ```python
+        from flowtangent import Module
+
+        module = Module(name="Main Wing")
+        assert module.field_name == "main_wing"
+        ```
 
         Returns:
-            str: The lowercase, underscore-separated attribute name.
+            str: The normalized name, including any retained punctuation.
 
         Raises:
-            AttributeError: If the internal name attribute cannot be resolved to a string.
+            AttributeError: If a truthy non-string name has no `value` attribute.
         """
         actual_name = self.name
         if actual_name and not isinstance(actual_name, str):
