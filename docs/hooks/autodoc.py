@@ -10,6 +10,17 @@ import flowtangent as ft
 class ProcessDiagramExtension(Extension):
     def on_class(self, *, cls, **kwargs):
         # 1. Skip anything that isn't part of FlowTangent
+        """Append a process diagram to a FlowTangent class's Griffe docstring.
+
+        Instantiate concrete Process subclasses without arguments and request their
+        recursive Cytoscape graph. Append a diagram only for a nonempty list or a
+        dictionary with truthy `elements` or `nodes`. Exceptions during graph
+        generation or injection are caught, leaving documentation without a new graph.
+
+        Args:
+            cls (griffe.Class): Griffe class whose documentation may be modified in place.
+            **kwargs (Any): Additional Griffe event arguments; ignored.
+        """
         if not cls.path.startswith("flowtangent."):
             return
 
@@ -67,6 +78,14 @@ class CleanSignaturesExtension(Extension):
 
     def _clean_parameters(self, obj):
         # Safely check if the object has a parameters collection
+        """Remove parameters beginning with an underscore from a Griffe object.
+
+        Objects without parameters are left unchanged. KeyError, TypeError, and
+        AttributeError during individual deletions are caught so removal can continue.
+
+        Args:
+            obj (griffe.Class | griffe.Function | None): Griffe object whose parameters are modified in place, or None.
+        """
         if obj and hasattr(obj, "parameters") and obj.parameters:
             # Find all private arguments
             to_remove = [p.name for p in obj.parameters if p.name.startswith("_")]
@@ -81,10 +100,21 @@ class CleanSignaturesExtension(Extension):
                     )
 
     def on_function(self, **kwargs):
+        """Clean a function signature supplied by a Griffe event.
+
+        Args:
+            **kwargs (Any): Event payload; `obj` takes precedence over `function`.
+        """
         func = kwargs.get("obj") or kwargs.get("function")
         self._clean_parameters(func)
 
     def on_class(self, **kwargs):
+        """Clean a class signature and its explicitly defined constructor.
+
+        Args:
+            **kwargs (Any): Event payload; `obj` takes precedence over `cls`. Both the
+                class's parameters and its `__init__` parameters are modified in place.
+        """
         cls = kwargs.get("obj") or kwargs.get("cls")
         self._clean_parameters(cls)
 
