@@ -12,8 +12,17 @@ from jaxtyping import jaxtyped
 from .typing import NameType, _Placeholder
 
 
-def null_step(*args):
-    """A generic no-op function that returns its inputs unchanged."""
+def null_step(*args) -> tuple:
+    """A generic no-op function that returns its inputs unchanged.
+
+    Useful as a default placeholder for optional process steps in a workflow pipeline.
+
+    Args:
+        *args: Any positional arguments passed to the step.
+
+    Returns:
+        tuple: The exact arguments passed in, unmodified.
+    """
     return args
 
 
@@ -30,7 +39,23 @@ if typing.TYPE_CHECKING:
 
 
 def field(initializer: typing.Any = None, as_func: bool = False, **kwargs):
-    """Smart wrapper for eqx.field that auto-routes default vs default_factory."""
+    """Smart wrapper for `eqx.field` that automatically routes to `default` or `default_factory`.
+
+    Prevents common JAX/Equinox instantiation errors by automatically catching mutable standard
+    types (lists, dicts, sets) and JAX arrays, routing them to factories or rejecting them safely.
+
+    Args:
+        initializer (Any, optional): The default value, class, or factory function. Defaults to None.
+        as_func (bool, optional): If True, forces the initializer to be treated as a factory lambda,
+            even if it is a standard value. Defaults to False.
+        **kwargs: Additional keyword arguments passed directly to `eqx.field` (e.g., `static=True`).
+
+    Raises:
+        ValueError: If a standard mutable instance (list, dict, set) is passed instead of a factory.
+
+    Returns:
+        dataclasses.Field: A configured Equinox field.
+    """
     if as_func:
         return eqx.field(default_factory=lambda: initializer, **kwargs)
     if callable(initializer):
@@ -46,17 +71,48 @@ def field(initializer: typing.Any = None, as_func: bool = False, **kwargs):
 
 
 def static_field(*args, **kwargs):
-    """Alias for creating static fields"""
+    """Alias for creating static fields in Equinox modules.
+
+    Static fields are ignored by JAX transformations (like `jit` and `grad`) and are treated
+    as metadata rather than differentiable array leaves.
+
+    Args:
+        *args: Positional arguments passed to `field`.
+        **kwargs: Keyword arguments passed to `field`.
+
+    Returns:
+        dataclasses.Field: An Equinox field marked as static.
+    """
     return field(*args, static=True, **kwargs)
 
 
 def method_field(*args, **kwargs):
-    """Alias for creating fields which pass methods or other Callables without trying to initialize/call them."""
+    """Alias for fields holding callables or methods without triggering instantiation.
+
+    Forces the callable to be stored statically and wrapped in a lambda factory to prevent
+    Equinox from attempting to evaluate it during class initialization.
+
+    Args:
+        *args: Positional arguments passed to `field`.
+        **kwargs: Keyword arguments passed to `field`.
+
+    Returns:
+        dataclasses.Field: An Equinox field storing a function/method.
+    """
     return field(*args, as_func=True, static=True, **kwargs)
 
 
 def empty_array(shape: tuple | int = 0, dtype: Any = float, **kwargs):
-    """Syntactic sugar for an empty JAX array in an Equinox module."""
+    """Syntactic sugar for instantiating an empty JAX array field in an Equinox module.
+
+    Args:
+        shape (tuple | int, optional): The dimensions of the empty array. Defaults to 0.
+        dtype (Any, optional): The numerical data type of the array. Defaults to float.
+        **kwargs: Additional keyword arguments passed to `field`.
+
+    Returns:
+        dataclasses.Field: A field configured to generate a `jnp.empty` array on instantiation.
+    """
     return field(lambda: jnp.empty(shape, dtype=dtype), **kwargs)
 
 
@@ -65,18 +121,34 @@ FLOWTANGENT_REGISTRY = {}
 
 @dataclass_transform(field_specifiers=(eqx.field, static_field, method_field))
 class Module(eqx.Module):
-    """
-    Base class for all FlowTangent modules. Implements registration for saving/loading with utils.io functions.
-    Adds "field_name" property for converting module names into psuedo-attributes, e.g. "Main Wing" -> main_wing.
+    """Base class for all FlowTangent models, components, and state data structures.
+
+    Extends `eqx.Module` by providing automatic class registration for serialization/I/O,
+    dynamic name-to-attribute conversion, and automatic runtime type-checking injection.
+
+    Attributes:
+        name (NameType): A static string identifier for the module. Defaults to the class name.
     """
 
     name: NameType = static_field(None)
 
     def __check_init__(self):
+        """Post-initialization hook to ensure a valid name attribute exists."""
         if self.name is None:
             object.__setattr__(self, "name", self.__class__.__name__)
 
     def __init_subclass__(cls, **kwargs) -> None:
+        """Metaclass hook invoked when a subclass is created.
+
+        Performs three primary tasks:
+        1. Strips internal Equinox keyword arguments (`kw_only`).
+        2. Registers the subclass in `FLOWTANGENT_REGISTRY` for save/load resolution.
+        3. Scans all custom methods and automatically decorates them with `jaxtyped`
+           and `beartype` if they contain type annotations.
+
+        Raises:
+            ValueError: If a class with the same name is already registered from a different module.
+        """
         # Prevent kw_only being passed to object.__init_subclass__
         # It's used in eqx._ModuleMeta.__new__ only
         kwargs.pop("kw_only", None)
@@ -108,10 +180,37 @@ class Module(eqx.Module):
         super().__init_subclass__(**kwargs)
 
     def __repr__(self) -> str:
+        """Returns the module's name as its string representation."""
         return f"{self.name}"
 
     @property
-    def field_name(self):
+    def field_name(self) -> str:
+        """Converts the module's name to lowercase with spaces replaced by underscores.
+
+        Provides a lookup key for named components. Other punctuation and leading
+        digits are retained, so the result need not be a valid Python identifier.
+
+        ### Mathematical Formulation
+        For the resolved name $n$, $k = lower(replace(str(n), " ", "_"))$.
+
+        ### Process Architecture
+        Resolve a truthy non-string name through its `value` attribute, then
+        convert to a string, replace spaces, and lowercase.
+
+        ### Usage Example
+        ```python
+        from flowtangent import Module
+
+        module = Module(name="Main Wing")
+        assert module.field_name == "main_wing"
+        ```
+
+        Returns:
+            str: The normalized name, including any retained punctuation.
+
+        Raises:
+            AttributeError: If a truthy non-string name has no `value` attribute.
+        """
         actual_name = self.name
         if actual_name and not isinstance(actual_name, str):
             if hasattr(actual_name, "value"):
@@ -123,9 +222,19 @@ class Module(eqx.Module):
 
 
 class StateDataMeta(type(Module)):
-    """Metaclass for State data to expand Placeholder in utils.typing into properly shaped arrays."""
+    """Metaclass for FlowTangent State definitions to handle missing or placeholder initialization.
+
+    Intercepts the creation of state dataclasses. If an attribute is typed as a JAX array but
+    lacks a default value (or uses `_Placeholder`), this metaclass automatically injects an
+    `empty_array` factory with the correct deduced shape prior to Equinox initialization.
+    """
 
     def __new__(mcs, name, bases, namespace):
+        """Creates the new state class with injected array defaults.
+
+        Supports Python 3.14+ deferred annotations by explicitly resolving `__annotate_func__`
+        via `annotationlib` before parsing the hints.
+        """
         ### ADDED
         annotations = namespace.get("__annotations__", {})
         # Python 3.14 defers class annotations instead of putting them directly

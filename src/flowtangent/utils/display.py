@@ -1,15 +1,50 @@
+# src/flowtangent/utils/display.py
+from typing import Any
+
 import numpy as np
 
 
-def format_array(v, precision=3, width=10):
-    """Formats numeric values and arrays for terminal printing."""
+def format_array(v: Any, precision: int = 3, width: int = 10) -> str:
+    """Formats numeric values and arrays for terminal printing.
+
+    Produces a display string for solver reports. Any input containing exactly
+    one element uses right-aligned scientific notation; all other arrays use
+    NumPy's array string formatting, including its truncation settings.
+
+    ### Mathematical Formulation
+    A one-element value is displayed as $m$ followed by a base-10 exponent $e$,
+    where $m 10^e$ approximates $v$ at the requested precision for finite nonzero values.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils import format_array
+
+    assert format_array(jnp.array([1.0])) == " 1.000e+00"
+    ```
+
+    Args:
+        v (Any): A numeric scalar or ND array-like object convertible to NumPy.
+        precision (int, optional): Digits after the decimal point for one-element
+            inputs; otherwise passed to `np.array2string`. Defaults to 3.
+        width (int, optional): Minimum character width for one-element inputs only.
+            Longer representations are not truncated. Defaults to 10.
+
+    Returns:
+        str: The formatted string representation of the array or scalar.
+
+    Raises:
+        ValueError: If a one-element value or its format specification does not
+            support scientific notation, or NumPy conversion/formatting fails.
+        TypeError: If a value does not support the requested numeric formatting.
+    """
     v_np = np.asarray(v)
     if v_np.size == 1:
         return f"{v_np.item():>{width}.{precision}e}"
     return np.array2string(v_np, precision=precision, separator=", ")
 
 
-MERMAID_STYLES = {
+MERMAID_STYLES: dict[str, str] = {
     "default": "",
     "formal": """%%{init: {"theme": "base", "themeVariables": {
         "primaryColor": "#ffffff",
@@ -33,3 +68,4 @@ MERMAID_STYLES = {
         "fontFamily": "Fira Code, monospace"
     }}}%%""",
 }
+"""dict[str, str]: Pre-configured Mermaid JS theme initialization strings for rendering process graphs."""

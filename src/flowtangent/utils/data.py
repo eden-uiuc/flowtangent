@@ -1,3 +1,18 @@
+# src/flowtangent/utils/data.py
+"""FlowTangent data loading and dataset management utilities.
+
+This module provides a unified data loading architecture that bridges the gap
+between PyTorch's robust multi-processing data streams and JAX's functional
+compilation requirements. It introduces a universal `Dataset` PyTree that duck-types
+as a PyTorch Dataset, offering out-of-the-box lazy evaluation for massive on-disk
+formats (Zarr, HDF5, Parquet, NetCDF) via dynamic file proxies.
+
+Crucially, it replaces PyTorch's default collation with `numpy_collate` to guarantee
+that downstream JAX optimizers never receive incompatible Torch tensors. It also
+provides mechanisms for dynamic dataset expansion—like virtual columns and row
+appends—to support active learning loops without mutating the original source files on disk.
+"""
+
 import warnings
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -41,11 +56,42 @@ from .typing import _
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def numpy_collate(batch):
-    """
-    Recursively converts to NumPy and stacks the batch.
-    Completely replaces PyTorch's default_collate to ensure downstream
-    JAX functions never accidentally receive a torch.Tensor.
+def numpy_collate(batch: list[Any]) -> Any:
+    """Recursively converts a PyTorch batch into stacked NumPy arrays.
+
+    Replaces `torch.utils.data.default_collate` for NumPy-based training inputs.
+    Preserves nested dictionaries, tuples, and lists; tensors are detached and
+    moved to the CPU before conversion.
+
+    ### Mathematical Formulation
+    For array samples $x_i$ of shape $S$, the result has shape $(B, *S)$ and
+    $C[i] = x_i$, where $B$ is the batch size.
+
+    ### Process Architecture
+    Convert array or scalar samples, or recursively collate matching container
+    entries. Sequence entries are paired only up to the shortest sample length;
+    dictionary keys come from the first sample.
+
+    ### Usage Example
+    ```python
+    from flowtangent.utils.data import numpy_collate
+
+    batch = numpy_collate([{"x": 1.0}, {"x": 2.0}])
+    assert batch["x"].shape == (2,)
+    ```
+
+    Args:
+        batch (list[Any]): Nonempty samples of compatible structure. Leaves may
+            be ND NumPy/JAX arrays, tensors, numbers, booleans, or NumPy scalars.
+
+    Returns:
+        Any: A NumPy array, or a nested dictionary, tuple, or list of collated values.
+
+    Raises:
+        IndexError: If `batch` is empty.
+        TypeError: If a leaf's first sample has an unsupported type.
+        ValueError: If array samples cannot be stacked because their shapes differ.
+        KeyError: If a later dictionary lacks a key from the first sample.
     """
     elem = batch[0]
 
@@ -65,10 +111,18 @@ def numpy_collate(batch):
 
 
 class DataLoader(TorchDataLoader):
-    """
-    A standalone facade wrapper around PyTorch's DataLoader.
-    Defaults to `numpy_collate` to ensure batches are returned as pure NumPy arrays
-    (or dictionaries of arrays) instead of PyTorch Tensors.
+    """A standalone facade wrapper around PyTorch's `DataLoader`.
+
+    Forces the use of `numpy_collate` by default to ensure batches are returned
+    as pure NumPy arrays instead of PyTorch Tensors, providing drop-in compatibility
+    between PyTorch multi-processing data streams and JAX optimizers.
+
+    Args:
+        dataset (Dataset): The dataset from which to load the data.
+        batch_size (int, optional): How many samples per batch to load. Defaults to 1.
+        shuffle (bool, optional): Set to True to have the data reshuffled at every epoch. Defaults to False.
+        collate_fn (callable, optional): Merges a list of samples to form a mini-batch. Defaults to `numpy_collate`.
+        **kwargs: Additional keyword arguments passed directly to `torch.utils.data.DataLoader`.
     """
 
     def __init__(self, dataset, batch_size=1, shuffle=False, collate_fn=numpy_collate, **kwargs):
@@ -76,9 +130,15 @@ class DataLoader(TorchDataLoader):
 
 
 class LatentDataLoader:
-    """
-    Wraps a physical DataLoader to encode X_batch into Z_batch on the fly.
-    Duck-types as a standard DataLoader for downstream training loops.
+    """Wraps a physical DataLoader to encode a physical batch into a latent batch on the fly.
+
+    Duck-types as a standard `DataLoader` for downstream training loops.
+    Useful for training surrogate models directly on the encoded latent space
+    without explicitly saving intermediate encoded datasets to disk.
+
+    Args:
+        dataloader (DataLoader): The primary DataLoader supplying physical states `(X, Y)`.
+        manifold (Any): A FlowTangent autoencoder/manifold model equipped with an `.encode()` method.
     """
 
     def __init__(self, dataloader, manifold):
@@ -87,19 +147,27 @@ class LatentDataLoader:
         self.dataset = dataloader.dataset  # Satisfies duck-typing checks
 
     def __iter__(self):
+        """Yields batches mapped through the manifold encoder."""
         for x_batch, y_batch in self.dataloader:
             # Encode physical batch to latent batch
             z_batch = jax.vmap(self.manifold.encode)(x_batch)
             yield z_batch, y_batch
 
     def __len__(self):
+        """Returns the number of batches in the underlying dataloader."""
         return len(self.dataloader)
 
 
 class SlicedDataLoader:
-    """
-    Dynamically slices the feature dimension of batches streaming from a DataLoader.
-    Duck-types as a standard DataLoader for neural training loops.
+    """Dynamically slices the feature dimension of batches streaming from a DataLoader.
+
+    Duck-types as a standard DataLoader. Primarily used in multi-GPU or distributed
+    training loops where data parallelization splits batches across devices.
+
+    Args:
+        dataloader (DataLoader): The base DataLoader stream.
+        split_indices (int | Sequence[int]): The array indices at which to split the feature dimension.
+        chunk_idx (int): Which specific split section to yield to this worker.
     """
 
     def __init__(self, dataloader, split_indices, chunk_idx):
@@ -109,6 +177,7 @@ class SlicedDataLoader:
         self.dataset = getattr(dataloader, "dataset", None)
 
     def __iter__(self):
+        """Yields specific feature-chunks of the underlying batch stream."""
         for batch in self.dataloader:
             if isinstance(batch, (tuple, list)):
                 x_batch, y_batch = batch
@@ -119,11 +188,52 @@ class SlicedDataLoader:
                 yield x_parts[self.chunk_idx]
 
     def __len__(self):
+        """Returns the number of batches in the underlying dataloader."""
         return len(self.dataloader)
 
 
-def slice_data(data, split_indices, chunk_idx):
-    """Routes data slicing depending on if it's a full array or a DataLoader."""
+def slice_data(data: Any, split_indices: Union[int, list[int]], chunk_idx: int) -> Any:
+    """Selects a feature chunk from arrays or wraps a loader to slice its batches.
+
+    Splits the final feature axis while preserving targets in an `(X, Y)` pair.
+    Objects with both `__iter__` and `dataset` attributes are treated as loaders.
+
+    ### Mathematical Formulation
+    For feature blocks $(X_0, ..., X_{K-1}) = split(X)$ along the final axis,
+    the selected features are $X_c$, where $c$ is `chunk_idx`.
+
+    ### Process Architecture
+    Return a lazy slicing wrapper for loaders; otherwise split the feature array
+    immediately and return the selected chunk with any original targets.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils.data import slice_data
+
+    x, y = jnp.ones((4, 6)), jnp.zeros((4,))
+    chunk, targets = slice_data((x, y), 3, 1)
+    assert chunk.shape == (4, 2)
+    assert targets is y
+    ```
+
+    Args:
+        data (Any): A loader, an `(X, Y)` tuple/list, or an ND feature array with
+            at least one axis. Targets are returned unchanged.
+        split_indices (Union[int, list[int]]): A positive number of equal-sized
+            sections, or split positions along the final axis, as for `jnp.split`.
+        chunk_idx (int): Chunk index; negative indices count from the last chunk.
+
+    Returns:
+        Any: A `SlicedDataLoader`, a feature array chunk, or `(chunk, Y)` for paired data.
+
+    Raises:
+        ValueError: If an integer section count does not evenly divide the feature axis.
+        IndexError: If `chunk_idx` is out of range or a data pair lacks its targets.
+            For loaders, splitting/indexing errors occur during iteration.
+        ZeroDivisionError: If the integer section count is zero; for loaders,
+            this occurs during iteration.
+    """
     if hasattr(data, "__iter__") and hasattr(data, "dataset"):
         return SlicedDataLoader(data, split_indices, chunk_idx)
     # If it's a raw tuple of (X, Y) or a raw X array
@@ -133,6 +243,7 @@ def slice_data(data, split_indices, chunk_idx):
 
 
 LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
+"""Union[DataLoader, LatentDataLoader, SlicedDataLoader]: Type alias for standard dataloader structures."""
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Dataset
@@ -140,10 +251,13 @@ LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
 
 
 class Dataset(Module):
-    """
-    Universal FlowTangent Dataset factory.
-    Duck-types as a PyTorch Dataset (via __len__ and __getitem__)
-    while remaining a valid Equinox PyTree.
+    """Universal FlowTangent Dataset factory and abstraction layer.
+
+    Duck-types as a PyTorch Dataset (implementing `__len__` and `__getitem__`)
+    while remaining a valid, immutable Equinox PyTree module. It utilizes proxy
+    classes to lazily evaluate massive on-disk datasets (Zarr, HDF5, Parquet, NetCDF),
+    and handles dynamic row appends (for active learning) through a non-destructive
+    virtual overlay mechanism.
     """
 
     _source: Any = static_field(_)
@@ -157,6 +271,7 @@ class Dataset(Module):
     _appended_len: int = 0
 
     def __check_init__(self):
+        """Initializes empty containers for the virtual data overlay post-instantiation."""
         super(Dataset, self).__check_init__()
         if getattr(self, "_virtual_columns", _) is _:
             object.__setattr__(self, "_virtual_columns", {})
@@ -176,13 +291,23 @@ class Dataset(Module):
 
     @property
     def full_vars(self) -> list[str]:
+        """list[str]: Returns a sorted list of all column names available in the disk proxy and virtual overlay."""
         virtual_keys = list(self._virtual_columns.keys())
         return sorted(list(set(list(self._proxy_vars) + virtual_keys)))
 
     def add_variable(self, name: str, data: Optional[jax.Array] = None, quiet: bool = False) -> "Dataset":
-        """
-        Registers a new variable in the virtual overlay.
-        Emits a warning to prevent silent typo bugs unless quiet=True.
+        """Registers a new variable in the virtual overlay without modifying the disk source.
+
+        Args:
+            name (str): The column name to register.
+            data (Optional[jax.Array], optional): The array data. If None, it is filled with NaNs.
+            quiet (bool, optional): Suppresses the warning when a user typos a column name. Defaults to False.
+
+        Raises:
+            ValueError: If the provided data array length does not match the dataset length.
+
+        Returns:
+            Dataset: A new instance of the Dataset containing the added virtual column.
         """
         if not quiet:
             warnings.warn(
@@ -203,10 +328,17 @@ class Dataset(Module):
         return eqx.tree_at(lambda d: d._virtual_columns, self, new_virtuals)
 
     def append(self, row_dict: dict[str, Any]) -> "Dataset":
-        """
-        Appends a new row to the dataset via the virtual overlay.
-        Missing variables are automatically filled with NaNs.
-        Returns a functionally updated Dataset.
+        """Appends a new row to the dataset via the virtual overlay.
+
+        Useful for expanding datasets dynamically during Active Learning loops.
+        Variables missing from `row_dict` that exist in the broader dataset are
+        automatically padded with NaNs.
+
+        Args:
+            row_dict (dict[str, Any]): A dictionary mapping column names to values.
+
+        Returns:
+            Dataset: A new instance of the Dataset containing the appended row.
         """
         new_appended = dict(self._appended_data)
 
@@ -244,8 +376,13 @@ class Dataset(Module):
         return new
 
     def filter(self, mask: jax.Array) -> "Dataset":
-        """
-        Creates a zero-copy view of the dataset using a boolean mask or index array.
+        """Creates a zero-copy filtered view of the dataset using a boolean mask or index array.
+
+        Args:
+            mask (jax.Array): A boolean mask array or an integer index array.
+
+        Returns:
+            Dataset: A new instance of the Dataset configured to yield only the masked subset.
         """
         # Convert boolean mask to integer indices
         if mask.dtype == jnp.bool_:
@@ -259,7 +396,45 @@ class Dataset(Module):
 
         return eqx.tree_at(lambda d: d._indices, self, new_indices)
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
+        """Retrieves a column array by resolving virtual overrides, then disk proxies.
+
+        Attribute access includes appended rows and respects the dataset's current
+        filter. Proxy reads may load data from disk and populate backend caches.
+
+        ### Mathematical Formulation
+        For base column $C$, appended rows $A$, and optional indices $I$, return
+        $concat(C, A)[I]$, omitting concatenation or indexing when absent.
+
+        ### Process Architecture
+        Resolve the virtual column or proxy value, append any overlay rows, then
+        apply the current row indices.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        import pandas as pd
+        from flowtangent.utils.data import DataFrameDataset
+
+        dataset = DataFrameDataset(
+            pd.DataFrame({"x": [0.0, 1.0, 2.0]})
+        )
+        subset = dataset.filter(jnp.array([2]))
+        assert subset.x.shape == (1,)
+        ```
+
+        Args:
+            name (str): Column name; names starting with `_` use ordinary attribute lookup.
+
+        Returns:
+            Any: The column value, including appended rows and any row selection.
+                Array columns may be ND, with rows along axis 0.
+
+        Raises:
+            AttributeError: If the variable cannot be found in the dataset.
+            TypeError: If appended rows have incompatible trailing dimensions.
+            OSError: If an underlying file read fails; backend errors propagate.
+        """
         if name.startswith("_"):
             return object.__getattribute__(self, name)
 
@@ -286,12 +461,53 @@ class Dataset(Module):
         return base_col
 
     # --- PyTorch DataLoader Compatibility ---
-    def __len__(self):
+    def __len__(self) -> int:
+        """Returns the total number of accessible rows in the dataset."""
         if self._indices is not None:
             return len(self._indices)
         return object.__getattribute__(self, "_len") + self._appended_len
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int | slice) -> dict[str, Any]:
+        """Retrieves a row dict (or sliced column dict) from the dataset.
+
+        Row indices refer to the current filtered view, including appended rows.
+        Integer access uses backend row reads; slices may load entire columns
+        and populate backend caches.
+
+        ### Mathematical Formulation
+        For current-view columns $C_v$, the returned mapping is $R[v] = C_v[idx]$.
+
+        ### Process Architecture
+        Map integer indices through the current view and select appended, virtual,
+        or proxy rows. For slices, retrieve current-view columns before slicing.
+
+        ### Usage Example
+        ```python
+        import pandas as pd
+        from flowtangent.utils.data import DataFrameDataset
+
+        dataset = DataFrameDataset(
+            pd.DataFrame({"x": [0.0, 1.0, 2.0]})
+        )
+        assert dataset[-1]["x"] == 2.0
+        assert dataset[:2]["x"].shape == (2,)
+        ```
+
+        Args:
+            idx (int | slice): Row index or slice along axis 0. Negative integers
+                are offset by `len(self)` once. Bounds handling is delegated to
+                the backend arrays; there is no uniform out-of-range check.
+
+        Returns:
+            dict[str, Any]: Values for every name in `full_vars`. Integer access
+                removes the row axis; slices retain it for array columns.
+
+        Raises:
+            IndexError: If an underlying backend rejects the row index.
+            KeyError: If an appended row has no data for a requested column.
+            AttributeError: If a column cannot be resolved by the backend.
+            OSError: If an underlying file read fails; backend errors propagate.
+        """
         # Fast-path for single integer indexing (PyTorch DataLoader)
         if isinstance(idx, int):
             row = {}
@@ -324,7 +540,23 @@ class Dataset(Module):
 
 
 def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
-    """Loads dataset and routes to type based on source extension."""
+    """Intelligently detects a data source format and initializes the correct `Dataset` subclass.
+
+    Supports reading natively from `.zarr`, `.h5`/`.hdf5`, `.parquet`, `.csv`,
+    `.nc`/`.netcdf`, and `.mat` files, as well as Pandas or Polars DataFrames.
+
+    Args:
+        source (Union[str, Path, Any]): A file path or DataFrame object.
+        *args: Additional positional arguments passed to the specific `Dataset` implementation.
+        **kwargs: Additional keyword arguments passed to the specific `Dataset` implementation.
+
+    Raises:
+        ValueError: If instantiated with `None` or an unsupported file extension.
+        TypeError: If the source object is not recognized (e.g. not a path or DataFrame).
+
+    Returns:
+        Dataset: The initialized, type-specific subclass of `ft.Dataset`.
+    """
 
     if source is None:
         raise ValueError("ft.Dataset requires a source when instantiated directly.")
@@ -363,7 +595,7 @@ def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
 
 
 class MemoryProxy:
-    """A generic proxy for tabular formats loaded fully into memory (CSV, MAT, DataFrames)."""
+    """A generic proxy layer for tabular formats loaded fully into memory (CSV, MAT, DataFrames)."""
 
     def __init__(self, data_dict: dict):
         self._data = data_dict
@@ -385,7 +617,7 @@ class MemoryProxy:
 
 
 class ParquetProxy:
-    """Lazy-evaluation proxy for Parquet files with column caching."""
+    """A lazy-evaluation proxy layer for Parquet files utilizing dynamic column caching."""
 
     def __init__(self, file_path: str, columns: list):
         self._file_path = file_path
@@ -426,6 +658,8 @@ class ParquetProxy:
 
 
 class ZarrGroupProxy:
+    """Lazy evaluation proxy for chunked arrays within Zarr storage architectures."""
+
     def __init__(self, zarr_path: str, group_path: str = ""):
         self._zarr_path = zarr_path
         self._group_path = group_path
@@ -461,6 +695,14 @@ class ZarrGroupProxy:
 
 
 class ZarrDataset(Dataset):
+    """Dataset implementation explicitly targeting `.zarr` directories.
+
+    Args:
+        source (str): File path to the `.zarr` directory.
+        primary_array (str, optional): The canonical array used to derive dataset row length.
+            Defaults to the first array found in the root if empty.
+    """
+
     _len: int = _
 
     def __init__(self, source: str, primary_array: str = ""):
@@ -478,6 +720,12 @@ class ZarrDataset(Dataset):
 
 
 class DataFrameDataset(Dataset):
+    """Dataset implementation explicitly targeting in-memory Pandas or Polars DataFrames.
+
+    Args:
+        df (Any): The DataFrame instance.
+    """
+
     _len: int = _
 
     def __init__(self, df):
@@ -496,6 +744,8 @@ class DataFrameDataset(Dataset):
 
 
 class HDF5GroupProxy:
+    """Lazy evaluation proxy for arrays within HDF5 files."""
+
     def __init__(self, file_path: str, group_path: str = ""):
         self._file_path = str(file_path)
         self._group_path = group_path
@@ -535,6 +785,14 @@ class HDF5GroupProxy:
 
 
 class HDF5Dataset(Dataset):
+    """Dataset implementation explicitly targeting `.h5`/`.hdf5` files.
+
+    Args:
+        file_path (str): File path to the `.h5` file.
+        primary_key (str, optional): The canonical array used to derive dataset row length.
+            Defaults to "data" or the first dataset found if "data" is missing.
+    """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_key: str = "data"):
@@ -556,6 +814,12 @@ class HDF5Dataset(Dataset):
 
 
 class ParquetDataset(Dataset):
+    """Dataset implementation explicitly targeting `.parquet` files.
+
+    Args:
+        file_path (str): File path to the `.parquet` file.
+    """
+
     _len: int = _
 
     def __init__(self, file_path: str):
@@ -571,9 +835,13 @@ class ParquetDataset(Dataset):
 
 
 class ArrayDataset(Dataset):
-    """
-    Direct JAX replacement for PyTorch's TensorDataset.
-    Does not use the string-based proxy routing of the tabular datasets.
+    """Direct JAX replacement for PyTorch's `TensorDataset`.
+
+    Requires all provided arrays to possess the same length in their first dimension.
+    Does not use the string-based proxy routing of tabular datasets.
+
+    Args:
+        *arrays: Positional arguments of matching-length JAX or NumPy arrays.
     """
 
     arrays: tuple = _
@@ -583,10 +851,12 @@ class ArrayDataset(Dataset):
         object.__setattr__(self, "arrays", arrays)
         # Bypassing _source/_proxy entirely since we use positional indexing
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int | slice) -> tuple:
+        """Retrieves an index or slice positionally across all internal arrays."""
         return tuple(array[index] for array in self.arrays)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Returns the shared length of the arrays."""
         return self.arrays[0].shape[0]
 
 
@@ -594,6 +864,14 @@ class ArrayDataset(Dataset):
 
 
 class CSVDataset(Dataset):
+    """Dataset implementation explicitly targeting `.csv` files.
+
+    Utilizes PyArrow to swiftly read the CSV into memory.
+
+    Args:
+        file_path (str): File path to the `.csv` file.
+    """
+
     _len: int = _
 
     def __init__(self, file_path: str):
@@ -611,6 +889,8 @@ class CSVDataset(Dataset):
 
 
 class NetCDFGroupProxy:
+    """Lazy evaluation proxy for arrays within NetCDF4 files."""
+
     def __init__(self, file_path: str, group_path: str = ""):
         self._file_path = file_path
         self._group_path = group_path
@@ -644,6 +924,14 @@ class NetCDFGroupProxy:
 
 
 class NetCDFDataset(Dataset):
+    """Dataset implementation explicitly targeting `.nc`/`.nc4`/`.netcdf` files.
+
+    Args:
+        file_path (str): File path to the `.nc` file.
+        primary_variable (str, optional): The canonical array used to derive dataset row length.
+            Defaults to the first variable found if empty.
+    """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_variable: str = None):
@@ -662,6 +950,16 @@ class NetCDFDataset(Dataset):
 
 
 class MATDataset(Dataset):
+    """Dataset implementation explicitly targeting older `.mat` files.
+
+    Attempts to load via `scipy.io` first, falling back to HDF5 mechanisms
+    if the `.mat` file was saved in newer formats.
+
+    Args:
+        file_path (str): File path to the `.mat` file.
+        primary_key (str, optional): The canonical array used to derive dataset row length.
+    """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_key: str = None):
