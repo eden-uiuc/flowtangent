@@ -41,12 +41,12 @@ if typing.TYPE_CHECKING:
 def field(initializer: typing.Any = None, as_func: bool = False, **kwargs):
     """Smart wrapper for `eqx.field` that automatically routes to `default` or `default_factory`.
 
-    Prevents common JAX/Equinox instantiation errors by automatically catching mutable standard 
+    Prevents common JAX/Equinox instantiation errors by automatically catching mutable standard
     types (lists, dicts, sets) and JAX arrays, routing them to factories or rejecting them safely.
 
     Args:
         initializer (Any, optional): The default value, class, or factory function. Defaults to None.
-        as_func (bool, optional): If True, forces the initializer to be treated as a factory lambda, 
+        as_func (bool, optional): If True, forces the initializer to be treated as a factory lambda,
             even if it is a standard value. Defaults to False.
         **kwargs: Additional keyword arguments passed directly to `eqx.field` (e.g., `static=True`).
 
@@ -72,8 +72,8 @@ def field(initializer: typing.Any = None, as_func: bool = False, **kwargs):
 
 def static_field(*args, **kwargs):
     """Alias for creating static fields in Equinox modules.
-    
-    Static fields are ignored by JAX transformations (like `jit` and `grad`) and are treated 
+
+    Static fields are ignored by JAX transformations (like `jit` and `grad`) and are treated
     as metadata rather than differentiable array leaves.
 
     Args:
@@ -89,7 +89,7 @@ def static_field(*args, **kwargs):
 def method_field(*args, **kwargs):
     """Alias for fields holding callables or methods without triggering instantiation.
 
-    Forces the callable to be stored statically and wrapped in a lambda factory to prevent 
+    Forces the callable to be stored statically and wrapped in a lambda factory to prevent
     Equinox from attempting to evaluate it during class initialization.
 
     Args:
@@ -123,7 +123,7 @@ FLOWTANGENT_REGISTRY = {}
 class Module(eqx.Module):
     """Base class for all FlowTangent models, components, and state data structures.
 
-    Extends `eqx.Module` by providing automatic class registration for serialization/I/O, 
+    Extends `eqx.Module` by providing automatic class registration for serialization/I/O,
     dynamic name-to-attribute conversion, and automatic runtime type-checking injection.
 
     Attributes:
@@ -139,11 +139,11 @@ class Module(eqx.Module):
 
     def __init_subclass__(cls, **kwargs) -> None:
         """Metaclass hook invoked when a subclass is created.
-        
+
         Performs three primary tasks:
         1. Strips internal Equinox keyword arguments (`kw_only`).
         2. Registers the subclass in `FLOWTANGENT_REGISTRY` for save/load resolution.
-        3. Scans all custom methods and automatically decorates them with `jaxtyped` 
+        3. Scans all custom methods and automatically decorates them with `jaxtyped`
            and `beartype` if they contain type annotations.
 
         Raises:
@@ -192,7 +192,7 @@ class Module(eqx.Module):
 
         Returns:
             str: The lowercase, underscore-separated attribute name.
-            
+
         Raises:
             AttributeError: If the internal name attribute cannot be resolved to a string.
         """
@@ -209,15 +209,15 @@ class Module(eqx.Module):
 class StateDataMeta(type(Module)):
     """Metaclass for FlowTangent State definitions to handle missing or placeholder initialization.
 
-    Intercepts the creation of state dataclasses. If an attribute is typed as a JAX array but 
-    lacks a default value (or uses `_Placeholder`), this metaclass automatically injects an 
+    Intercepts the creation of state dataclasses. If an attribute is typed as a JAX array but
+    lacks a default value (or uses `_Placeholder`), this metaclass automatically injects an
     `empty_array` factory with the correct deduced shape prior to Equinox initialization.
     """
 
     def __new__(mcs, name, bases, namespace):
         """Creates the new state class with injected array defaults.
 
-        Supports Python 3.14+ deferred annotations by explicitly resolving `__annotate_func__` 
+        Supports Python 3.14+ deferred annotations by explicitly resolving `__annotate_func__`
         via `annotationlib` before parsing the hints.
         """
         ### ADDED

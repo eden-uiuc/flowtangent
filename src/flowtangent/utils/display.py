@@ -1,13 +1,14 @@
 # src/flowtangent/utils/display.py
 from typing import Any
+
 import numpy as np
 
 
 def format_array(v: Any, precision: int = 3, width: int = 10) -> str:
     """Formats numeric values and arrays for terminal printing.
 
-    Converts the input to a NumPy array. Scalars are formatted using 
-    scientific notation with explicit width and precision alignment. 
+    Converts the input to a NumPy array. Scalars are formatted using
+    scientific notation with explicit width and precision alignment.
     Multi-dimensional arrays are formatted using `np.array2string`.
 
     Args:

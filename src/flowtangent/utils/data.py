@@ -1,17 +1,18 @@
 # src/flowtangent/utils/data.py
 """FlowTangent data loading and dataset management utilities.
 
-This module provides a unified data loading architecture that bridges the gap 
-between PyTorch's robust multi-processing data streams and JAX's functional 
-compilation requirements. It introduces a universal `Dataset` PyTree that duck-types 
-as a PyTorch Dataset, offering out-of-the-box lazy evaluation for massive on-disk 
+This module provides a unified data loading architecture that bridges the gap
+between PyTorch's robust multi-processing data streams and JAX's functional
+compilation requirements. It introduces a universal `Dataset` PyTree that duck-types
+as a PyTorch Dataset, offering out-of-the-box lazy evaluation for massive on-disk
 formats (Zarr, HDF5, Parquet, NetCDF) via dynamic file proxies.
 
-Crucially, it replaces PyTorch's default collation with `numpy_collate` to guarantee 
-that downstream JAX optimizers never receive incompatible Torch tensors. It also 
-provides mechanisms for dynamic dataset expansion—like virtual columns and row 
+Crucially, it replaces PyTorch's default collation with `numpy_collate` to guarantee
+that downstream JAX optimizers never receive incompatible Torch tensors. It also
+provides mechanisms for dynamic dataset expansion—like virtual columns and row
 appends—to support active learning loops without mutating the original source files on disk.
 """
+
 import warnings
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -58,8 +59,8 @@ from .typing import _
 def numpy_collate(batch: list[Any]) -> Any:
     """Recursively converts a PyTorch batch into stacked NumPy arrays.
 
-    Replaces `torch.utils.data.default_collate` to ensure downstream JAX 
-    functions never accidentally receive a PyTorch `Tensor`, preventing memory 
+    Replaces `torch.utils.data.default_collate` to ensure downstream JAX
+    functions never accidentally receive a PyTorch `Tensor`, preventing memory
     leaks and execution crashes.
 
     Args:
@@ -92,8 +93,8 @@ def numpy_collate(batch: list[Any]) -> Any:
 class DataLoader(TorchDataLoader):
     """A standalone facade wrapper around PyTorch's `DataLoader`.
 
-    Forces the use of `numpy_collate` by default to ensure batches are returned 
-    as pure NumPy arrays instead of PyTorch Tensors, providing drop-in compatibility 
+    Forces the use of `numpy_collate` by default to ensure batches are returned
+    as pure NumPy arrays instead of PyTorch Tensors, providing drop-in compatibility
     between PyTorch multi-processing data streams and JAX optimizers.
 
     Args:
@@ -111,8 +112,8 @@ class DataLoader(TorchDataLoader):
 class LatentDataLoader:
     """Wraps a physical DataLoader to encode a physical batch into a latent batch on the fly.
 
-    Duck-types as a standard `DataLoader` for downstream training loops. 
-    Useful for training surrogate models directly on the encoded latent space 
+    Duck-types as a standard `DataLoader` for downstream training loops.
+    Useful for training surrogate models directly on the encoded latent space
     without explicitly saving intermediate encoded datasets to disk.
 
     Args:
@@ -140,7 +141,7 @@ class LatentDataLoader:
 class SlicedDataLoader:
     """Dynamically slices the feature dimension of batches streaming from a DataLoader.
 
-    Duck-types as a standard DataLoader. Primarily used in multi-GPU or distributed 
+    Duck-types as a standard DataLoader. Primarily used in multi-GPU or distributed
     training loops where data parallelization splits batches across devices.
 
     Args:
@@ -201,10 +202,10 @@ LoaderType = Union[DataLoader, LatentDataLoader, SlicedDataLoader]
 class Dataset(Module):
     """Universal FlowTangent Dataset factory and abstraction layer.
 
-    Duck-types as a PyTorch Dataset (implementing `__len__` and `__getitem__`) 
-    while remaining a valid, immutable Equinox PyTree module. It utilizes proxy 
-    classes to lazily evaluate massive on-disk datasets (Zarr, HDF5, Parquet, NetCDF), 
-    and handles dynamic row appends (for active learning) through a non-destructive 
+    Duck-types as a PyTorch Dataset (implementing `__len__` and `__getitem__`)
+    while remaining a valid, immutable Equinox PyTree module. It utilizes proxy
+    classes to lazily evaluate massive on-disk datasets (Zarr, HDF5, Parquet, NetCDF),
+    and handles dynamic row appends (for active learning) through a non-destructive
     virtual overlay mechanism.
     """
 
@@ -239,7 +240,7 @@ class Dataset(Module):
 
     @property
     def full_vars(self) -> list[str]:
-        """list[str]: Returns a unified, sorted list of all column names available in both the disk proxy and virtual overlay."""
+        """list[str]: Returns a sorted list of all column names available in the disk proxy and virtual overlay."""
         virtual_keys = list(self._virtual_columns.keys())
         return sorted(list(set(list(self._proxy_vars) + virtual_keys)))
 
@@ -249,7 +250,7 @@ class Dataset(Module):
         Args:
             name (str): The column name to register.
             data (Optional[jax.Array], optional): The array data. If None, it is filled with NaNs.
-            quiet (bool, optional): Suppresses the warning commonly triggered when a user typos a column name. Defaults to False.
+            quiet (bool, optional): Suppresses the warning when a user typos a column name. Defaults to False.
 
         Raises:
             ValueError: If the provided data array length does not match the dataset length.
@@ -279,7 +280,7 @@ class Dataset(Module):
         """Appends a new row to the dataset via the virtual overlay.
 
         Useful for expanding datasets dynamically during Active Learning loops.
-        Variables missing from `row_dict` that exist in the broader dataset are 
+        Variables missing from `row_dict` that exist in the broader dataset are
         automatically padded with NaNs.
 
         Args:
@@ -391,7 +392,7 @@ class Dataset(Module):
     def __getitem__(self, idx: int | slice) -> dict[str, Any]:
         """Retrieves a row dict (or sliced column dict) from the dataset.
 
-        Prioritizes fast-path single-index retrieval when interfacing directly 
+        Prioritizes fast-path single-index retrieval when interfacing directly
         with PyTorch `DataLoader` workers to avoid fully reading massive columns from disk.
 
         Args:
@@ -434,7 +435,7 @@ class Dataset(Module):
 def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
     """Intelligently detects a data source format and initializes the correct `Dataset` subclass.
 
-    Supports reading natively from `.zarr`, `.h5`/`.hdf5`, `.parquet`, `.csv`, 
+    Supports reading natively from `.zarr`, `.h5`/`.hdf5`, `.parquet`, `.csv`,
     `.nc`/`.netcdf`, and `.mat` files, as well as Pandas or Polars DataFrames.
 
     Args:
@@ -551,7 +552,7 @@ class ParquetProxy:
 
 class ZarrGroupProxy:
     """Lazy evaluation proxy for chunked arrays within Zarr storage architectures."""
-    
+
     def __init__(self, zarr_path: str, group_path: str = ""):
         self._zarr_path = zarr_path
         self._group_path = group_path
@@ -591,9 +592,10 @@ class ZarrDataset(Dataset):
 
     Args:
         source (str): File path to the `.zarr` directory.
-        primary_array (str, optional): The canonical array used to derive dataset row length. 
+        primary_array (str, optional): The canonical array used to derive dataset row length.
             Defaults to the first array found in the root if empty.
     """
+
     _len: int = _
 
     def __init__(self, source: str, primary_array: str = ""):
@@ -616,6 +618,7 @@ class DataFrameDataset(Dataset):
     Args:
         df (Any): The DataFrame instance.
     """
+
     _len: int = _
 
     def __init__(self, df):
@@ -635,7 +638,7 @@ class DataFrameDataset(Dataset):
 
 class HDF5GroupProxy:
     """Lazy evaluation proxy for arrays within HDF5 files."""
-    
+
     def __init__(self, file_path: str, group_path: str = ""):
         self._file_path = str(file_path)
         self._group_path = group_path
@@ -679,9 +682,10 @@ class HDF5Dataset(Dataset):
 
     Args:
         file_path (str): File path to the `.h5` file.
-        primary_key (str, optional): The canonical array used to derive dataset row length. 
+        primary_key (str, optional): The canonical array used to derive dataset row length.
             Defaults to "data" or the first dataset found if "data" is missing.
     """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_key: str = "data"):
@@ -708,6 +712,7 @@ class ParquetDataset(Dataset):
     Args:
         file_path (str): File path to the `.parquet` file.
     """
+
     _len: int = _
 
     def __init__(self, file_path: str):
@@ -759,6 +764,7 @@ class CSVDataset(Dataset):
     Args:
         file_path (str): File path to the `.csv` file.
     """
+
     _len: int = _
 
     def __init__(self, file_path: str):
@@ -777,7 +783,7 @@ class CSVDataset(Dataset):
 
 class NetCDFGroupProxy:
     """Lazy evaluation proxy for arrays within NetCDF4 files."""
-    
+
     def __init__(self, file_path: str, group_path: str = ""):
         self._file_path = file_path
         self._group_path = group_path
@@ -815,9 +821,10 @@ class NetCDFDataset(Dataset):
 
     Args:
         file_path (str): File path to the `.nc` file.
-        primary_variable (str, optional): The canonical array used to derive dataset row length. 
+        primary_variable (str, optional): The canonical array used to derive dataset row length.
             Defaults to the first variable found if empty.
     """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_variable: str = None):
@@ -838,13 +845,14 @@ class NetCDFDataset(Dataset):
 class MATDataset(Dataset):
     """Dataset implementation explicitly targeting older `.mat` files.
 
-    Attempts to load via `scipy.io` first, falling back to HDF5 mechanisms 
+    Attempts to load via `scipy.io` first, falling back to HDF5 mechanisms
     if the `.mat` file was saved in newer formats.
 
     Args:
         file_path (str): File path to the `.mat` file.
         primary_key (str, optional): The canonical array used to derive dataset row length.
     """
+
     _len: int = _
 
     def __init__(self, file_path: str, primary_key: str = None):

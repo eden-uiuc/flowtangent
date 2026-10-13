@@ -2,7 +2,7 @@
 """FlowTangent JAX-aware type aliases and dimension glossary.
 
 This module provides strict shape and dtype annotations utilizing `jaxtyping`.
-It defines the standardized tensor geometries expected by FlowTangent components 
+It defines the standardized tensor geometries expected by FlowTangent components
 and solvers.
 
 Dimension Glossary:
@@ -10,6 +10,7 @@ Dimension Glossary:
     _: An arbitrary, unconstrained dimension length.
     ...: Any number of dimensions (variadic wildcard).
 """
+
 # ruff: noqa: F722
 from typing import Any, Optional, Union, cast
 
@@ -20,6 +21,7 @@ from .tree import TreePath
 
 class _Placeholder:
     """Sentinel class used by `StateDataMeta` to detect uninitialized attributes."""
+
     pass
 
 
@@ -29,7 +31,8 @@ _ = cast(Any, _Placeholder())
 # FT Metatypes
 
 NameType = Union[str, None]
-"""Union[str, None]: Dummy type to allow names to be defaulted to None for modules while still being parsed by registry."""
+"""Union[str, None]: Dummy type to allow names to be defaulted to \\
+    None for modules while still being parsed by registry."""
 
 TreePathLike = Union[TreePath, str, tuple[tuple | str | TreePath, Any, Optional[slice]]]
 """Union[TreePath, str, tuple]: Represents a valid selector for traversing and updating Equinox module trees."""
@@ -41,8 +44,8 @@ TreePathLike = Union[TreePath, str, tuple[tuple | str | TreePath, Any, Optional[
 ScalarFloat = Union[Float[Array, ""], Float[Array, "1"], float]
 """Union[Array, float]: A floating-point scalar, accepting standard floats or 0D/1D JAX arrays."""
 
-ScalarInt = Union[Int[Array, ""], Float[Array, "1"], int]  
-"""Union[Array, int]: An integer scalar, accepting standard ints or 0D/1D JAX arrays. 
+ScalarInt = Union[Int[Array, ""], Float[Array, "1"], int]
+"""Union[Array, int]: An integer scalar, accepting standard ints or 0D/1D JAX arrays. \\
 Note: Accepts Float[Array, "1"] due to JAX's default casting behaviors in some optimizers."""
 
 ScalarBool = Union[Bool[Array, ""], Float[Array, "1"], bool]

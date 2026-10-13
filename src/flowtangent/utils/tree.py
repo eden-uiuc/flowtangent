@@ -1,12 +1,13 @@
 # src/flowtangent/utils/tree.py
 """FlowTangent PyTree manipulation and traversal utilities.
 
-This module provides an extended facade over native JAX and Equinox tree operations. 
-It introduces the `TreePath` abstraction to enable natural, string-based attribute 
-targeting (e.g., `"system.component.value"`), transparently resolves virtual or 
-aliased paths within FlowTangent modules, and includes robust debugging tools 
+This module provides an extended facade over native JAX and Equinox tree operations.
+It introduces the `TreePath` abstraction to enable natural, string-based attribute
+targeting (e.g., `"system.component.value"`), transparently resolves virtual or
+aliased paths within FlowTangent modules, and includes robust debugging tools
 for inspecting and validating complex PyTree structures prior to JIT compilation.
 """
+
 from __future__ import annotations
 
 import os
@@ -59,13 +60,19 @@ def update(obj: Any, where_or_updates: str, val: Any, **kwargs) -> Any: ...
 def update(obj, where_or_updates, val=None, **kwargs):
     """FlowTangent wrapper for `eqx.tree_at` with simplified string/tuple pathing.
 
-    Allows updating nested PyTree attributes using standard dot-notation strings, 
-    tuples of paths and values, or lists of updates. Handles canonicalization 
+    Allows updating nested PyTree attributes using standard dot-notation strings,
+    tuples of paths and values, or lists of updates. Handles canonicalization
     of virtual fields (e.g. `subcomponents` aliases).
 
     Examples:
         >>> updated_tree = update(tree, "branch.leaf", new_val)
-        >>> updated_tree = update(tree, (("branch.leaf_1", new_val_1), ("branch.leaf_2", new_val_2)))
+        >>> updated_tree = update(
+        ...     tree,
+        ...     (
+        ...         ("branch.leaf_1", new_val_1),
+        ...         ("branch.leaf_2", new_val_2),
+        ...     ),
+        ... )
 
     Args:
         obj (Any): The base PyTree to update.
@@ -141,8 +148,8 @@ def update(obj, where_or_updates, val=None, **kwargs):
 @dataclass(frozen=True)
 class TreePath:
     """Parses and strictly holds JAX PyTree paths, values, and array slices.
-    
-    Translates human-readable string paths (`"system.energy"`) or tuples 
+
+    Translates human-readable string paths (`"system.energy"`) or tuples
     into explicit attribute sequences suitable for PyTree traversal.
 
     Attributes:
@@ -254,9 +261,9 @@ class TreePath:
 
 def get_actual_path(obj: Any, path: str | tuple | TreePath) -> TreePath:
     """Resolves virtual path aliases into canonical PyTree hierarchy paths.
-    
+
     If a path contains virtual field names (e.g., components referenced by their `name`
-    attribute rather than their structural index), this function performs a breadth-first 
+    attribute rather than their structural index), this function performs a breadth-first
     search to locate the canonical `getattr` path.
 
     Args:
@@ -362,7 +369,7 @@ def get_actual_path(obj: Any, path: str | tuple | TreePath) -> TreePath:
 
 def get_parent_target(obj: Any, path: str | tuple | TreePath) -> Any:
     """Traverses the PyTree and returns the leaf object referenced by the path.
-    
+
     Ignores array slices if present in the `TreePath` object.
 
     Args:
@@ -411,7 +418,7 @@ def get_all_targets(s: Any, input_map: Sequence[str | tuple | TreePath]) -> tupl
 def is_equivalent(a: Any, b: Any) -> bool:
     """Safely checks deep equality between any two PyTrees, arrays, or scalars.
 
-    Navigates NaN equivalency and dimension checking for JAX/NumPy arrays while 
+    Navigates NaN equivalency and dimension checking for JAX/NumPy arrays while
     using standard equality checks for primitives.
 
     Args:
@@ -461,7 +468,7 @@ def compute_tree_delta(old_tree: Any, new_tree: Any) -> tuple[list[int], list[An
         new_tree (Any): The modified PyTree.
 
     Returns:
-        tuple[list[int], list[Any]]: A list of flattened leaf indices that changed, 
+        tuple[list[int], list[Any]]: A list of flattened leaf indices that changed,
             and a list of their corresponding new values.
     """
     old_leaves, _ = tree_flatten(old_tree)
@@ -504,8 +511,8 @@ def apply_tree_delta(base_tree: Any, delta_indices: list[int], delta_leaves: lis
 
 def id_partition(tree: Any, active_ids: set[int]) -> tuple[Any, Any, Any]:
     """Partitions a PyTree into dynamic and static halves based on an ID whitelist.
-    
-    Only array-like leaves whose exact memory ID matches the whitelist are kept 
+
+    Only array-like leaves whose exact memory ID matches the whitelist are kept
     dynamic; all other nodes become static structural references.
 
     Args:
@@ -570,7 +577,7 @@ def inspect_leaves(tree: Any, mask: Any, settings: Settings, tree_name: str = "T
             summary[prefix]["types"].add(type(leaf).__name__)
 
     lines = []
-    header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 15 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"
+    header = f"{'PyTree Path (Depth ' + str(depth) + ')':<{35 + 15 * depth}} | {'Kept':<6} | {'Pruned':<6} | {'Common Kept Types'}"  # noqa: E501
     lines.append(header)
     lines.append("-" * 100)
 
@@ -596,7 +603,7 @@ def inspect_leaves(tree: Any, mask: Any, settings: Settings, tree_name: str = "T
 def scan_for_invalid_JAX_types(pytree: Any, name: Optional[str] = None) -> None:
     """Validates that all dynamic leaves in a PyTree are safe for JAX compilation.
 
-    Traverses the tree and raises terminal warnings if it discovers standard lists, 
+    Traverses the tree and raises terminal warnings if it discovers standard lists,
     dicts, strings, or unhashable objects masquerading as dynamic leaves.
 
     Args:
