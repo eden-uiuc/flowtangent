@@ -3,10 +3,11 @@
 
 import os
 import time
+import contextlib
 
 
 def numerical_environment():
-    """Configures hardware and NUMA affinity before JAX initializes.
+    """Configures JAX and TensorFlow environment variables before JAX initializes.
 
     This function must be called before importing JAX, Equinox, or any
     hardware-accelerated libraries. It enforces 64-bit precision, prevents
@@ -73,11 +74,15 @@ def _prune_cache(cache_path, max_size_gb, max_age_days):
         if not os.path.isfile(filepath):
             continue
 
-        file_stat = os.stat(filepath)
+        try:
+            file_stat = os.stat(filepath)
+        except FileNotFoundError:
+            continue
         file_age = current_time - file_stat.st_mtime
 
         if file_age > max_age_seconds:
-            os.remove(filepath)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(filepath)
         else:
             files.append((filepath, file_stat.st_mtime, file_stat.st_size))
             total_size += file_stat.st_size
@@ -87,7 +92,8 @@ def _prune_cache(cache_path, max_size_gb, max_age_days):
         # Sort by modification time (oldest first)
         files.sort(key=lambda x: x[1])
         for filepath, _, size in files:
-            os.remove(filepath)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(filepath)
             total_size -= size
             if total_size <= max_size_bytes:
                 break
