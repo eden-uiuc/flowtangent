@@ -14,8 +14,9 @@ class ProcessDiagramExtension(Extension):
 
         Instantiate concrete Process subclasses without arguments and request their
         recursive Cytoscape graph. Append a diagram only for a nonempty list or a
-        dictionary with truthy `elements` or `nodes`. Exceptions during graph
-        generation or injection are caught, leaving documentation without a new graph.
+        dictionary with truthy `elements` or `nodes`. Exceptions during runtime
+        import, instantiation, graph generation, JSON parsing, or injection are caught,
+        leaving documentation without a new graph.
 
         Args:
             cls (griffe.Class): Griffe class whose documentation may be modified in place.

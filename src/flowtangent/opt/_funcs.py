@@ -102,6 +102,7 @@ def quadratic_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwarg
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
@@ -139,6 +140,7 @@ def linear_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) 
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
@@ -179,6 +181,7 @@ def log_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> 
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     d_lower = x - bounds[0]
     d_upper = bounds[1] - x
@@ -218,6 +221,7 @@ def inverse_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs)
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     d_lower = jnp.maximum(x - bounds[0], 1e-8)
     d_upper = jnp.maximum(bounds[1] - x, 1e-8)
@@ -258,6 +262,7 @@ def exponential_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], k: fl
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
@@ -296,6 +301,7 @@ def infinite_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs
 
     Raises:
         TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
     """
     in_bounds = jnp.all((x >= bounds[0]) & (x <= bounds[1]))
     return jnp.where(in_bounds, 0.0, jnp.inf)
