@@ -241,7 +241,7 @@ class Process(ProcessStep):
     Uses __call__ as basic method when executed as a nested process, uses .run as method to include
     non-JIT/grad-able initialization steps.
 
-    By default, only applies array_barrier as initialization step. Can partition inputs based on IO-graph
+    As default, only applies array_barrier as initialization step. Can partition inputs based on IO-graph
     of wrapped ProcessSteps.
     """
 
