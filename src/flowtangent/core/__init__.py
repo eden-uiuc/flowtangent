@@ -9,12 +9,4 @@ from ._settings import Settings
 from ._systems import System, Aircraft
 from ._state import State
 
-__all__ = [
-    "Component",
-    "System",
-    "Aircraft",
-    "ProcessStep",
-    "Process",
-    "Settings",
-    "State"
-]
+__all__ = ["Component", "System", "Aircraft", "ProcessStep", "Process", "Settings", "State"]

@@ -35,6 +35,7 @@ class State[EnergyType: NetworkState](StateData):
     """
     Top level State class for tracking time-wise or batch-wise variables.
     """
+
     time: Time = field(Time)
 
     frames: FrameData = field(FrameData)

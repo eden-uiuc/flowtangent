@@ -26,7 +26,7 @@ from ..core._component import Component, MassProperties
 from ..data.ac_classes import AircraftClass, MediumRange
 
 # FlowTangent imports
-from ..utils import Module, empty_array, field, static_field, NameType
+from ..utils import Module, NameType, empty_array, field, static_field
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
@@ -48,6 +48,7 @@ class System(Component):
     """
     Component wrapper for including multiple components or variant configurations in one data structure.
     """
+
     configurations: Component = field(lambda: Component(name="Configurations"))
 
 

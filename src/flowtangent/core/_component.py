@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from ..data.solids import Aluminum, Solid
 
 # FlowTangent imports
-from ..utils import Module, TreePathLike, field, static_field, update
+from ..utils import Module, field, static_field, update
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component
@@ -35,6 +35,7 @@ class Fineness(Module):
     """
     Component fineness ratios
     """
+
     effective: float = 1.0
     nose: float = 0.0
     tail: float = 0.0
@@ -44,6 +45,7 @@ class Dimensions(Module):
     """
     Generic class for linear dimensions.
     """
+
     ordinal_direction: bool = field(False, static=True)
 
     reference: float = 0.0
@@ -64,6 +66,7 @@ class Areas(Module):
     """
     Generic class for areal properties.
     """
+
     reference: float = 0.0
     total: float = 0.0
     maximum: float = 0.0
@@ -91,6 +94,7 @@ class MaterialProperties(Module):
     """
     Class for designating material usage within component.
     """
+
     tensile_stress_carrier: Solid = field(Aluminum)
     torsional_stress_carrier: Solid = field(Aluminum)
     shear_stress_carrier: Solid = field(Aluminum)
@@ -103,6 +107,7 @@ class MassProperties(Module):
     """
     Class for packing mass properies of a component and associated subcomponents.
     """
+
     total: float = 0.0
     empty: float = 0.0
     subcomponent_total: float = 0.0
@@ -122,7 +127,8 @@ class Component(Module):
     """
     Base physical component/collection of subcomponents class.
     """
-    is_variable_component: bool = static_field(False) # Used for designating comonent tie to ImplicitAnalysis Variable
+
+    is_variable_component: bool = static_field(False)  # Used for designating comonent tie to ImplicitAnalysis Variable
 
     segments: tuple[Component, ...] = field(tuple)
     subcomponents: tuple[Component, ...] = field(tuple)

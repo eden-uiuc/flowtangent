@@ -47,10 +47,8 @@ from ..utils import (
     Module,
     NameType,
     Partial,
-    TreePath,
     compute_tree_delta,
     field,
-    get_target,
     id_partition,
     inspect_leaves,
     is_array_like,
@@ -70,6 +68,7 @@ class ProcessStep(Module):
     """
     Basic ProcessStep class, used for wrapping functions and providing I/O and tracing hooks.
     """
+
     function: ProcessFunc = method_field(null_step)
 
     _state_delta: Optional[State] = field(None)
@@ -245,6 +244,7 @@ class Process(ProcessStep):
     By default, only applies array_barrier as initialization step. Can partition inputs based on IO-graph
     of wrapped ProcessSteps.
     """
+
     steps: tuple[ProcessStep, ...] = ()
 
     initial_step: int = static_field(0)
