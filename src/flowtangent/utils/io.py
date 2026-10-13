@@ -8,11 +8,11 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
-from beartype.typing import Callable
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+from beartype.typing import Callable
 
 from .base import FLOWTANGENT_REGISTRY, Module, field
 
@@ -236,6 +236,7 @@ class JAXCompileFilter(logging.Filter):
     Filter for only logging a whitelist of particular functions to skip basic primitives/lower level functions.
     Primarily used for debugging or benchmarking.
     """
+
     def __init__(self, name: str = "", whitelist: Optional[tuple[str]] = None) -> None:
         super().__init__(name)
         self.whitelist = whitelist

@@ -28,7 +28,7 @@ def _get_full_X(data: Union[Float[Array, "N D"], LoaderType]) -> Float[Array, "N
     return data  # type: ignore
 
 
-def _unpack_batch(batch: Union[Float[Array, "B D"], Tuple]) -> Float[Array, "B D"]:
+def _unpack_batch(batch: Union[Float[Array, "B D"], tuple]) -> Float[Array, "B D"]:
     """Safely unpacks X_batch from a DataLoader (X, Y) tuple for unsupervised AE training."""
     if isinstance(batch, (tuple, list)):
         return batch[0]
@@ -123,7 +123,7 @@ class Passthrough(Manifold):
     def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return z
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType, Tuple], **kwargs) -> "Passthrough":
+    def fit(self, X: Union[Float[Array, "N D"], LoaderType, tuple], **kwargs) -> "Passthrough":
         return self
 
 

@@ -124,6 +124,7 @@ class Module(eqx.Module):
 
 class StateDataMeta(type(Module)):
     """Metaclass for State data to expand Placeholder in utils.typing into properly shaped arrays."""
+
     def __new__(mcs, name, bases, namespace):
         ### ADDED
         annotations = namespace.get("__annotations__", {})

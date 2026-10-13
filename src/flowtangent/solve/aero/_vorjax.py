@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 import dataclasses
 import warnings
 from typing import Any, Iterable, Optional
-from beartype.typing import Callable
 
 # package imports
 import equinox as eqx
@@ -30,6 +29,7 @@ import jax.numpy as jnp
 
 # package imports
 import sklearn
+from beartype.typing import Callable
 
 from ...components._wings import Wing, WingSegment, WingSweeps
 from ...core._processes import Process, ProcessStep, array_barrier

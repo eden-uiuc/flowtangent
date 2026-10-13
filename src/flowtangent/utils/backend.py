@@ -7,10 +7,10 @@ import time
 
 def numerical_environment():
     """Configures hardware and NUMA affinity before JAX initializes.
-    
-    This function must be called before importing JAX, Equinox, or any 
+
+    This function must be called before importing JAX, Equinox, or any
     hardware-accelerated libraries. It enforces 64-bit precision, prevents
-    XLA from preallocating all available GPU memory, and silences standard 
+    XLA from preallocating all available GPU memory, and silences standard
     TensorFlow C++ warnings.
     """
     os.environ["JAX_ENABLE_X64"] = "True"
@@ -24,18 +24,18 @@ def numerical_environment():
 
 def initialize_jax_cache(cache_dir="~/.flowtangent/jax_cache", max_size_gb=2.0, max_age_days=30):
     """Initializes and prunes the persistent JAX compilation cache.
-    
-    Setting up a compilation cache significantly reduces startup times for 
+
+    Setting up a compilation cache significantly reduces startup times for
     frequently run graphs. This function ensures the cache directory exists,
-    binds it to the JAX configuration, and triggers a maintenance pass to 
+    binds it to the JAX configuration, and triggers a maintenance pass to
     clean up stale or oversized cache files.
 
     Args:
         cache_dir (str): The local directory path for storing compiled XLA binaries.
             Defaults to `~/.flowtangent/jax_cache`.
-        max_size_gb (float): The maximum allowed size of the cache directory in 
+        max_size_gb (float): The maximum allowed size of the cache directory in
             gigabytes. Defaults to `2.0`.
-        max_age_days (int): The maximum number of days to retain an untouched 
+        max_age_days (int): The maximum number of days to retain an untouched
             cache file. Defaults to `30`.
     """
     import jax  # Lazy import safe here
@@ -51,7 +51,7 @@ def initialize_jax_cache(cache_dir="~/.flowtangent/jax_cache", max_size_gb=2.0, 
 
 def _prune_cache(cache_path, max_size_gb, max_age_days):
     """Enforces size and age limits on the compilation cache directory.
-    
+
     Args:
         cache_path (str): The expanded absolute path to the cache directory.
         max_size_gb (float): Target maximum directory size in gigabytes.
@@ -62,26 +62,26 @@ def _prune_cache(cache_path, max_size_gb, max_age_days):
 
     current_time = time.time()
     max_age_seconds = max_age_days * 86400
-    max_size_bytes = max_size_gb * (1024 ** 3)
-    
+    max_size_bytes = max_size_gb * (1024**3)
+
     total_size = 0
     files = []
-    
+
     # First pass: collect files and immediately remove expired ones
     for filename in os.listdir(cache_path):
         filepath = os.path.join(cache_path, filename)
         if not os.path.isfile(filepath):
             continue
-            
+
         file_stat = os.stat(filepath)
         file_age = current_time - file_stat.st_mtime
-        
+
         if file_age > max_age_seconds:
             os.remove(filepath)
         else:
             files.append((filepath, file_stat.st_mtime, file_stat.st_size))
             total_size += file_stat.st_size
-            
+
     # Second pass: if total size exceeds limit, remove oldest files until compliant
     if total_size > max_size_bytes:
         # Sort by modification time (oldest first)
@@ -95,13 +95,13 @@ def _prune_cache(cache_path, max_size_gb, max_age_days):
 
 def configure_environment(settings):
     """Configures global JAX and XLA compiler flags at runtime.
-    
-    Modifies the active JAX session based on the provided settings object. 
+
+    Modifies the active JAX session based on the provided settings object.
     This allows switching to debug modes, enabling NaN detection, or viewing
     compiler trace logs without restarting the Python interpreter.
 
     Args:
-        settings: The global configuration object containing framework flags 
+        settings: The global configuration object containing framework flags
             (must provide `_DEV_MODE` and `DEBUG_MODE` attributes).
     """
     import jax  # Lazy import safe here

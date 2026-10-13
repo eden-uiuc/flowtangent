@@ -34,7 +34,7 @@ class ProcessDiagramExtension(Extension):
                     # Parse the JSON string to verify it isn't empty
                     cyto_data = json.loads(cyto_json) if isinstance(cyto_json, str) else cyto_json
                     has_elements = False
-                    
+
                     if isinstance(cyto_data, list) and len(cyto_data) > 0:
                         has_elements = True
                     elif isinstance(cyto_data, dict):
@@ -61,15 +61,16 @@ class ProcessDiagramExtension(Extension):
         except Exception as exc:
             logging.getLogger("mkdocs").warning(f"autodoc: no graph for {cls.path}: {exc}")
 
+
 class CleanSignaturesExtension(Extension):
     """Removes private parameters (starting with _) from all documented signatures."""
-    
+
     def _clean_parameters(self, obj):
         # Safely check if the object has a parameters collection
         if obj and hasattr(obj, "parameters") and obj.parameters:
             # Find all private arguments
             to_remove = [p.name for p in obj.parameters if p.name.startswith("_")]
-            
+
             # Delete them directly from the Griffe Parameters object
             for name in to_remove:
                 try:
@@ -84,7 +85,7 @@ class CleanSignaturesExtension(Extension):
     def on_class(self, **kwargs):
         cls = kwargs.get("obj") or kwargs.get("cls")
         self._clean_parameters(cls)
-        
+
         # Also clean the underlying __init__ method if it's explicitly defined
         if cls and "__init__" in cls.members:
             self._clean_parameters(cls.members["__init__"])

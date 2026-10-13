@@ -14,8 +14,6 @@ if TYPE_CHECKING:
     from .... import Aircraft, Settings, State, System
     from ....solve.energy.jets import JetSettings
 
-from beartype.typing import Callable
-
 import json
 import warnings
 from dataclasses import replace
@@ -24,6 +22,7 @@ from pathlib import Path
 # package imports
 import jax
 import jax.numpy as jnp
+from beartype.typing import Callable
 
 from flowtangent.data import units
 

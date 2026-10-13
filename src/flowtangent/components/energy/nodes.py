@@ -16,8 +16,6 @@ if TYPE_CHECKING:
     from ... import Settings, State, System
     from ...solve.energy.jets import JetSettings
 
-from beartype.typing import Callable
-
 import warnings
 from dataclasses import replace
 from functools import reduce
@@ -25,6 +23,7 @@ from functools import reduce
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from beartype.typing import Callable
 
 from ...core._component import Component
 from ...data.gases import Air, Gas

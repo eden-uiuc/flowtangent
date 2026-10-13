@@ -1,9 +1,9 @@
 from typing import Any
-from beartype.typing import Callable
 
 import equinox as eqx
 import jax
 import optax
+from beartype.typing import Callable
 
 from ..utils import Module
 from ..utils.typing import _

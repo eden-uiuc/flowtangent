@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional, Sequence, overload
+
 from beartype.typing import Callable
 
 if TYPE_CHECKING:
@@ -50,8 +51,9 @@ def update(obj: Any, where_or_updates: str, val: Any, **kwargs) -> Any: ...
 
 def update(obj, where_or_updates, val=None, **kwargs):
     """
-    FlowTangent wrapper for eqx.tree_at. Reorders inputs, and takes a variety of specifications for where/how to update the tree. e.g.:
-    
+    FlowTangent wrapper for eqx.tree_at. Reorders inputs, and takes a variety of
+    specifications for where/how to update the tree. e.g.:
+
     updated_tree = update(tree, "branch.leaf", new_val)
     updated_tree = update(tree, (("branch.leaf_1", new_val_1), ("branch.leaf_2", new_val_2)))
 
@@ -115,8 +117,10 @@ def update(obj, where_or_updates, val=None, **kwargs):
 @dataclass(frozen=True)
 class TreePath:
     """
-    FlowTangent utility for specifying JAX Tree Paths in more natural language as either a string of period-separated attributes/keys, or a tuple thereof.
+    FlowTangent utility for specifying JAX Tree Paths in more natural language as either
+    a string of period-separated attributes/keys, or a tuple thereof.
     """
+
     path: tuple
     value: Any
     path_slice: slice | tuple[slice, ...] | Any
