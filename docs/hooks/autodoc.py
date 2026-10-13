@@ -1,4 +1,5 @@
 import importlib
+import json
 import logging
 
 from griffe import Docstring, Extension
@@ -30,19 +31,32 @@ class ProcessDiagramExtension(Extension):
                     dummy = runtime_cls()
                     cyto_json = dummy.to_cytoscape_json(recursive=True)
 
-                    diagram_section = (
-                        f"\n\n### Process Architecture\n\n"
-                        f"<div class='cyto-wrapper' style='height: 500px; width: 100%; border: 2px solid #3b4252; border-radius: 8px; overflow: hidden; position: relative; margin-top: 1em;'>\n"  # noqa: E501
-                        f"  <div class='cyto-canvas' style='width: 100%; height: 100%; background-color: #2e3440;'></div>\n"  # noqa: E501
-                        f"  <script type='application/json' class='cyto-data'>\n{cyto_json}\n  </script>\n"
-                        f"</div>\n"
-                    )
+                    # Parse the JSON string to verify it isn't empty
+                    cyto_data = json.loads(cyto_json) if isinstance(cyto_json, str) else cyto_json
+                    has_elements = False
+                    
+                    if isinstance(cyto_data, list) and len(cyto_data) > 0:
+                        has_elements = True
+                    elif isinstance(cyto_data, dict):
+                        # Handle both {"elements": [...]} and {"nodes": [...]} formats
+                        if cyto_data.get("elements") or cyto_data.get("nodes"):
+                            has_elements = True
 
-                    # 4. Inject directly into Griffe's documentation model
-                    if cls.docstring:
-                        cls.docstring.value += diagram_section
-                    else:
-                        cls.docstring = Docstring(diagram_section, parent=cls)
+                    # Only inject the diagram if we confirmed there are nodes to render
+                    if has_elements:
+                        diagram_section = (
+                            f"\n\n### Process Architecture\n\n"
+                            f"<div class='cyto-wrapper' style='height: 500px; width: 100%; border: 2px solid #3b4252; border-radius: 8px; overflow: hidden; position: relative; margin-top: 1em;'>\n"  # noqa: E501
+                            f"  <div class='cyto-canvas' style='width: 100%; height: 100%; background-color: #2e3440;'></div>\n"  # noqa: E501
+                            f"  <script type='application/json' class='cyto-data'>\n{cyto_json}\n  </script>\n"
+                            f"</div>\n"
+                        )
+
+                        # 4. Inject directly into Griffe's documentation model
+                        if cls.docstring:
+                            cls.docstring.value += diagram_section
+                        else:
+                            cls.docstring = Docstring(diagram_section, parent=cls)
 
         except Exception as exc:
             logging.getLogger("mkdocs").warning(f"autodoc: no graph for {cls.path}: {exc}")

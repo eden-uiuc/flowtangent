@@ -20,18 +20,19 @@ code_generation:
           ### FlowTangent Docstring Specification Rulebook:
 
           1. Description Header:
-          - Sentence 1: High-level overview of what the module/class computes.
-          - Sentence 2-3: Mathematical context or system design role.
+             - Sentence 1: High-level overview of what the module/class computes.
+             - Sentence 2-3: Mathematical context or system design role.
 
           2. Markdown Sections (Use H3 '###' headings):
-          - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$).
-          - '### Process Architecture': Include only if describing a multi-step routine without a `.to_mermaid()` method.
-          - '### Usage Example': A minimal, Runnable snippet demonstrating usage with FlowTangent's datastructures and utilities, or JAX/Equinox as necessary.
+             - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$).
+             - '### Process Architecture': Include only if describing a multi-step routine without a `.to_cytoscape_json()` method.
+             - '### Usage Example': A minimal, Runnable snippet demonstrating usage with FlowTangent's datastructures and utilities, or JAX/Equinox as necessary.
 
           3. Standard Google Sections:
-          - 'Args:': Typed parameter descriptions, noting if a JAX array is expected to be 1D or ND.
-          - 'Returns:': Return type and payload specification.
-          - 'Raises:': Exceptions for dimension mismatches or invalid shapes.
+             - 'Attributes:': (CRITICAL FOR EQUINOX MODULES/DATACLASSES) Typed field descriptions. This ensures MkDocs/Griffe renders a clean HTML table instead of clunky individual signature boxes for class fields.
+             - 'Args:': Typed parameter descriptions for standard functions/methods, noting if a JAX array is expected to be 1D or ND.
+             - 'Returns:': Return type and payload specification.
+             - 'Raises:': Exceptions for dimension mismatches or invalid shapes.
 
           ### Standard Template Reference:
 
@@ -57,9 +58,12 @@ code_generation:
               result = model(jnp.ones((10, 3)))
               ```
 
-              Args:
-                  param_a (jax.Array): Description of param_a, shape `(N, D)`.
+              Attributes:
+                  param_a (jax.Array): Description of field param_a, shape `(N, D)`.
                   param_b (float): Scaling hyperparameter. Defaults to 1.0.
+
+              Args:
+                  input_data (jax.Array): Parameters for methods like `__call__` or `fit`.
 
               Returns:
                   jax.Array: Transformed array, shape `(N, L)`.

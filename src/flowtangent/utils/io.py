@@ -106,12 +106,13 @@ def jax_path_string(jax_path: tuple) -> str:
 
 
 def _ft_root() -> Path:
-    """Returns the absolute path to the src/flowtangent directory."""
+    """Returns the absolute path to the src/flowtangent directory. Meant for developer internal use only"""
     # .parent steps up from src/flowtangent/utils to src/flowtangent
     return Path(os.path.dirname(os.path.abspath(__file__))).resolve().parent
 
 
 def serialize_node(obj):
+    """Recusively serializes FT Modules by saving only deviations from defaults in FT module registry"""
     if isinstance(obj, (jax.Array, np.ndarray)):
         if obj.size == 1:
             return obj.item()
@@ -158,6 +159,7 @@ def serialize_node(obj):
 
 
 def deserialize_node(data):
+    """Deserializes FT modules by augmenting class defaults with data saved by serialize_node."""
     if not isinstance(data, dict):
         return data
 
@@ -190,6 +192,7 @@ def deserialize_node(data):
 
 
 def save_data(obj, filename: str | Path):
+    """Saves FT modules to file."""
     file_path = Path(filename).resolve()
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -209,6 +212,7 @@ def save_data(obj, filename: str | Path):
 
 
 def load_data(filename: str | Path) -> Any:
+    """Loads FT modules from file."""
     with gzip.open(filename, "rt", encoding="utf-8") as f:
         payload = json.load(f)
 
@@ -228,6 +232,10 @@ def load_data(filename: str | Path) -> Any:
 
 
 class JAXCompileFilter(logging.Filter):
+    """
+    Filter for only logging a whitelist of particular functions to skip basic primitives/lower level functions.
+    Primarily used for debugging or benchmarking.
+    """
     def __init__(self, name: str = "", whitelist: Optional[tuple[str]] = None) -> None:
         super().__init__(name)
         self.whitelist = whitelist

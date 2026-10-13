@@ -22,7 +22,7 @@ class _Placeholder:
 _ = cast(Any, _Placeholder())
 
 # FT Metatypes
-NameType = Union[str, None]
+NameType = Union[str, None]  # Dummy type to allow name to be defaulted to None for modules while still being parsed by Module.__init_subclass__ for registry
 TreePathLike = Union[TreePath, str, tuple[tuple | str | TreePath, Any, Optional[slice]]]
 
 # --- Scalars (Accepts JAX 0D arrays or Python primitives) ---
