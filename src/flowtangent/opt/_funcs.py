@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 from jax.scipy.stats import norm
@@ -74,42 +72,237 @@ def __dir__():
 
 
 @register_penalty("quadratic_penalty")
-def quadratic_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def quadratic_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+    r"""Sum squared violations of lower and upper bounds.
+
+    Zero for values within inclusive bounds; otherwise in squared input units.
+
+    ### Mathematical Formulation
+    $$P(x) = \sum_i [\max(0,l_i-x_i)^2 + \max(0,x_i-u_i)^2].$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import quadratic_penalty
+
+    value = quadratic_penalty(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum(viol_lower**2 + viol_upper**2)
 
 
 @register_penalty("linear_penalty")
-def linear_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def linear_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+    r"""Sum absolute violations of lower and upper bounds.
+
+    Zero for values within inclusive bounds; otherwise in input units.
+
+    ### Mathematical Formulation
+    $$P(x) = \sum_i [\max(0,l_i-x_i) + \max(0,x_i-u_i)].$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import linear_penalty
+
+    value = linear_penalty(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum(viol_lower + viol_upper)
 
 
 @register_penalty("log_barrier")
-def log_barrier(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def log_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+    r"""Sum negative logarithms of clipped distances to the bounds.
+
+    Distances at or beyond either bound are clipped to `1e-8` instead of rejecting
+    points outside the interval. The total can be negative when distances exceed
+    one in the supplied units.
+
+    ### Mathematical Formulation
+    $$P(x) = -\sum_i\log\max(x_i-l_i,10^{-8})
+    -\sum_i\log\max(u_i-x_i,10^{-8}).$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import log_barrier
+
+    value = log_barrier(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     d_lower = x - bounds[0]
     d_upper = bounds[1] - x
     return -jnp.sum(jnp.log(jnp.maximum(d_lower, 1e-8))) - jnp.sum(jnp.log(jnp.maximum(d_upper, 1e-8)))
 
 
 @register_penalty("inverse_barrier")
-def inverse_barrier(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def inverse_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+    r"""Sum reciprocals of clipped distances to the bounds.
+
+    Distances at or beyond either bound are clipped to `1e-8`; their reciprocal
+    contributions saturate at `1e8` in inverse input units.
+
+    ### Mathematical Formulation
+    $$P(x) = \sum_i [1/\max(x_i-l_i,10^{-8})
+    +1/\max(u_i-x_i,10^{-8})].$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import inverse_barrier
+
+    value = inverse_barrier(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     d_lower = jnp.maximum(x - bounds[0], 1e-8)
     d_upper = jnp.maximum(bounds[1] - x, 1e-8)
     return jnp.sum(1.0 / d_lower + 1.0 / d_upper)
 
 
 @register_penalty("exponential_penalty")
-def exponential_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], k: float = 10.0, **kwargs) -> jax.Array:
+def exponential_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], k: float = 10.0, **kwargs) -> jax.Array:
+    r"""Sum exponentially scaled violations of lower and upper bounds.
+
+    For positive `k`, values within inclusive bounds contribute zero and violations
+    grow exponentially; sufficiently large exponents can overflow to infinity.
+
+    ### Mathematical Formulation
+    $$P(x) = \sum_i [e^{k\max(0,l_i-x_i)}-1
+    +e^{k\max(0,x_i-u_i)}-1].$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import exponential_penalty
+
+    value = exponential_penalty(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        k (float): Exponential scale in inverse input units; defaults to `10.0`.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum((jnp.exp(k * viol_lower) - 1.0) + (jnp.exp(k * viol_upper) - 1.0))
 
 
 @register_penalty("infinite_penalty")
-def infinite_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def infinite_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+    r"""Return zero only when every value satisfies its inclusive bounds.
+
+    An empty input with compatible bounds yields zero. A NaN in a compared value
+    or bound makes the all-in-bounds condition false.
+
+    ### Mathematical Formulation
+    $$P(x) = 0\ \text{if all }l_i\le x_i\le u_i;\quad P(x)=+\infty\ \text{otherwise}.$$
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.opt._funcs import infinite_penalty
+
+    value = infinite_penalty(
+        jnp.array([0.5]), (jnp.zeros(1), jnp.ones(1))
+    )
+    ```
+
+    Args:
+        x (jax.Array): Values as a 1D or ND array; all broadcast entries are reduced.
+        bounds (tuple[jax.Array, jax.Array]): Lower and upper bounds in the same
+            units as `x`, with shapes broadcast-compatible with it. Bound ordering
+            is not validated.
+        **kwargs (Any): Ignored.
+
+    Returns:
+        jax.Array: Scalar penalty reduced over all broadcast dimensions.
+
+    Raises:
+        TypeError: If the values and bounds cannot be broadcast together.
+        ValueError: If incompatible shapes have different numbers of dimensions.
+    """
     in_bounds = jnp.all((x >= bounds[0]) & (x <= bounds[1]))
     return jnp.where(in_bounds, 0.0, jnp.inf)
 

@@ -11,14 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass
-
-from typing import TYPE_CHECKING, Callable
-
-if TYPE_CHECKING:
     from .... import Aircraft, Settings, State, System
     from ....solve.energy.jets import JetSettings
-
 
 import json
 import warnings
@@ -28,6 +22,7 @@ from pathlib import Path
 # package imports
 import jax
 import jax.numpy as jnp
+from beartype.typing import Callable
 
 from flowtangent.data import units
 

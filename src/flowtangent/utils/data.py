@@ -324,6 +324,7 @@ class Dataset(Module):
 
 
 def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
+    """Loads dataset and routes to type based on source extension."""
 
     if source is None:
         raise ValueError("ft.Dataset requires a source when instantiated directly.")

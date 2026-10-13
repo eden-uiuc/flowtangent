@@ -10,6 +10,8 @@ theme:
     - navigation.tabs
     - navigation.sections
     - navigation.indexes
+    # - toc.integrate
+    - toc.follow
     - content.code.copy
 
 extra_css:
@@ -21,14 +23,30 @@ plugins:
       default_handler: python
       handlers:
         python:
+          paths: ["src"]
           options:
+            # Fixes ToC hierarchy by explicitly rendering the class name as a header
+            show_root_heading: true
+            show_root_toc_entry: true
+            
+            # Fixes missing dataclass/module fields by showing them even without docstrings
+            show_signature_annotations: true
+            
+            # Best practice: Combines the __init__ signature docs with the main class docs
+            merge_init_into_class: true
+            separate_signature: true
+
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+
+            filters: ["!^_"]
+
             extensions:
               - docs/hooks/autodoc.py
   - mkdocs-jupyter:
       execute: false 
       theme: dark 
       include_source: true 
-      ignore_hugo: false
       ignore: ["*.ipynb_checkpoints/*"]
       
 nav:
@@ -43,13 +61,12 @@ nav:
 
 
 markdown_extensions:
+  - toc:
+        permalink: true
+        toc_depth: 1-2
   - admonition
   - pymdownx.details
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.superfences
   - pymdownx.arithmatex:
       generic: true
 

@@ -1,12 +1,13 @@
 import warnings
 from functools import partial
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 import blackjax
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import optimistix as optx
+from beartype.typing import Callable
 from blackjax.mcmc.hmc import HMCState
 from jax.flatten_util import ravel_pytree
 from jax.scipy.stats import norm
@@ -16,13 +17,13 @@ from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
 from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
 from ..utils.data import DataLoader, Dataset, LatentDataLoader, RandomSampler, numpy_collate
-from ..utils.typing import _
+from ..utils.typing import NameType, _
 from .manifolds import Manifold
 from .surrogates import Surrogate, SurrogateEvaluation
 
 
 class Parameter(Module):
-    name: str = static_field("Parameter")
+    name: NameType = static_field("Parameter")
 
     path: Optional[TreePathLike] = None
 

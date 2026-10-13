@@ -11,21 +11,21 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    Callable,
     Generator,
     Literal,
     Optional,
     Sequence,
-    Tuple,
     TypeAlias,
     overload,
 )
+
+from beartype.typing import Callable
 
 if TYPE_CHECKING:
     from .. import Settings, State, System
     from ..solve import JacobianMap
 
-    ProcessFunc: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
+    ProcessFunc: TypeAlias = Callable[[State, System, Settings], tuple[State, System, Settings]]
 
 import inspect
 import re
@@ -645,10 +645,32 @@ class Process(ProcessStep):
             all_io |= step.outputs
         return all_io
 
-    def _get_flattened_steps(self, prefix: str = "") -> Generator[Tuple[str, ProcessStep], None, None]:
-        """
-        Recursively yields (node_name, step_obj) for all steps.
-        The prefix tracks the hierarchical origin (e.g., '0_InitializeVLM.2_ProcessGeometry').
+    def _get_flattened_steps(self, prefix: str = "") -> Generator[tuple[str, ProcessStep], None, None]:
+        r"""Yield leaf steps in depth-first process order.
+
+        Nested processes contribute their descendants rather than a step of their own.
+        This supplies the leaf names and objects used by recursive process graphs.
+
+        ### Mathematical Formulation
+        The flattened sequence is the ordered concatenation of each child sequence:
+        $F(P) = F(P_1) + \cdots + F(P_n)$, with $F(s) = [(s.name, s)]$ for a leaf.
+
+        ### Usage Example
+        ```python
+        import flowtangent as ft
+
+        process = ft.Process().append(ft.ProcessStep(name="Leaf"))
+        names = [name for name, _ in process._get_flattened_steps()]
+        assert names == ["Leaf"]
+        ```
+
+        Args:
+            prefix (str): Accumulated parent-name prefix passed through recursion;
+                it is not included in yielded names.
+
+        Yields:
+            tuple[str, ProcessStep]: Leaf name and the original step object. Names
+                need not be unique; empty nested processes yield nothing.
         """
         for step in self.steps:
             node_name = step.name

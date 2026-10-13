@@ -10,13 +10,13 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+
+from flowtangent import Aircraft, Settings, State
 from flowtangent.aero.VORJAX import discretize_surfaces
+from flowtangent.core._settings import AnalysisSettings
 from flowtangent.framework.plotting import plot_vlm_panels
 from flowtangent.library.components.wings import Chords, Sweeps, Wing, WingDimensions
 from flowtangent.solve.aero.VORJAX import VORJAX_Settings, Vortices
-
-from flowtangent import Aircraft, Settings, State
-from flowtangent.core._settings import AnalysisSettings
 
 from .._utils import update
 

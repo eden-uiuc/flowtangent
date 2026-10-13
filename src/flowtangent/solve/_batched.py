@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 
 if TYPE_CHECKING:
     from .. import Settings, System
@@ -157,8 +157,53 @@ class BatchedAnalysis(Process):
 
         return update(pytree, lambda p: get_all_targets(p, inputs), padded_arrays)
 
-    def __call__(self, state: State, system: System, settings: Settings) -> Tuple[State, System, Settings]:
+    def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
+        r"""Evaluate state inputs in fixed-size vectorized batches.
 
+        The numerical settings select paired (`zip`) or Cartesian (`mesh`) inputs.
+        Only state inputs are applied; system input paths do not vary the supplied
+        system. Changes to system or settings returned by the analysis are discarded.
+
+        ### Mathematical Formulation
+        The number of states is $N=n$ in zip mode or $N=\prod_i n_i$ in mesh mode;
+        the returned state concatenates results along the batch axis.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        import flowtangent as ft
+
+        analysis = ft.BatchedAnalysis(
+            batch_inputs=(
+                ft.TreePath(
+                    "freestream.mach_number",
+                    jnp.array([[0.2], [0.3]]),
+                ),
+            )
+        )
+        result, system, settings = analysis(
+            ft.State(), ft.System(), ft.Settings()
+        )
+        ```
+
+        Args:
+            state (State): Base state expanded along a leading batch axis.
+            system (System): Shared system passed to every state evaluation.
+            settings (Settings): Uses `numerical.batch_size` and `numerical.batch_mode`.
+                Batch size must be positive; at least one state input is required,
+                and input arrays must have nonempty leading dimensions.
+
+        Returns:
+            tuple[State, System, Settings]: Concatenated state results and the original
+                system and settings. The final batch is padded by repeating its last
+                input and truncated afterward, so padded results are omitted.
+
+        Raises:
+            ValueError: If batch mode is unsupported, zip inputs have unequal leading
+                lengths, or batch size is zero. Analysis errors propagate.
+            IndexError: If there are no batch inputs or no state inputs to update.
+            TypeError: If the inputs produce no states to concatenate.
+        """
         batch_size = settings.numerical.batch_size
         batch_mode = settings.numerical.batch_mode
 
@@ -329,11 +374,78 @@ class ShardedDatasetGenerator:
         state_kwargs: Dict[str, np.ndarray],
         state_mode: str = "zip",
         system: Optional[Any] = None,
-        system_iter: Optional[Iterable[Tuple[Any, Dict[str, float]]]] = None,
+        system_iter: Optional[Iterable[tuple[Any, Dict[str, float]]]] = None,
         total_systems: Optional[int] = None,
         batch_size: Optional[int] = None,
     ):
         # Resolve inputs upfront to determine total states
+        r"""Generate sharded analysis data over state combinations and systems.
+
+        Zip mode broadcasts state arrays; mesh mode forms their Cartesian product.
+        Each system's metadata is added as constant output columns and can overwrite
+        result columns with the same names. Exceptions during a system's analysis,
+        output conversion, or shard append skip that system without rolling back writes.
+
+        ### Mathematical Formulation
+        For 1D state arrays, $N=\prod_i n_i$ in mesh mode; zip mode uses the common
+        broadcast length. Each metadata value supplies a column of shape `(N, 1)`.
+
+        ### Process Architecture
+        Expand state inputs, analyze each system, append outputs, offload the final
+        shard, and recursively delete the entire configured cache directory.
+
+        ### Usage Example
+        ```python
+        import tempfile
+        from pathlib import Path
+        import numpy as np
+        import flowtangent as ft
+        from flowtangent.solve._batched import (
+            ShardedDatasetGenerator,
+        )
+
+
+        class BatchRunner:
+            def run(self, **kwargs):
+                return {"mach": kwargs["mach"]}
+
+
+        with tempfile.TemporaryDirectory() as root:
+            generator = ShardedDatasetGenerator(
+                BatchRunner(),
+                Path(root, "cache"),
+                Path(root, "data"),
+            )
+            generator.run(
+                ft.Settings(),
+                {"mach": np.array([0.2, 0.3])},
+                system=ft.System(),
+            )
+        ```
+
+        Args:
+            settings (Settings): Forwarded to the batch runner for each system.
+            state_kwargs (dict[str, numpy.ndarray]): Nonempty mapping of state input
+                names to nonempty 1D value arrays. Values are passed to the runner as
+                flattened columns `(N, 1)`.
+            state_mode (str): `zip` broadcasts inputs; `mesh` enumerates combinations.
+            system (Any | None): Single system used when `system_iter` is absent.
+            system_iter (Iterable[tuple[Any, dict[str, float]]] | None): Systems paired
+                with scalar metadata. Takes precedence over `system`.
+            total_systems (int | None): Progress total only; does not limit iteration.
+            batch_size (int | None): Forwarded to the batch runner.
+
+        Returns:
+            None: Writes Zarr shards to the configured storage directory and removes
+                the cache directory on successful completion, even if systems were skipped.
+
+        Raises:
+            ValueError: If state mode is unsupported, zip arrays cannot broadcast, or
+                neither a system nor a system iterable is provided.
+            IndexError: If the state mapping is empty.
+            OSError: If final shard offloading or cache removal fails. Iterator errors
+                outside the per-system analysis block also propagate.
+        """
         raw_states = [np.atleast_1d(v) for v in state_kwargs.values()]
         state_keys = list(state_kwargs.keys())
 

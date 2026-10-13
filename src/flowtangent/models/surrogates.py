@@ -1,5 +1,5 @@
 import abc
-from typing import List, Optional, Tuple, TypeAlias, Union
+from typing import List, Optional, TypeAlias, Union
 
 import equinox as eqx
 import jax
@@ -15,8 +15,40 @@ _loader: TypeAlias = DataLoader | LatentDataLoader
 
 
 # --- DataLoader Compatibility Helper ---
-def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax.Array, jax.Array]:
-    """Drains a DataLoader into full-batch arrays for classical matrix inversion."""
+def _get_full_XY(data: Union[tuple[jax.Array, jax.Array], _loader]) -> tuple[jax.Array, jax.Array]:
+    r"""Collect feature and target arrays from paired training data.
+
+    A loader is consumed for one iteration and its batches are concatenated in
+    yielded order. Directly supplied pairs retain their original arrays.
+
+    ### Mathematical Formulation
+    $X = concat_0(X_1, \ldots, X_b)$ and $Y = concat_0(Y_1, \ldots, Y_b)$.
+
+    ### Process Architecture
+    Collect each batch's features and targets, then concatenate each along axis zero.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.models.surrogates import _get_full_XY
+
+    x, y = _get_full_XY((jnp.ones((2, 3)), jnp.zeros((2, 1))))
+    ```
+
+    Args:
+        data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+            An `(X, Y)` pair, normally with 2D arrays `(N, D)` and `(N, O)`, or
+            a loader yielding pairs with compatible non-batch dimensions.
+
+    Returns:
+        tuple[jax.Array, jax.Array]: Features and targets. Loader data is
+            materialized in memory; direct pairs are returned without conversion.
+
+    Raises:
+        IndexError: If data or a loader batch lacks a target item.
+        ValueError: If the loader yields no batches.
+        TypeError: If batch array shapes are incompatible for concatenation.
+    """
     if hasattr(data, "dataset") and hasattr(data, "__iter__"):
         X_list, Y_list = [], []
         for batch in data:
@@ -47,7 +79,34 @@ class Surrogate(Module):
         pass
 
     @abc.abstractmethod
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
+        r"""Define the fitting interface for surrogate implementations.
+
+        Subclasses provide the training rule; this abstract body performs no fitting.
+
+        ### Mathematical Formulation
+        Concrete implementations determine the map $(M, X, Y) \mapsto M'$.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            InverseDistanceWeighting,
+        )
+
+        model = InverseDistanceWeighting(1, 1)
+        fitted = model.fit((jnp.zeros((2, 1)), jnp.ones((2, 1))))
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                Feature and target arrays, conventionally 2D `(N, D)` and `(N, O)`,
+                or a loader yielding corresponding batches.
+            **kwargs (Any): Training options interpreted by the concrete implementation.
+
+        Returns:
+            Surrogate: The fitted model supplied by the concrete implementation.
+        """
         pass
 
 
@@ -84,11 +143,58 @@ class PolynomialChaosSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
     ) -> "PolynomialChaosSurrogate":
+        r"""Fit polynomial-basis coefficients by minimizing mean squared error.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean((Y-f_\theta(X))^2)$, where the basis uses elementwise powers
+        from one through the configured degree.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            PolynomialChaosSurrogate,
+        )
+
+        model = PolynomialChaosSurrogate(
+            jax.random.PRNGKey(0), 1, 1
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-2`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            PolynomialChaosSurrogate: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
@@ -123,7 +229,44 @@ class InverseDistanceWeighting(Surrogate):
             )
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
+        """Store training samples for inverse-distance interpolation.
+
+        Fitting replaces the reference features and targets without optimizing parameters.
+        Loaders are materialized in their yielded order.
+
+        ### Mathematical Formulation
+        $X_{fit} = X$ and $Y_{fit} = Y$; the distance-weighting power is unchanged.
+
+        ### Process Architecture
+        Collect paired arrays and replace the reference data in a new model.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            InverseDistanceWeighting,
+        )
+
+        fitted = InverseDistanceWeighting(1, 1).fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1)))
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D features `(N, D)` and targets `(N, O)`, or a loader yielding pairs.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            InverseDistanceWeighting: A new model containing the training arrays.
+
+        Raises:
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+            IndexError: If a loader batch lacks a target item.
+            ValueError: If the loader yields no batches.
+            TypeError: If loader batch shapes are incompatible for concatenation.
+        """
         X_full, Y_full = _get_full_XY(data)
 
         return eqx.tree_at(lambda m: (m.X_fit, m.Y_fit), self, (X_full, Y_full))
@@ -153,7 +296,46 @@ class RadialBasisFunction(Surrogate):
             )
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
+        r"""Fit Gaussian radial-basis weights to paired training data.
+
+        Each training feature becomes a center. A fixed diagonal ridge regularizes
+        the interpolation system, and the original model is unchanged.
+
+        ### Mathematical Formulation
+        $\Phi_{ij} = \exp(-\|X_i-X_j\|^2/(2\ell^2))$ and
+        $W = (\Phi + 10^{-6}I)^{-1}Y$, using the current lengthscale $\ell$.
+
+        ### Process Architecture
+        Materialize pairs, form the regularized kernel matrix, and solve for weights.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            RadialBasisFunction,
+        )
+
+        fitted = RadialBasisFunction(1, 1).fit(
+            (jnp.array([[0.0], [1.0]]), jnp.ones((2, 1)))
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D features `(N, D)` and targets `(N, O)`, or a loader yielding pairs.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            RadialBasisFunction: A new model with training centers and solved weights.
+
+        Raises:
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+            IndexError: If a loader batch lacks a target item.
+            ValueError: If the loader yields no batches or targets have an incompatible
+                leading dimension for the linear solve.
+            TypeError: If loader batch shapes are incompatible for concatenation.
+        """
         X_full, Y_full = _get_full_XY(data)
 
         def phi_fn(x1, x2):
@@ -213,11 +395,63 @@ class GaussianProcessSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], "_loader"],
+        data: Union[tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
     ) -> "GaussianProcessSurrogate":
+        r"""Fit inducing-point predictions with a Gaussian likelihood objective.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = \frac12\sum\log V + \frac12\sum (Y-\mu)^2/V
+        + \frac12\sum A^2$, where $A$ is the variational mean and $V$ is the
+        predictive variance.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.kernels import RBFKernel
+        from flowtangent.models.surrogates import (
+            GaussianProcessSurrogate,
+        )
+
+        model = GaussianProcessSurrogate(
+            jax.random.PRNGKey(0),
+            1,
+            1,
+            RBFKernel(1),
+            num_inducing=2,
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-2`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            GaussianProcessSurrogate: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
 
         def loss_fn(model, batch):
             x_train, y_train = batch
@@ -268,11 +502,55 @@ class MLPSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 1000,
         **kwargs,
     ) -> "MLPSurrogate":
+        r"""Fit the neural network by minimizing mean squared error.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean((Y-f_\theta(X))^2)$.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import MLPSurrogate
+
+        model = MLPSurrogate(
+            jax.random.PRNGKey(0), 1, 1, width=4, depth=1
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-3`.
+            epochs (int): Number of passes over the data. Defaults to `1000`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            MLPSurrogate: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
             preds = jax.vmap(model._internal_predict)(x_batch)
@@ -321,11 +599,58 @@ class TransformerSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
     ) -> "TransformerSurrogate":
+        r"""Fit latent-and-context predictions by minimizing mean squared error.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean((Y-f_\theta(X))^2)$; each feature row concatenates latent
+        coordinates followed by context coordinates.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            TransformerSurrogate,
+        )
+
+        model = TransformerSurrogate(
+            jax.random.PRNGKey(0), 1, 1, 1, hidden_size=4
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 2)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches. Feature rows concatenate latent and context coordinates.
+            learning_rate (float): Adam step size. Defaults to `1e-3`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            TransformerSurrogate: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
@@ -358,11 +683,58 @@ class DeepEnsembleSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
     ) -> "DeepEnsembleSurrogate":
+        r"""Fit all ensemble members against the same target batches.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean_{n,m,o}((Y_{no}-f_{\theta_m}(X_n)_o)^2)$; every member
+        receives the same samples rather than a separate bootstrap sample.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            DeepEnsembleSurrogate,
+        )
+
+        model = DeepEnsembleSurrogate(
+            jax.random.PRNGKey(0), 2, 1, 1
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-3`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            DeepEnsembleSurrogate: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
@@ -399,11 +771,54 @@ class MixtureOfExperts(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
     ) -> "MixtureOfExperts":
+        r"""Fit the gating network and experts using mean squared error.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean((Y-\sum_m g_m(X)f_m(X))^2)$, where $g$ is the
+        softmax routing distribution.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import MixtureOfExperts
+
+        model = MixtureOfExperts(jax.random.PRNGKey(0), 2, 1, 1)
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-3`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            MixtureOfExperts: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
 
@@ -480,11 +895,57 @@ class FourierNeuralOperator(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], "_loader"],
+        data: Union[tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
     ) -> "FourierNeuralOperator":
+        r"""Fit spectral predictions by minimizing mean squared error.
+
+        The current parameters provide the starting point for Adam training.
+        Training returns a fitted model without modifying this instance.
+
+        ### Mathematical Formulation
+        $L = mean((Y-f_\theta(X))^2)$.
+
+        ### Process Architecture
+        Apply Adam updates once per loader batch per epoch, or once per epoch for array pairs.
+
+        ### Usage Example
+        ```python
+        import jax
+        import jax.numpy as jnp
+        from flowtangent.models.surrogates import (
+            FourierNeuralOperator,
+        )
+
+        model = FourierNeuralOperator(
+            jax.random.PRNGKey(0), 1, 1, modes=2, width=2, grid=4
+        )
+        fitted = model.fit(
+            (jnp.zeros((2, 1)), jnp.ones((2, 1))), epochs=1
+        )
+        ```
+
+        Args:
+            data (tuple[jax.Array, jax.Array] | DataLoader | LatentDataLoader):
+                2D feature and target arrays `(N, D)` and `(N, O)`, or a loader yielding
+                such batches.
+            learning_rate (float): Adam step size. Defaults to `1e-3`.
+            epochs (int): Number of passes over the data. Defaults to `500`;
+                a nonpositive count performs no updates.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            FourierNeuralOperator: Model after training; returns the original instance if
+                no updates run. Loader and training errors propagate.
+
+        Raises:
+            TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
+
         def loss_fn(model, batch):
             x_batch, y_batch = batch
             preds = jax.vmap(model._internal_predict)(x_batch)

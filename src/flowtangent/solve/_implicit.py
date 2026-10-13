@@ -23,13 +23,14 @@ import threading
 import time
 import warnings
 from collections import Counter
-from typing import Any, Callable, Literal, Optional, overload
+from typing import Any, Literal, Optional, overload
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
+from beartype.typing import Callable
 from jax.core import Tracer
 from scipy.optimize import root
 

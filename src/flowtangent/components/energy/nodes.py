@@ -9,12 +9,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
-from typing import TYPE_CHECKING, Callable, Iterable, Literal, cast, get_args
+from typing import TYPE_CHECKING, Iterable, Literal, cast, get_args
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
@@ -28,6 +23,7 @@ from functools import reduce
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from beartype.typing import Callable
 
 from ...core._component import Component
 from ...data.gases import Air, Gas

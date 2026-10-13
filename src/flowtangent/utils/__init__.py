@@ -1,4 +1,9 @@
 # src/flowtangent/utils/__init__.py
+"""Utility functions and backend configuration for FlowTangent.
+
+This package provides core system utilities, numerical environment setup,
+and JAX cache initialization required for the framework's core processes.
+"""
 
 # 1. Base / Syntax
 from .base import (

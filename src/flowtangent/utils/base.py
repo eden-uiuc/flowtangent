@@ -6,6 +6,7 @@ from typing import Any, dataclass_transform, get_args
 import equinox as eqx
 import jax.numpy as jnp
 from beartype import beartype
+from beartype.typing import Callable
 from jaxtyping import jaxtyped
 
 from .typing import NameType, _Placeholder
@@ -21,7 +22,7 @@ if typing.TYPE_CHECKING:
 
     # Overload 1: If passed a class/callable, Pylance binds it to 'default_factory'
     @typing.overload
-    def field(default_factory: typing.Callable[[], T], as_func: bool = False, **kwargs) -> T: ...
+    def field(default_factory: Callable[[], T], as_func: bool = False, **kwargs) -> T: ...
 
     # Overload 2: If passed a standard value, Pylance binds it to 'default'
     @typing.overload
@@ -45,10 +46,12 @@ def field(initializer: typing.Any = None, as_func: bool = False, **kwargs):
 
 
 def static_field(*args, **kwargs):
+    """Alias for creating static fields"""
     return field(*args, static=True, **kwargs)
 
 
 def method_field(*args, **kwargs):
+    """Alias for creating fields which pass methods or other Callables without trying to initialize/call them."""
     return field(*args, as_func=True, static=True, **kwargs)
 
 
@@ -62,7 +65,10 @@ FLOWTANGENT_REGISTRY = {}
 
 @dataclass_transform(field_specifiers=(eqx.field, static_field, method_field))
 class Module(eqx.Module):
-    """Base class for all FlowTangent modules."""
+    """
+    Base class for all FlowTangent modules. Implements registration for saving/loading with utils.io functions.
+    Adds "field_name" property for converting module names into psuedo-attributes, e.g. "Main Wing" -> main_wing.
+    """
 
     name: NameType = static_field(None)
 
@@ -117,6 +123,8 @@ class Module(eqx.Module):
 
 
 class StateDataMeta(type(Module)):
+    """Metaclass for State data to expand Placeholder in utils.typing into properly shaped arrays."""
+
     def __new__(mcs, name, bases, namespace):
         ### ADDED
         annotations = namespace.get("__annotations__", {})

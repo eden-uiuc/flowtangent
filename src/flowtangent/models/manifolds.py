@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, List, Literal, Tuple, Union
+from typing import Any, List, Literal, Union
 
 import equinox as eqx
 import jax
@@ -28,8 +28,34 @@ def _get_full_X(data: Union[Float[Array, "N D"], LoaderType]) -> Float[Array, "N
     return data  # type: ignore
 
 
-def _unpack_batch(batch: Union[Float[Array, "B D"], Tuple]) -> Float[Array, "B D"]:
-    """Safely unpacks X_batch from a DataLoader (X, Y) tuple for unsupervised AE training."""
+def _unpack_batch(batch: Union[Float[Array, "B D"], tuple]) -> Float[Array, "B D"]:
+    """Extract features from a training batch.
+
+    Autoencoder losses use the first item of a tuple or list and ignore targets.
+    A batch supplied directly as an array is returned unchanged.
+
+    ### Mathematical Formulation
+    For paired data, $U((X, Y)) = X$; for an array, $U(X) = X$.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.models.manifolds import _unpack_batch
+
+    x = jnp.ones((2, 3))
+    assert _unpack_batch((x, jnp.zeros((2, 1)))) is x
+    ```
+
+    Args:
+        batch (jax.Array | tuple | list): A 2D feature array of shape `(B, D)`
+            or a nonempty sequence whose first item contains the features.
+
+    Returns:
+        jax.Array: The feature array, without copying or converting it.
+
+    Raises:
+        IndexError: If a tuple or list batch is empty.
+    """
     if isinstance(batch, (tuple, list)):
         return batch[0]
     return batch
@@ -67,8 +93,8 @@ class CompositeManifold(Manifold):
     """Adjoins multiple manifolds side-by-side."""
 
     manifolds: List[Manifold] = _
-    _input_splits: Tuple[int, ...] = static_field(())
-    _latent_splits: Tuple[int, ...] = static_field(())
+    _input_splits: tuple[int, ...] = static_field(())
+    _latent_splits: tuple[int, ...] = static_field(())
 
     def __init__(self, manifolds: List[Manifold]):
         self.manifolds = manifolds
@@ -92,7 +118,42 @@ class CompositeManifold(Manifold):
         x_parts = [m.decode(z_p) for m, z_p in zip(self.manifolds, z_parts)]
         return jnp.concatenate(x_parts, axis=-1)
 
-    def fit(self, data: Union[Float[Array, "N D"], Tuple[Array, Array], LoaderType], **kwargs) -> "CompositeManifold":
+    def fit(self, data: Union[Float[Array, "N D"], tuple[Array, Array], LoaderType], **kwargs) -> "CompositeManifold":
+        """Fit each component to its corresponding feature columns.
+
+        The composite retains its structure and replaces components with their fitted
+        results. Array pairs retain targets for surrogate components; other components
+        receive features only. Loader batches are sliced lazily and retain targets.
+
+        ### Mathematical Formulation
+        For column blocks $X_i$, the fitted components are $M_i' = fit(M_i, X_i)$,
+        or $M_i' = fit(M_i, (X_i, Y))$ for surrogates given array pairs.
+
+        ### Process Architecture
+        Slice the final feature axis, fit components in order, and return a new composite.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        from flowtangent.models.manifolds import Passthrough
+
+        model = Passthrough(1) + Passthrough(2)
+        fitted = model.fit(jnp.ones((4, 3)))
+        ```
+
+        Args:
+            data (jax.Array | tuple[jax.Array, jax.Array] | LoaderType): A 2D feature
+                array `(N, D)`, an `(X, Y)` pair, or a loader. Feature columns are
+                partitioned using the component input dimensions; targets are unsliced.
+            **kwargs (Any): Forwarded to every component's `fit` method.
+
+        Returns:
+            CompositeManifold: A composite containing the fitted components; the
+                original composite is unchanged. Component fitting errors propagate.
+
+        Raises:
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
         new_manifolds = []
         for i, m in enumerate(self.manifolds):
             sliced_data = slice_data(data, self._input_splits, i)
@@ -123,7 +184,34 @@ class Passthrough(Manifold):
     def decode(self, z: Float[Array, " L"]) -> Float[Array, " D"]:
         return z
 
-    def fit(self, X: Union[Float[Array, "N D"], LoaderType, Tuple], **kwargs) -> "Passthrough":
+    def fit(self, X: Union[Float[Array, "N D"], LoaderType, tuple], **kwargs) -> "Passthrough":
+        """Return this identity manifold without fitting.
+
+        Passthrough has no data-dependent parameters, so training data is unused.
+
+        ### Mathematical Formulation
+        $fit(M, X) = M$ for the identity map $M(x) = x$.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        from flowtangent.models.manifolds import Passthrough
+
+        model = Passthrough(2)
+        assert model.fit(jnp.ones((3, 2))) is model
+        ```
+
+        Args:
+            X (jax.Array | LoaderType | tuple): Training data, conventionally a 2D
+                `(N, D)` feature array; unused by fitting. Loaders are not iterated.
+            **kwargs (Any): Ignored.
+
+        Returns:
+            Passthrough: The same instance.
+
+        Raises:
+            jaxtyping.TypeCheckError: If arguments violate the method annotations.
+        """
         return self
 
 
