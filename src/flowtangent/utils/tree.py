@@ -416,17 +416,44 @@ def get_all_targets(s: Any, input_map: Sequence[str | tuple | TreePath]) -> tupl
 
 
 def is_equivalent(a: Any, b: Any) -> bool:
-    """Safely checks deep equality between any two PyTrees, arrays, or scalars.
+    """Compares PyTrees using exact numeric leaf equality and matching structure.
 
-    Navigates NaN equivalency and dimension checking for JAX/NumPy arrays while
-    using standard equality checks for primitives.
+    Used to omit default-valued fields during serialization. Root types must
+    match, but numeric leaves are converted to JAX arrays and squeezed, so
+    singleton axes and numeric dtype differences need not prevent equality.
+
+    ### Mathematical Formulation
+    Numeric leaves compare $squeeze(a_i)$ and $squeeze(b_i)$ elementwise, with
+    matching NaNs considered equal. Squeezed shapes must match.
+
+    ### Process Architecture
+    Check root types and PyTree structures, then compare corresponding numeric
+    leaves or use ordinary inequality for other leaves. Flattening errors are
+    caught and converted to `False`; conversion and comparison errors propagate.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils import is_equivalent
+
+    assert is_equivalent(
+        {"x": jnp.array([[1.0]])},
+        {"x": jnp.array([1.0])},
+    )
+    ```
 
     Args:
         a (Any): The first object/PyTree.
         b (Any): The second object/PyTree.
 
     Returns:
-        bool: True if structure and all leaf values are equivalent.
+        bool: Whether root types, structures, and all leaf comparisons match.
+            A failure to flatten either input returns `False`.
+
+    Raises:
+        TypeError: If a numeric leaf cannot be converted to a supported JAX dtype.
+        jax.errors.TracerBoolConversionError: If a numeric comparison requires
+            converting a traced result to a Python boolean, such as under `jax.jit`.
     """
     if type(a) is not type(b):
         return False
@@ -463,13 +490,40 @@ def is_equivalent(a: Any, b: Any) -> bool:
 def compute_tree_delta(old_tree: Any, new_tree: Any) -> tuple[list[int], list[Any]]:
     """Identifies changed leaves between two identically structured PyTrees.
 
+    Produces leaf replacements for process history. Equality is checked only for
+    two JAX arrays; other leaves are unchanged only when they are the same object.
+
+    ### Mathematical Formulation
+    For flattened leaves $o_i$ and $n_i$, include $i$ unless $o_i$ is $n_i$ or
+    both are JAX arrays with equal shapes and all elements equal. Distinct arrays
+    containing NaNs are considered changed.
+
+    ### Process Architecture
+    Flatten both inputs and compare paired leaves in order. Structures are not
+    validated, and leaves beyond the shorter flattened input are ignored.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils import compute_tree_delta
+
+    old, new = {"x": jnp.zeros(2)}, {"x": jnp.ones(2)}
+    indices, values = compute_tree_delta(old, new)
+    assert indices == [0]
+    ```
+
     Args:
-        old_tree (Any): The baseline PyTree.
-        new_tree (Any): The modified PyTree.
+        old_tree (Any): Baseline PyTree; array leaves may be ND.
+        new_tree (Any): Modified PyTree expected to have the same structure and
+            flattened leaf order as `old_tree`.
 
     Returns:
         tuple[list[int], list[Any]]: A list of flattened leaf indices that changed,
             and a list of their corresponding new values.
+
+    Raises:
+        jax.errors.TracerBoolConversionError: If comparing distinct JAX arrays
+            requires converting a traced equality result to a Python boolean.
     """
     old_leaves, _ = tree_flatten(old_tree)
     new_leaves, _ = tree_flatten(new_tree)
@@ -493,13 +547,39 @@ def compute_tree_delta(old_tree: Any, new_tree: Any) -> tuple[list[int], list[An
 def apply_tree_delta(base_tree: Any, delta_indices: list[int], delta_leaves: list[Any]) -> Any:
     """Reconstructs a new PyTree by applying a delta onto a base structure.
 
+    Replaces flattened leaves while retaining the base tree's structure.
+    Repeated indices use the last supplied replacement; unequal delta lengths
+    are paired only up to the shorter length.
+
+    ### Mathematical Formulation
+    For flattened base leaves $b$, each paired index and value $(i, v)$ assigns
+    $b_i = v$ before reconstruction with the original tree definition.
+
+    ### Process Architecture
+    Flatten the base, apply replacements in order, and reconstruct its PyTree.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils import apply_tree_delta
+
+    updated = apply_tree_delta(
+        {"x": jnp.zeros(2)}, [0], [jnp.ones(2)]
+    )
+    assert updated["x"].shape == (2,)
+    ```
+
     Args:
         base_tree (Any): The base PyTree structure.
-        delta_indices (list[int]): Flattened leaf indices where changes occurred.
+        delta_indices (list[int]): Flattened leaf indices. Negative indices count
+            from the end, following Python list indexing.
         delta_leaves (list[Any]): The new leaf values corresponding to the indices.
 
     Returns:
         Any: A new PyTree with the delta applied.
+
+    Raises:
+        IndexError: If a paired index is outside the flattened leaf list.
     """
     old_leaves, treedef = tree_flatten(base_tree)
     new_leaves = list(old_leaves)
@@ -537,14 +617,43 @@ def id_partition(tree: Any, active_ids: set[int]) -> tuple[Any, Any, Any]:
 def inspect_leaves(tree: Any, mask: Any, settings: Settings, tree_name: str = "Tree", depth: int = 3) -> None:
     """Summarizes PyTree leaf structure and prints or logs the kept/pruned counts.
 
-    Useful for analyzing how a filter function or partition mask affected the graph.
+    Groups leaves by path prefix to inspect a partition mask. Can print the
+    summary and overwrite a structure log according to the logging settings.
+
+    ### Mathematical Formulation
+    For each path-prefix group $G$, the kept count is the number of truthy mask
+    entries. Kept and pruned counts satisfy $K_G + P_G = |G|$.
+
+    ### Process Architecture
+    Pair flattened leaves with mask entries, group their path prefixes, then
+    emit the summary. Entries beyond the shorter flattened input are ignored.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent import Settings, update
+    from flowtangent.utils import inspect_leaves
+
+    settings = update(Settings(), "logging.stream_ouput", True)
+    inspect_leaves({"x": jnp.ones(2)}, {"x": True}, settings)
+    ```
 
     Args:
         tree (Any): The PyTree being inspected.
         mask (Any): A matching boolean mask tree denoting which leaves were kept.
-        settings (Settings): The FlowTangent global settings environment object.
-        tree_name (str, optional): The display name of the root node. Defaults to "Tree".
-        depth (int, optional): How many hierarchical levels deep to summarize. Defaults to 3.
+        settings (Settings): `logging.stream_ouput` enables printing;
+            `logging.log_dir` enables file output; `verbose` prints the saved path.
+        tree_name (str, optional): Root display label and filename prefix for
+            `<tree_name>_structure.log`. Defaults to "Tree".
+        depth (int, optional): Number of path elements in each group prefix.
+            Zero groups everything at the root; negative values use Python slice
+            semantics. Defaults to 3.
+
+    Returns:
+        None: Emits the configured output and creates parent log directories as needed.
+
+    Raises:
+        OSError: If log directory creation or file writing fails.
     """
     leaves_with_path, _ = tree_flatten_with_path(tree)
     mask_leaves, _ = tree_flatten(mask)
@@ -601,14 +710,39 @@ def inspect_leaves(tree: Any, mask: Any, settings: Settings, tree_name: str = "T
 
 
 def scan_for_invalid_JAX_types(pytree: Any, name: Optional[str] = None) -> None:
-    """Validates that all dynamic leaves in a PyTree are safe for JAX compilation.
+    """Prints diagnostics for PyTree leaves outside a fixed set of numeric types.
 
-    Traverses the tree and raises terminal warnings if it discovers standard lists,
-    dicts, strings, or unhashable objects masquerading as dynamic leaves.
+    Provides a pre-compilation debugging report; it does not raise an exception
+    for flagged leaves or certify that JAX compilation will succeed. Registered
+    containers are traversed, and static Equinox fields are not scanned.
+
+    ### Mathematical Formulation
+    A leaf has $invalid(x) = 1$ if it is not an instance of any type in $T$,
+    the set of JAX/NumPy arrays and Python `float`, `int`, `complex`, and `bool`.
+    Array shape and dtype are not checked.
+
+    ### Process Architecture
+    Traverse the PyTree, print each flagged leaf's path, type, and value, and
+    print a success message if no leaves are flagged.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils import scan_for_invalid_JAX_types
+
+    scan_for_invalid_JAX_types(
+        {"x": jnp.ones(2), "label": "example"}
+    )
+    ```
 
     Args:
         pytree (Any): The PyTree to validate.
-        name (Optional[str], optional): The display name for logging. Defaults to None.
+        name (Optional[str], optional): Currently has no effect. The report uses
+            `pytree.name` if present, otherwise "PyTree".
+
+    Returns:
+        None: Prints diagnostics without changing leaf values. PyTree traversal
+            errors propagate to the caller.
     """
     tree_name = getattr(pytree, "name", "PyTree")
     scan_name = tree_name if name is None else tree_name

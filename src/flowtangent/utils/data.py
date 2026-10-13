@@ -59,19 +59,39 @@ from .typing import _
 def numpy_collate(batch: list[Any]) -> Any:
     """Recursively converts a PyTorch batch into stacked NumPy arrays.
 
-    Replaces `torch.utils.data.default_collate` to ensure downstream JAX
-    functions never accidentally receive a PyTorch `Tensor`, preventing memory
-    leaks and execution crashes.
+    Replaces `torch.utils.data.default_collate` for NumPy-based training inputs.
+    Preserves nested dictionaries, tuples, and lists; tensors are detached and
+    moved to the CPU before conversion.
+
+    ### Mathematical Formulation
+    For array samples $x_i$ of shape $S$, the result has shape $(B, *S)$ and
+    $C[i] = x_i$, where $B$ is the batch size.
+
+    ### Process Architecture
+    Convert array or scalar samples, or recursively collate matching container
+    entries. Sequence entries are paired only up to the shortest sample length;
+    dictionary keys come from the first sample.
+
+    ### Usage Example
+    ```python
+    from flowtangent.utils.data import numpy_collate
+
+    batch = numpy_collate([{"x": 1.0}, {"x": 2.0}])
+    assert batch["x"].shape == (2,)
+    ```
 
     Args:
-        batch (list[Any]): A list of data samples (dicts, tuples, or raw primitives)
-            yielded from a PyTorch `Dataset`.
-
-    Raises:
-        TypeError: If the batch contains un-collatable object types.
+        batch (list[Any]): Nonempty samples of compatible structure. Leaves may
+            be ND NumPy/JAX arrays, tensors, numbers, booleans, or NumPy scalars.
 
     Returns:
-        Any: The batched data, strictly cast to standard NumPy arrays.
+        Any: A NumPy array, or a nested dictionary, tuple, or list of collated values.
+
+    Raises:
+        IndexError: If `batch` is empty.
+        TypeError: If a leaf's first sample has an unsupported type.
+        ValueError: If array samples cannot be stacked because their shapes differ.
+        KeyError: If a later dictionary lacks a key from the first sample.
     """
     elem = batch[0]
 
@@ -173,15 +193,46 @@ class SlicedDataLoader:
 
 
 def slice_data(data: Any, split_indices: Union[int, list[int]], chunk_idx: int) -> Any:
-    """Routes data slicing depending on if it's a full array or an iterable DataLoader stream.
+    """Selects a feature chunk from arrays or wraps a loader to slice its batches.
+
+    Splits the final feature axis while preserving targets in an `(X, Y)` pair.
+    Objects with both `__iter__` and `dataset` attributes are treated as loaders.
+
+    ### Mathematical Formulation
+    For feature blocks $(X_0, ..., X_{K-1}) = split(X)$ along the final axis,
+    the selected features are $X_c$, where $c$ is `chunk_idx`.
+
+    ### Process Architecture
+    Return a lazy slicing wrapper for loaders; otherwise split the feature array
+    immediately and return the selected chunk with any original targets.
+
+    ### Usage Example
+    ```python
+    import jax.numpy as jnp
+    from flowtangent.utils.data import slice_data
+
+    x, y = jnp.ones((4, 6)), jnp.zeros((4,))
+    chunk, targets = slice_data((x, y), 3, 1)
+    assert chunk.shape == (4, 2)
+    assert targets is y
+    ```
 
     Args:
-        data (Any): A DataLoader, a tuple of `(X, Y)` arrays, or a single JAX array.
-        split_indices (Union[int, list[int]]): The indices at which to split the feature dimension.
-        chunk_idx (int): The specific chunk section to return.
+        data (Any): A loader, an `(X, Y)` tuple/list, or an ND feature array with
+            at least one axis. Targets are returned unchanged.
+        split_indices (Union[int, list[int]]): A positive number of equal-sized
+            sections, or split positions along the final axis, as for `jnp.split`.
+        chunk_idx (int): Chunk index; negative indices count from the last chunk.
 
     Returns:
-        Any: A `SlicedDataLoader` if `data` was a DataLoader, or the sliced sub-array if `data` was static.
+        Any: A `SlicedDataLoader`, a feature array chunk, or `(chunk, Y)` for paired data.
+
+    Raises:
+        ValueError: If an integer section count does not evenly divide the feature axis.
+        IndexError: If `chunk_idx` is out of range or a data pair lacks its targets.
+            For loaders, splitting/indexing errors occur during iteration.
+        ZeroDivisionError: If the integer section count is zero; for loaders,
+            this occurs during iteration.
     """
     if hasattr(data, "__iter__") and hasattr(data, "dataset"):
         return SlicedDataLoader(data, split_indices, chunk_idx)
@@ -348,14 +399,41 @@ class Dataset(Module):
     def __getattr__(self, name: str) -> Any:
         """Retrieves a column array by resolving virtual overrides, then disk proxies.
 
+        Attribute access includes appended rows and respects the dataset's current
+        filter. Proxy reads may load data from disk and populate backend caches.
+
+        ### Mathematical Formulation
+        For base column $C$, appended rows $A$, and optional indices $I$, return
+        $concat(C, A)[I]$, omitting concatenation or indexing when absent.
+
+        ### Process Architecture
+        Resolve the virtual column or proxy value, append any overlay rows, then
+        apply the current row indices.
+
+        ### Usage Example
+        ```python
+        import jax.numpy as jnp
+        import pandas as pd
+        from flowtangent.utils.data import DataFrameDataset
+
+        dataset = DataFrameDataset(
+            pd.DataFrame({"x": [0.0, 1.0, 2.0]})
+        )
+        subset = dataset.filter(jnp.array([2]))
+        assert subset.x.shape == (1,)
+        ```
+
         Args:
-            name (str): The column variable name.
+            name (str): Column name; names starting with `_` use ordinary attribute lookup.
+
+        Returns:
+            Any: The column value, including appended rows and any row selection.
+                Array columns may be ND, with rows along axis 0.
 
         Raises:
             AttributeError: If the variable cannot be found in the dataset.
-
-        Returns:
-            Any: The full dataset array for the specified column (including appended rows).
+            TypeError: If appended rows have incompatible trailing dimensions.
+            OSError: If an underlying file read fails; backend errors propagate.
         """
         if name.startswith("_"):
             return object.__getattribute__(self, name)
@@ -392,14 +470,43 @@ class Dataset(Module):
     def __getitem__(self, idx: int | slice) -> dict[str, Any]:
         """Retrieves a row dict (or sliced column dict) from the dataset.
 
-        Prioritizes fast-path single-index retrieval when interfacing directly
-        with PyTorch `DataLoader` workers to avoid fully reading massive columns from disk.
+        Row indices refer to the current filtered view, including appended rows.
+        Integer access uses backend row reads; slices may load entire columns
+        and populate backend caches.
+
+        ### Mathematical Formulation
+        For current-view columns $C_v$, the returned mapping is $R[v] = C_v[idx]$.
+
+        ### Process Architecture
+        Map integer indices through the current view and select appended, virtual,
+        or proxy rows. For slices, retrieve current-view columns before slicing.
+
+        ### Usage Example
+        ```python
+        import pandas as pd
+        from flowtangent.utils.data import DataFrameDataset
+
+        dataset = DataFrameDataset(
+            pd.DataFrame({"x": [0.0, 1.0, 2.0]})
+        )
+        assert dataset[-1]["x"] == 2.0
+        assert dataset[:2]["x"].shape == (2,)
+        ```
 
         Args:
-            idx (int | slice): The index or slice to retrieve.
+            idx (int | slice): Row index or slice along axis 0. Negative integers
+                are offset by `len(self)` once. Bounds handling is delegated to
+                the backend arrays; there is no uniform out-of-range check.
 
         Returns:
-            dict[str, Any]: A dictionary of the row values for all variables in `full_vars`.
+            dict[str, Any]: Values for every name in `full_vars`. Integer access
+                removes the row axis; slices retain it for array columns.
+
+        Raises:
+            IndexError: If an underlying backend rejects the row index.
+            KeyError: If an appended row has no data for a requested column.
+            AttributeError: If a column cannot be resolved by the backend.
+            OSError: If an underlying file read fails; backend errors propagate.
         """
         # Fast-path for single integer indexing (PyTorch DataLoader)
         if isinstance(idx, int):
