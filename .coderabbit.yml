@@ -24,7 +24,7 @@ code_generation:
              - Sentence 2-3: Mathematical context or system design role.
 
           2. Markdown Sections (Use H3 '###' headings):
-             - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$).
+             - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$) where applicable.
              - '### Process Architecture': Include only if describing a multi-step routine without a `.to_cytoscape_json()` method.
              - '### Usage Example': A minimal, Runnable snippet demonstrating usage with FlowTangent's datastructures and utilities, or JAX/Equinox as necessary.
 

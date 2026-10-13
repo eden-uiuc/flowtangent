@@ -24,7 +24,7 @@ import jax.numpy as jnp
 from ..data.solids import Aluminum, Solid
 
 # FlowTangent imports
-from ..utils import Module, TreePathLike, field, update
+from ..utils import Module, TreePathLike, field, static_field, update
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Component
@@ -32,17 +32,18 @@ from ..utils import Module, TreePathLike, field, update
 
 
 class Fineness(Module):
-    # Attribute     Type    Default Value
+    """
+    Component fineness ratios
+    """
     effective: float = 1.0
     nose: float = 0.0
     tail: float = 0.0
 
-    def __repr__(self):
-        return f"Eff.: {self.effective}"
-
 
 class Dimensions(Module):
-    # Attribute         Type    Default Value
+    """
+    Generic class for linear dimensions.
+    """
     ordinal_direction: bool = field(False, static=True)
 
     reference: float = 0.0
@@ -60,6 +61,9 @@ class Dimensions(Module):
 
 
 class Areas(Module):
+    """
+    Generic class for areal properties.
+    """
     reference: float = 0.0
     total: float = 0.0
     maximum: float = 0.0
@@ -84,7 +88,9 @@ class Areas(Module):
 
 
 class MaterialProperties(Module):
-    # Attribute                 Type        Default Value
+    """
+    Class for designating material usage within component.
+    """
     tensile_stress_carrier: Solid = field(Aluminum)
     torsional_stress_carrier: Solid = field(Aluminum)
     shear_stress_carrier: Solid = field(Aluminum)
@@ -94,7 +100,9 @@ class MaterialProperties(Module):
 
 
 class MassProperties(Module):
-    # Attribute                         Type        Default Value
+    """
+    Class for packing mass properies of a component and associated subcomponents.
+    """
     total: float = 0.0
     empty: float = 0.0
     subcomponent_total: float = 0.0
@@ -111,7 +119,10 @@ class MassProperties(Module):
 
 
 class Component(Module):
-    is_variable_component: bool = field(False, static=True)
+    """
+    Base physical component/collection of subcomponents class.
+    """
+    is_variable_component: bool = static_field(False) # Used for designating comonent tie to ImplicitAnalysis Variable
 
     segments: tuple[Component, ...] = field(tuple)
     subcomponents: tuple[Component, ...] = field(tuple)
@@ -130,7 +141,7 @@ class Component(Module):
     mass_properties: MassProperties = field(MassProperties)
     material_properties: MaterialProperties = field(MaterialProperties)
 
-    _bookkeeping: dict[str, Any] = field(dict, static=True)
+    _bookkeeping: dict[str, Any] = static_field(dict)  # Used by subclasses for collecting subcomponents into categories
 
     def __repr__(self):
         repr_str = (
@@ -228,8 +239,3 @@ class Component(Module):
         new_subcomponents = self.subcomponents[:index] + self.subcomponents[index + 1 :]
 
         return update(self, "subcomponents", new_subcomponents)
-
-
-class VariableComponent(Component):
-    is_variable_component: bool = field(True, static=True)
-    state_path: TreePathLike = field(tuple, static=True)

@@ -26,7 +26,7 @@ from ..core._component import Component, MassProperties
 from ..data.ac_classes import AircraftClass, MediumRange
 
 # FlowTangent imports
-from ..utils import Module, empty_array, field
+from ..utils import Module, empty_array, field, static_field, NameType
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Components
@@ -45,6 +45,9 @@ class VehicleEnvelope(Module):
 
 
 class System(Component):
+    """
+    Component wrapper for including multiple components or variant configurations in one data structure.
+    """
     configurations: Component = field(lambda: Component(name="Configurations"))
 
 
@@ -80,7 +83,7 @@ class AircraftDesign(Module):
 
 
 class Aircraft[EnergyType: PACTNetwork](System):
-    name: str = field("Aircraft", static=True)
+    name: NameType = static_field("Aircraft")
 
     mass_properties: AircraftMassProperties = field(AircraftMassProperties)  # type: ignore
     design_parameters: AircraftDesign = field(AircraftDesign)
