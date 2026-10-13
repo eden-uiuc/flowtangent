@@ -9,11 +9,11 @@ description = "A differentiable, GPU-accelerated aerospace systems design enviro
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "blackjax",
     "beartype",
     "equinox",
     "jax",
     "jaxtyping",
-    "beartype",
     "matplotlib",
     "networkx",
     "numcodecs",
@@ -21,27 +21,46 @@ dependencies = [
     "optimistix",
     "pandas",
     "plotly",
+    "kaleido",
     "scikit-learn",
     "scipy",
+    "torch",
     "tqdm",
     "zarr",
     "dask",
-    "pyarrow"
+    "pyarrow",
+    "h5py",
+    "netcdf4",
+    "optax",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "chex",
     "openmdao",
     "pycycle",
     "pytest",
+    "pytest-regressions",
     "nvidia-ml-py",
     "om-pycycle",
-    "ruff"
+    "ruff",
+]
+docs = [
+    "griffe",
+    "mkdocs-material",
+    "mkdocs-jupyter",
+    "mkdocstrings[python]",
 ]
 
 [tool.ruff]
-line-length = 120 
+line-length = 120
+exclude = [
+    "exp",
+    ".git",
+    ".github",
+    ".ruff_cache",
+    "__pycache__"
+]
 
 # Python 3.12 as the minimum
 target-version = "py312"
@@ -58,7 +77,9 @@ select = [
 ]
 
 ignore = [
-    "E741", 
+    "E731",
+    "E741",
+    "F722",
     "N802",
     "N803", 
     "N806",
@@ -91,6 +112,7 @@ section-order = [
 [tool.ruff.lint.per-file-ignores]
 # Ignore unused imports (F401) and import sorting (I) globally for init files
 "__init__.py" = ["F401", "I","E402"]
+"src/flowtangent/components/airfoils/_data.pyi" = ["N816"] # Ignore case for airfoil names
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]       # Only look for tests in the tests/ directory

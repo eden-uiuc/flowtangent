@@ -52,8 +52,8 @@ class JacobianMap(Module):
         self.inputs = tuple(TreePath(i) for i in inputs)
         self.outputs = tuple(TreePath(o) for o in outputs)
 
-        _filter_in = lambda s: tuple(p for p in self.inputs if p.path[0].lower() == s)  # noqa: E731
-        _filter_out = lambda s: tuple(p for p in self.outputs if p.path[0].lower() == s)  # noqa: E731
+        _filter_in = lambda s: tuple(p for p in self.inputs if p.path[0].lower() == s)
+        _filter_out = lambda s: tuple(p for p in self.outputs if p.path[0].lower() == s)
 
         self.state_inputs = _filter_in("state") if state_inputs is None else state_inputs
         self.system_inputs = _filter_in("system") if system_inputs is None else system_inputs

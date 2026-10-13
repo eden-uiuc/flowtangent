@@ -1,0 +1,80 @@
+# .coderabbit.yaml
+language: "en-US"
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!exp/**"
+
+
+code_generation:
+  docstrings:
+    path_instructions:
+      - path: "src/**/*.py"
+        instructions: |
+          When generating or expanding Python docstrings for FlowTangent, strictly adhere 
+          to the FlowTangent Extended Google Docstring Specification below.
+
+          ### FlowTangent Docstring Specification Rulebook:
+
+          1. Description Header:
+          - Sentence 1: High-level overview of what the module/class computes.
+          - Sentence 2-3: Mathematical context or system design role.
+
+          2. Markdown Sections (Use H3 '###' headings):
+          - '### Mathematical Formulation': LaTeX equations for governing math ($inline$ and $$display$$).
+          - '### Process Architecture': Include only if describing a multi-step routine without a `.to_mermaid()` method.
+          - '### Usage Example': A minimal, Runnable snippet demonstrating usage with FlowTangent's datastructures and utilities, or JAX/Equinox as necessary.
+
+          3. Standard Google Sections:
+          - 'Args:': Typed parameter descriptions, noting if a JAX array is expected to be 1D or ND.
+          - 'Returns:': Return type and payload specification.
+          - 'Raises:': Exceptions for dimension mismatches or invalid shapes.
+
+          ### Standard Template Reference:
+
+          ```python
+          class ModuleName(Module):
+              """
+              Brief single-line description of the module.
+
+              Extended paragraph explaining physical significance, numerical properties, 
+              and integration into the broader simulation/optimization framework.
+
+              ### Mathematical Formulation
+              State the core equations solved or evaluated by this component:
+              
+              $$\mathbf{y} = f(\mathbf{x}; \theta) + \epsilon, \quad \epsilon \sim \mathcal{N}(0, \mathbf{\Sigma})$$
+
+              ### Usage Example
+              ```python
+              import jax.numpy as jnp
+              import flowtangent as ft
+
+              model = ft.ModuleName(...)
+              result = model(jnp.ones((10, 3)))
+              ```
+
+              Args:
+                  param_a (jax.Array): Description of param_a, shape `(N, D)`.
+                  param_b (float): Scaling hyperparameter. Defaults to 1.0.
+
+              Returns:
+                  jax.Array: Transformed array, shape `(N, L)`.
+
+              Raises:
+                  ValueError: If `param_a` shape does not match expected manifold dimension.
+              """
+          ```
+  unit_tests:
+    instructions: |
+      Follow these strict guidelines when generating test files for FlowTangent:
+      
+      1. Location & Naming: Place all newly generated tests in the `tests/` directory at the repository root. Name files strictly as `test_<module_name>.py`.
+      2. Framework: Use `pytest`. Do not use the `unittest` standard library module.
+      3. JAX Arrays: When asserting equality between JAX arrays, use `chex.assert_trees_all_close` or `numpy.testing.assert_allclose`. Do not use standard `==` operators.
+      4. File I/O & Mocking: FlowTangent reads various external files (Airfoils, Datasets, turbomachinery maps, material properties). NEVER rely on external files in tests. Instead, use one of these two approaches:
+         a) Inline Mock Files: Use `pytest`'s `tmp_path` fixture and write a minimal, inline string payload to a temporary file. Deduce the required formatting and headers by reading the parsing logic of the module you are testing.
+         b) Patching: Use `unittest.mock.patch` to mock the file-reading methods directly, returning valid Equinox modules, dicts, or JAX arrays without touching the disk.

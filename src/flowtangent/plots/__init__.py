@@ -1,4 +1,4 @@
-from .Airfoils import plot_airfoil
+from .airfoils import plot_airfoil
 from .VORJAX import plot_panels
 
 __all__ = [

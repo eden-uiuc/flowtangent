@@ -1,7 +1,6 @@
-from typing import Any
 from ._classes import Airfoil
 
-def load_foil(name: str, interpolate: bool = True, n_pts: int = 128) -> Airfoil: ...
+def load_foil(name: str, n_pts: int = 128) -> Airfoil: ...
 
 a18: Airfoil
 a18sm: Airfoil

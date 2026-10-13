@@ -1,0 +1,23 @@
+:root > * {
+    /* Backgrounds: Nord Polar Night */
+    --md-default-bg-color: #2e3440;
+    --md-default-bg-color--light: #3b4252;
+    --md-default-bg-color--lighter: #434c5e;
+    
+    /* Text: Nord Snow Storm */
+    --md-default-fg-color: #eceff4;
+    --md-default-fg-color--light: #e5e9f0;
+    --md-default-fg-color--lighter: #d8dee9;
+    
+    /* Primary Colors: Nord Frost (Blues) */
+    --md-primary-fg-color: #5e81ac;
+    --md-primary-fg-color--light: #81a1c1;
+    --md-primary-fg-color--dark: #4c566a;
+    
+    /* Accents: Nord Aurora (Orange/Green/Purple) */
+    --md-accent-fg-color: #8fbcbb;
+    --md-accent-fg-color--transparent: rgba(143, 188, 187, 0.1);
+    
+    /* Code Blocks */
+    --md-code-bg-color: #242933;
+}
