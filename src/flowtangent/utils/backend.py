@@ -1,9 +1,9 @@
 # src/flowtangent/utils/backend.py
 ## NO 3RD PARTY PACKAGE IMPORTS - SETS UP JAX/EQUINOX FLAGS AND MUST RUN FIRST
 
+import contextlib
 import os
 import time
-import contextlib
 
 
 def numerical_environment():

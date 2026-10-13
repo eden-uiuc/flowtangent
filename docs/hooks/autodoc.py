@@ -76,7 +76,9 @@ class CleanSignaturesExtension(Extension):
                 try:
                     del obj.parameters[name]
                 except (KeyError, TypeError, AttributeError):
-                    logging.getLogger("mkdocs").warning(f"autodoc: Failed to remove parameter {name} from object {obj} signature.")
+                    logging.getLogger("mkdocs").warning(
+                        f"autodoc: Failed to remove parameter {name} from object {obj} signature."
+                    )
 
     def on_function(self, **kwargs):
         func = kwargs.get("obj") or kwargs.get("function")
