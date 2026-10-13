@@ -191,6 +191,7 @@ class PolynomialChaosSurrogate(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -448,6 +449,7 @@ class GaussianProcessSurrogate(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -545,6 +547,7 @@ class MLPSurrogate(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -644,6 +647,7 @@ class TransformerSurrogate(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -727,6 +731,7 @@ class DeepEnsembleSurrogate(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -810,6 +815,7 @@ class MixtureOfExperts(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
@@ -936,6 +942,7 @@ class FourierNeuralOperator(Surrogate):
 
         Raises:
             TypeError: If target and prediction shapes cannot broadcast in the loss.
+            ValueError: If incompatible loss shapes have different numbers of dimensions.
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 

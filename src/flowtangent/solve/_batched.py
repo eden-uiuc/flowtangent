@@ -190,7 +190,8 @@ class BatchedAnalysis(Process):
             state (State): Base state expanded along a leading batch axis.
             system (System): Shared system passed to every state evaluation.
             settings (Settings): Uses `numerical.batch_size` and `numerical.batch_mode`.
-                Batch size must be positive; at least one state input is required.
+                Batch size must be positive; at least one state input is required,
+                and input arrays must have nonempty leading dimensions.
 
         Returns:
             tuple[State, System, Settings]: Concatenated state results and the original
@@ -201,6 +202,7 @@ class BatchedAnalysis(Process):
             ValueError: If batch mode is unsupported, zip inputs have unequal leading
                 lengths, or batch size is zero. Analysis errors propagate.
             IndexError: If there are no batch inputs or no state inputs to update.
+            TypeError: If the inputs produce no states to concatenate.
         """
         batch_size = settings.numerical.batch_size
         batch_mode = settings.numerical.batch_mode
