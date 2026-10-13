@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, List, Literal, Tuple, Union
+from typing import Any, List, Literal, Union
 
 import equinox as eqx
 import jax
@@ -67,8 +67,8 @@ class CompositeManifold(Manifold):
     """Adjoins multiple manifolds side-by-side."""
 
     manifolds: List[Manifold] = _
-    _input_splits: Tuple[int, ...] = static_field(())
-    _latent_splits: Tuple[int, ...] = static_field(())
+    _input_splits: tuple[int, ...] = static_field(())
+    _latent_splits: tuple[int, ...] = static_field(())
 
     def __init__(self, manifolds: List[Manifold]):
         self.manifolds = manifolds
@@ -92,7 +92,7 @@ class CompositeManifold(Manifold):
         x_parts = [m.decode(z_p) for m, z_p in zip(self.manifolds, z_parts)]
         return jnp.concatenate(x_parts, axis=-1)
 
-    def fit(self, data: Union[Float[Array, "N D"], Tuple[Array, Array], LoaderType], **kwargs) -> "CompositeManifold":
+    def fit(self, data: Union[Float[Array, "N D"], tuple[Array, Array], LoaderType], **kwargs) -> "CompositeManifold":
         new_manifolds = []
         for i, m in enumerate(self.manifolds):
             sliced_data = slice_data(data, self._input_splits, i)

@@ -80,3 +80,4 @@ nosetests.xml
 
 
 .VSCodeCounter
+.cache

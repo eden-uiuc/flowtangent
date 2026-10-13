@@ -13,10 +13,10 @@ numerical_environment()
 initialize_jax_cache()
 
 # Framework Hoists
-from .core._state import State
-from .core._systems import System, Aircraft
-from .core._component import Component
-from .core._processes import Process, ProcessStep, array_barrier
+from .core._state import State  # griffe: no-alias
+from .core._component import Component  # griffe: no-alias
+from .core._systems import System, Aircraft  # griffe: no-alias
+from .core._processes import Process, ProcessStep, array_barrier  # griffe: no-alias
 
 # Utility Hoists
 from .utils import (
@@ -33,8 +33,8 @@ from .utils import (
 
 # Data Hoists
 from .data import units
-from .components.airfoils import _data as airfoils, load_foil as load_airfoil
-from .components.energy.maps import _data as turbo_maps, load_map as load_turbo_map
+from .components.airfoils import _data as airfoils, load_foil as load_airfoil  # griffe: no-alias
+from .components.energy.maps import _data as turbo_maps, load_map as load_turbo_map  # griffe: no-alias
 from .data import gases
 
 # Analysis hoists
@@ -47,7 +47,7 @@ from .solve import (
     AnalysisSettings,
 )
 
-from .opt import _funcs as opt_funcs
+from .opt import _funcs as opt_funcs  # griffe: no-alias
 
 from .components import Wing, Fuselage
 

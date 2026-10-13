@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from typing import Any
+from beartype.typing import Callable
 
 import equinox as eqx
 import jax

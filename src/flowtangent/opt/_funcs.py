@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 from jax.scipy.stats import norm
@@ -74,42 +72,42 @@ def __dir__():
 
 
 @register_penalty("quadratic_penalty")
-def quadratic_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def quadratic_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum(viol_lower**2 + viol_upper**2)
 
 
 @register_penalty("linear_penalty")
-def linear_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def linear_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum(viol_lower + viol_upper)
 
 
 @register_penalty("log_barrier")
-def log_barrier(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def log_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
     d_lower = x - bounds[0]
     d_upper = bounds[1] - x
     return -jnp.sum(jnp.log(jnp.maximum(d_lower, 1e-8))) - jnp.sum(jnp.log(jnp.maximum(d_upper, 1e-8)))
 
 
 @register_penalty("inverse_barrier")
-def inverse_barrier(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def inverse_barrier(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
     d_lower = jnp.maximum(x - bounds[0], 1e-8)
     d_upper = jnp.maximum(bounds[1] - x, 1e-8)
     return jnp.sum(1.0 / d_lower + 1.0 / d_upper)
 
 
 @register_penalty("exponential_penalty")
-def exponential_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], k: float = 10.0, **kwargs) -> jax.Array:
+def exponential_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], k: float = 10.0, **kwargs) -> jax.Array:
     viol_lower = jnp.maximum(0.0, bounds[0] - x)
     viol_upper = jnp.maximum(0.0, x - bounds[1])
     return jnp.sum((jnp.exp(k * viol_lower) - 1.0) + (jnp.exp(k * viol_upper) - 1.0))
 
 
 @register_penalty("infinite_penalty")
-def infinite_penalty(x: jax.Array, bounds: Tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
+def infinite_penalty(x: jax.Array, bounds: tuple[jax.Array, jax.Array], **kwargs) -> jax.Array:
     in_bounds = jnp.all((x >= bounds[0]) & (x <= bounds[1]))
     return jnp.where(in_bounds, 0.0, jnp.inf)
 

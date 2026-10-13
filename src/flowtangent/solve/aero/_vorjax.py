@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 
 import dataclasses
 import warnings
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Iterable, Optional
+from beartype.typing import Callable
 
 # package imports
 import equinox as eqx
@@ -2235,7 +2236,7 @@ class FormFactors(Module):
     pylon: float = 0.2
 
 
-class Surrogate(Module):
+class SurrogateSettings(Module):
     surrogate: Optional[Any] = field(sklearn.gaussian_process.GaussianProcessRegressor, static=True)
 
     blend_transonic: bool = True
@@ -2349,7 +2350,7 @@ class VORJAXSettings(Module):
     supersonic: SupersonicSettings = field(SupersonicSettings)
     corrections: CorrectionFactors = field(CorrectionFactors)
     form_factors: FormFactors = field(FormFactors)
-    surrogate: Surrogate = field(Surrogate)
+    surrogate: SurrogateSettings = field(SurrogateSettings)
 
 
 # ----------------------------------------------------------------------------------------------------------------------

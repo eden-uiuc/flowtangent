@@ -9,17 +9,14 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
-from typing import TYPE_CHECKING, Callable, Iterable, Literal, cast, get_args
+from typing import TYPE_CHECKING, Iterable, Literal, cast, get_args
 
 # --- Framework Imports (Strictly for Type Hinting to avoid Circular Imports) ---
 if TYPE_CHECKING:
     from ... import Settings, State, System
     from ...solve.energy.jets import JetSettings
+
+from beartype.typing import Callable
 
 import warnings
 from dataclasses import replace

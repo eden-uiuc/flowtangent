@@ -11,14 +11,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass
-
-from typing import TYPE_CHECKING, Callable
-
-if TYPE_CHECKING:
     from .... import Aircraft, Settings, State, System
     from ....solve.energy.jets import JetSettings
 
+from beartype.typing import Callable
 
 import json
 import warnings

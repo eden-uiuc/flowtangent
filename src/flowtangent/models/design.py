@@ -1,6 +1,7 @@
 import warnings
 from functools import partial
-from typing import Any, Callable, Optional
+from beartype.typing import Callable
+from typing import Any, Optional
 
 import blackjax
 import equinox as eqx
@@ -16,13 +17,13 @@ from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
 from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
 from ..utils.data import DataLoader, Dataset, LatentDataLoader, RandomSampler, numpy_collate
-from ..utils.typing import _
+from ..utils.typing import _, NameType
 from .manifolds import Manifold
 from .surrogates import Surrogate, SurrogateEvaluation
 
 
 class Parameter(Module):
-    name: str = static_field("Parameter")
+    name: NameType = static_field("Parameter")
 
     path: Optional[TreePathLike] = None
 

@@ -11,21 +11,21 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    Callable,
     Generator,
     Literal,
     Optional,
     Sequence,
-    Tuple,
     TypeAlias,
     overload,
 )
+
+from beartype.typing import Callable
 
 if TYPE_CHECKING:
     from .. import Settings, State, System
     from ..solve import JacobianMap
 
-    ProcessFunc: TypeAlias = Callable[[State, System, Settings], Tuple[State, System, Settings]]
+    ProcessFunc: TypeAlias = Callable[[State, System, Settings], tuple[State, System, Settings]]
 
 import inspect
 import re
@@ -645,7 +645,7 @@ class Process(ProcessStep):
             all_io |= step.outputs
         return all_io
 
-    def _get_flattened_steps(self, prefix: str = "") -> Generator[Tuple[str, ProcessStep], None, None]:
+    def _get_flattened_steps(self, prefix: str = "") -> Generator[tuple[str, ProcessStep], None, None]:
         """
         Recursively yields (node_name, step_obj) for all steps.
         The prefix tracks the hierarchical origin (e.g., '0_InitializeVLM.2_ProcessGeometry').

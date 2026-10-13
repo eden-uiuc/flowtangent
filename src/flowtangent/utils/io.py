@@ -7,7 +7,8 @@ import string
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from beartype.typing import Callable
 
 import jax
 import jax.numpy as jnp

@@ -34,6 +34,14 @@ dependencies = [
     "optax",
 ]
 
+[project.optional-dependencies]
+cuda13 = ["jax[cuda13]"]
+cuda12 = ["jax[cuda12]"]
+cuda11 = ["jax[cuda11]"]
+tpu = ["jax[tpu]"]
+rocm7 = ["jax[rocm7-local]"]
+oneapi = ["jax[oneapi]"]
+
 [dependency-groups]
 dev = [
     "chex",
@@ -46,6 +54,7 @@ dev = [
     "ruff",
 ]
 docs = [
+    "mkdocs<2.0",  # MkDocs 2.0 is going closed source and breaking plugins
     "griffe",
     "mkdocs-material",
     "mkdocs-jupyter",

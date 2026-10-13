@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Optional, Sequence, overload
+from typing import TYPE_CHECKING, Any, Optional, Sequence, overload
+from beartype.typing import Callable
 
 if TYPE_CHECKING:
     from ..core._settings import Settings

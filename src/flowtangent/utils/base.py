@@ -6,6 +6,7 @@ from typing import Any, dataclass_transform, get_args
 import equinox as eqx
 import jax.numpy as jnp
 from beartype import beartype
+from beartype.typing import Callable
 from jaxtyping import jaxtyped
 
 from .typing import NameType, _Placeholder
@@ -21,7 +22,7 @@ if typing.TYPE_CHECKING:
 
     # Overload 1: If passed a class/callable, Pylance binds it to 'default_factory'
     @typing.overload
-    def field(default_factory: typing.Callable[[], T], as_func: bool = False, **kwargs) -> T: ...
+    def field(default_factory: Callable[[], T], as_func: bool = False, **kwargs) -> T: ...
 
     # Overload 2: If passed a standard value, Pylance binds it to 'default'
     @typing.overload

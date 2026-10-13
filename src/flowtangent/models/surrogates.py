@@ -1,5 +1,5 @@
 import abc
-from typing import List, Optional, Tuple, TypeAlias, Union
+from typing import List, Optional, TypeAlias, Union
 
 import equinox as eqx
 import jax
@@ -15,7 +15,7 @@ _loader: TypeAlias = DataLoader | LatentDataLoader
 
 
 # --- DataLoader Compatibility Helper ---
-def _get_full_XY(data: Union[Tuple[jax.Array, jax.Array], _loader]) -> Tuple[jax.Array, jax.Array]:
+def _get_full_XY(data: Union[tuple[jax.Array, jax.Array], _loader]) -> tuple[jax.Array, jax.Array]:
     """Drains a DataLoader into full-batch arrays for classical matrix inversion."""
     if hasattr(data, "dataset") and hasattr(data, "__iter__"):
         X_list, Y_list = [], []
@@ -47,7 +47,7 @@ class Surrogate(Module):
         pass
 
     @abc.abstractmethod
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
         pass
 
 
@@ -84,7 +84,7 @@ class PolynomialChaosSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
@@ -123,7 +123,7 @@ class InverseDistanceWeighting(Surrogate):
             )
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "InverseDistanceWeighting":
         X_full, Y_full = _get_full_XY(data)
 
         return eqx.tree_at(lambda m: (m.X_fit, m.Y_fit), self, (X_full, Y_full))
@@ -153,7 +153,7 @@ class RadialBasisFunction(Surrogate):
             )
         return preds
 
-    def fit(self, data: Union[Tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
+    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "RadialBasisFunction":
         X_full, Y_full = _get_full_XY(data)
 
         def phi_fn(x1, x2):
@@ -213,7 +213,7 @@ class GaussianProcessSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], "_loader"],
+        data: Union[tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
@@ -268,7 +268,7 @@ class MLPSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 1000,
         **kwargs,
@@ -321,7 +321,7 @@ class TransformerSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
@@ -358,7 +358,7 @@ class DeepEnsembleSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
@@ -399,7 +399,7 @@ class MixtureOfExperts(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], _loader],
+        data: Union[tuple[jax.Array, jax.Array], _loader],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,
@@ -480,7 +480,7 @@ class FourierNeuralOperator(Surrogate):
 
     def fit(
         self,
-        data: Union[Tuple[jax.Array, jax.Array], "_loader"],
+        data: Union[tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-3,
         epochs: int = 500,
         **kwargs,

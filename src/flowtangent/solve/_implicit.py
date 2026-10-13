@@ -23,7 +23,8 @@ import threading
 import time
 import warnings
 from collections import Counter
-from typing import Any, Callable, Literal, Optional, overload
+from typing import Any, Literal, Optional, overload
+from beartype.typing import Callable
 
 import equinox as eqx
 import jax

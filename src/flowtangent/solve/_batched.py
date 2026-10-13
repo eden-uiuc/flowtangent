@@ -9,7 +9,7 @@
 # ----------------------------------------------------------------------------------------------------------------------
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 
 if TYPE_CHECKING:
     from .. import Settings, System
@@ -157,7 +157,7 @@ class BatchedAnalysis(Process):
 
         return update(pytree, lambda p: get_all_targets(p, inputs), padded_arrays)
 
-    def __call__(self, state: State, system: System, settings: Settings) -> Tuple[State, System, Settings]:
+    def __call__(self, state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
         batch_size = settings.numerical.batch_size
         batch_mode = settings.numerical.batch_mode
@@ -329,7 +329,7 @@ class ShardedDatasetGenerator:
         state_kwargs: Dict[str, np.ndarray],
         state_mode: str = "zip",
         system: Optional[Any] = None,
-        system_iter: Optional[Iterable[Tuple[Any, Dict[str, float]]]] = None,
+        system_iter: Optional[Iterable[tuple[Any, Dict[str, float]]]] = None,
         total_systems: Optional[int] = None,
         batch_size: Optional[int] = None,
     ):
