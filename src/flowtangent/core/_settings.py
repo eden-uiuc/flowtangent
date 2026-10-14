@@ -29,6 +29,10 @@ from ..utils import LoggingSettings, Module, field, static_field
 
 
 class Settings(Module):
+    """
+    Top level settings class. Wraps domain-specific settings
+    """
+
     name: Optional[str] = static_field("Settings")
 
     report_units: Literal["SI", "Imperial"] = static_field("SI")

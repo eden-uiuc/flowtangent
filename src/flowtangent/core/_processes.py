@@ -47,10 +47,8 @@ from ..utils import (
     Module,
     NameType,
     Partial,
-    TreePath,
     compute_tree_delta,
     field,
-    get_target,
     id_partition,
     inspect_leaves,
     is_array_like,
@@ -67,6 +65,10 @@ from ..utils.typing import _Placeholder
 
 
 class ProcessStep(Module):
+    """
+    Basic ProcessStep class, used for wrapping functions and providing I/O and tracing hooks.
+    """
+
     function: ProcessFunc = method_field(null_step)
 
     _state_delta: Optional[State] = field(None)
@@ -233,6 +235,16 @@ def array_barrier(state: State, system: System, settings: Settings):
 
 
 class Process(ProcessStep):
+    """
+    Base Process class. Used for chaining ProcessSteps, tracing process Jacobian and/or step result history.
+
+    Uses __call__ as basic method when executed as a nested process, uses .run as method to include
+    non-JIT/grad-able initialization steps.
+
+    As default, only applies array_barrier as initialization step. Can partition inputs based on IO-graph
+    of wrapped ProcessSteps.
+    """
+
     steps: tuple[ProcessStep, ...] = ()
 
     initial_step: int = static_field(0)
@@ -241,7 +253,7 @@ class Process(ProcessStep):
     _initial_system: Optional[System] = field(None)
     _initial_settings: Optional[Settings] = field(None)
 
-    _filter_map: dict = field(lambda _: {"energy": r"state\.energy\.nodes\.\[*\]."}, static=True)
+    _filter_map: dict = method_field(lambda _: {"energy": r"state\.energy\.nodes\.\[*\]."})
 
     def __init__(
         self,
@@ -1116,60 +1128,3 @@ class Process(ProcessStep):
             process_str += f"\n\t{idx + 1:>2}) {step_tags[idx]:<{max_tag_length}} : {step_func_names[idx]}"
 
         return process_str
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#  Legacy Optimizer Interface
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class OptimizerInterface:
-    """Interface with legacy optimizers to separate value and gradient function for FlowTangent Processes."""
-
-    def __init__(
-        self,
-        process: Process,
-        base_state: State,
-        base_system: System,
-        base_settings: Settings,
-        grad_map: JacobianMap,
-        objective_path: TreePath,
-        **kwargs,
-    ):
-
-        self.process = process
-
-        self.base_state = base_state
-        self.base_system = base_system
-        self.base_settings = base_settings
-
-        self.grad_map = grad_map
-        self.objective_path = objective_path
-
-        self.last_x = None
-        self.last_val = None
-        self.last_jac = None
-
-        # Store additonal optimizer-specific settings
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def _update_cache(self, x):
-        if self.last_x is None or not np.allclose(x, self.last_x):
-            state, system, settings = self.grad_map.update_inputs(
-                x, self.base_state, self.base_system, self.base_settings
-            )
-            f_st, f_sys, f_setts, jac = self.process.run(state, system, settings)
-            token = dict(state=f_st, system=f_sys, settings=f_setts)
-
-            self.last_val = get_target(token, self.objective_path)
-            self.last_jac = np.array(jac)
-            self.last_x = x
-
-    def fun(self, x):
-        self._update_cache(x)
-        return self.last_val
-
-    def jac(self, x):
-        self._update_cache(x)
-        return self.last_jac
