@@ -806,12 +806,29 @@ class XArrayProxy:
     """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
 
     def __init__(self, file_path: str, engine: str = "zarr", **kwargs):
-        # lazy loads the dataset; doesn't pull arrays into memory
-        self._ds = xr.open_dataset(file_path, engine=engine, chunks=None, **kwargs)
-
         self._file_path = file_path
         self._engine = engine
         self._kwargs = kwargs
+        
+        self._ds = xr.open_dataset(file_path, engine=engine, chunks=None, **kwargs)
+        
+        # Build a routing map to flatten dimension coordinates into tabular variables
+        self._var_map = {}
+        
+        for var_name, da in self._ds.data_vars.items():
+            # 1. Always expose the top-level macro array itself (e.g., 'polar_data')
+            self._var_map[var_name] = var_name
+            
+            # 2. Inspect dimensions to see if they have string coordinate labels
+            for dim in da.dims:
+                if dim in self._ds.coords:
+                    coord_vals = self._ds.coords[dim].values
+                    # If the coordinate contains string labels (like 'CL', 'CD', 'Mach')
+                    if coord_vals.dtype.kind in ('U', 'S', 'O'):
+                        for label in coord_vals:
+                            # Map the label to its parent array and dimension
+                            # e.g., 'CL' -> ('polar_data', 'polar_var')
+                            self._var_map[str(label)] = (var_name, dim)
 
     def __getattr__(self, name: str):
         if name.startswith("_"):
