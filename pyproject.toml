@@ -32,6 +32,7 @@ dependencies = [
     "h5py",
     "netcdf4",
     "optax",
+    "xarray",
 ]
 
 [project.optional-dependencies]

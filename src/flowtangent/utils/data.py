@@ -27,6 +27,7 @@ import pyarrow.csv as pcsv
 import pyarrow.parquet as pq
 import scipy.io as sio
 import torch
+import xarray as xr
 import zarr
 from torch.utils.data import (
     BatchSampler,
@@ -984,6 +985,51 @@ class MATDataset(Dataset):
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", len(data_dict[primary_key]))
 
+# XArray ---------------------------------------------------------------------------------------------------------------
+
+class XArrayProxy:
+    """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
+
+    def __init__(self, file_path: str, engine: str = "zarr"):
+        # lazy loads the dataset; doesn't pull arrays into memory
+        self._ds = xr.open_dataset(file_path, engine=engine, chunks="auto")
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError
+        if name not in self._ds.data_vars:
+            raise AttributeError(f"XArrayProxy has no variable '{name}'")
+        # .values forces computation of the Dask array into NumPy
+        return self._ds[name].values
+
+    def __dir__(self):
+        return list(self._ds.data_vars.keys())
+
+    def get_row(self, name: str, idx: int):
+        if name not in self._ds.data_vars:
+            raise AttributeError(f"XArrayProxy has no variable '{name}'")
+        
+        # isel (integer select) slices the primary dimension (assumed to be dim 0)
+        first_dim = list(self._ds[name].dims)[0]
+        return self._ds[name].isel({first_dim: idx}).values
+
+
+class XArrayDataset(Dataset):
+    """Dataset implementation explicitly targeting datasets with complex dimensional coordinates."""
+    
+    _len: int = _
+
+    def __init__(self, file_path: str, engine: str = "zarr"):
+        # ds = xr.open_dataset(file_path, engine=engine)
+        
+        object.__setattr__(self, "_source", file_path)
+        object.__setattr__(self, "_proxy", XArrayProxy(file_path, engine))
+        object.__setattr__(self, "_virtual_columns", {})
+        
+        # Deduce length from the size of the first dimension of the first variable
+        first_var = list(self._proxy._ds.data_vars.values())[0]
+        first_dim = list(first_var.dims)[0]
+        object.__setattr__(self, "_len", self._proxy._ds.sizes[first_dim])
 
 __all__ = [
     "Dataset",
