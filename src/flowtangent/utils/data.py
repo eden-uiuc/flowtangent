@@ -1,3 +1,5 @@
+# type: ignore
+# Dask and other data libraries aren't type hinted an so create nuisance errors.
 # src/flowtangent/utils/data.py
 """FlowTangent data loading and dataset management utilities.
 
@@ -13,16 +15,24 @@ provides mechanisms for dynamic dataset expansion—like virtual columns and row
 appends—to support active learning loops without mutating the original source files on disk.
 """
 
+import copy
+import math
 import warnings
+from beartype.typing import Callable
+from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional, Union
 
+
+import dask.array as da
 import equinox as eqx
 import h5py
 import jax
 import jax.numpy as jnp
 import netCDF4 as nc  # noqa: N813
 import numpy as np
+import polars as pl
 import pyarrow.csv as pcsv
 import pyarrow.parquet as pq
 import scipy.io as sio
@@ -63,23 +73,6 @@ def numpy_collate(batch: list[Any]) -> Any:
     Replaces `torch.utils.data.default_collate` for NumPy-based training inputs.
     Preserves nested dictionaries, tuples, and lists; tensors are detached and
     moved to the CPU before conversion.
-
-    ### Mathematical Formulation
-    For array samples $x_i$ of shape $S$, the result has shape $(B, *S)$ and
-    $C[i] = x_i$, where $B$ is the batch size.
-
-    ### Process Architecture
-    Convert array or scalar samples, or recursively collate matching container
-    entries. Sequence entries are paired only up to the shortest sample length;
-    dictionary keys come from the first sample.
-
-    ### Usage Example
-    ```python
-    from flowtangent.utils.data import numpy_collate
-
-    batch = numpy_collate([{"x": 1.0}, {"x": 2.0}])
-    assert batch["x"].shape == (2,)
-    ```
 
     Args:
         batch (list[Any]): Nonempty samples of compatible structure. Leaves may
@@ -296,6 +289,7 @@ class Dataset(Module):
         virtual_keys = list(self._virtual_columns.keys())
         return sorted(list(set(list(self._proxy_vars) + virtual_keys)))
 
+
     def add_variable(self, name: str, data: Optional[jax.Array] = None, quiet: bool = False) -> "Dataset":
         """Registers a new variable in the virtual overlay without modifying the disk source.
 
@@ -327,6 +321,25 @@ class Dataset(Module):
 
         new_virtuals = {**self._virtual_columns, name: data}
         return eqx.tree_at(lambda d: d._virtual_columns, self, new_virtuals)
+
+    def compute_variable(self, name: str, expr_fn: Callable, quiet: bool = False, **compute_kwargs):
+        """
+        Derives a new variable out-of-core.
+        compute_kwargs are passed directly to the backend's ephemeral compute engine.
+        """
+        # 1. Ask the backend to spin up a temporary compute engine just for this math
+        with self._proxy._compute_engine(**compute_kwargs) as compute_env:
+            # 2. Execute the user's graph
+            derived_data = expr_fn(compute_env)
+            
+            # 3. Force Dask/Polars to evaluate the graph and return a concrete numpy/JAX array
+            if hasattr(derived_data, "compute"):
+                concrete_array = jnp.asarray(derived_data.compute())
+            else: # For eager engines
+                concrete_array = jnp.asarray(derived_data)
+
+        # 4. Attach to the virtual overlay (which returns a new Dataset PyTree)
+        return self.add_variable(name, concrete_array, quiet=quiet)
 
     def append(self, row_dict: dict[str, Any]) -> "Dataset":
         """Appends a new row to the dataset via the virtual overlay.
@@ -403,14 +416,6 @@ class Dataset(Module):
         Attribute access includes appended rows and respects the dataset's current
         filter. Proxy reads may load data from disk and populate backend caches.
 
-        ### Mathematical Formulation
-        For base column $C$, appended rows $A$, and optional indices $I$, return
-        $concat(C, A)[I]$, omitting concatenation or indexing when absent.
-
-        ### Process Architecture
-        Resolve the virtual column or proxy value, append any overlay rows, then
-        apply the current row indices.
-
         ### Usage Example
         ```python
         import jax.numpy as jnp
@@ -474,13 +479,6 @@ class Dataset(Module):
         Row indices refer to the current filtered view, including appended rows.
         Integer access uses backend row reads; slices may load entire columns
         and populate backend caches.
-
-        ### Mathematical Formulation
-        For current-view columns $C_v$, the returned mapping is $R[v] = C_v[idx]$.
-
-        ### Process Architecture
-        Map integer indices through the current view and select appended, virtual,
-        or proxy rows. For slices, retrieve current-view columns before slicing.
 
         ### Usage Example
         ```python
@@ -591,7 +589,7 @@ def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
 
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Universal Proxy Helpers
+# Dataset Proxies
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -615,6 +613,10 @@ class MemoryProxy:
         if name not in self._data:
             raise AttributeError(f"MemoryProxy has no attribute '{name}'")
         return self._data[name][idx]
+
+    @contextmanager
+    def _compute_engine(self, **kwargs):
+        yield self._data
 
 
 class ParquetProxy:
@@ -650,13 +652,10 @@ class ParquetProxy:
     def __dir__(self):
         return self._columns
 
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Dataset Implementations
-# ----------------------------------------------------------------------------------------------------------------------
-
-# Zarr -----------------------------------------------------------------------------------------------------------------
-
+    @contextmanager
+    def _compute_engine(self, **kwargs):
+        df = pl.scan_parquet(self._file_path)
+        yield df
 
 class ZarrGroupProxy:
     """Lazy evaluation proxy for chunked arrays within Zarr storage architectures."""
@@ -682,7 +681,7 @@ class ZarrGroupProxy:
 
         if isinstance(target, zarr.Group):
             return ZarrGroupProxy(self._zarr_path, next_path)
-        return target[:]
+        return target
 
     def __dir__(self):
         return list(self._get_zarr_obj().keys())
@@ -694,55 +693,19 @@ class ZarrGroupProxy:
         # Slicing the Zarr array object reads only that specific chunk from disk
         return obj[name][idx]
 
-
-class ZarrDataset(Dataset):
-    """Dataset implementation explicitly targeting `.zarr` directories.
-
-    Args:
-        source (str): File path to the `.zarr` directory.
-        primary_array (str, optional): The canonical array used to derive dataset row length.
-            Defaults to the first array found in the root if empty.
-    """
-
-    _len: int = _
-
-    def __init__(self, source: str, primary_array: str = ""):
-        object.__setattr__(self, "_source", source)
-        object.__setattr__(self, "_proxy", ZarrGroupProxy(source))
-        object.__setattr__(self, "_virtual_columns", {})
-
-        root = zarr.open_group(source, mode="r")
-        # Use first array if primary_array isn't specified
-        primary_array = primary_array or list(root.keys())[0]
-        object.__setattr__(self, "_len", root[primary_array].shape[0])
-
-
-# DataFrames (Pandas/Polars) -------------------------------------------------------------------------------------------
-
-
-class DataFrameDataset(Dataset):
-    """Dataset implementation explicitly targeting in-memory Pandas or Polars DataFrames.
-
-    Args:
-        df (Any): The DataFrame instance.
-    """
-
-    _len: int = _
-
-    def __init__(self, df):
-        columns = list(df.columns)
-        data_arr = df.to_numpy(dtype=np.float32)
-
-        data_dict = {col: data_arr[:, i] for i, col in enumerate(columns)}
-
-        object.__setattr__(self, "_source", "dataframe")
-        object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
-        object.__setattr__(self, "_virtual_columns", {})
-        object.__setattr__(self, "_len", len(data_arr))
-
-
-# HDF5 -----------------------------------------------------------------------------------------------------------------
-
+    @contextmanager
+    def _compute_engine(self, chunk_size: int = 1000, **kwargs):
+        obj = self._get_zarr_obj()
+        arrays = {}
+        
+        # Build a dictionary of Dask arrays to bypass Xarray metadata requirements
+        for key in obj.keys():
+            if isinstance(obj[key], zarr.Array):
+                # Chunk along the primary axis (0), leaving trailing dimensions whole
+                chunks = (chunk_size,) + obj[key].shape[1:]
+                arrays[key] = da.from_zarr(obj[key], chunks=chunks)
+                
+        yield arrays
 
 class HDF5GroupProxy:
     """Lazy evaluation proxy for arrays within HDF5 files."""
@@ -769,7 +732,7 @@ class HDF5GroupProxy:
             if isinstance(target, h5py.Group):
                 return HDF5GroupProxy(self._file_path, next_path)
             elif isinstance(target, h5py.Dataset):
-                return target[...]
+                return target
 
     def __dir__(self):
         with h5py.File(self._file_path, "r") as f:
@@ -783,6 +746,236 @@ class HDF5GroupProxy:
                 raise AttributeError
             # Target is an h5py.Dataset, slicing it reads only that index from disk
             return group[name][idx]
+
+    @contextmanager
+    def _compute_engine(self, chunk_size: int = 1000, **kwargs):
+        with h5py.File(self._file_path, "r") as f:
+            group = self._get_obj(f)
+            arrays = {}
+            for key in group.keys():
+                if isinstance(group[key], h5py.Dataset):
+                    chunks = (chunk_size,) + group[key].shape[1:]
+                    arrays[key] = da.from_array(group[key], chunks=chunks)
+            yield arrays
+
+class NetCDFGroupProxy:
+    """Lazy evaluation proxy for arrays within NetCDF4 files."""
+
+    def __init__(self, file_path: str, group_path: str = ""):
+        self._file_path = file_path
+        self._group_path = group_path
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError
+
+        with nc.Dataset(self._file_path, "r") as ds:
+            grp = ds[self._group_path] if self._group_path else ds
+
+            if name in grp.groups:
+                next_path = f"{self._group_path}/{name}" if self._group_path else name
+                return NetCDFGroupProxy(self._file_path, next_path)
+            elif name in grp.variables:
+                return grp.variables[name]
+            raise AttributeError
+
+    def __dir__(self):
+        with nc.Dataset(self._file_path, "r") as ds:
+            grp = ds[self._group_path] if self._group_path else ds
+            return list(grp.groups.keys()) + list(grp.variables.keys())
+
+    def get_row(self, name: str, idx: int):
+        with nc.Dataset(self._file_path, "r") as ds:
+            grp = ds[self._group_path] if self._group_path else ds
+            if name not in grp.variables:
+                raise AttributeError
+            # Slicing the netCDF variable reads only that index from disk
+            return grp.variables[name][idx]
+
+    @contextmanager
+    def _compute_engine(self, chunk_size: int = 1000, **kwargs):
+        with nc.Dataset(self._file_path, "r") as ds:
+            grp = ds[self._group_path] if self._group_path else ds
+            arrays = {}
+            for key in grp.variables.keys():
+                chunks = (chunk_size,) + grp.variables[key].shape[1:]
+                arrays[key] = da.from_array(grp.variables[key], chunks=chunks)
+            yield arrays
+
+class XArrayProxy:
+    """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
+
+    def __init__(self, file_path: str, engine: str = "zarr", **kwargs):
+        # lazy loads the dataset; doesn't pull arrays into memory
+        self._ds = xr.open_dataset(file_path, engine=engine, chunks=None, **kwargs)
+
+        self._file_path = file_path
+        self._engine = engine
+        self._kwargs = kwargs
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError
+            
+        if name not in self._var_map:
+            raise AttributeError(f"XArrayProxy has no variable or coordinate label '{name}'")
+            
+        mapping = self._var_map[name]
+        
+        # If it's a sub-variable mapped to a dimension label, use Xarray's .sel()
+        if isinstance(mapping, tuple):
+            array_name, dim_name = mapping
+            return self._ds[array_name].sel({dim_name: name})
+            
+        # Otherwise, return the top-level macro array
+        return self._ds[mapping]
+
+    def __dir__(self):
+        return list(self._ds.data_vars.keys())
+
+    def get_row(self, name: str, idx: int):
+        if name not in self._var_map:
+            raise AttributeError(f"XArrayProxy has no variable '{name}'")
+            
+        mapping = self._var_map[name]
+        
+        # Resolve the target lazy array
+        if isinstance(mapping, tuple):
+            array_name, dim_name = mapping
+            target_array = self._ds[array_name].sel({dim_name: name})
+        else:
+            target_array = self._ds[mapping]
+
+        # --- VIRTUAL STACKING SLICE ---
+        if hasattr(self, "_virtual_stack") and self._virtual_stack:
+            # 1. Get the sizes of the stacked dimensions (e.g., [358400, 42])
+            dim_sizes = tuple(self._ds.sizes[d] for d in self._virtual_stack)
+            
+            # 2. Unravel the flat index (e.g., 43 -> (1, 1))
+            unraveled_indices = np.unravel_index(idx, dim_sizes)
+            
+            # 3. Create a dictionary of the slice mapping: {'run': 1, 'alpha': 1}
+            isel_kwargs = dict(zip(self._virtual_stack, unraveled_indices))
+            
+            # 4. Filter the slice down to only the dimensions this specific array actually has!
+            # E.g. foil_name only has 'run', so we safely ignore the 'alpha' index.
+            valid_isel_kwargs = {k: v for k, v in isel_kwargs.items() if k in target_array.dims}
+            
+            val = target_array.isel(**valid_isel_kwargs).values
+            
+        # --- STANDARD 1D SLICE ---
+        else:
+            first_dim = list(target_array.dims)[0]
+            val = target_array.isel({first_dim: idx}).values
+            
+        # Handle Xarray MultiIndex coordinate scalar wrapping
+        if isinstance(val, tuple): 
+            return np.array(val)
+        return val
+    
+    @contextmanager
+    def _compute_engine(self, chunk_size: int = 1000, **kwargs):
+        # 1. Grab the primary dimension name dynamically to use as the chunking axis
+        first_var = list(self._ds.data_vars.values())[0]
+        primary_dim = list(first_var.dims)[0]
+        
+        # 2. Combine base kwargs with any passed specifically to the compute engine
+        compute_kwargs = {**self._kwargs, **kwargs}
+        
+        # 3. Open a fresh Xarray dataset natively mapped to Dask
+        lazy_ds = xr.open_dataset(
+            self._file_path, 
+            engine=self._engine, 
+            chunks={primary_dim: chunk_size}, 
+            **compute_kwargs
+        )
+        
+        try:
+            yield lazy_ds
+        finally:
+            lazy_ds.close()
+
+    def _build_var_map(self):
+        self._var_map = {}
+        
+        # 1. Map explicit dimensions/coordinates first (e.g., the integer indices)
+        for coord_name in self._ds.coords:
+            self._var_map[coord_name] = coord_name
+
+        # 2. Map MultiIndex levels (e.g., 'run', 'alpha' after stacking)
+        for coord_name, index in self._ds.indexes.items():
+            if isinstance(index, pd.MultiIndex):
+                for level_name in index.names:
+                    self._var_map[level_name] = level_name
+
+        # 3. Map Features last so they win any name collisions
+        # If polar_data has a feature named "alpha", it overwrites the integer dimension index.
+        for var_name, da in self._ds.data_vars.items():
+            self._var_map[var_name] = var_name
+            for dim in da.dims:
+                if dim in self._ds.coords:
+                    coord_vals = self._ds.coords[dim].values
+                    if coord_vals.dtype.kind in ('U', 'S', 'O') and not isinstance(self._ds.indexes.get(dim), pd.MultiIndex):
+                        for label in coord_vals:
+                            self._var_map[str(label)] = (var_name, dim)
+
+    def create_stacked_view(self, stack_dims: list[str], new_dim_name: str) -> "XArrayProxy":
+        """Creates a new proxy with a virtual Cartesian view using index unraveling."""
+        new_proxy = copy.copy(self)
+        
+        # Store the dimensions we are virtually stacking
+        new_proxy._virtual_stack = stack_dims
+        
+        # Calculate the new total length (e.g., 358400 * 42)
+        new_proxy._stacked_len = math.prod(self._ds.sizes[d] for d in stack_dims)
+        
+        return new_proxy
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Datasets
+# ----------------------------------------------------------------------------------------------------------------------
+
+class ZarrDataset(Dataset):
+    """Dataset implementation explicitly targeting `.zarr` directories.
+
+    Args:
+        source (str): File path to the `.zarr` directory.
+        primary_array (str, optional): The canonical array used to derive dataset row length.
+            Defaults to the first array found in the root if empty.
+    """
+
+    _len: int = _
+
+    def __init__(self, source: str, primary_array: str = ""):
+        object.__setattr__(self, "_source", source)
+        object.__setattr__(self, "_proxy", ZarrGroupProxy(source))
+        object.__setattr__(self, "_virtual_columns", {})
+
+        root = zarr.open_group(source, mode="r")
+        # Use first array if primary_array isn't specified
+        primary_array = primary_array or list(root.keys())[0]
+        object.__setattr__(self, "_len", root[primary_array].shape[0])
+
+
+class DataFrameDataset(Dataset):
+    """Dataset implementation explicitly targeting in-memory Pandas or Polars DataFrames.
+
+    Args:
+        df (Any): The DataFrame instance.
+    """
+
+    _len: int = _
+
+    def __init__(self, df):
+        columns = list(df.columns)
+        data_arr = df.to_numpy(dtype=np.float32)
+
+        data_dict = {col: data_arr[:, i] for i, col in enumerate(columns)}
+
+        object.__setattr__(self, "_source", "dataframe")
+        object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
+        object.__setattr__(self, "_virtual_columns", {})
+        object.__setattr__(self, "_len", len(data_arr))
 
 
 class HDF5Dataset(Dataset):
@@ -811,9 +1004,6 @@ class HDF5Dataset(Dataset):
         object.__setattr__(self, "_len", length)
 
 
-# Parquet --------------------------------------------------------------------------------------------------------------
-
-
 class ParquetDataset(Dataset):
     """Dataset implementation explicitly targeting `.parquet` files.
 
@@ -830,9 +1020,6 @@ class ParquetDataset(Dataset):
         object.__setattr__(self, "_proxy", ParquetProxy(file_path, pf.schema.names))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", pf.metadata.num_rows)
-
-
-# Tensor/Arrays --------------------------------------------------------------------------------------------------------
 
 
 class ArrayDataset(Dataset):
@@ -861,9 +1048,6 @@ class ArrayDataset(Dataset):
         return self.arrays[0].shape[0]
 
 
-# CSV ------------------------------------------------------------------------------------------------------------------
-
-
 class CSVDataset(Dataset):
     """Dataset implementation explicitly targeting `.csv` files.
 
@@ -884,44 +1068,6 @@ class CSVDataset(Dataset):
         object.__setattr__(self, "_proxy", MemoryProxy(data_dict))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", table.num_rows)
-
-
-# NetCDF ---------------------------------------------------------------------------------------------------------------
-
-
-class NetCDFGroupProxy:
-    """Lazy evaluation proxy for arrays within NetCDF4 files."""
-
-    def __init__(self, file_path: str, group_path: str = ""):
-        self._file_path = file_path
-        self._group_path = group_path
-
-    def __getattr__(self, name: str):
-        if name.startswith("_"):
-            raise AttributeError
-
-        with nc.Dataset(self._file_path, "r") as ds:
-            grp = ds[self._group_path] if self._group_path else ds
-
-            if name in grp.groups:
-                next_path = f"{self._group_path}/{name}" if self._group_path else name
-                return NetCDFGroupProxy(self._file_path, next_path)
-            elif name in grp.variables:
-                return grp.variables[name][:]
-            raise AttributeError
-
-    def __dir__(self):
-        with nc.Dataset(self._file_path, "r") as ds:
-            grp = ds[self._group_path] if self._group_path else ds
-            return list(grp.groups.keys()) + list(grp.variables.keys())
-
-    def get_row(self, name: str, idx: int):
-        with nc.Dataset(self._file_path, "r") as ds:
-            grp = ds[self._group_path] if self._group_path else ds
-            if name not in grp.variables:
-                raise AttributeError
-            # Slicing the netCDF variable reads only that index from disk
-            return grp.variables[name][idx]
 
 
 class NetCDFDataset(Dataset):
@@ -945,9 +1091,6 @@ class NetCDFDataset(Dataset):
         object.__setattr__(self, "_proxy", NetCDFGroupProxy(file_path))
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", length)
-
-
-# MATLAB ---------------------------------------------------------------------------------------------------------------
 
 
 class MATDataset(Dataset):
@@ -985,51 +1128,35 @@ class MATDataset(Dataset):
         object.__setattr__(self, "_virtual_columns", {})
         object.__setattr__(self, "_len", len(data_dict[primary_key]))
 
-# XArray ---------------------------------------------------------------------------------------------------------------
-
-class XArrayProxy:
-    """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
-
-    def __init__(self, file_path: str, engine: str = "zarr"):
-        # lazy loads the dataset; doesn't pull arrays into memory
-        self._ds = xr.open_dataset(file_path, engine=engine, chunks="auto")
-
-    def __getattr__(self, name: str):
-        if name.startswith("_"):
-            raise AttributeError
-        if name not in self._ds.data_vars:
-            raise AttributeError(f"XArrayProxy has no variable '{name}'")
-        # .values forces computation of the Dask array into NumPy
-        return self._ds[name].values
-
-    def __dir__(self):
-        return list(self._ds.data_vars.keys())
-
-    def get_row(self, name: str, idx: int):
-        if name not in self._ds.data_vars:
-            raise AttributeError(f"XArrayProxy has no variable '{name}'")
-        
-        # isel (integer select) slices the primary dimension (assumed to be dim 0)
-        first_dim = list(self._ds[name].dims)[0]
-        return self._ds[name].isel({first_dim: idx}).values
-
 
 class XArrayDataset(Dataset):
     """Dataset implementation explicitly targeting datasets with complex dimensional coordinates."""
     
     _len: int = _
 
-    def __init__(self, file_path: str, engine: str = "zarr"):
+    def __init__(self, file_path: str, engine: str = "zarr", _proxy: Any = None, **kwargs):
         # ds = xr.open_dataset(file_path, engine=engine)
         
         object.__setattr__(self, "_source", file_path)
-        object.__setattr__(self, "_proxy", XArrayProxy(file_path, engine))
+        object.__setattr__(self, "_engine", engine)
         object.__setattr__(self, "_virtual_columns", {})
+
+        if not _proxy:
+            object.__setattr__(self, "_proxy", XArrayProxy(file_path, engine))
+        else:
+            object.__setattr__(self, "_proxy", _proxy)
         
         # Deduce length from the size of the first dimension of the first variable
         first_var = list(self._proxy._ds.data_vars.values())[0]
         first_dim = list(first_var.dims)[0]
         object.__setattr__(self, "_len", self._proxy._ds.sizes[first_dim])
+
+    def to_tabular(self, stack_dims: list[str], new_dim_name: str = "row") -> "XArrayDataset":
+        """Transforms an N-dimensional dataset into a flat, tabular view via virtual indexing."""
+        stacked_proxy = self._proxy.create_stacked_view(stack_dims, new_dim_name)
+        
+        new_ds = replace(self, file_path=self._source, engine=self._engine, _proxy=stacked_proxy)
+        return eqx.tree_at(lambda d: d._len, new_ds, stacked_proxy._stacked_len)
 
 __all__ = [
     "Dataset",

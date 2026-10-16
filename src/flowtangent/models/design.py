@@ -155,7 +155,7 @@ class Requirement(Parameter):
         # 3. Probabilistic Evaluation (If variance is provided)
         prob, log_ll = None, None
         if vars_dict is not None:
-            if not self._is_custom_extractor:  # Use the flag!
+            if not self._is_custom_extractor:
                 val_var = vars_dict.get(str(self.name), jnp.array(0.0))
             else:
                 # Delta Method: propagate variance through the custom derived function

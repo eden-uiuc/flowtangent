@@ -1,7 +1,6 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:venv"
-}
-{
+  "python-envs.defaultEnvManager": "ms-python.python:venv",
+
   // 1. Stops PyLance from trying to read and provide autocomplete for these folders
   "python.analysis.exclude": [
     ".venv",
@@ -24,5 +23,9 @@
     "**/.git": true,
     "**/.venv": true,
     "**/__pycache__": true
+  },
+
+  "problems.excludePatterns":{
+    "**/exp/**": true,
   }
 }

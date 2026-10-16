@@ -325,7 +325,7 @@ def load_valid_airfoils(filepath="train_set.json"):
     return names
 
 def generate_data(N_SAMPLES: int = 256):
-    from flowtangent.components.airfoils._data import validate_library, regularize_design_space, _AF_REGISTRY
+    from flowtangent.components.airfoils._data import validate_library, regularize_design_space, _AF_REGISTRY #type: ignore
 
     try:
         train_set = set(load_valid_airfoils(str(FILE_DIR / "train_set.json")))
@@ -401,7 +401,7 @@ def generate_data(N_SAMPLES: int = 256):
                 ))
             run_counter += 1
 
-    n_threads = os.cpu_count() - 4
+    n_threads = os.cpu_count() - 4 #type: ignore
     setup_display_pool(n_threads)
     
     print(f"Starting {TOTAL_RUNS} runs on {n_threads} threads...")
