@@ -1,7 +1,7 @@
 import jax
 jax.config.update("jax_log_compiles", True)
 
-import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -14,24 +14,20 @@ from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
 
-from flowtangent.utils import TreePath
+import flowtangent as ft
+import flowtangent.components.wings as ftw
 
-from flowtangent.data import units
-from flowtangent.library.components.wings import Wing, Chords, WingDimensions, Sweeps
+TEST_DIR = Path(__file__).resolve().parent
 
-from flowtangent.framework import Aircraft, Settings, JacobianMap
-from flowtangent.core._settings import AnalysisSettings
-from flowtangent.framework.analyses.batched import ShardedDatasetGenerator
-from flowtangent.framework.analyses.aero.VORJAX import VORJAX_Settings, Vortices, BatchVORJAX
 
 #-----------------------------------------------------------------------------------------------------------------------
 # One Segment Wing Data
 #-----------------------------------------------------------------------------------------------------------------------
 
 def generate_flow_state_grid():
-    alphas = np.linspace(-5.0, 15.0, 81) * units.deg
+    alphas = np.linspace(-5.0, 15.0, 81) * ft.units.deg
     machs = np.linspace(0.1, 2.0, 20)
-    betas = np.linspace(0.0, 10.0, 11) * units.deg
+    betas = np.linspace(0.0, 10.0, 11) * ft.units.deg
 
     total_states = len(alphas) * len(machs) * len(betas)
     
@@ -63,9 +59,9 @@ def generate_weighted_sobol(
     return pd.DataFrame({
         "aspect_ratio": ar_samples,
         "taper_ratio": taper_samples,
-        "sweep": sweep_samples * units.deg,
-        "twist": twist_samples * units.deg,
-        "dihedral": dihedral_samples * units.deg
+        "sweep": sweep_samples * ft.units.deg,
+        "twist": twist_samples * ft.units.deg,
+        "dihedral": dihedral_samples * ft.units.deg
     })
 
 def plot_sampling_validation(df_geometry, dist_kwargs):
@@ -174,20 +170,24 @@ def wing_generator(df_geometries):
 
     for row in df_geometries.itertuples(index=False):
 
-        wing = Wing(
-            name="W1 Wing",
+        sw = ftw.WingSweeps(quarter_chord=row.sweep)
+        ch = ftw.WingChords(root=1.0)
+        tw = ftw.WingTwists(tip=row.twist)
+        sp = ftw.WingSpans(projected=row.aspect_ratio * (1 + row.taper_ratio)/2)
+
+        wing = ft.Wing(
+            name="main_wing",
             symmetric=True,
             taper=row.taper_ratio,
             dihedral=row.dihedral,
-            sweeps=Sweeps(quarter_chord=row.sweep),
-            chords=Chords(root=1.0),
-            twists=WingDimensions(tip=row.twist),
-            spans=WingDimensions(projected=row.aspect_ratio * (1 + row.taper_ratio)/2),
+            sweeps=sw,
+            chords=ch,
+            twists=tw,
+            spans=sp,
             origin=jnp.array([[0., 0., 0.]]),
         ).update_geometry(calculate_reference_area=True, calculate_wetted_area=True)
 
-        system = Aircraft(name=f"W1_System", areas=wing.areas).add_subcomponent(wing)
-        system = update(system, "mass_properties.center_of_gravity", jnp.array([[0.0, 0.0, 0.0]]))
+        system = ft.Aircraft(name=f"W1_System", areas=wing.areas).add_subcomponent(wing)
 
         meta = {
             "aspect_ratio": row.aspect_ratio,
@@ -214,7 +214,7 @@ if __name__ == "__main__":
             "dihedral":     {'a': 2.8, 'b': 5.2, 'loc': -5.00, 'scale': 50.00}  # Max Dihedral = +45
         }
 
-        df_geometry_W1 = generate_weighted_sobol(n_samples=4096, **beta_distributions)
+        df_geometry_W1 = generate_weighted_sobol(n_samples=4, **beta_distributions)
         
         df_geometry_W1["wing_ID"] = df_geometry_W1.apply(
             lambda row: encode_wing_id(
@@ -231,53 +231,66 @@ if __name__ == "__main__":
         df_geometry_W1 = df_geometry_W1[cols]
 
         fig = plot_sampling_validation(df_geometry_W1, beta_distributions)
-        fig.write_image("./tests/VORJAX/Wing Data Generation/sampling_validation.png")
-        # fig.show()
+        fig.write_image(TEST_DIR / "sampling_validation.png")
 
         alphas, betas, machs = generate_flow_state_grid()
-        
-        solver=BatchVORJAX()
 
-        mach_path   = TreePath(("freestream", "mach_number"), name="M")
-        alpha_path  = TreePath(("aerodynamics", "angles", "alpha"), name="a")
-        beta_path   = TreePath(("aerodynamics", "angles", "beta"), name="b")
+        VJX = ft.solve.VORJAX()
+        solver=ft.solve.BatchedAnalysis(analyze=VJX)
 
-        lift_path   = TreePath(("aerodynamics", "coefficients", "lift", "total"), name="CL")
-        drag_path   = TreePath(("aerodynamics", "coefficients", "drag", "total"), name="CD")
-
-        GRAD_MAP = JacobianMap(
-            state_inputs=(
-                mach_path,
-                alpha_path,
-                beta_path,
-            ),
-            state_outputs=(
-                lift_path,
-                drag_path
-            ))
-
-        aero_settings = VORJAX_Settings(vortices=Vortices(n_spanwise=16, n_chordwise=8))
-        analysis_settings = AnalysisSettings(
-            aerodynamics=aero_settings,
-            gradient_map=GRAD_MAP
+        state_inputs = (
+            ft.TreePath(("freestream", "mach_number"), name="M"),
+            ft.TreePath(("aerodynamics", "angles", "alpha"), name="alpha"),
+            ft.TreePath(("aerodynamics", "angles", "beta"), name="beta"),
         )
-        settings = Settings(analysis=analysis_settings, DEBUG_MODE=False)
 
-        generator = ShardedDatasetGenerator(
+        state_outputs = (
+            ft.TreePath(("aerodynamics.coefficients.lift.total"), name="CL"),
+            ft.TreePath(("aerodynamics.coefficients.drag.total"), name="CD"),
+        )
+
+        system_inputs = (
+            ft.TreePath(("main_wing.sweeps.quarter_chord"), name="QC"),
+            ft.TreePath(("main_wing.twists.tip"), name="theta"),
+            ft.TreePath(("main_wing.dihedral"), name="gamma"),
+            ft.TreePath(("main_wing.spans.projected"), name="b"),
+            ft.TreePath(("main_wing.taper_ratio"), name="lambda"),
+
+        )
+
+        GRAD_MAP = ft.JacobianMap(
+            state_inputs=state_inputs,
+            state_outputs=state_outputs
+            )
+
+        aero_settings = ft.update(
+            ft.solve.aero.VORJAXSettings(),
+            (("vortices.n_spanwise", 16),
+             ("vortices.n_chordwise", 8))
+        )
+
+        analysis_settings = ft.update(
+            ft.AnalysisSettings(aerodynamics=aero_settings),
+            "jacobian.mapping", GRAD_MAP
+        )
+        
+        settings = ft.Settings(analysis=analysis_settings, DEBUG_MODE=False)
+
+        generator = ft.solve.ShardedDatasetGenerator(
             batch_analysis=solver,
-            cache_dir="./tests/VORJAX/Wing Data Generation/W1",
-            storage_dir="/media/jordan/Ashley_Backup/Wing Data Generation/W1",
-            shard_size=3_000_000,
+            cache_dir=TEST_DIR,
+            storage_dir=TEST_DIR / "data",
+            shard_size=4,
             name="W1"
         )
         
         generator.run(
             settings=settings,
-            system_iter=wing_generator(df_geometry_W1),
+            system_iter=wing_generator(df_geometry_W1), #type: ignore
             total_systems=len(df_geometry_W1),
             state_kwargs={"alpha":alphas, "mach": machs, "beta": betas},
             state_mode="mesh",
-            batch_size=1024
+            batch_size=1
         )
     
     if GEN_W2:

@@ -13,7 +13,7 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from flowtangent.components import Airfoil
-from flowtangent.components._wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
+from flowtangent.components.wings import Wing, WingChords, WingDimensions, WingSegment, WingSweeps
 from flowtangent.core._component import Areas
 from flowtangent.core._systems import Aircraft
 

@@ -496,3 +496,17 @@ class Wing(Component):
             return update(self, "control_surfaces", new_controls)
 
         return super().add_subcomponent(subcomponent)
+
+# Aliases
+WingTwists = WingDimensions
+WingSpans = WingDimensions
+
+__all__ = [
+    "Wing",
+    "WingSweeps",
+    "WingChords",
+    "WingSegment",
+    "WingTwists",
+    "WingSpans",
+    "ControlSurface"
+]
