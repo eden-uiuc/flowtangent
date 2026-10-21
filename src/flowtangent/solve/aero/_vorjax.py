@@ -31,7 +31,7 @@ import jax.numpy as jnp
 import sklearn
 from beartype.typing import Callable
 
-from ...components._wings import Wing, WingSegment, WingSweeps
+from ...components.wings import Wing, WingSegment, WingSweeps
 from ...core._processes import Process, ProcessStep, array_barrier
 from ...data import units as U  # noqa: N812
 from ...functional.aero.shocks import oblique_shock, theta_beta_mach
@@ -948,6 +948,15 @@ def generate_topology(state: State, system: System, settings: Settings) -> tuple
 @io.outputs("system.analysis_data.lattice")
 def update_mesh(state: State, system: System, settings: Settings) -> tuple[State, System, Settings]:
 
+    # --- 1. Create accumulation lists ---
+    acc_vertices = []
+    acc_camber = []
+    acc_surf_id = []
+    acc_cs_id = []
+    acc_is_le = []
+    acc_is_te = []
+    acc_wedge = []
+
     N_idx = 0
     S_idx = 0
 
@@ -1039,79 +1048,50 @@ def update_mesh(state: State, system: System, settings: Settings) -> tuple[State
 
         # Flatten and pack into VortexDistribution ---------------------------------------------------------------------
         flat_vertices = (morph_results + wing.origin).reshape(-1, 4, 3)
-        N = flat_vertices.shape[0]
-        lat_old = system.analysis_data.lattice
+        camber_flat = camber_slopes.reshape(-1)
+        surf_id = jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)
+        cs_id_flat = panel_cs_id.reshape(-1)
+        le_flat = jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)
+        te_flat = jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)
+        wedge_flat = strip_wedge_angle.reshape(-1)
 
-        # Panel indexing
-        p_start = N_idx
-        p_end = N_idx + N
-
-        # Strip Indexing
-        LE_idx = jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)
-        TE_idx = jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)
-        N_s = jnp.sum(LE_idx)
-
-        s_start = S_idx
-        s_end = S_idx + N_s
-
-        latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(p_start, p_end), value=val)
-        stripPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(s_start, s_end), value=val)
-
-        lat = update(
-            lat_old,
-            (
-                latPath("panel_vertices", flat_vertices),
-                latPath("camber_slopes", camber_slopes.reshape(-1)),
-                latPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
-                latPath("control_surface_id", panel_cs_id.reshape(-1)),
-                latPath("is_leading_edge", LE_idx),
-                latPath("is_trailing_edge", TE_idx),
-                stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-            ),
-        )
-
-        updated_system = update(system, TreePath(("analysis_data.lattice"), lat))
+        # --- Append local arrays to accumulation lists ---
+        acc_vertices.append(flat_vertices)
+        acc_camber.append(camber_flat)
+        acc_surf_id.append(surf_id)
+        acc_cs_id.append(cs_id_flat)
+        acc_is_le.append(le_flat)
+        acc_is_te.append(te_flat)
+        acc_wedge.append(wedge_flat)
 
         if wing.symmetric:
             flipped_verts = flat_vertices.at[:, :, 1].multiply(-1.0)
             mirrored_verts = flipped_verts[:, jnp.array([3, 2, 1, 0]), :]
+            
+            acc_vertices.append(mirrored_verts)
+            acc_camber.append(camber_flat)
+            acc_surf_id.append(surf_id)
+            acc_cs_id.append(cs_id_flat)
+            # Leading/Trailing edge flags for symmetric half
+            acc_is_le.append(le_flat) 
+            acc_is_te.append(te_flat)
+            acc_wedge.append(wedge_flat)
 
-            # Mirror Panel Indexing
-            m_p_start = p_end
-            m_p_end = m_p_start + N
+        
+        lat = update(
+        system.analysis_data.lattice,
+        (
+            TreePath("panel_vertices", jnp.concatenate(acc_vertices, axis=0)),
+            TreePath("camber_slopes", jnp.concatenate(acc_camber, axis=0)),
+            TreePath("surface_id", jnp.concatenate(acc_surf_id, axis=0)),
+            TreePath("control_surface_id", jnp.concatenate(acc_cs_id, axis=0)),
+            TreePath("is_leading_edge", jnp.concatenate(acc_is_le, axis=0)),
+            TreePath("is_trailing_edge", jnp.concatenate(acc_is_te, axis=0)),
+            TreePath("wedge_angles", jnp.concatenate(acc_wedge, axis=0)),
+        ),
+    )
 
-            # Mirror Strip Indexing
-            m_s_start = S_idx + N_s
-            m_s_end = m_s_start + N_s
-
-            m_latPath = lambda attr_name, val: TreePath(path=attr_name, path_slice=slice(m_p_start, m_p_end), value=val)
-            m_stripPath = lambda attr_name, val: TreePath(
-                path=attr_name, path_slice=slice(m_s_start, m_s_end), value=val
-            )
-
-            lat_old = updated_system.analysis_data.lattice
-            lat = update(
-                updated_system.analysis_data.lattice,
-                (
-                    TreePath("panel_vertices", path_slice=slice(m_p_start, m_p_end), value=mirrored_verts),
-                    m_latPath("camber_slopes", camber_slopes.reshape(-1)),
-                    m_latPath("surface_id", jnp.full(flat_vertices.shape[0], wing_idx, dtype=jnp.int32)),
-                    m_latPath("control_surface_id", panel_cs_id.reshape(-1)),
-                    m_latPath("is_leading_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, 0].set(True).reshape(-1)),
-                    m_latPath("is_trailing_edge", jnp.zeros_like(xi_mid, dtype=bool).at[:, -1].set(True).reshape(-1)),
-                    m_stripPath("wedge_angles", strip_wedge_angle.reshape(-1)),
-                ),
-            )
-
-            N_idx = m_p_end + N
-            S_idx = m_s_end
-        else:
-            N_idx += N
-            S_idx += N_s
-
-        # Preserve both halves, and carry this wing's mesh into the next update.
-        updated_system = update(updated_system, TreePath("analysis_data.lattice", lat))
-        system = updated_system
+        updated_system = update(system, TreePath(("analysis_data.lattice"), lat))
 
     return state, updated_system, settings
 

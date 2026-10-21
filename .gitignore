@@ -81,3 +81,4 @@ nosetests.xml
 
 .VSCodeCounter
 .cache
+exp/XFOIL/stream_test.ipynb

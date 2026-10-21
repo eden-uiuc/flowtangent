@@ -4,7 +4,7 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
-from ._batched import BatchedAnalysis
+from ._batched import BatchedAnalysis, ShardedDatasetGenerator
 from ._implicit import ImplicitAnalysis
 from .energy import PACTAnalysis
 
@@ -29,6 +29,7 @@ __all__ = [
     "BatchedAnalysis",
     "ImplicitAnalysis",
     "PACTAnalysis",
+    "ShardedDatasetGenerator",
     # Specific Analyses
     "VORJAX",
     # Settings

@@ -1,10 +1,10 @@
-from ._fuselages import Fuselage
+from .fuselages import Fuselage
 
-from ._landing_gear import LandingGear
+from .landing_gear import LandingGear
 
-from ._nacelles import Nacelle
+from .nacelles import Nacelle
 
-from ._wings import (
+from .wings import (
     Wing,
     WingSegment,
     ControlSurface,
