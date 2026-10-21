@@ -262,8 +262,8 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
                     bl_data = np.loadtxt(bl_file, skiprows=1)
 
                     panel_arr[i, :, :-1] = bl_data[:N_PANELS, :]
-                    # Ensure we extract only the Cp column (idx 2) from CPWR file
-                    panel_arr[i, :, -1] = cp_data[:N_PANELS, 2] if cp_data.ndim > 1 else cp_data[:N_PANELS]
+                    # Ensure we extract only the Cp column (idx 1) from CPWR file
+                    panel_arr[i, :, -1] = cp_data[:N_PANELS, 1] if cp_data.ndim > 1 else cp_data[:N_PANELS]
                 except Exception:
                     pass
 

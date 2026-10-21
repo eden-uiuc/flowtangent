@@ -848,7 +848,7 @@ class XArrayProxy:
         return self._ds[mapping]
 
     def __dir__(self):
-        return list(self._ds.data_vars.keys())
+        return list(self._ds.data_vars.keys()) + list(self._var_map.keys())
 
     def get_row(self, name: str, idx: int):
         if name not in self._var_map:
