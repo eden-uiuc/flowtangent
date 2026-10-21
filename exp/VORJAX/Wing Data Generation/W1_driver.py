@@ -1,15 +1,11 @@
-import jax
-jax.config.update("jax_log_compiles", True)
-
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import equinox as eqx
-import jax
 import jax.numpy as jnp
 import plotly.graph_objects as go
 
+import dataclasses as dc
 from plotly._subplots import make_subplots
 
 from scipy.stats import qmc, beta
@@ -201,8 +197,8 @@ def wing_generator(df_geometries):
 
 
 if __name__ == "__main__":
-    GEN_W1 = False
-    GEN_W2 = True
+    GEN_W1 = True
+    GEN_W2 = False
     GEN_W3 = False
 
     if GEN_W1:
@@ -231,7 +227,7 @@ if __name__ == "__main__":
         df_geometry_W1 = df_geometry_W1[cols]
 
         fig = plot_sampling_validation(df_geometry_W1, beta_distributions)
-        fig.write_image(TEST_DIR / "sampling_validation.png")
+        fig.write_html(TEST_DIR / "sampling_validation.html")
 
         alphas, betas, machs = generate_flow_state_grid()
 
@@ -263,11 +259,9 @@ if __name__ == "__main__":
             state_outputs=state_outputs
             )
 
-        aero_settings = ft.update(
-            ft.solve.aero.VORJAXSettings(),
-            (("vortices.n_spanwise", 16),
-             ("vortices.n_chordwise", 8))
-        )
+        aero_settings = ft.solve.aero.VORJAXSettings()
+        panel_settings = dc.replace(aero_settings.panels, n_spanwise=16, n_chordwise=8)
+        aero_settings = dc.replace(aero_settings, panels=panel_settings)
 
         analysis_settings = ft.update(
             ft.AnalysisSettings(aerodynamics=aero_settings),
