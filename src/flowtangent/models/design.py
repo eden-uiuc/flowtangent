@@ -94,7 +94,7 @@ class Requirement(Parameter):
     Can map directly to a variable name or use a custom derived extract_func.
     """
 
-    name: str = "Parameter"
+    name: str | None = "Parameter"
     eq_bound: Optional[jax.Array] = None
     lower_bound: Optional[jax.Array] = None
     upper_bound: Optional[jax.Array] = None
@@ -197,8 +197,6 @@ class DesignSpace(Module):
     surrogate: Surrogate = _
 
     solver: Any = optx.BFGS
-
-    augment: Process = _
 
     _unravel: Callable = method_field(_)
 

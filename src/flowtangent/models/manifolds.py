@@ -339,7 +339,7 @@ class LinearPCA(Manifold):
     W_dec: jax.Array = _
     b_dec: jax.Array = _
 
-    def __init__(self, physical_dim: int, latent_dim: int, key=None):
+    def __init__(self, physical_dim: int, latent_dim: int):
         self.input_dim = physical_dim
         self.latent_dim = latent_dim
 
