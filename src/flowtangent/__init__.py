@@ -59,6 +59,7 @@ from . import solve as solve
 from . import sim as sim
 from . import utils as utils
 from . import plots as plots
+from . import models
 
 from .core._settings import Settings
 
@@ -109,4 +110,5 @@ __all__ = [
     "sim",
     "utils",
     "plots",
+    "models"
 ]

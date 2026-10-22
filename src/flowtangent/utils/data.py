@@ -261,6 +261,8 @@ class Dataset(Module):
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
 
+    _tranforms: tuple[Callable, ...] = static_field(())
+
     _appended_data: dict = _
     _appended_len: int = 0
 
@@ -289,6 +291,14 @@ class Dataset(Module):
         virtual_keys = list(self._virtual_columns.keys())
         return sorted(list(set(list(self._proxy_vars) + virtual_keys)))
 
+    def transform_variable(self, transform_fn: Callable):
+        """
+        Returns a shallow copy of the dataset with a new transformation function applied.
+        """
+        new_tfs = self._tranforms + (transform_fn,)
+        new_ds = copy.copy(self)
+        object.__setattr__(new_ds, "_transforms", new_tfs)
+        return new_ds
 
     def add_variable(self, name: str, data: Optional[jax.Array] = None, quiet: bool = False) -> "Dataset":
         """Registers a new variable in the virtual overlay without modifying the disk source.
@@ -535,6 +545,10 @@ class Dataset(Module):
         row = {}
         for var in self.full_vars:
             row[var] = getattr(self, var)[idx]
+
+        for tf in self._tranforms:
+            row = tf(row)
+        
         return row
 
 
