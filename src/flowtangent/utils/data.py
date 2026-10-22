@@ -1189,6 +1189,7 @@ class XArrayDataset(Dataset):
         new_ds = replace(self, file_path=self._source, engine=self._engine, _proxy=stacked_proxy)
         return eqx.tree_at(lambda d: d._len, new_ds, stacked_proxy._stacked_len)
 
+
 __all__ = [
     "Dataset",
     "load_dataset",

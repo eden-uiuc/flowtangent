@@ -33,7 +33,7 @@ import flowtangent.utils as ftu
 
 from flowtangent.data import units
 from flowtangent.core._component import Areas
-from flowtangent.components._wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
+from flowtangent.components.wings import Wing, WingSegment, WingChords, WingDimensions, WingSweeps
 from flowtangent.components._airfoils import Airfoil
 
 from flowtangent.functional.aero.transonic import ensemble_CL_spline
