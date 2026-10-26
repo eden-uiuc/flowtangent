@@ -71,7 +71,7 @@ N_ALPHAS = len(ALPHAS)
 N_PANELS = 160
 
 # --- GLOBAL VARIABLE DEFINITIONS (Guarantees Shape Matching) ---
-PANEL_VARS = ["s", "x", "y", "Ue/Vinf", "Dstar", "Theta", "Cf", "H", "H*", "P", "m", "K", "tau", "Di", "Cp"]
+PANEL_VARS = ["s", "x", "y", "Ue/Vinf", "Dstar", "Theta", "Cf", "H", "H*", "P", "m", "K", "Cp"]
 POLAR_VARS = ["alpha", "CL", "CD", "CDp", "CM", "Top_Xtr", "Bot_Xtr", "Top_Itr", "Bot_Itr"]
 COND_VARS = ["flap_angle", "flap_x/c", "Re", "Mach"]
 BEND_KEYS = [
@@ -136,6 +136,50 @@ def parse_bend_stdout(stdout_text):
             break
             
     return bend_data
+
+def parse_xfoil_bl(filepath: str | Path, max_rows: int) -> np.ndarray:
+    """Safely parses XFOIL boundary layer dumps, mitigating Fortran formatting bleed."""
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+        
+    start_idx = next((i for i, line in enumerate(lines) if '------' in line), 0) + 1
+    
+    parsed_data = []
+    expected_cols = None
+
+    for line in lines[start_idx:]:
+        if not line.strip() or len(parsed_data) >= max_rows:
+            break
+            
+        clean_line = line.replace("-", " -").replace("E -", "E-").replace("e -", "e-")
+        parts = clean_line.split()
+        
+        # Lock in the expected column count based on the first healthy row
+        if expected_cols is None and len(parts) > 0:
+            expected_cols = len(parts)
+            
+        row_vals = []
+        # If the column count changed (fused columns), the row is corrupted.
+        if len(parts) != expected_cols:
+            row_vals = [np.nan] * expected_cols
+        else:
+            for p in parts:
+                if '*' in p:
+                    row_vals.append(np.nan)
+                else:
+                    try:
+                        row_vals.append(float(p))
+                    except ValueError:
+                        # Catch any leftover fused decimals
+                        row_vals.append(np.nan)
+        
+        # If any NaNs were triggered by bad values, consider the whole panel corrupted
+        if np.isnan(row_vals).any():
+             row_vals = [np.nan] * expected_cols
+             
+        parsed_data.append(row_vals)
+        
+    return np.array(parsed_data)
 
 def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, zarr_root):
     
@@ -258,14 +302,23 @@ def run_xfoil_point(run_idx, airfoil, flap_angle, flap_hinge, reynolds, mach, za
 
             if cp_file.exists() and bl_file.exists():
                 try:
+                    # Use standard loadtxt for Cp (usually format-safe), but slice safely!
                     cp_data = np.loadtxt(cp_file, skiprows=1)
-                    bl_data = np.loadtxt(bl_file, skiprows=1)
+                    
+                    # Use our custom robust parser for the BL data
+                    bl_data = parse_xfoil_bl(bl_file, max_rows=N_PANELS)
 
-                    panel_arr[i, :, :-1] = bl_data[:N_PANELS, :]
-                    # Ensure we extract only the Cp column (idx 1) from CPWR file
-                    panel_arr[i, :, -1] = cp_data[:N_PANELS, 1] if cp_data.ndim > 1 else cp_data[:N_PANELS]
-                except Exception:
-                    pass
+                    # Ensure shapes match before assignment
+                    if bl_data.shape[0] == N_PANELS:
+                        panel_arr[i, :, :-1] = bl_data
+                        
+                        # Cp files are usually (N, 3): x, y, Cp
+                        # Grab the last column safely
+                        panel_arr[i, :, -1] = cp_data[:N_PANELS, -1] if cp_data.ndim > 1 else cp_data[:N_PANELS]
+                        
+                except Exception as e:
+                    raise ValueError(f"Failed parsing BL at alpha {a}: {e}")
+
 
         polar_arr = np.full((N_ALPHAS, len(POLAR_VARS)), np.nan)
 
@@ -443,7 +496,7 @@ def generate_data(N_SAMPLES: int = 256):
                         time_delta = timestamp - start_time
                         ETA = (time_delta / (i + 1) * len(tasks)) + start_time
                         yield_pct = (total_converged / total_attempted) * 100 if total_attempted > 0 else 0
-                        print(f"Progress: {i} / {len(tasks)} ({1/len(tasks) * 100:.1f}%)| Yield: {yield_pct:.1f}% | Recent: {t_af_name} | Time: {timestamp.strftime('%a %I:%M %p')} | ETA: {ETA.strftime('%a %I:%M %p')}")
+                        print(f"Progress: {i} / {len(tasks)} ({i/len(tasks) * 100:.1f}%)| Yield: {yield_pct:.1f}% | Recent: {t_af_name} | Time: {timestamp.strftime('%a %I:%M %p')} | ETA: {ETA.strftime('%a %I:%M %p')}")
     finally:
         cleanup_display_pool()
         subprocess.run(['killall', 'xfoil'], stderr=subprocess.DEVNULL)
