@@ -12,7 +12,6 @@ from blackjax.mcmc.hmc import HMCState
 from jax.flatten_util import ravel_pytree
 from jax.scipy.stats import norm
 
-from .. import Process
 from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
 from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
@@ -58,10 +57,6 @@ class Parameter(Module):
                     self, "update_func", lambda tree, value: ftu.update(tree, ftu.update(tree_path, "value", value))
                 )
         else:
-            if not self.extract_func:
-                raise ValueError(f"Parameter {self.name} has no path and is missing an extraction function.")
-            if not self.update_func:
-                raise ValueError(f"Parameter {self.name} has no path and is missing an update function.")
             object.__setattr__(self, "path", TreePath(path="", name=self.name))
 
         if self.name == "Parameter":
@@ -243,12 +238,12 @@ class DesignSpace(Module):
 
             # CASE 1: User did NOT provide a value
             if p.value is None or jnp.size(p.value) == 0:
-                if not in_dataset:
+                try:
+                    dataset_val = jnp.atleast_1d(sample_row[str(p.name)])
+                except Exception as e:
                     raise ValueError(
-                        f"Parameter '{p.name}' is not in the dataset and has no default value. "
-                        "Shape cannot be inferred."
-                    )
-                dataset_val = jnp.atleast_1d(sample_row[p.name])
+                            f"Could not resolve Parameter '{p.name}' from dataset: {e}"
+                        )
                 tp = TreePath.cast(p.path)
                 new_p = eqx.tree_at(lambda x: x.path, p, TreePath(tp.path, dataset_val, tp.path_slice, tp.name))
                 initialized_params.append(new_p)
@@ -258,7 +253,7 @@ class DesignSpace(Module):
                 user_val = jnp.atleast_1d(p.value)
 
                 if in_dataset:
-                    dataset_val = jnp.atleast_1d(sample_row[p.name])
+                    dataset_val = jnp.atleast_1d(sample_row[str(p.name)])
                     if user_val.shape != dataset_val.shape:
                         raise ValueError(
                             f"Shape mismatch for Parameter '{p.name}'. User: {user_val.shape}, Dataset: {dataset_val.shape}."  # noqa: E501
@@ -302,7 +297,11 @@ class DesignSpace(Module):
 
         # Instantiate the FT facade wrapper
         return DataLoader(
-            dataset=self.dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=xy_collate_fn, **kwargs
+            dataset=self.dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=xy_collate_fn,
+            **kwargs,
         )
 
     def project(self, physical_inputs: dict) -> jax.Array:
