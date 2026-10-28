@@ -666,7 +666,7 @@ class MemoryProxy:
 class ParquetProxy:
     """A lazy-evaluation proxy layer for Parquet files utilizing dynamic column caching."""
 
-    def __init__(self, file_path: str, columns: list):
+    def __init__(self, file_path: str | Path, columns: list):
         self._file_path = file_path
         self._columns = columns
         # Cache to store columns as they are requested
@@ -754,7 +754,7 @@ class ZarrGroupProxy:
 class HDF5GroupProxy:
     """Lazy evaluation proxy for arrays within HDF5 files."""
 
-    def __init__(self, file_path: str, group_path: str = ""):
+    def __init__(self, file_path: str | Path, group_path: str = ""):
         self._file_path = str(file_path)
         self._group_path = group_path
 
@@ -805,7 +805,7 @@ class HDF5GroupProxy:
 class NetCDFGroupProxy:
     """Lazy evaluation proxy for arrays within NetCDF4 files."""
 
-    def __init__(self, file_path: str, group_path: str = ""):
+    def __init__(self, file_path: str | Path, group_path: str = ""):
         self._file_path = file_path
         self._group_path = group_path
 
@@ -849,7 +849,7 @@ class NetCDFGroupProxy:
 class XArrayProxy:
     """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
 
-    def __init__(self, file_path: str, engine: str = "zarr", **kwargs):
+    def __init__(self, file_path: str | Path, engine: str = "zarr", **kwargs):
         self._file_path = file_path
         self._engine = engine
         self._kwargs = kwargs
@@ -1050,7 +1050,7 @@ class HDF5Dataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str, primary_key: str = "data"):
+    def __init__(self, file_path: str | Path, primary_key: str = "data"):
         with h5py.File(file_path, "r") as f:
             if primary_key not in f:
                 datasets = [k for k in f.keys() if isinstance(f[k], h5py.Dataset)]
@@ -1074,7 +1074,7 @@ class ParquetDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | Path):
         pf = pq.ParquetFile(file_path)
 
         object.__setattr__(self, "_source", file_path)
@@ -1120,7 +1120,7 @@ class CSVDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | Path):
         table = pcsv.read_csv(file_path)
         columns = table.column_names
         data_dict = {col: table.column(col).to_numpy() for col in columns}
@@ -1167,7 +1167,7 @@ class MATDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str, primary_key: str = None):
+    def __init__(self, file_path: str | Path, primary_key: str = None):
         data_dict = {}
         try:
             mat = sio.loadmat(file_path)
@@ -1195,7 +1195,7 @@ class XArrayDataset(Dataset):
     
     _len: int = _
 
-    def __init__(self, file_path: str, engine: str = "zarr", _proxy: Any = None, **kwargs):
+    def __init__(self, file_path: str | Path, engine: str = "zarr", _proxy: Any = None, **kwargs):
         # ds = xr.open_dataset(file_path, engine=engine)
         
         object.__setattr__(self, "_source", file_path)
