@@ -263,7 +263,7 @@ class Dataset(Module):
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
 
-    _tranforms: tuple[Callable, ...] = static_field(())
+    _transforms: tuple[Callable, ...] = static_field(())
 
     _appended_data: dict = _
     _appended_len: int = 0
