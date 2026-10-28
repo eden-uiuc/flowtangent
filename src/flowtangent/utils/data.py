@@ -297,7 +297,7 @@ class Dataset(Module):
         """
         Returns a shallow copy of the dataset with a new transformation function applied.
         """
-        new_tfs = self._tranforms + (transform_fn,)
+        new_tfs = self._transforms + (transform_fn,)
         new_ds = copy.copy(self)
         object.__setattr__(new_ds, "_transforms", new_tfs)
         return new_ds
