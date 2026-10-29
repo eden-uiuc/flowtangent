@@ -1249,7 +1249,7 @@ class TurbojetOpPoint[KinType: JetKinematics | FanKinematics](FlowOpPoint):
 
 
 class TurbojetEngine(FlowNode[TurbojetOpPoint]):
-    name: str = field("Engine", static=True)
+    name: str | None = field("Engine", static=True)
     subcomponents: tuple = field(_TurbojetSetup)
 
     plug_diameter: ScalarFloat = 0.0

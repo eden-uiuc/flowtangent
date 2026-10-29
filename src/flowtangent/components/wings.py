@@ -16,7 +16,7 @@ from ..utils import empty_array, field, static_field, update
 from .airfoils._classes import Airfoil
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Wing
+# Wing Elements
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -37,7 +37,7 @@ class WingChords(WingDimensions):
 
 
 class WingSegment(Component):
-    name: str = static_field("Wing Segment")
+    name: str | None = static_field("Wing Segment")
     airfoil: Airfoil | None = None
     control_surfaces: tuple = field(tuple)
 
@@ -93,6 +93,9 @@ class ControlSurface(Component):
                 )
             )
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Wing Classes
+# ----------------------------------------------------------------------------------------------------------------------
 
 class Wing(Component):
     airfoil: Optional[Airfoil] = None
@@ -125,25 +128,6 @@ class Wing(Component):
     twists: WingDimensions = field(WingDimensions)
     chords: WingChords = field(WingChords)
     sweeps: WingSweeps = field(WingSweeps)
-
-    # def __post_init__(self):
-    #     new_taper, new_chords = self.validate_chords()
-    #     object.__setattr__(self, "taper", new_taper)
-    #     object.__setattr__(self, "chords", new_chords)
-
-    #     updated_segments = []
-
-    #     for idx, seg in enumerate(self.segments):
-    #         root = new_chords.root * seg.root_chord_percent
-    #         if idx == len(self.segments) - 1:
-    #             tip = new_chords.tip
-    #         else:
-    #             tip = new_chords.root * self.segments[idx + 1].root_chord_percent
-
-    #         new_seg = update(seg, "chords", WingChords(root=root, tip=tip))
-    #         updated_segments.append(new_seg)
-
-    #     object.__setattr__(self, "segments", updated_segments)
 
     def validate_chords(self) -> tuple:
 
@@ -500,6 +484,7 @@ class Wing(Component):
 # Aliases
 WingTwists = WingDimensions
 WingSpans = WingDimensions
+RotorBlade = Wing
 
 __all__ = [
     "Wing",
@@ -508,5 +493,6 @@ __all__ = [
     "WingSegment",
     "WingTwists",
     "WingSpans",
-    "ControlSurface"
+    "ControlSurface",
+    "RotorBlade"
 ]

@@ -8,14 +8,16 @@
 #  IMPORT
 # ----------------------------------------------------------------------------------------------------------------------
 
+import jax
+
 # package imports
 
 from flowtangent.core._state_data import StateData
 from flowtangent.data.gases import Air, Gas
 
 # FlowTangent imports
-from ...utils import field
-from ...utils.typing import TimeScalar, TimeVector3, _
+from ...utils import field, static_field
+from ...utils.typing import NameType, TimeScalar, TimeVector3, _
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  Energy Interfaces
@@ -23,14 +25,14 @@ from ...utils.typing import TimeScalar, TimeVector3, _
 
 
 class MechanicalOutputs(StateData):
-    name: str = field("Mechanical Outputs", static=True)
+    name: NameType = field("Mechanical Outputs", static=True)
 
     work: TimeScalar = _
     power: TimeScalar = _
 
 
 class ElectricalOutputs(StateData):
-    name: str = field("Electrical Outputs", static=True)
+    name: NameType = field("Electrical Outputs", static=True)
 
     power: TimeScalar = _
     voltage: TimeScalar = _
@@ -38,14 +40,14 @@ class ElectricalOutputs(StateData):
 
 
 class FuelOutputs(StateData):
-    name: str = field("Fuel Outputs", static=True)
+    name: NameType = field("Fuel Outputs", static=True)
 
     TSFC: TimeScalar = _
     flow_rate: TimeScalar = _
 
 
 class FlowOutputs(StateData):
-    name: str = field("Flow Outputs", static=True)
+    name: NameType = field("Flow Outputs", static=True)
     fluid: Gas = field(Air)
 
     speed: TimeScalar = _
@@ -75,7 +77,7 @@ class FlowOutputs(StateData):
 
 
 class ResidualOutputs(StateData):
-    name: str = field("Residual Outputs", static=True)
+    name: NameType = field("Residual Outputs", static=True)
 
     mass: TimeScalar = _
     mass_flow_rate: TimeScalar = _
@@ -100,15 +102,17 @@ class ResidualOutputs(StateData):
 
 
 class ForceOutputs(StateData):
-    name: str = field("Force Outputs", static=True)
+    name: NameType = field("Force Outputs", static=True)
 
     thrust: TimeScalar = _
     nondimensional_thrust: TimeScalar = _
     specific_impulse: TimeScalar = _
 
+    torque: TimeScalar = _
+
 
 class NodeState(StateData):
-    name: str = field("Node Outputs", static=True)
+    name: NameType = field("Node Outputs", static=True)
 
     mechanical: MechanicalOutputs = field(MechanicalOutputs)
     electrical: ElectricalOutputs = field(ElectricalOutputs)
@@ -127,7 +131,7 @@ class NodeState(StateData):
 
 class BatteryCellConditions(NodeState):
     # Attribute                 Type        Default Value
-    name: str = field("Battery Cell", static=True)
+    name: NameType = field("Battery Cell", static=True)
 
     cycle_in_day: int = field(0, static=True)
     resistance_growth_factor: float = field(0.0, static=True)
@@ -140,7 +144,7 @@ class BatteryCellConditions(NodeState):
 
 class BatteryPackConditions(NodeState):
     # Attribute             Type                    Default Value
-    name: str = field("Battery Pack", static=True)
+    name: NameType = field("Battery Pack", static=True)
 
     maximum_total_energy: float = field(0.0, static=True)
 
@@ -153,9 +157,8 @@ class BatteryPackConditions(NodeState):
 #  Energy Networks
 # ----------------------------------------------------------------------------------------------------------------------
 
-
 class NetworkState(NodeState):
-    name: str = field("Energy Network", static=True)
+    name: NameType = field("Energy Network", static=True)
 
     nodes: dict = field(dict)
 
@@ -170,7 +173,7 @@ class NetworkState(NodeState):
 
 
 class TurbojetState(NetworkState):
-    name: str = field("Turbojet Network", static=True)
+    name: NameType = field("Turbojet Network", static=True)
 
     # Variable hooks
     fuel_air_ratio: TimeScalar = _
@@ -184,7 +187,7 @@ class TurbojetState(NetworkState):
 
 
 class TurbofanState(NetworkState):
-    name: str = field("Turbofan Network", static=True)
+    name: NameType = field("Turbofan Network", static=True)
 
     # Variable hooks
     fuel_air_ratio: TimeScalar = _
@@ -203,3 +206,10 @@ class TurbofanState(NetworkState):
     bypass_ratio: TimeScalar = _
     target_thrust: TimeScalar = _
     target_temperature: TimeScalar = _
+
+class RotorState(NetworkState):
+    name: NameType = static_field("Rotor Network")
+
+    # Variable Hooks
+    omega: TimeScalar = _
+    phi: jax.Array = _

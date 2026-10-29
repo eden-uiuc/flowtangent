@@ -26,8 +26,6 @@ from typing import Any, Iterable, Optional
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-
-# package imports
 import sklearn
 from beartype.typing import Callable
 
@@ -39,8 +37,6 @@ from ...functional.aero.transonic import ensemble_CL_spline, peaked_CL_spline
 from ...sim.initialize import initialize_aerodynamics
 from ...utils import Module, TreePath, field, io, method_field, static_field, update
 from ...utils.typing import _
-
-# FT imports
 
 # ----------------------------------------------------------------------------------------------------------------------
 #  API Setup
@@ -1152,7 +1148,7 @@ def compute_boundary_conditions(state: State, system: Aircraft, settings: Settin
     RHS = (V_freestream + V_rotation + V_wake) @ n
     """
 
-    vlm_settings: "VORJAXSettings" = settings.analysis.aerodynamics  # type: ignore
+    vlm_settings: VORJAXSettings = settings.analysis.aerodynamics  # type: ignore
     lat: LatticeData = system.analysis_data.lattice  # type: ignore
 
     # Extract State Conditions
