@@ -5,7 +5,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from ..utils import Module
+from ..utils import Module, static_field
 from ..utils.data import DataLoader, LatentDataLoader
 from ..utils.typing import _
 from .kernels import Kernel
@@ -348,30 +348,52 @@ class RadialBasisFunction(Surrogate):
         return eqx.tree_at(lambda m: (m.centers, m.weights), self, (X_full, W))
 
 
-class GaussianProcessSurrogate(Surrogate):
-    inducing_points: jax.Array = _
-    kernel: Kernel = _
-    variational_mean: jax.Array = _
-    noise_variance: jax.Array = _
+class SVGPSurrogate(Surrogate):
 
-    def __init__(self, key, input_dim: int, output_dim: int, kernel: Kernel, num_inducing: int = 128):
-        k1, k2 = jax.random.split(key)
+    input_dim: int = _
+    output_dim: int = _
+
+    kernel: Kernel = _
+    jitter: float = static_field(1e-5)
+    complexity_weight: float = static_field(0.5)
+
+    _inducing_points: jax.Array = _
+    _variational_mean: jax.Array = _
+    _noise_variance: jax.Array = _
+
+    def __init__(
+            self,
+            key,
+            input_dim: int,
+            output_dim: int,
+            kernel: Kernel,
+            num_inducing: int = 128,
+            jitter: float = 1e-5,
+            complexity_weight: float = 0.5
+        ):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        
         self.kernel = kernel
-        self.inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
-        self.variational_mean = jax.random.normal(k2, (num_inducing, output_dim)) * 1e-2
-        self.noise_variance = jnp.zeros(output_dim)
+        self.jitter = jitter
+        self.complexity_weight = complexity_weight
+        
+        k1, k2 = jax.random.split(key)
+        self._inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
+        self._variational_mean = jax.random.normal(k2, (num_inducing, output_dim)) * 1e-2
+        self._noise_variance = jnp.zeros(output_dim)
 
     def predict(self, x, compute_derivatives=False):
         # 1. Cross-covariance
-        K_xz = jax.vmap(lambda z: self.kernel(x, z))(self.inducing_points)
-        means = K_xz @ self.variational_mean
+        K_xz = jax.vmap(lambda z: self.kernel(x, z))(self._inducing_points)
+        means = K_xz @ self._variational_mean
 
         # --- NEW VARIANCE CALCULATION ---
         # 2. Inducing point covariance matrix
-        K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self.inducing_points))(self.inducing_points)
+        K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self._inducing_points))(self._inducing_points)
 
         # Add numerical jitter to the diagonal for Cholesky stability
-        K_zz += 1e-5 * jnp.eye(self.inducing_points.shape[0])
+        K_zz += self.jitter * jnp.eye(self._inducing_points.shape[0])
 
         # 3. Cholesky decomposition (lower triangular)
         L = jax.scipy.linalg.cholesky(K_zz, lower=True)
@@ -381,13 +403,13 @@ class GaussianProcessSurrogate(Surrogate):
 
         # 5. Correct variance calculation
         k_xx = self.kernel(x, x)
-        var = k_xx - jnp.sum(v**2) + jnp.exp(self.noise_variance)
+        var = k_xx - jnp.sum(v**2) + jnp.exp(self._noise_variance)
 
         preds = SurrogateEvaluation(means=means, variances=var)
 
         if compute_derivatives:
             mean_fn = lambda x_in: (
-                jax.vmap(lambda z: self.kernel(x_in, z))(self.inducing_points) @ self.variational_mean
+                jax.vmap(lambda z: self.kernel(x_in, z))(self._inducing_points) @ self._variational_mean
             )
             preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x), is_leaf=lambda x: x is None)
 
@@ -399,7 +421,7 @@ class GaussianProcessSurrogate(Surrogate):
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
-    ) -> "GaussianProcessSurrogate":
+    ) -> "SVGPSurrogate":
         r"""Fit inducing-point predictions with a Gaussian likelihood objective.
 
         The current parameters provide the starting point for Adam training.
@@ -470,7 +492,7 @@ class GaussianProcessSurrogate(Surrogate):
 
             # 3. Add a complexity penalty (KL divergence proxy) for the variational mean.
             #    This prevents the sparse weights from exploding during SGD.
-            complexity_penalty = 0.5 * jnp.sum(model.variational_mean**2)
+            complexity_penalty = self.complexity_weight * jnp.sum(model.variational_mean**2)
 
             return data_fit + complexity_penalty
 
@@ -850,13 +872,21 @@ class SpectralConv1d(Module):
 
 
 class FourierNeuralOperator(Surrogate):
-    lifting: eqx.nn.Linear
-    spectral_conv: SpectralConv1d
-    projection: eqx.nn.Linear
-    grid: int
-    width: int
+    lifting: eqx.nn.Linear = _
+    spectral_conv: SpectralConv1d = _
+    projection: eqx.nn.Linear = _
+    grid: int = _
+    width: int = _
 
-    def __init__(self, key, input_dim: int, output_dim: int, modes: int = 16, width: int = 64, grid: int = 64):
+    def __init__(
+            self,
+            key,
+            input_dim: int,
+            output_dim: int,
+            modes: int = 16,
+            width: int = 64,
+            grid: int = 64,
+        ):
         # Enforce the Nyquist limit: modes cannot exceed half the grid size plus one
         if modes > grid // 2 + 1:
             raise ValueError(f"modes ({modes}) must be <= grid // 2 + 1 ({grid // 2 + 1})")
@@ -960,7 +990,7 @@ __all__ = [
     "PolynomialChaosSurrogate",
     "InverseDistanceWeighting",
     "RadialBasisFunction",
-    "GaussianProcessSurrogate",
+    "SVGPSurrogate",
     "MLPSurrogate",
     "TransformerSurrogate",
     "DeepEnsembleSurrogate",

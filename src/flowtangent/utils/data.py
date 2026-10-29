@@ -59,6 +59,8 @@ from torch.utils.data import (
 )
 from torch.utils.data import DataLoader as TorchDataLoader
 
+from tqdm.dask import TqdmCallback
+
 from .base import Module, static_field
 from .typing import _
 
@@ -261,7 +263,7 @@ class Dataset(Module):
     _virtual_columns: dict[str, jax.Array] = _
     _indices: Optional[jax.Array] = _
 
-    _tranforms: tuple[Callable, ...] = static_field(())
+    _transforms: tuple[Callable, ...] = static_field(())
 
     _appended_data: dict = _
     _appended_len: int = 0
@@ -295,7 +297,7 @@ class Dataset(Module):
         """
         Returns a shallow copy of the dataset with a new transformation function applied.
         """
-        new_tfs = self._tranforms + (transform_fn,)
+        new_tfs = self._transforms + (transform_fn,)
         new_ds = copy.copy(self)
         object.__setattr__(new_ds, "_transforms", new_tfs)
         return new_ds
@@ -332,13 +334,13 @@ class Dataset(Module):
         new_virtuals = {**self._virtual_columns, name: data}
         return eqx.tree_at(lambda d: d._virtual_columns, self, new_virtuals)
 
-    def compute_variable(self, name: str, expr_fn: Callable, quiet: bool = False, **compute_kwargs):
+    def compute_variable(self, name: str, expr_fn: Callable, chunk_size: int=1000, quiet: bool = False, **compute_kwargs):
         """
         Derives a new variable out-of-core.
         compute_kwargs are passed directly to the backend's ephemeral compute engine.
         """
         # 1. Ask the backend to spin up a temporary compute engine just for this math
-        with self._proxy._compute_engine(**compute_kwargs) as compute_env:
+        with self._proxy._compute_engine(chunk_size=chunk_size,**compute_kwargs) as compute_env:
             # 2. Execute the user's graph
             derived_data = expr_fn(compute_env)
             
@@ -472,7 +474,36 @@ class Dataset(Module):
             base_col = jnp.concatenate([jnp.asarray(base_col), self._appended_data[name]], axis=0)
 
         if self._indices is not None:
-            return base_col[self._indices]
+            import numpy as np
+            
+            # 1. Convert JAX array to standard NumPy array
+            idx_np = np.asarray(self._indices)
+            
+            # 2. Handle Xarray DataArrays specifically
+            if hasattr(base_col, "values"):
+                arr = base_col.values 
+                
+                # 3. Handle virtual stacking by unraveling the indices
+                if hasattr(self, "_proxy") and getattr(self._proxy, "_virtual_stack", None):
+                    stack_dims = self._proxy._virtual_stack
+                    dim_sizes = tuple(self._proxy._ds.sizes[d] for d in stack_dims)
+                    
+                    # Unravel the flat index array into N-D coordinate arrays
+                    # e.g., returns (array([0, 1, ...]), array([41, 0, ...]))
+                    unraveled = np.unravel_index(idx_np, dim_sizes)
+                    idx_map = dict(zip(stack_dims, unraveled))
+                    
+                    # Slice using ONLY the dimensions this specific variable has!
+                    # For panel_data: slices (run, alpha). For foil_name: slices just (run).
+                    actual_indices = tuple(idx_map[d] for d in base_col.dims if d in idx_map)
+                    
+                    return arr[actual_indices]
+                
+                # Fallback for standard 1D Datasets
+                return arr[idx_np]
+                
+            # Fallback for standard NumPy/JAX arrays (e.g., appended active-learning data)
+            return base_col[idx_np]
 
         return base_col
 
@@ -539,14 +570,13 @@ class Dataset(Module):
                 # 3. It must be on disk
                 else:
                     row[var] = self._proxy.get_row(var, actual_idx)
-            return row
+        else:
+            # Fallback for slices
+            row = {}
+            for var in self.full_vars:
+                row[var] = getattr(self, var)[idx]
 
-        # Fallback for slices
-        row = {}
-        for var in self.full_vars:
-            row[var] = getattr(self, var)[idx]
-
-        for tf in self._tranforms:
+        for tf in self._transforms:
             row = tf(row)
         
         return row
@@ -636,7 +666,7 @@ class MemoryProxy:
 class ParquetProxy:
     """A lazy-evaluation proxy layer for Parquet files utilizing dynamic column caching."""
 
-    def __init__(self, file_path: str, columns: list):
+    def __init__(self, file_path: str | Path, columns: list):
         self._file_path = file_path
         self._columns = columns
         # Cache to store columns as they are requested
@@ -724,7 +754,7 @@ class ZarrGroupProxy:
 class HDF5GroupProxy:
     """Lazy evaluation proxy for arrays within HDF5 files."""
 
-    def __init__(self, file_path: str, group_path: str = ""):
+    def __init__(self, file_path: str | Path, group_path: str = ""):
         self._file_path = str(file_path)
         self._group_path = group_path
 
@@ -775,7 +805,7 @@ class HDF5GroupProxy:
 class NetCDFGroupProxy:
     """Lazy evaluation proxy for arrays within NetCDF4 files."""
 
-    def __init__(self, file_path: str, group_path: str = ""):
+    def __init__(self, file_path: str | Path, group_path: str = ""):
         self._file_path = file_path
         self._group_path = group_path
 
@@ -819,7 +849,7 @@ class NetCDFGroupProxy:
 class XArrayProxy:
     """Lazy evaluation proxy utilizing Xarray for labeled N-dimensional coordinates."""
 
-    def __init__(self, file_path: str, engine: str = "zarr", **kwargs):
+    def __init__(self, file_path: str | Path, engine: str = "zarr", **kwargs):
         self._file_path = file_path
         self._engine = engine
         self._kwargs = kwargs
@@ -862,7 +892,7 @@ class XArrayProxy:
         return self._ds[mapping]
 
     def __dir__(self):
-        return list(self._ds.data_vars.keys())
+        return list(self._ds.data_vars.keys()) + list(self._var_map.keys())
 
     def get_row(self, name: str, idx: int):
         if name not in self._var_map:
@@ -1020,7 +1050,7 @@ class HDF5Dataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str, primary_key: str = "data"):
+    def __init__(self, file_path: str | Path, primary_key: str = "data"):
         with h5py.File(file_path, "r") as f:
             if primary_key not in f:
                 datasets = [k for k in f.keys() if isinstance(f[k], h5py.Dataset)]
@@ -1044,7 +1074,7 @@ class ParquetDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | Path):
         pf = pq.ParquetFile(file_path)
 
         object.__setattr__(self, "_source", file_path)
@@ -1090,7 +1120,7 @@ class CSVDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str | Path):
         table = pcsv.read_csv(file_path)
         columns = table.column_names
         data_dict = {col: table.column(col).to_numpy() for col in columns}
@@ -1137,7 +1167,7 @@ class MATDataset(Dataset):
 
     _len: int = _
 
-    def __init__(self, file_path: str, primary_key: str = None):
+    def __init__(self, file_path: str | Path, primary_key: str = None):
         data_dict = {}
         try:
             mat = sio.loadmat(file_path)
@@ -1165,7 +1195,7 @@ class XArrayDataset(Dataset):
     
     _len: int = _
 
-    def __init__(self, file_path: str, engine: str = "zarr", _proxy: Any = None, **kwargs):
+    def __init__(self, file_path: str | Path, engine: str = "zarr", _proxy: Any = None, **kwargs):
         # ds = xr.open_dataset(file_path, engine=engine)
         
         object.__setattr__(self, "_source", file_path)
@@ -1188,6 +1218,54 @@ class XArrayDataset(Dataset):
         
         new_ds = replace(self, file_path=self._source, engine=self._engine, _proxy=stacked_proxy)
         return eqx.tree_at(lambda d: d._len, new_ds, stacked_proxy._stacked_len)
+
+    def dropna(self, columns: list[str], chunk_size: int = 10_000, **compute_kwargs) -> "Dataset":
+        """Returns a new Dataset with NaN rows filtered out using the out-of-core compute engine."""
+
+        with self._proxy._compute_engine(chunk_size=chunk_size, **compute_kwargs) as lazy_ds:
+            global_valid_mask = None
+            
+            # 1. Identify the axes that define our "rows"
+            if hasattr(self._proxy, "_virtual_stack") and self._proxy._virtual_stack:
+                row_dims = self._proxy._virtual_stack
+            else:
+                first_var = list(lazy_ds.data_vars.values())[0]
+                row_dims = [list(first_var.dims)[0]]
+
+            for col in columns:
+                # 2. Resolve the actual backend variable name from the proxy map
+                if hasattr(self._proxy, "_var_map") and col in self._proxy._var_map:
+                    mapping = self._proxy._var_map[col]
+                    real_name = mapping[0] if isinstance(mapping, tuple) else mapping
+                else:
+                    real_name = col
+                    
+                col_data = lazy_ds[real_name]
+                
+                # 3. Reduce over any dimension that ISN'T a row dimension (e.g., panels, vars)
+                reduce_dims = [d for d in col_data.dims if d not in row_dims]
+                
+                if reduce_dims:
+                    col_valid = ~col_data.isnull().any(dim=reduce_dims)
+                else:
+                    col_valid = ~col_data.isnull()
+                    
+                # Xarray's '&' operator automatically broadcasts mismatched dimensions!
+                # (e.g., if one column only has 'run' and another has 'run' + 'alpha')
+                if global_valid_mask is None:
+                    global_valid_mask = col_valid
+                else:
+                    global_valid_mask = global_valid_mask & col_valid
+                
+            # 4. Compute the mask in its original N-Dimensional shape (e.g., [N_run, N_alpha])
+            with TqdmCallback(desc="Dropping NaNs from dataset"):
+                concrete_mask = np.asarray(global_valid_mask.compute())
+            
+        # 5. Flatten the N-D mask! This perfectly mirrors np.unravel_index in get_row()
+        flat_mask = concrete_mask.ravel()
+        
+        valid_indices = jnp.array(np.where(flat_mask)[0])
+        return self.filter(valid_indices)
 
 
 __all__ = [
