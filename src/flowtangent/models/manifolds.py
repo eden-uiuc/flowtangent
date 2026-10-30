@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Any, List, Literal, Union
+from typing import Any, List, Literal, Union, Optional
 
 import equinox as eqx
 import jax
@@ -12,7 +12,7 @@ from ..utils import Module, static_field
 from ..utils.data import LoaderType, slice_data
 from ..utils.typing import _
 from .kernels import Kernel
-from .nn import TransformerBlock, fit_neural_model
+from .nn import TransformerBlock, train_model
 from .surrogates import Surrogate
 
 
@@ -219,6 +219,13 @@ class ScalingManifold(Manifold):
     """
     Unified manifold for transforming physical variables into an unbounded,
     normalized [-inf, inf] latent space suitable for gradient-based optimization.
+
+     Scaling Methods:
+        - 'linear': Direct proportional scaling. Best for unconstrained, O(1) variables.
+        - 'log_bounded': Exponential sigmoid. Best for variables with strict upper/lower bounds.
+        - 'algebraic_bounded': Slower-decaying sigmoid. Best for tight bounds where gradient starvation is a risk.
+        - 'softplus': One-sided bound (y > 0). Best for mass, pressure, or physical properties without an upper limit.
+        - 'logarithmic': Base-10 scaling. Best for strictly positive vars. spanning multiple orders of magnitude (e.g., Re).
     """
 
     method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = static_field(
@@ -231,15 +238,19 @@ class ScalingManifold(Manifold):
 
     def __init__(
         self,
-        dim: int,
+        dim: int = 1,
         method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = "log_bounded",
+        scale_factors: Optional[jax.Array | float] = None,
+        bounds_min: Optional[jax.Array | float] = None,
+        bounds_max: Optional[jax.Array | float] = None,
     ):
         self.input_dim = dim
         self.latent_dim = dim
         self.method = method
-        self.scale_factors = jnp.ones(dim)
-        self.bounds_min = jnp.zeros(dim)
-        self.bounds_max = jnp.ones(dim)
+        
+        self.scale_factors = jnp.ones(dim) if not scale_factors else jnp.asarray(scale_factors)
+        self.bounds_min = jnp.zeros(dim) if not bounds_min else jnp.asarray(bounds_min)
+        self.bounds_max = jnp.ones(dim) if not bounds_max else jnp.asarray(bounds_max)
 
     # ==========================================================================
     # 1. Routing
@@ -428,7 +439,7 @@ class KernelPCA(Manifold):
             return jnp.mean((X_target - X_pred) ** 2)
 
         Z_full = jax.vmap(model.encode)(X_full)
-        new_decoder = fit_neural_model(model.pre_image_decoder, (Z_full, X_full), decoder_loss, learning_rate, epochs)
+        new_decoder = train_model(model.pre_image_decoder, (Z_full, X_full), decoder_loss, learning_rate, epochs)
 
         return eqx.tree_at(lambda m: m.pre_image_decoder, model, new_decoder)
 
@@ -489,7 +500,7 @@ class VariationalAutoencoder(Manifold):
 
             return recon_loss + kl_loss
 
-        return fit_neural_model(self, X, vae_loss, learning_rate, epochs)
+        return train_model(self, X, vae_loss, learning_rate, epochs)
 
 
 class TransformerAutoencoder(Manifold):
@@ -539,7 +550,7 @@ class TransformerAutoencoder(Manifold):
             X_recon = jax.vmap(model.decode)(Z)
             return jnp.mean((X_batch - X_recon) ** 2)
 
-        return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
+        return train_model(self, X, ae_loss, learning_rate, epochs)
 
 
 class StateSpaceAutoencoder(Manifold):
@@ -591,7 +602,7 @@ class StateSpaceAutoencoder(Manifold):
             X_recon = jax.vmap(model.decode)(Z)
             return jnp.mean((X_batch - X_recon) ** 2)
 
-        return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
+        return train_model(self, X, ae_loss, learning_rate, epochs)
 
 
 class AffineCoupling(Module):
@@ -654,7 +665,7 @@ class NormalizingFlow(Manifold):
             X_recon = jax.vmap(model.decode)(Z)
             return jnp.mean((X_batch - X_recon) ** 2)
 
-        return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
+        return train_model(self, X, ae_loss, learning_rate, epochs)
 
 
 class PointCloudManifold(Manifold):
@@ -696,7 +707,7 @@ class PointCloudManifold(Manifold):
             X_recon = jax.vmap(model.decode)(Z)
             return jnp.mean((X_batch - X_recon) ** 2)
 
-        return fit_neural_model(self, X, ae_loss, learning_rate, epochs)
+        return train_model(self, X, ae_loss, learning_rate, epochs)
 
 
 __all__ = [

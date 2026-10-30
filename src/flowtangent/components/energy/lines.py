@@ -5,12 +5,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     pass
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
-
 from flowtangent.utils import field
 
 from .nodes import EnergyStore, PACTNode, Splitter
@@ -21,7 +15,7 @@ from .nodes import EnergyStore, PACTNode, Splitter
 
 
 class PACTLine(PACTNode):
-    name: str = field("Line", static=True)
+    name: str | None = field("Line", static=True)
     _bookkeeping: dict = field(
         lambda: {
             "splitters": Splitter,

@@ -34,7 +34,7 @@ from ..utils import Module, NameType, empty_array, field, static_field
 
 
 class VehicleEnvelope(Module):
-    # Attribute             Type        Default Value
+    
     ultimate_load_factor: float = 0.0
     limit_load_factor: float = 0.0
 
@@ -89,7 +89,7 @@ class Aircraft[EnergyType: PACTNetwork](System):
     mass_properties: AircraftMassProperties = field(AircraftMassProperties)  # type: ignore
     design_parameters: AircraftDesign = field(AircraftDesign)
 
-    _bookkeeping: dict = field(
+    _bookkeeping: dict = static_field(
         lambda: {
             "energy_networks": PACTNetwork,
             "wings": Wing,
@@ -97,7 +97,6 @@ class Aircraft[EnergyType: PACTNetwork](System):
             "nacelles": Nacelle,
             "landing_gear": LandingGear,
         },
-        static=True,
     )
 
     @property

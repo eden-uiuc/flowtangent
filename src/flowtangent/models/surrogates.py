@@ -9,7 +9,7 @@ from ..utils import Module, static_field
 from ..utils.data import DataLoader, LatentDataLoader
 from ..utils.typing import _
 from .kernels import Kernel
-from .nn import TransformerBlock, fit_neural_model
+from .nn import TransformerBlock, train_model
 
 _loader: TypeAlias = DataLoader | LatentDataLoader
 
@@ -201,7 +201,7 @@ class PolynomialChaosSurrogate(Surrogate):
             preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((y_batch - preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class InverseDistanceWeighting(Surrogate):
@@ -441,10 +441,10 @@ class SVGPSurrogate(Surrogate):
         import jax.numpy as jnp
         from flowtangent.models.kernels import RBFKernel
         from flowtangent.models.surrogates import (
-            GaussianProcessSurrogate,
+            SVGPSurrogate,
         )
 
-        model = GaussianProcessSurrogate(
+        model = SVGPSurrogate(
             jax.random.PRNGKey(0),
             1,
             1,
@@ -466,7 +466,7 @@ class SVGPSurrogate(Surrogate):
             **kwargs (Any): Ignored.
 
         Returns:
-            GaussianProcessSurrogate: Model after training; returns the original instance if
+            SVGPSurrogate: Model after training; returns the original instance if
                 no updates run. Loader and training errors propagate.
 
         Raises:
@@ -486,17 +486,16 @@ class SVGPSurrogate(Surrogate):
             variances = preds.variances  # Shape: (N, D)
 
             # 2. Compute the Negative Log Likelihood (NLL)
-            #    This correctly broadcasts the variances across the output dimensions.
             diff = y_train - means
             data_fit = 0.5 * jnp.sum(jnp.log(variances)) + 0.5 * jnp.sum((diff**2) / variances)
 
             # 3. Add a complexity penalty (KL divergence proxy) for the variational mean.
             #    This prevents the sparse weights from exploding during SGD.
-            complexity_penalty = self.complexity_weight * jnp.sum(model.variational_mean**2)
+            complexity_penalty = self.complexity_weight * jnp.sum(model._variational_mean**2)
 
             return data_fit + complexity_penalty
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 # ==========================================
@@ -578,7 +577,7 @@ class MLPSurrogate(Surrogate):
             preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((y_batch - preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class TransformerSurrogate(Surrogate):
@@ -679,7 +678,7 @@ class TransformerSurrogate(Surrogate):
             preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((y_batch - preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class DeepEnsembleSurrogate(Surrogate):
@@ -763,7 +762,7 @@ class DeepEnsembleSurrogate(Surrogate):
             all_preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class MixtureOfExperts(Surrogate):
@@ -847,7 +846,7 @@ class MixtureOfExperts(Surrogate):
             preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((y_batch - preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 class SpectralConv1d(Module):
@@ -981,7 +980,7 @@ class FourierNeuralOperator(Surrogate):
             preds = jax.vmap(model._internal_predict)(x_batch)
             return jnp.mean((y_batch - preds) ** 2)
 
-        return fit_neural_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs)
 
 
 __all__ = [
