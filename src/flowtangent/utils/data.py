@@ -24,7 +24,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional, Union
 
-
 import dask.array as da
 import equinox as eqx
 import h5py
@@ -40,24 +39,23 @@ import torch
 import xarray as xr
 import zarr
 from torch.utils.data import (
-    BatchSampler,
     ChainDataset,
     ConcatDataset,
-    # Core Datasets
     IterableDataset,
-    RandomSampler,
+    DataLoader as TorchDataLoader,
     # Samplers
     Sampler,
+    BatchSampler,
     SequentialSampler,
     StackDataset,
     Subset,
+    RandomSampler,
     SubsetRandomSampler,
     WeightedRandomSampler,
     # Utils
     get_worker_info,
     random_split,
 )
-from torch.utils.data import DataLoader as TorchDataLoader
 
 from tqdm.dask import TqdmCallback
 
@@ -474,7 +472,6 @@ class Dataset(Module):
             base_col = jnp.concatenate([jnp.asarray(base_col), self._appended_data[name]], axis=0)
 
         if self._indices is not None:
-            import numpy as np
             
             # 1. Convert JAX array to standard NumPy array
             idx_np = np.asarray(self._indices)
@@ -580,6 +577,198 @@ class Dataset(Module):
             row = tf(row)
         
         return row
+
+
+class StreamingDataset(IterableDataset):
+    """An out-of-core IterableDataset that yields pre-collated matrices directly.
+
+    Args:
+        dataset (Dataset): The underlying FlowTangent Dataset instance.
+        in_names (list[str]): Column names to stack into the X_batch matrix.
+        out_names (list[str]): Column names to stack into the Y_batch matrix.
+        batch_size (int): The number of rows to slice from disk per read.
+        shuffle (bool): Whether to randomize chunk order and rows.
+    """
+    def __init__(
+        self, 
+        dataset, 
+        in_names: list[str], 
+        out_names: list[str], 
+        batch_size: int = 16384, 
+        shuffle: bool = True,
+        read_cols: Optional[list[str]] = None
+    ):
+        super().__init__()
+        self.dataset = dataset
+        self.in_names = in_names
+        self.out_names = out_names
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.total_rows = len(dataset)
+
+        if read_cols is not None:
+            self.read_cols = read_cols
+        else:
+            self.read_cols = dataset.full_vars
+
+
+    def __len__(self) -> int:
+        return math.ceil(self.total_rows / self.batch_size)
+
+    def _extract(self, lazy_arr, indices, actual_dims=None):
+        """Backend-agnostic router for lazy array evaluation."""
+        
+        # Fast Path: Contiguous 1D Slice (Supported by literally everything)
+        if not isinstance(indices, tuple) and len(indices) > 0:
+            if indices[-1] - indices[0] == len(indices) - 1:
+                res = lazy_arr[indices[0] : indices[-1] + 1]
+                if hasattr(res, "compute"): return res.compute()
+                if hasattr(res, "values"): return res.values
+                return np.asarray(res)
+            
+        # Try Xarray Native Selection
+        if hasattr(lazy_arr, "isel"):
+            if isinstance(indices, tuple) and actual_dims is not None:
+                # ND Unraveled Fancy Indexing
+                idx_dict = {dim: xr.DataArray(idx) for dim, idx in zip(actual_dims, indices)}
+                res = lazy_arr.isel(**idx_dict)
+            else:
+                # 1D Fancy Indexing
+                res = lazy_arr.isel({lazy_arr.dims[0]: xr.DataArray(indices)})
+                
+            if hasattr(res, "compute"): return res.compute()
+            if hasattr(res, "values"): return res.values
+            return np.asarray(res)
+            
+        # Try Dask Native Selection
+        if hasattr(lazy_arr, "vindex"):
+            res = lazy_arr.vindex[indices]
+            if hasattr(res, "compute"): return res.compute()
+            return np.asarray(res)
+
+        # Try Universal Python Fancy Indexing
+        try:
+            res = lazy_arr[indices]
+            if hasattr(res, "compute"): return res.compute()
+            if hasattr(res, "values"): return res.values
+            return np.asarray(res)
+        except Exception:
+            pass # Backend rejected standard fancy indexing
+            
+        # Bulletproof Fallback: Bounded memory block fetch (for strict Zarr/HDF5)
+        if not isinstance(indices, tuple):
+            min_idx, max_idx = indices[0], indices[-1]
+            block = lazy_arr[min_idx : max_idx + 1]
+            
+            if hasattr(block, "compute"): block = block.compute()
+            elif hasattr(block, "values"): block = block.values
+            else: block = np.asarray(block)
+            
+            # Localize indices and slice in memory
+            return block[indices - min_idx]
+            
+        raise TypeError(f"Could not extract ND indices from backend array of type {type(lazy_arr)}")
+
+    def __iter__(self):
+        chunk_starts = list(range(0, self.total_rows, self.batch_size))
+        if self.shuffle:
+            np.random.shuffle(chunk_starts)
+            
+        proxy = getattr(self.dataset, "_proxy", None)
+        has_proxy = proxy is not None and getattr(proxy, "_compute_engine", None) is not None
+        virtual_stack = getattr(proxy, "_virtual_stack", None) if has_proxy else None
+        
+        orig_len = getattr(self.dataset, "_len", self.total_rows)
+        indices = getattr(self.dataset, "_indices", None)
+        virtuals = getattr(self.dataset, "_virtual_columns", {})
+        appended = getattr(self.dataset, "_appended_data", {})
+
+        @contextmanager
+        def get_backend_arrays():
+            if has_proxy:
+                with proxy._compute_engine(chunk_size=self.batch_size) as arrs:
+                    yield arrs
+            elif proxy is not None:
+                # Fallback: Yield raw proxy columns if no compute engine exists
+                yield {k: getattr(proxy, k) for k in dir(proxy) if not k.startswith("_")}
+            else:
+                yield {}
+
+        with get_backend_arrays() as backend_arrays:
+            for start in chunk_starts:
+                end = min(start + self.batch_size, self.total_rows)
+                
+                # 1. Resolve flat indices
+                if indices is not None:
+                    batch_indices = np.asarray(indices[start:end])
+                else:
+                    batch_indices = np.arange(start, end)
+                    
+                base_mask = batch_indices < orig_len
+                app_mask = batch_indices >= orig_len
+                
+                base_idx = batch_indices[base_mask]
+                app_idx = batch_indices[app_mask] - orig_len
+                
+                raw_dict = {}
+                for name in self.read_cols:
+                    base_data = None
+                    
+                    # --- A. In-Memory Virtuals ---
+                    if name in virtuals:
+                        if len(base_idx) > 0:
+                            base_data = virtuals[name][base_idx]
+                            
+                    # --- B. Out-of-Core Backend OR Proxy Reads ---
+                    else:
+                        lazy_arr = None
+                        if name in backend_arrays:
+                            lazy_arr = backend_arrays[name]
+                        elif has_proxy and hasattr(proxy, name):
+                            # Fallback for coordinates/variables the compute engine skipped
+                            lazy_arr = getattr(proxy, name)
+                            
+                        if lazy_arr is not None and len(base_idx) > 0:
+                            # Handle ND XArray/Dask unraveling
+                            if virtual_stack is not None:
+                                dim_sizes = tuple(proxy._ds.sizes[d] for d in virtual_stack)
+                                unraveled = np.unravel_index(base_idx, dim_sizes)
+                                idx_map = dict(zip(virtual_stack, unraveled))
+                                
+                                # raw_col = getattr(proxy, name)
+                                actual_dims = getattr(lazy_arr, "dims", None)
+                                
+                                if actual_dims is not None:
+                                    actual_indices = tuple(idx_map[d] for d in actual_dims if d in idx_map)
+                                    base_data = self._extract(lazy_arr, actual_indices, actual_dims)
+                                else:
+                                    base_data = self._extract(lazy_arr, base_idx)
+                            else:
+                                base_data = self._extract(lazy_arr, base_idx)
+                                
+                    # --- C. Active-Learning & Recombination ---
+                    app_data = appended[name][app_idx] if (len(app_idx) > 0 and name in appended) else None
+                        
+                    if base_data is not None and app_data is not None:
+                        raw_dict[name] = np.concatenate([base_data, app_data], axis=0)
+                    elif base_data is not None:
+                        raw_dict[name] = base_data
+                    elif app_data is not None:
+                        raw_dict[name] = app_data
+                        
+                # 2. Functional Transforms & Stacking
+                for tf in getattr(self.dataset, "_transforms", ()):
+                    raw_dict = tf(raw_dict)
+                    
+                X_batch = jnp.column_stack([jnp.asarray(raw_dict[name]) for name in self.in_names])
+                Y_batch = jnp.column_stack([jnp.asarray(raw_dict[name]) for name in self.out_names])
+                
+                # 3. Micro-Shuffle
+                if self.shuffle:
+                    perm = np.random.permutation(X_batch.shape[0])
+                    X_batch, Y_batch = X_batch[perm], Y_batch[perm]
+                    
+                yield X_batch, Y_batch
 
 
 def load_dataset(source: Union[str, Path, Any], *args, **kwargs) -> Dataset:
@@ -1272,6 +1461,7 @@ __all__ = [
     "Dataset",
     "load_dataset",
     "IterableDataset",
+    "StreamingDataset"
     "ArrayDataset",
     "StackDataset",
     "ConcatDataset",

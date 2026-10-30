@@ -15,7 +15,7 @@ from jax.scipy.stats import norm
 from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
 from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
-from ..utils.data import DataLoader, Dataset, LatentDataLoader, RandomSampler, numpy_collate
+from ..utils.data import DataLoader, Dataset, StreamingDataset, LatentDataLoader, RandomSampler
 from ..utils.typing import NameType, _
 from .manifolds import Manifold
 from .surrogates import Surrogate, SurrogateEvaluation
@@ -29,7 +29,10 @@ class Parameter(Module):
     extract_func: Optional[Callable] = method_field(None)
     update_func: Optional[Callable] = method_field(None)
 
-    is_output: bool = False
+    is_output: bool = static_field(False)
+    is_transform: bool = static_field(False)
+
+    transform_sources: tuple[str, ...] = static_field(())
 
     def __post_init__(self):
 
@@ -90,9 +93,9 @@ class Requirement(Parameter):
     """
 
     name: str | None = "Parameter"
-    eq_bound: Optional[jax.Array] = None
-    lower_bound: Optional[jax.Array] = None
-    upper_bound: Optional[jax.Array] = None
+    eq_bound: Optional[float | jax.Array] = None
+    lower_bound: Optional[float | jax.Array] = None
+    upper_bound: Optional[float | jax.Array] = None
     tolerance: float = 1e-5
 
     # Generalizes the probabilistic evaluation (default is Gaussian CDF)
@@ -278,30 +281,39 @@ class DesignSpace(Module):
         _, unravel_fn = ravel_pytree(ordered_defaults)
         object.__setattr__(self, "_unravel", unravel_fn)
 
-    def get_dataloader(self, batch_size: int = 256, shuffle: bool = True, **kwargs) -> DataLoader:
+    def get_dataloader(self, batch_size: int = 16384, shuffle: bool = True, **kwargs) -> DataLoader:
         """
-        Creates a NumPy-native DataLoader that streams [X_batch, Y_batch] arrays on the fly.
+        Creates an out-of-core Iterable DataLoader that streams [X_batch, Y_batch] 
+        matrices on the fly, optimized for chunked storage backends.
         """
+        # 1. Extract parameter string names
+        read_cols = [str(p.name) for p in self.parameters if not p.is_transform]
+        
+        tf_cols = [p for p in self.parameters if p.is_transform]
+        if len(tf_cols) > 0:
+            for inp in tf_cols: read_cols.extend(inp.transform_sources)
+
         in_names = [str(p.name) for p in self.inputs]
         out_names = [str(p.name) for p in self.outputs]
 
-        def xy_collate_fn(batch):
-            # 1. Use the standalone utility to handle the raw dictionary batching safely
-            batched_dict = numpy_collate(batch)
-
-            # 2. Extract and stack into the [Batch, D] matrices required by the 1D contract
-            X_batch = jnp.column_stack([batched_dict[name] for name in in_names])
-            Y_batch = jnp.column_stack([batched_dict[name] for name in out_names])
-
-            return X_batch, Y_batch
-
-        # Instantiate the FT facade wrapper
-        return DataLoader(
+        # 2. Instantiate the standalone Iterable wrapper
+        iterable_ds = StreamingDataset(
             dataset=self.dataset,
+            in_names=in_names,
+            out_names=out_names,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=xy_collate_fn,
-            **kwargs,
+            read_cols=read_cols
+        )
+        
+        # 3. Pass to the FT DataLoader facade. 
+        # batch_size=None disables PyTorch's native batching, allowing our
+        # iterator to yield the pre-stacked matrices directly.
+        return DataLoader(
+            dataset=iterable_ds,
+            batch_size=None,
+            collate_fn=lambda x: x,
+            **kwargs
         )
 
     def project(self, physical_inputs: dict) -> jax.Array:
@@ -530,22 +542,26 @@ class DesignSpace(Module):
         # 5. Return functionally updated DesignSpace
         return eqx.tree_at(lambda s: s.dataset, self, new_dataset)
 
-    def refit_models(
-        self, batch_size: int = 256, manifold_epochs: int = 100, surrogate_epochs: int = 50, **dataloader_kwargs
+    def fit_models(
+        self,
+        batch_size: int = 256,
+        manifold_epochs: int = 0,
+        surrogate_epochs: int = 0,
+        **dataloader_kwargs
     ) -> "DesignSpace":
         """
         Streams the current dataset to fine-tune the models.
         """
         dataloader = self.get_dataloader(batch_size=batch_size, **dataloader_kwargs)
 
-        # 1. Fine-Tune Manifold on physical data
-        new_manifold = self.manifold.fit(dataloader, epochs=manifold_epochs)
+        if manifold_epochs > 0:
+            new_manifold = self.manifold.fit(dataloader, epochs=manifold_epochs)
+        else: new_manifold = self.manifold
 
-        # 2. Wrap the dataloader so the Surrogate only sees latent vectors
-        latent_dataloader = LatentDataLoader(dataloader, new_manifold)
-
-        # 3. Fine-Tune Surrogate (blissfully unaware of the Manifold's existence)
-        new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs)
+        if surrogate_epochs > 0:
+            latent_dataloader = LatentDataLoader(dataloader, new_manifold)
+            new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs)
+        else: new_surrogate = self.surrogate
 
         return eqx.tree_at(lambda s: (s.manifold, s.surrogate), self, (new_manifold, new_surrogate))
 
@@ -946,6 +962,6 @@ class ActiveSpace(DesignSpace):
         # 4. Automatically close the loop by refitting the models on the newly appended data
         if refit:
             refit_kwargs = refit_kwargs or {}
-            return new_space.refit_models(**refit_kwargs)  # type: ignore
+            return new_space.fit_models(**refit_kwargs)  # type: ignore
 
         return new_space  # type: ignore
