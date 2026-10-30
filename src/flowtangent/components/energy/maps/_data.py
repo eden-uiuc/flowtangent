@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import pycycle.api as pyc
+# import pycycle.api as pyc
 
 from ....data import units
 from ....utils.io import _ft_root
@@ -80,105 +80,105 @@ def __dir__():
     return []
 
 
-def harvest_pycycle_maps(output_dir=_MAP_DIR):
-    """Extracts legacy NEPP maps and their design anchors from PyCycle."""
+# def harvest_pycycle_maps(output_dir=_MAP_DIR):
+#     """Extracts legacy NEPP maps and their design anchors from PyCycle."""
 
-    os.makedirs(output_dir, exist_ok=True)
+#     os.makedirs(output_dir, exist_ok=True)
 
-    # Now a dictionary mapping the name to a tuple: (PyCycle Map Object, Map Type)
-    maps_to_harvest = {
-        "AXI3_2": (pyc.AXI3_2, "compressor"),
-        "AXI5": (pyc.AXI5, "compressor"),
-        "Fan": (pyc.FanMap, "compressor"),
-        "HPC": (pyc.HPCMap, "compressor"),
-        "LPC": (pyc.LPCMap, "compressor"),
-        "NCPO1": (pyc.NCP01, "compressor"),
-        "HPT": (pyc.HPTMap, "turbine"),
-        "HPT1269": (pyc.HPT1269, "turbine"),
-        "LPT": (pyc.LPTMap, "turbine"),
-        "LPT2269": (pyc.LPT2269, "turbine"),
-    }
+#     # Now a dictionary mapping the name to a tuple: (PyCycle Map Object, Map Type)
+#     maps_to_harvest = {
+#         "AXI3_2": (pyc.AXI3_2, "compressor"),
+#         "AXI5": (pyc.AXI5, "compressor"),
+#         "Fan": (pyc.FanMap, "compressor"),
+#         "HPC": (pyc.HPCMap, "compressor"),
+#         "LPC": (pyc.LPCMap, "compressor"),
+#         "NCPO1": (pyc.NCP01, "compressor"),
+#         "HPT": (pyc.HPTMap, "turbine"),
+#         "HPT1269": (pyc.HPT1269, "turbine"),
+#         "LPT": (pyc.LPTMap, "turbine"),
+#         "LPT2269": (pyc.LPT2269, "turbine"),
+#     }
 
-    # The 1D/2D/3D array data
-    array_mapping = {
-        "alphaMap": "alpha",
-        "NpMap": "Np",
-        "NcMap": "Nc",
-        "RlineMap": "Rline",
-        "PRmap": "PR",
-        "WcMap": "Wc",
-        "WpMap": "Wp",
-        "effMap": "eff",
-        "RlineStall": "Rline_stall",
-    }
+#     # The 1D/2D/3D array data
+#     array_mapping = {
+#         "alphaMap": "alpha",
+#         "NpMap": "Np",
+#         "NcMap": "Nc",
+#         "RlineMap": "Rline",
+#         "PRmap": "PR",
+#         "WcMap": "Wc",
+#         "WpMap": "Wp",
+#         "effMap": "eff",
+#         "RlineStall": "Rline_stall",
+#     }
 
-    # The scalar design/anchor points PyCycle uses to center the map
-    scalar_mapping = {
-        "alphaMap": "alpha_des",
-        "NcMap": "Nc_des",
-        "NpMap": "Np_des",
-        "PRmap": "PR_des",
-        "PR": "PR_des",
-        "RlineMap": "Rline_des",
-    }
+#     # The scalar design/anchor points PyCycle uses to center the map
+#     scalar_mapping = {
+#         "alphaMap": "alpha_des",
+#         "NcMap": "Nc_des",
+#         "NpMap": "Np_des",
+#         "PRmap": "PR_des",
+#         "PR": "PR_des",
+#         "RlineMap": "Rline_des",
+#     }
 
-    for map_name, (map_obj, map_type) in maps_to_harvest.items():
-        # Initialize JSON dict with the explicit component type
-        json_data = {"type": map_type}
+#     for map_name, (map_obj, map_type) in maps_to_harvest.items():
+#         # Initialize JSON dict with the explicit component type
+#         json_data = {"type": map_type}
 
-        # 1. Harvest Arrays
-        for pyc_attr, json_key in array_mapping.items():
-            if hasattr(map_obj, pyc_attr):
-                val = getattr(map_obj, pyc_attr)
-                val_units = map_obj.units.get(pyc_attr, None)
-                if val_units is not None:
-                    if val_units == "rpm":
-                        val = val
-                    else:
-                        val = val * units.parse(val_units)
-                if hasattr(val, "tolist"):
-                    json_data[json_key] = val.tolist()
-                else:
-                    json_data[json_key] = val
+#         # 1. Harvest Arrays
+#         for pyc_attr, json_key in array_mapping.items():
+#             if hasattr(map_obj, pyc_attr):
+#                 val = getattr(map_obj, pyc_attr)
+#                 val_units = map_obj.units.get(pyc_attr, None)
+#                 if val_units is not None:
+#                     if val_units == "rpm":
+#                         val = val
+#                     else:
+#                         val = val * units.parse(val_units)
+#                 if hasattr(val, "tolist"):
+#                     json_data[json_key] = val.tolist()
+#                 else:
+#                     json_data[json_key] = val
 
-        # 2. Harvest Scalar Design Parameters
-        for pyc_attr, json_key in scalar_mapping.items():
-            val = map_obj.defaults.get(pyc_attr, None)
-            val_units = map_obj.units.get(pyc_attr, None)
-            if val_units is not None:
-                if val_units == "rpm":
-                    val = val
-                else:
-                    val = val * units.parse(val_units)
-            if val is not None:
-                json_data[json_key] = val
+#         # 2. Harvest Scalar Design Parameters
+#         for pyc_attr, json_key in scalar_mapping.items():
+#             val = map_obj.defaults.get(pyc_attr, None)
+#             val_units = map_obj.units.get(pyc_attr, None)
+#             if val_units is not None:
+#                 if val_units == "rpm":
+#                     val = val
+#                 else:
+#                     val = val * units.parse(val_units)
+#             if val is not None:
+#                 json_data[json_key] = val
 
-        # Initial Write to Disk
-        file_path = os.path.join(output_dir, f"{map_name}.json")
-        with open(file_path, "w") as f:
-            json.dump(json_data, f, indent=4)
+#         # Initial Write to Disk
+#         file_path = os.path.join(output_dir, f"{map_name}.json")
+#         with open(file_path, "w") as f:
+#             json.dump(json_data, f, indent=4)
 
-        # Update design values
-        test_map = load_map(map_name)
-        if isinstance(test_map, CompressorMap):
-            PR_map, Wc_map, eff_map = test_map.evaluate(
-                alpha=test_map.alpha_des, Nc=test_map.Nc_des, Rline=test_map.Rline_des
-            )
-            json_data["PR_des"] = PR_map.item()
-            json_data["Wc_des"] = Wc_map.item()
-            json_data["eff_des"] = eff_map.item()
+#         # Update design values
+#         test_map = load_map(map_name)
+#         if isinstance(test_map, CompressorMap):
+#             PR_map, Wc_map, eff_map = test_map.evaluate(
+#                 alpha=test_map.alpha_des, Nc=test_map.Nc_des, Rline=test_map.Rline_des
+#             )
+#             json_data["PR_des"] = PR_map.item()
+#             json_data["Wc_des"] = Wc_map.item()
+#             json_data["eff_des"] = eff_map.item()
 
-        if isinstance(test_map, TurbineMap):
-            Wp_map, eff_map = test_map.evaluate(alpha=test_map.alpha_des, Np=test_map.Np_des, PR=test_map.PR_des)
+#         if isinstance(test_map, TurbineMap):
+#             Wp_map, eff_map = test_map.evaluate(alpha=test_map.alpha_des, Np=test_map.Np_des, PR=test_map.PR_des)
 
-            json_data["Wp_des"] = Wp_map.item()
-            json_data["eff_des"] = eff_map.item()
+#             json_data["Wp_des"] = Wp_map.item()
+#             json_data["eff_des"] = eff_map.item()
 
-        # Final Write
-        with open(file_path, "w") as f:
-            json.dump(json_data, f, indent=4)
+#         # Final Write
+#         with open(file_path, "w") as f:
+#             json.dump(json_data, f, indent=4)
 
-        print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
+#         print(f"Successfully harvested {map_name} ({map_type}) to {file_path}")
 
 
 def generate_stub():
