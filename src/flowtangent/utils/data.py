@@ -1136,9 +1136,9 @@ class XArrayProxy:
         lazy_ds = xr.open_dataset(
             self._file_path, 
             engine=self._engine, 
-            chunks={primary_dim: chunk_size}, 
+            chunks={}, 
             **compute_kwargs
-        )
+        ).chunk({primary_dim: chunk_size})
         
         try:
             yield lazy_ds

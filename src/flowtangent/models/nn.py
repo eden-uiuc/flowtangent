@@ -86,7 +86,8 @@ def train_model(
         
         # Live update (Notebook only)
         if logging_mode == "notebook" and (epoch + 1) % plot_every == 0:
-            fig.data[0].y = loss_history  #type: ignore
+            with fig.batch_update():
+                fig.data[0].y = tuple(loss_history)
 
     # 5. Terminal Fallback
     if logging_mode == "terminal":
