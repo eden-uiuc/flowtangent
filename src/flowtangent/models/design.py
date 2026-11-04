@@ -547,6 +547,8 @@ class DesignSpace(Module):
         batch_size: int = 256,
         manifold_epochs: int = 0,
         surrogate_epochs: int = 0,
+        manifold_stop_fn: Optional[Callable] = None,
+        surrogate_stop_fn: Optional[Callable] = None,
         **dataloader_kwargs
     ) -> "DesignSpace":
         """
@@ -555,12 +557,12 @@ class DesignSpace(Module):
         dataloader = self.get_dataloader(batch_size=batch_size, **dataloader_kwargs)
 
         if manifold_epochs > 0:
-            new_manifold = self.manifold.fit(dataloader, epochs=manifold_epochs)
+            new_manifold = self.manifold.fit(dataloader, epochs=manifold_epochs, stop_fn=manifold_stop_fn)
         else: new_manifold = self.manifold
 
         if surrogate_epochs > 0:
             latent_dataloader = LatentDataLoader(dataloader, new_manifold)
-            new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs)
+            new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs, stop_fn=surrogate_stop_fn)
         else: new_surrogate = self.surrogate
 
         return eqx.tree_at(lambda s: (s.manifold, s.surrogate), self, (new_manifold, new_surrogate))

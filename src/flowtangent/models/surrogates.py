@@ -1,5 +1,5 @@
 import abc
-from typing import List, Optional, TypeAlias, Union
+from typing import List, Optional, TypeAlias, Union, Callable
 
 import equinox as eqx
 import jax
@@ -147,7 +147,7 @@ class PolynomialChaosSurrogate(Surrogate):
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
-    ) -> "PolynomialChaosSurrogate":
+    ) -> tuple:
         r"""Fit polynomial-basis coefficients by minimizing mean squared error.
 
         The current parameters provide the starting point for Adam training.
@@ -199,7 +199,7 @@ class PolynomialChaosSurrogate(Surrogate):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds) ** 2)
+            return jnp.mean((y_batch - preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -422,8 +422,9 @@ class SVGPSurrogate(Surrogate):
         data: Union[tuple[jax.Array, jax.Array], "_loader"],
         learning_rate: float = 1e-2,
         epochs: int = 500,
+        stop_fn: Optional[Callable]= None,
         **kwargs,
-    ) -> "SVGPSurrogate":
+    ):
         r"""Fit inducing-point predictions with a Gaussian likelihood objective.
 
         The current parameters provide the starting point for Adam training.
@@ -491,9 +492,9 @@ class SVGPSurrogate(Surrogate):
             #    This prevents the sparse weights from exploding during SGD.
             complexity_penalty = self.complexity_weight * jnp.sum(model._variational_mean**2)
 
-            return data_fit + complexity_penalty
+            return data_fit + complexity_penalty, {"NLPD": data_fit, "MAE": jnp.mean(diff)}
 
-        return train_model(self, data, loss_fn, learning_rate, epochs)
+        return train_model(self, data, loss_fn, learning_rate, epochs, stop_fn=stop_fn)
 
 
 # ==========================================
@@ -573,7 +574,7 @@ class MLPSurrogate(Surrogate):
         def loss_fn(model, batch):
             x_batch, y_batch = batch
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds) ** 2)
+            return jnp.mean((y_batch - preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -674,7 +675,7 @@ class TransformerSurrogate(Surrogate):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds) ** 2)
+            return jnp.mean((y_batch - preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -758,7 +759,7 @@ class DeepEnsembleSurrogate(Surrogate):
             x_batch, y_batch = batch
 
             all_preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds) ** 2)
+            return jnp.mean((jnp.expand_dims(y_batch, 1) - all_preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -842,7 +843,7 @@ class MixtureOfExperts(Surrogate):
             x_batch, y_batch = batch
 
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds) ** 2)
+            return jnp.mean((y_batch - preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 
@@ -976,7 +977,7 @@ class FourierNeuralOperator(Surrogate):
         def loss_fn(model, batch):
             x_batch, y_batch = batch
             preds = jax.vmap(model._internal_predict)(x_batch)
-            return jnp.mean((y_batch - preds) ** 2)
+            return jnp.mean((y_batch - preds) ** 2), {}
 
         return train_model(self, data, loss_fn, learning_rate, epochs)
 

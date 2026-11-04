@@ -19,6 +19,7 @@ def train_model(
     epochs: int = 50,
     plot_every: int = 1,
     logging_mode: Literal["auto", "notebook", "terminal"] = "auto",
+    stop_fn=None,
 ):
     # 1. Environment Auto-Detection
     if logging_mode == "auto":
@@ -35,10 +36,11 @@ def train_model(
     opt_state = optimizer.init(eqx.filter(model, eqx.is_array))
 
     @eqx.filter_jit
-    def make_step(current_model, state, batch):
-        loss, grads = eqx.filter_value_and_grad(loss_fn)(current_model, batch)
-        updates, state = optimizer.update(grads, state, current_model)
-        return eqx.apply_updates(current_model, updates), state, loss
+    def make_step(current_model, opt_state, batch):
+        (loss, metrics), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(current_model, batch)
+        updates, updated_state = optimizer.update(grads, opt_state, current_model)
+        updated_model =  eqx.apply_updates(current_model, updates)
+        return updated_model, updated_state, loss, metrics
 
     is_dataloader = hasattr(data, "dataset") and hasattr(data, "__iter__")
     
@@ -69,7 +71,7 @@ def train_model(
                 if epoch == 0 and i == 0:
                     batch_pbar.set_description("Compiling XLA (Wait for it...)")
 
-                model, opt_state, loss = make_step(model, opt_state, batch)
+                model, opt_state, loss, metrics = make_step(model, opt_state, batch)
                 epoch_loss += loss.item()
                 batches += 1
                         
@@ -78,7 +80,7 @@ def train_model(
             epoch_loss /= batches
         
         else:
-            model, opt_state, loss = make_step(model, opt_state, data)
+            model, opt_state, loss, metrics = make_step(model, opt_state, data)
             epoch_loss = loss.item()
             
         loss_history.append(epoch_loss)
@@ -89,6 +91,11 @@ def train_model(
             with fig.batch_update():
                 fig.data[0].y = tuple(loss_history)
 
+        metrics["epoch"] = epoch
+        if stop_fn is not None:
+            if stop_fn(metrics):
+                break
+
     # 5. Terminal Fallback
     if logging_mode == "terminal":
         final_fig = go.Figure(go.Scatter(y=loss_history, mode='lines', line=dict(color='#2563eb')))
@@ -96,7 +103,7 @@ def train_model(
         final_fig.write_html("svgp_convergence.html")
         tqdm.write("Training complete. Convergence plot saved to 'svgp_convergence.html'")
 
-    return model
+    return model, opt_state, loss, metrics
 
 
 class TransformerBlock(Module):
