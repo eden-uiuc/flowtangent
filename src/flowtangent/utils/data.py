@@ -1083,42 +1083,50 @@ class XArrayProxy:
     def __dir__(self):
         return list(self._ds.data_vars.keys()) + list(self._var_map.keys())
 
-    def get_row(self, name: str, idx: int):
+    def get_row(self, name: str, idx: int | np.ndarray):
         if name not in self._var_map:
             raise AttributeError(f"XArrayProxy has no variable '{name}'")
             
         mapping = self._var_map[name]
         
-        # Resolve the target lazy array
         if isinstance(mapping, tuple):
             array_name, dim_name = mapping
             target_array = self._ds[array_name].sel({dim_name: name})
         else:
             target_array = self._ds[mapping]
 
+        # Use ndim to safely catch ints, np scalars, and 0-D JAX arrays
+        is_scalar = (np.ndim(idx) == 0)
+
         # --- VIRTUAL STACKING SLICE ---
         if hasattr(self, "_virtual_stack") and self._virtual_stack:
-            # 1. Get the sizes of the stacked dimensions (e.g., [358400, 42])
             dim_sizes = tuple(self._ds.sizes[d] for d in self._virtual_stack)
-            
-            # 2. Unravel the flat index (e.g., 43 -> (1, 1))
             unraveled_indices = np.unravel_index(idx, dim_sizes)
             
-            # 3. Create a dictionary of the slice mapping: {'run': 1, 'alpha': 1}
-            isel_kwargs = dict(zip(self._virtual_stack, unraveled_indices))
+            isel_kwargs = {}
+            for i, dim_name in enumerate(self._virtual_stack):
+                if dim_name in target_array.dims:
+                    if is_scalar:
+                        # Extract the 0-D array as a pure Python integer
+                        isel_kwargs[dim_name] = int(np.asarray(unraveled_indices[i]))
+                    else:
+                        # Vectorized point-wise extraction for arrays
+                        import xarray as xr
+                        isel_kwargs[dim_name] = xr.DataArray(unraveled_indices[i], dims=["batch"])
             
-            # 4. Filter the slice down to only the dimensions this specific array actually has!
-            # E.g. foil_name only has 'run', so we safely ignore the 'alpha' index.
-            valid_isel_kwargs = {k: v for k, v in isel_kwargs.items() if k in target_array.dims}
-            
-            val = target_array.isel(**valid_isel_kwargs).values
+            val = target_array.isel(**isel_kwargs).values
             
         # --- STANDARD 1D SLICE ---
         else:
             first_dim = list(target_array.dims)[0]
-            val = target_array.isel({first_dim: idx}).values
+            if is_scalar:
+                isel_kwargs = {first_dim: int(np.asarray(idx))}
+            else:
+                import xarray as xr
+                isel_kwargs = {first_dim: xr.DataArray(idx, dims=["batch"])}
+                
+            val = target_array.isel(**isel_kwargs).values
             
-        # Handle Xarray MultiIndex coordinate scalar wrapping
         if isinstance(val, tuple): 
             return np.array(val)
         return val
@@ -1169,7 +1177,7 @@ class XArrayProxy:
                         for label in coord_vals:
                             self._var_map[str(label)] = (var_name, dim)
 
-    def create_stacked_view(self, stack_dims: list[str], new_dim_name: str) -> "XArrayProxy":
+    def create_stacked_view(self, stack_dims: list[str]) -> "XArrayProxy":
         """Creates a new proxy with a virtual Cartesian view using index unraveling."""
         new_proxy = copy.copy(self)
         
@@ -1401,9 +1409,9 @@ class XArrayDataset(Dataset):
         first_dim = list(first_var.dims)[0]
         object.__setattr__(self, "_len", self._proxy._ds.sizes[first_dim])
 
-    def to_tabular(self, stack_dims: list[str], new_dim_name: str = "row") -> "XArrayDataset":
+    def to_tabular(self, stack_dims: list[str]) -> "XArrayDataset":
         """Transforms an N-dimensional dataset into a flat, tabular view via virtual indexing."""
-        stacked_proxy = self._proxy.create_stacked_view(stack_dims, new_dim_name)
+        stacked_proxy = self._proxy.create_stacked_view(stack_dims)
         
         new_ds = replace(self, file_path=self._source, engine=self._engine, _proxy=stacked_proxy)
         return eqx.tree_at(lambda d: d._len, new_ds, stacked_proxy._stacked_len)
@@ -1456,7 +1464,47 @@ class XArrayDataset(Dataset):
         valid_indices = jnp.array(np.where(flat_mask)[0])
         return self.filter(valid_indices)
 
+    def __getitem__(self, idx: int | slice | np.ndarray) -> dict[str, Any]:
+        # 1. Convert slices to discrete integer arrays
+        if isinstance(idx, slice):
+            idx = np.arange(*idx.indices(len(self)))
+            
+        row = {}
+        total_len = len(self)
+        orig_len = object.__getattribute__(self, "_len")
+        
+        # Handle negative indexing for both scalars and arrays
+        if isinstance(idx, np.ndarray):
+            idx = np.where(idx < 0, idx + total_len, idx)
+        else:
+            idx = idx + total_len if idx < 0 else idx
+            
+        actual_idx = idx if self._indices is None else self._indices[idx]
+        
+        # Masking for active learning vs proxy data
+        is_appended = actual_idx >= orig_len if isinstance(actual_idx, np.ndarray) else actual_idx >= orig_len
+        
+        for var in self.full_vars:
+            if var in self._virtual_columns:
+                row[var] = self._virtual_columns[var][actual_idx]
+            elif isinstance(actual_idx, (int, np.integer)):
+                if is_appended:
+                    row[var] = self._appended_data[var][actual_idx - orig_len]
+                else:
+                    row[var] = self._proxy.get_row(var, actual_idx)
+            else:
+                # Vectorized array extraction
+                if np.any(is_appended):
+                    # Advanced: dynamically split the array between memory and proxy, 
+                    # or fall back to a loop if active learning points are hit.
+                    raise NotImplementedError("Vectorized indexing across the active learning boundary requires mask splitting.")
+                row[var] = self._proxy.get_row(var, actual_idx)
 
+        for tf in self._transforms:
+            row = tf(row)
+        
+        return row
+    
 __all__ = [
     "Dataset",
     "load_dataset",
