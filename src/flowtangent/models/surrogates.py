@@ -5,7 +5,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from ..utils import Module, static_field
+from ..utils import Module, static_field, field
 from ..utils.data import DataLoader, LatentDataLoader
 from ..utils.typing import _
 from .kernels import Kernel
@@ -356,6 +356,8 @@ class SVGPSurrogate(Surrogate):
     kernel: Kernel = _
     jitter: float = static_field(1e-5)
     complexity_weight: float = static_field(0.5)
+    scale_mean: Optional[tuple] = static_field(())
+    scale_std: Optional[tuple] = static_field(())
 
     _inducing_points: jax.Array = _
     _variational_mean: jax.Array = _
@@ -369,7 +371,9 @@ class SVGPSurrogate(Surrogate):
             kernel: Kernel,
             num_inducing: int = 128,
             jitter: float = 1e-5,
-            complexity_weight: float = 0.5
+            complexity_weight: float = 0.5,
+            scale_mean: Optional[tuple] = None,
+            scale_std: Optional[tuple] = None,
         ):
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -383,37 +387,35 @@ class SVGPSurrogate(Surrogate):
         self._variational_mean = jax.random.normal(k2, (num_inducing, output_dim)) * 1e-2
         self._noise_variance = jnp.zeros(output_dim)
 
-    def predict(self, x, compute_derivatives=False):
-        # 1. Cross-covariance
+        self.scale_mean = tuple(scale_mean) if scale_mean is not None else tuple([0.0] * output_dim)
+        self.scale_std = tuple(scale_std) if scale_std is not None else tuple([1.0] * output_dim)
+        
+
+    def _predict_normalized(self, x):
+        """Internal forward pass for the training loss function."""
         K_xz = jax.vmap(lambda z: self.kernel(x, z))(self._inducing_points)
         means = K_xz @ self._variational_mean
 
-        # --- NEW VARIANCE CALCULATION ---
-        # 2. Inducing point covariance matrix
         K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self._inducing_points))(self._inducing_points)
-
-        # Add numerical jitter to the diagonal for Cholesky stability
         K_zz += self.jitter * jnp.eye(self._inducing_points.shape[0])
-
-        # 3. Cholesky decomposition (lower triangular)
+        
         L = jax.scipy.linalg.cholesky(K_zz, lower=True)
-
-        # 4. Solve L * v = K_zx for v
         v = jax.scipy.linalg.solve_triangular(L, K_xz, lower=True)
-
-        # 5. Correct variance calculation
+        
         k_xx = self.kernel(x, x)
         var = k_xx - jnp.sum(v**2) + jnp.exp(self._noise_variance)
+        
+        return means, var
 
-        preds = SurrogateEvaluation(means=means, variances=var)
-
-        if compute_derivatives:
-            mean_fn = lambda x_in: (
-                jax.vmap(lambda z: self.kernel(x_in, z))(self._inducing_points) @ self._variational_mean
-            )
-            preds = eqx.tree_at(lambda p: p.derivatives, preds, jax.jacrev(mean_fn)(x), is_leaf=lambda x: x is None)
-
-        return preds
+    def predict(self, x, compute_derivatives=False):
+        """External forward pass for active learning and MCMC."""
+        norm_means, norm_var = self._predict_normalized(x)
+        
+        # Inverse transform back to physical units
+        phys_means = (norm_means * jnp.asarray(self.scale_std)) + jnp.asarray(self.scale_mean)
+        phys_var = norm_var * (jnp.asarray(self.scale_std) ** 2)
+        
+        return SurrogateEvaluation(means=phys_means, variances=phys_var)
 
     def fit(
         self,
@@ -477,19 +479,15 @@ class SVGPSurrogate(Surrogate):
 
         def loss_fn(model, batch):
             x_train, y_train = batch
+            y_train = (y_train - jnp.asarray(model.scale_mean)) / jnp.asarray(model.scale_std)
 
-            # 1. Use the model's own predict method via vmap to ensure
-            #    the inducing points and variational mean are actively trained.
-            #    XLA is smart enough to compile this efficiently.
-            preds = jax.vmap(model.predict, in_axes=(0, None))(x_train, False)
-            means = preds.means  # Shape: (N, D)
-            variances = preds.variances  # Shape: (N, D)
+            mu, sigma = jax.vmap(model._predict_normalized)(x_train)
 
-            # 2. Compute the Negative Log Likelihood (NLL)
-            diff = y_train - means
-            data_fit = 0.5 * jnp.sum(jnp.log(variances)) + 0.5 * jnp.sum((diff**2) / variances)
+            # Compute the Negative Log Likelihood (NLL)
+            diff = y_train - mu
+            data_fit = 0.5 * jnp.sum(jnp.log(sigma)) + 0.5 * jnp.sum((diff**2) / sigma)
 
-            # 3. Add a complexity penalty (KL divergence proxy) for the variational mean.
+            # Add a complexity penalty (KL divergence proxy) for the variational mean.
             #    This prevents the sparse weights from exploding during SGD.
             complexity_penalty = self.complexity_weight * jnp.sum(model._variational_mean**2)
 
