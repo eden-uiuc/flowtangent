@@ -5,13 +5,13 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from ..utils import Module, static_field, field
-from ..utils.data import DataLoader, LatentDataLoader
+from ..utils import Module, static_field, update
+from ..utils.data import slice_data, DataLoader, LatentDataLoader, SlicedDataLoader
 from ..utils.typing import _
 from .kernels import Kernel
 from .nn import TransformerBlock, train_model
 
-_loader: TypeAlias = DataLoader | LatentDataLoader
+_loader: TypeAlias = DataLoader | LatentDataLoader | SlicedDataLoader
 
 
 # --- DataLoader Compatibility Helper ---
@@ -73,13 +73,18 @@ class SurrogateEvaluation(Module):
         return self.variances is not None or self.samples is not None
 
 
+
+# ==========================================
+# Surrogate Base Classes
+# ==========================================
 class Surrogate(Module):
+
     @abc.abstractmethod
     def predict(self, x: jax.Array, compute_derivatives: bool = False) -> SurrogateEvaluation:
         pass
 
     @abc.abstractmethod
-    def fit(self, data: Union[tuple[jax.Array, jax.Array], _loader], **kwargs) -> "Surrogate":
+    def fit(self, data: _loader, **kwargs) -> "Surrogate":
         r"""Define the fitting interface for surrogate implementations.
 
         Subclasses provide the training rule; this abstract body performs no fitting.
@@ -109,9 +114,54 @@ class Surrogate(Module):
         """
         pass
 
+    def __add__(self, other: "Surrogate") -> "Surrogate":
+        if not isinstance(other, Surrogate):
+            return NotImplemented
+
+        # Flatten nested combinations cleanly
+        left = self.surrogates if isinstance(self, CompositeSurrogate) else [self]
+        right = other.surrogates if isinstance(other, CompositeSurrogate) else [other]
+
+        return CompositeSurrogate(left + right)
+
+class CompositeSurrogate(Surrogate):
+
+    surrogates: list[Surrogate] = _
+
+    input_dim: int = _
+    output_dim: int = _
+
+    _input_splits: tuple[int, ...] = static_field(())
+    _output_splits: tuple[int, ...] = static_field(())
+
+    def __init__(self, surrogates: list[Surrogate], **kwargs):
+        self.surrogates = surrogates
+        self.input_dim = surrogates[0].input_dim
+        self.output_dim = sum(s.output_dim for s in surrogates)
+
+        in_sizes = [s.input_dim for s in surrogates[:-1]]
+        self._input_splits = tuple(jnp.cumsum(jnp.array(in_sizes)).tolist())
+
+        out_sizes = [s.output_dim for s in surrogates[:-1]]
+        self._output_splits = tuple(jnp.cumsum(jnp.array(out_sizes)).tolist())
+
+        super().__init__(**kwargs)
+
+    def predict(self, x: jax.Array, compute_derivatives: bool = False) -> SurrogateEvaluation:
+        y_parts = [s.predict(x, compute_derivatives=compute_derivatives) for s in self.surrogates]
+        return jax.tree_util.tree_map(lambda *a: jnp.concatenate(a, axis=-1), *y_parts)
+
+    def fit(self, data: _loader, **kwargs) -> "CompositeSurrogate":
+        new_surrogates = []
+        for i, s in enumerate(self.surrogates):
+            sliced_data = slice_data(data, self._output_splits, i, True)
+            new_surrogates.append(s.fit(sliced_data, **kwargs)[0])
+
+        return update(self, "surrogates", new_surrogates)
+
 
 # ==========================================
-# 1. Classical & Statistical Surrogates
+# Classical & Statistical Surrogates
 # ==========================================
 
 
@@ -143,7 +193,7 @@ class PolynomialChaosSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[tuple[jax.Array, jax.Array], _loader],
+        data: _loader,
         learning_rate: float = 1e-2,
         epochs: int = 500,
         **kwargs,
@@ -350,12 +400,15 @@ class RadialBasisFunction(Surrogate):
 
 class SVGPSurrogate(Surrogate):
 
+    name: str | None = "SVGPSurrogate"
+    kernel: Kernel = _
+
     input_dim: int = _
     output_dim: int = _
-
-    kernel: Kernel = _
+    
     jitter: float = static_field(1e-5)
     complexity_weight: float = static_field(0.5)
+    
     scale_mean: Optional[tuple] = static_field(())
     scale_std: Optional[tuple] = static_field(())
 
@@ -365,16 +418,20 @@ class SVGPSurrogate(Surrogate):
 
     def __init__(
             self,
-            key,
+            key:jax.Array,
             input_dim: int,
             output_dim: int,
             kernel: Kernel,
             num_inducing: int = 128,
+            initial_inducing_points: Optional[jax.Array] = None,
             jitter: float = 1e-5,
             complexity_weight: float = 0.5,
             scale_mean: Optional[tuple] = None,
             scale_std: Optional[tuple] = None,
+            name: str | None = "SVGPSurrogate"
         ):
+        
+        self.name = name
         self.input_dim = input_dim
         self.output_dim = output_dim
         
@@ -383,8 +440,13 @@ class SVGPSurrogate(Surrogate):
         self.complexity_weight = complexity_weight
         
         k1, k2 = jax.random.split(key)
-        self._inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
-        self._variational_mean = jax.random.normal(k2, (num_inducing, output_dim)) * 1e-2
+        if not initial_inducing_points:
+            self._inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
+            M = num_inducing
+        else:
+            self._inducing_points = jnp.asarray(initial_inducing_points)
+            M = self._inducing_points.shape[0]
+        self._variational_mean = jax.random.normal(k2, (M, output_dim)) * 1e-5
         self._noise_variance = jnp.zeros(output_dim)
 
         self.scale_mean = tuple(scale_mean) if scale_mean is not None else tuple([0.0] * output_dim)
@@ -394,13 +456,15 @@ class SVGPSurrogate(Surrogate):
     def _predict_normalized(self, x):
         """Internal forward pass for the training loss function."""
         K_xz = jax.vmap(lambda z: self.kernel(x, z))(self._inducing_points)
-        means = K_xz @ self._variational_mean
 
         K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self._inducing_points))(self._inducing_points)
         K_zz += self.jitter * jnp.eye(self._inducing_points.shape[0])
         
         L = jax.scipy.linalg.cholesky(K_zz, lower=True)
         v = jax.scipy.linalg.solve_triangular(L, K_xz, lower=True)
+
+        m_scaled = jax.scipy.linalg.solve_triangular(L, self._variational_mean, lower=True)
+        means = v.T @ m_scaled
         
         k_xx = self.kernel(x, x)
         var = k_xx - jnp.sum(v**2) + jnp.exp(self._noise_variance)
@@ -419,10 +483,9 @@ class SVGPSurrogate(Surrogate):
 
     def fit(
         self,
-        data: Union[tuple[jax.Array, jax.Array], "_loader"],
+        data: _loader,
         learning_rate: float = 1e-2,
         epochs: int = 500,
-        stop_fn: Optional[Callable]= None,
         **kwargs,
     ):
         r"""Fit inducing-point predictions with a Gaussian likelihood objective.
@@ -478,23 +541,34 @@ class SVGPSurrogate(Surrogate):
             jaxtyping.TypeCheckError: If arguments violate the method annotations.
         """
 
+        N = len(data)
+
         def loss_fn(model, batch):
+            
+            sig_scl = jnp.asarray(model.scale_std)
+            mu_scl = jnp.asarray(model.scale_mean)
+            
             x_train, y_train = batch
-            y_train = (y_train - jnp.asarray(model.scale_mean)) / jnp.asarray(model.scale_std)
+            y_train = (y_train - mu_scl) / sig_scl
+
+            B = x_train.shape[0]
 
             mu, sigma = jax.vmap(model._predict_normalized)(x_train)
 
             # Compute the Negative Log Likelihood (NLL)
             diff = y_train - mu
-            data_fit = 0.5 * jnp.sum(jnp.log(sigma)) + 0.5 * jnp.sum((diff**2) / sigma)
+            batch_data_fit = 0.5 * jnp.sum(jnp.log(2 * jnp.pi * sigma)) + 0.5 * jnp.sum((diff**2) / sigma)
+            data_fit = batch_data_fit * (N / B)
 
             # Add a complexity penalty (KL divergence proxy) for the variational mean.
-            #    This prevents the sparse weights from exploding during SGD.
+            # This prevents the sparse weights from exploding during SGD.
             complexity_penalty = self.complexity_weight * jnp.sum(model._variational_mean**2)
 
-            return data_fit + complexity_penalty, {"NLPD": data_fit, "MAE": jnp.mean(diff)}
+            diff_phys = diff * sig_scl
 
-        return train_model(self, data, loss_fn, learning_rate, epochs, stop_fn=stop_fn)
+            return data_fit + complexity_penalty, {f"{model.name} NLPD": data_fit, f"{model.name} MAE": jnp.mean(jnp.abs(diff_phys), axis=0)}
+
+        return train_model(self, train_data=data, loss_fn=loss_fn, learning_rate=learning_rate, epochs=epochs, **kwargs)
 
 
 # ==========================================

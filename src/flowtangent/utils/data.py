@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Optional, Union
+from collections.abc import Sequence
 
 import dask.array as da
 import equinox as eqx
@@ -54,7 +55,6 @@ from torch.utils.data import (
     WeightedRandomSampler,
     # Utils
     get_worker_info,
-    random_split,
 )
 
 from tqdm.dask import TqdmCallback
@@ -103,6 +103,10 @@ def numpy_collate(batch: list[Any]) -> Any:
     else:
         raise TypeError(f"numpy_collate cannot handle batch of type {type(elem)}")
 
+
+# ----------------------------------------------------------------------------------------------------------------------
+# DataLoader
+# ----------------------------------------------------------------------------------------------------------------------
 
 class DataLoader(TorchDataLoader):
     """A standalone facade wrapper around PyTorch's `DataLoader`.
@@ -164,19 +168,24 @@ class SlicedDataLoader:
         chunk_idx (int): Which specific split section to yield to this worker.
     """
 
-    def __init__(self, dataloader, split_indices, chunk_idx):
+    def __init__(self, dataloader, split_indices, chunk_idx, slice_outputs):
         self.dataloader = dataloader
         self.split_indices = split_indices
         self.chunk_idx = chunk_idx
         self.dataset = getattr(dataloader, "dataset", None)
+        self._slice_outputs = slice_outputs
 
     def __iter__(self):
         """Yields specific feature-chunks of the underlying batch stream."""
         for batch in self.dataloader:
             if isinstance(batch, (tuple, list)):
                 x_batch, y_batch = batch
-                x_parts = jnp.split(x_batch, self.split_indices, axis=-1)
-                yield x_parts[self.chunk_idx], y_batch
+                if self._slice_outputs:
+                    y_parts = jnp.split(y_batch, self.split_indices, axis=-1)
+                    yield x_batch, y_parts[self.chunk_idx]
+                else:
+                    x_parts = jnp.split(x_batch, self.split_indices, axis=-1)
+                    yield x_parts[self.chunk_idx], y_batch
             else:
                 x_parts = jnp.split(batch, self.split_indices, axis=-1)
                 yield x_parts[self.chunk_idx]
@@ -186,11 +195,12 @@ class SlicedDataLoader:
         return len(self.dataloader)
 
 
-def slice_data(data: Any, split_indices: Union[int, list[int]], chunk_idx: int) -> Any:
+def slice_data(data: Any, split_indices: Union[int, list[int]], chunk_idx: int, slice_output:bool=False) -> Any:
     """Selects a feature chunk from arrays or wraps a loader to slice its batches.
 
     Splits the final feature axis while preserving targets in an `(X, Y)` pair.
     Objects with both `__iter__` and `dataset` attributes are treated as loaders.
+    If slice_output is True, then the output (Y) is sliced, else, the input (X) is sliced.
 
     ### Mathematical Formulation
     For feature blocks $(X_0, ..., X_{K-1}) = split(X)$ along the final axis,
@@ -229,10 +239,13 @@ def slice_data(data: Any, split_indices: Union[int, list[int]], chunk_idx: int) 
             this occurs during iteration.
     """
     if hasattr(data, "__iter__") and hasattr(data, "dataset"):
-        return SlicedDataLoader(data, split_indices, chunk_idx)
+        return SlicedDataLoader(data, split_indices, chunk_idx, slice_output)
     # If it's a raw tuple of (X, Y) or a raw X array
     if isinstance(data, (tuple, list)):
-        return jnp.split(data[0], split_indices, axis=-1)[chunk_idx], data[1]
+        if slice_output:
+            return data[0], jnp.split(data[1], split_indices, axis=-1)[chunk_idx]
+        else:
+            return jnp.split(data[0], split_indices, axis=-1)[chunk_idx], data[1]
     return jnp.split(data, split_indices, axis=-1)[chunk_idx]
 
 
@@ -1504,7 +1517,36 @@ class XArrayDataset(Dataset):
             row = tf(row)
         
         return row
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Utilities
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+def random_split(data: Dataset, lengths:Sequence[int|float], key:jax.Array):
+
+    data_length = len(data)
+    key, subkey = jax.random.split(key)
+    idxs = jax.random.permutation(subkey, data_length)
+
+    if isinstance(lengths[0], float):
+        actual_lengths = [int(l * data_length) for l in lengths[:-1]]
+        actual_lengths.append(data_length - sum(actual_lengths))
+    else:
+        actual_lengths = list(lengths)
+        if sum(actual_lengths) != data_length:
+            raise ValueError("Integer lengths must sum to the total dataset length.")
+
+    split_data = ()
+    current_offset = 0
     
+    for length in actual_lengths:
+        chunk_idxs = idxs[current_offset : current_offset + length]
+        split_data += (data.filter(chunk_idxs),)
+        current_offset += length
+
+    return split_data
+
 __all__ = [
     "Dataset",
     "load_dataset",

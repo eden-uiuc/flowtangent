@@ -226,23 +226,28 @@ class ScalingManifold(Manifold):
         - 'algebraic_bounded': Slower-decaying sigmoid. Best for tight bounds where gradient starvation is a risk.
         - 'softplus': One-sided bound (y > 0). Best for mass, pressure, or physical properties without an upper limit.
         - 'logarithmic': Base-10 scaling. Best for strictly positive vars. spanning multiple orders of magnitude (e.g., Re).
+        - 'normalize': Projects data into z-score for N(0, 1) distribution
     """
 
-    method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = static_field(
-        "log_bounded"
+    method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic", "normalize"] = static_field(
+        "normalize"
     )
 
     scale_factors: jax.Array = _
     bounds_min: jax.Array = _
     bounds_max: jax.Array = _
+    mean: jax.Array = _
+    std: jax.Array = _
 
     def __init__(
         self,
         dim: int = 1,
-        method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic"] = "log_bounded",
+        method: Literal["linear", "log_bounded", "algebraic_bounded", "softplus", "logarithmic", "normalize"] = "normalize",
         scale_factors: Optional[jax.Array | float] = None,
         bounds_min: Optional[jax.Array | float] = None,
         bounds_max: Optional[jax.Array | float] = None,
+        mean: Optional[jax.Array | float] = None,
+        std: Optional[jax.Array | float] = None,
     ):
         self.input_dim = dim
         self.latent_dim = dim
@@ -251,6 +256,8 @@ class ScalingManifold(Manifold):
         self.scale_factors = jnp.ones(dim) if not scale_factors else jnp.asarray(scale_factors)
         self.bounds_min = jnp.zeros(dim) if not bounds_min else jnp.asarray(bounds_min)
         self.bounds_max = jnp.ones(dim) if not bounds_max else jnp.asarray(bounds_max)
+        self.mean = jnp.zeros(dim) if not mean else jnp.asarray(mean)
+        self.std = jnp.ones(dim) if not std else jnp.asarray(std)
 
     # ==========================================================================
     # 1. Routing
@@ -314,6 +321,15 @@ class ScalingManifold(Manifold):
         return 10.0**z
 
     # ==========================================================================
+    # 7. Normalization
+    # ==========================================================================
+    def _normalize_encode(self, x):
+        return (x - self.mean)/(self.std + 1e-6)
+
+    def _normalize_decode(self, z):
+        return z * (self.std + 1e-6) + self.mean
+
+    # ==========================================================================
     # 7. Data-Driven Fitting
     # ==========================================================================
     def fit(self, data: Union[Float[Array, "N D"], Any], **kwargs) -> "ScalingManifold":
@@ -332,8 +348,25 @@ class ScalingManifold(Manifold):
         scale_factors = jnp.maximum(jnp.abs(padded_max), jnp.abs(padded_min))
         scale_factors = jnp.where(scale_factors == 0, 1.0, scale_factors)
 
+        mean = X_full.mean()
+        std = X_full.std()
+
         return eqx.tree_at(
-            lambda m: (m.bounds_min, m.bounds_max, m.scale_factors), self, (padded_min, padded_max, scale_factors)
+            lambda m: (
+                m.bounds_min,
+                m.bounds_max,
+                m.scale_factors,
+                m.mean,
+                m.std
+                ),
+                self,
+                (
+                    padded_min,
+                    padded_max,
+                    scale_factors,
+                    mean,
+                    std
+                )
         )
 
 

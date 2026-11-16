@@ -15,7 +15,7 @@ from jax.scipy.stats import norm
 from .. import utils as ftu
 from ..opt import _funcs as opt_funcs
 from ..utils import Module, TreePath, TreePathLike, field, method_field, static_field
-from ..utils.data import DataLoader, Dataset, StreamingDataset, LatentDataLoader, RandomSampler
+from ..utils.data import DataLoader, Dataset, StreamingDataset, LatentDataLoader, RandomSampler, random_split
 from ..utils.typing import NameType, _
 from .manifolds import Manifold
 from .surrogates import Surrogate, SurrogateEvaluation
@@ -281,12 +281,26 @@ class DesignSpace(Module):
         _, unravel_fn = ravel_pytree(ordered_defaults)
         object.__setattr__(self, "_unravel", unravel_fn)
 
-    def get_dataloader(self, batch_size: int = 16384, shuffle: bool = True, **kwargs) -> DataLoader:
+    def get_dataloaders(
+            self,
+            batch_size: int = 16384,
+            shuffle: bool = True,
+            test_split:Optional[float]=None,
+            split_key:Optional[jax.Array]=None,
+            **kwargs
+        ) -> tuple[DataLoader, Optional[DataLoader]]:
         """
         Creates an out-of-core Iterable DataLoader that streams [X_batch, Y_batch] 
         matrices on the fly, optimized for chunked storage backends.
         """
-        # 1. Extract parameter string names
+
+        if test_split is not None:
+            assert split_key is not None, "Creating a test dataloader requires a split_key."
+            train_data, test_data = random_split(self.dataset, [1.0-test_split, test_split], split_key)
+        else:
+            train_data = self.dataset
+
+                # 1. Extract parameter string names
         read_cols = [str(p.name) for p in self.parameters if not p.is_transform]
         
         tf_cols = [p for p in self.parameters if p.is_transform]
@@ -296,25 +310,47 @@ class DesignSpace(Module):
         in_names = [str(p.name) for p in self.inputs]
         out_names = [str(p.name) for p in self.outputs]
 
+
         # 2. Instantiate the standalone Iterable wrapper
-        iterable_ds = StreamingDataset(
-            dataset=self.dataset,
+        train_ds = StreamingDataset(
+            dataset=train_data,
             in_names=in_names,
             out_names=out_names,
             batch_size=batch_size,
             shuffle=shuffle,
             read_cols=read_cols
         )
-        
-        # 3. Pass to the FT DataLoader facade. 
-        # batch_size=None disables PyTorch's native batching, allowing our
-        # iterator to yield the pre-stacked matrices directly.
-        return DataLoader(
-            dataset=iterable_ds,
+
+        train_dl = DataLoader(
+            dataset=train_ds,
             batch_size=None,
             collate_fn=lambda x: x,
             **kwargs
         )
+
+        if test_split is not None:
+            test_ds = StreamingDataset(
+                dataset=test_data,
+                in_names=in_names,
+                out_names=out_names,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                read_cols=read_cols
+            )
+
+            test_dl = DataLoader(
+                dataset=test_ds,
+                batch_size=None,
+                collate_fn=lambda x: x,
+                **kwargs
+            )
+        else:
+            test_dl = None
+        
+        # 3. Pass to the FT DataLoader facade. 
+        # batch_size=None disables PyTorch's native batching, allowing our
+        # iterator to yield the pre-stacked matrices directly.
+        return (train_dl, test_dl)
 
     def project(self, physical_inputs: dict) -> jax.Array:
         """
@@ -414,7 +450,7 @@ class DesignSpace(Module):
             # Default to scanning the dataset in random order
             sampler = RandomSampler(self.dataset)
 
-        dataloader = self.get_dataloader(batch_size=batch_size, sampler=sampler, shuffle=False)
+        dataloader = self.get_dataloaders(batch_size=batch_size, sampler=sampler, shuffle=False)
 
         feasible_points = []
         collected = 0
@@ -549,20 +585,22 @@ class DesignSpace(Module):
         surrogate_epochs: int = 0,
         manifold_stop_fn: Optional[Callable] = None,
         surrogate_stop_fn: Optional[Callable] = None,
+        test_split: Optional[float] = 0.0,
         **dataloader_kwargs
     ) -> "DesignSpace":
         """
         Streams the current dataset to fine-tune the models.
         """
-        dataloader = self.get_dataloader(batch_size=batch_size, **dataloader_kwargs)
+        train_dl, test_dl = self.get_dataloaders(batch_size=batch_size, **dataloader_kwargs)
 
         if manifold_epochs > 0:
-            new_manifold = self.manifold.fit(dataloader, epochs=manifold_epochs, stop_fn=manifold_stop_fn)
+            new_manifold = self.manifold.fit(train_dl, epochs=manifold_epochs, stop_fn=manifold_stop_fn)
         else: new_manifold = self.manifold
 
         if surrogate_epochs > 0:
-            latent_dataloader = LatentDataLoader(dataloader, new_manifold)
-            new_surrogate = self.surrogate.fit(latent_dataloader, epochs=surrogate_epochs, stop_fn=surrogate_stop_fn)
+            z_train_dl = LatentDataLoader(train_dl, new_manifold)
+            z_test_dl = LatentDataLoader(test_dl, new_manifold)
+            new_surrogate = self.surrogate.fit(z_train_dl, test_data=z_test_dl, epochs=surrogate_epochs, stop_fn=surrogate_stop_fn)
         else: new_surrogate = self.surrogate
 
         return eqx.tree_at(lambda s: (s.manifold, s.surrogate), self, (new_manifold, new_surrogate))
@@ -601,7 +639,7 @@ class DesignSpace(Module):
             latent_mask_chunks = []
 
             # Use shuffle=False so the batch order perfectly matches the dataset row order
-            for x_batch, _ in self.get_dataloader(shuffle=False):
+            for x_batch, _ in self.get_dataloaders(shuffle=False):
                 z_batch = jax.vmap(self.manifold.encode)(x_batch)
 
                 in_bounds = jnp.all((z_batch >= latent_bounds[0]) & (z_batch <= latent_bounds[1]), axis=-1)
