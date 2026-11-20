@@ -4,6 +4,7 @@ from typing import List, Optional, TypeAlias, Union, Callable
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from optax import Schedule
 
 from ..utils import Module, static_field, update
 from ..utils.data import slice_data, DataLoader, LatentDataLoader, SlicedDataLoader
@@ -398,9 +399,151 @@ class RadialBasisFunction(Surrogate):
         return eqx.tree_at(lambda m: (m.centers, m.weights), self, (X_full, W))
 
 
-class SVGPSurrogate(Surrogate):
+class SVGPR(Surrogate):
 
-    name: str | None = "SVGPSurrogate"
+    name: str | None = "SVGPR"
+    kernel: Kernel = _
+
+    input_dim: int = _
+    output_dim: int = _
+
+    jitter: float = static_field(1e-5)
+    complexity_weight: float = static_field(1.0)
+
+    scale_mean: Optional[tuple] = static_field(())
+    scale_std: Optional[tuple] = static_field(())
+
+    _inducing_points: jax.Array = _
+    _variational_mean: jax.Array = _
+    _variational_cov: jax.Array = _
+    _noise_variance: jax.Array = _
+
+    def __init__(
+            self,
+            key: jax.Array,
+            input_dim: int,
+            output_dim: int,
+            kernel: Kernel,
+            num_inducing: int = 128,
+            initial_inducing_points: Optional[jax.Array] = None,
+            jitter: float = 1e-5,
+            complexity_weight: float = 1.0,
+            scale_mean: Optional[tuple] = None,
+            scale_std: Optional[tuple] = None,
+            name: str | None = "SVGPR"
+        ):
+
+        self.name = name
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        self.kernel = kernel
+        self.jitter = jitter
+        self.complexity_weight = complexity_weight
+
+        k1, k2 = jax.random.split(key)
+
+        if initial_inducing_points is None:
+            self._inducing_points = jax.random.uniform(k1, (num_inducing, input_dim))
+            M = num_inducing
+        else:
+            self._inducing_points = jnp.asarray(initial_inducing_points)
+            M = self._inducing_points.shape[0]
+            
+        self._variational_mean = jax.random.normal(k2, (M, output_dim)) * 1e-5
+        self._variational_cov = jnp.eye(M) * -5.0
+        self._noise_variance = jnp.zeros(output_dim)
+
+        self.scale_mean = tuple(scale_mean) if scale_mean is not None else tuple([0.0] * output_dim)
+        self.scale_std = tuple(scale_std) if scale_std is not None else tuple([1.0] * output_dim)
+
+    def _get_L_var(self):
+        """Constructs the lower-triangular L_var matrix"""
+        off_diag = jnp.tril(self._variational_cov, k=-1)
+        diag = jnp.diag(jnp.exp(jnp.diag(self._variational_cov)))
+        return off_diag + diag
+
+    def _predict_normalized(self, x):
+        """Internal forward pass with normalized outputs"""
+        K_xz = jax.vmap(lambda z: self.kernel(x, z))(self._inducing_points)
+
+        K_zz = jax.vmap(lambda z1: jax.vmap(lambda z2: self.kernel(z1, z2))(self._inducing_points))(self._inducing_points)
+        K_zz += self.jitter * jnp.eye(self._inducing_points.shape[0])
+
+        L = jax.scipy.linalg.cholesky(K_zz, lower=True)
+        v = jax.scipy.linalg.solve_triangular(L, K_xz, lower=True)
+
+        means = v.T @ self._variational_mean
+
+        k_xx = self.kernel(x, x)
+        L_var = self._get_L_var()
+
+        var_ind = jnp.sum((L_var.T @ v)**2)
+        var = k_xx - jnp.sum(v**2) + var_ind + jnp.exp(self._noise_variance)
+
+        return means, var
+
+    def predict(slef, x, compute_derivatives=False):
+        norm_means, norm_var = self._predict_normalized(x)
+
+        phys_means = (norm_means * jnp.asarray(self.scale_std)) + jnp.asarray(self._scale_mean)
+        phys_var = norm_var * (jnp.asarray(self.scale_std)**2)
+
+        return SurrogateEvaluation(means=phys_means, variances=phys_var)
+
+    def fit(
+        self,
+        data: _loader,
+        learning_rate: float | Schedule = 1e-2,
+        epochs: int = 100,
+        **kwargs,
+    ):
+
+        N = len(data.dataset)
+
+        def loss_fn(model, batch):
+            sig_scl = jnp.asarray(model.scale_std)
+            mu_scl = jnp.asarray(model.scale_mean)
+
+            x_train, y_train = batch
+            y_train = (y_train - mu_scl) / sig_scl
+
+            B = x_train.shape[0]
+
+            mu, sigma = jax.vmap(model._predict_normalized)(x_train)
+
+            # Compute NLL
+            diff = y_train - mu
+            batch_data_fit = 0.5 * jnp.sum(jnp.log(2 * jnp.pi * sigma)) + 0.5 * jnp.sum((diff **2) / sigma)
+            data_fit = batch_data_fit * (N / B)
+
+            # Compute KL Div (K_zz calc fused with _predict_normalized call via XLA CSE)
+            M = model._inducing_points.shape[0]
+            L_var = model._get_L_var()
+
+            # Mathematical terms for KL(q(u) || p(u))
+            trace_term = jnp.sum(L_var**2)
+            mean_term = jnp.sum(model._variational_mean**2)
+            log_det_S = 2.0 * jnp.sum(jnp.diag(model._variational_cov))
+            
+            kl_div = 0.5 * (trace_term + mean_term - M - log_det_S)
+
+            complexity_penalty = model.complexity_weight * kl_div
+            diff_phys = diff * sig_scl
+
+            return data_fit + complexity_penalty, {
+                f"{model.name} NLPD": data_fit, 
+                f"{model.name} MAE": jnp.mean(jnp.abs(diff_phys), axis=0),
+                f"{model.name} KL": kl_div
+            }
+        
+        return train_model(self, train_data=data, loss_fn=loss_fn, learning_rate=learning_rate, epochs=epochs, **kwargs)
+
+
+
+class MAPSGPR(Surrogate):
+
+    name: str | None = "MAPSGPR"
     kernel: Kernel = _
 
     input_dim: int = _
@@ -424,6 +567,7 @@ class SVGPSurrogate(Surrogate):
             kernel: Kernel,
             num_inducing: int = 128,
             initial_inducing_points: Optional[jax.Array] = None,
+            initial_output_means: Optional[jax.Array] = None,
             jitter: float = 1e-5,
             complexity_weight: float = 0.5,
             scale_mean: Optional[tuple] = None,
@@ -484,7 +628,7 @@ class SVGPSurrogate(Surrogate):
     def fit(
         self,
         data: _loader,
-        learning_rate: float = 1e-2,
+        learning_rate: float | Schedule = 1e-2,
         epochs: int = 500,
         **kwargs,
     ):
@@ -1062,7 +1206,8 @@ __all__ = [
     "PolynomialChaosSurrogate",
     "InverseDistanceWeighting",
     "RadialBasisFunction",
-    "SVGPSurrogate",
+    "MAPSGPR",
+    "SVGPR",
     "MLPSurrogate",
     "TransformerSurrogate",
     "DeepEnsembleSurrogate",

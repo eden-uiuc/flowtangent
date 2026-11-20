@@ -21,7 +21,7 @@ def train_model(
     train_data: _loader,
     loss_fn: Callable,
     *,
-    learning_rate: float = 1e-3, 
+    learning_rate: float | optax.Schedule = 1e-3, 
     epochs: int = 50,
     plot_every: int = 1,
     logging_mode: Literal["off", "auto", "notebook", "terminal"] = "auto",
@@ -48,8 +48,6 @@ def train_model(
         updates, updated_state = optimizer.update(grads, opt_state, current_model)
         updated_model =  eqx.apply_updates(current_model, updates)
         return updated_model, updated_state, loss, metrics
-
-    is_dataloader = hasattr(train_data, "dataset") and hasattr(train_data, "__iter__")
     
     # 3. Initialize Tracking
     if logging_mode == "off":
@@ -127,7 +125,6 @@ def train_model(
             with fig.batch_update():
                 fig.data[0].y = tuple(epoch_metrics["loss"])
 
-        train_metrics["epoch"] = epoch
         if stop_fn is not None:
             if stop_fn(train_metrics, model):
                 break
