@@ -75,6 +75,10 @@ def train_model(
             batch_pbar = tqdm(train_data, leave=False)
         
         for i, batch in enumerate(batch_pbar):
+
+            if i > 1:
+                break
+
             if not logging_mode=="off":
                 batch_pbar.set_description(f"Epoch {epoch+1} Batches")  #type: ignore
                 if epoch == 0 and i == 0:
@@ -103,6 +107,9 @@ def train_model(
                 test_pbar = tqdm(test_data, leave=False)
 
             for j, batch in enumerate(test_pbar):
+                if j > 1:
+                    break
+
                 if not logging_mode=="off":
                     test_pbar.set_description(f"Epoch {epoch+1} Test Batches")  #type: ignore
 
